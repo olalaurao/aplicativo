@@ -4,20 +4,24 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/calendar/v3.dart' as calendar;
 import '../services/google_calendar_service.dart';
 import '../services/google_auth_service.dart' as auth;
+import '../services/sync_manager.dart';
+import 'sync_provider.dart';
 
 final googleAuthServiceProvider =
     StateNotifierProvider<GoogleCalendarAuthNotifier, GoogleSignInAccount?>((
       ref,
     ) {
       return GoogleCalendarAuthNotifier(
+        ref,
         ref.watch(auth.googleAuthServiceProvider),
       );
     });
 
 class GoogleCalendarAuthNotifier extends StateNotifier<GoogleSignInAccount?> {
+  final Ref _ref;
   final auth.GoogleAuthService _authService;
 
-  GoogleCalendarAuthNotifier(this._authService)
+  GoogleCalendarAuthNotifier(this._ref, this._authService)
     : super(_authService.currentUser) {
     _restore();
   }
@@ -30,11 +34,15 @@ class GoogleCalendarAuthNotifier extends StateNotifier<GoogleSignInAccount?> {
   Future<void> signIn() async {
     await _authService.signIn();
     state = _authService.currentUser;
+    if (state != null) {
+      await _ref.read(syncManagerProvider).performSync();
+    }
   }
 
   Future<void> signOut() async {
     await _authService.signOut();
     state = null;
+    _ref.read(syncStatusProvider.notifier).setStatus(SyncStatus.offline);
   }
 }
 
@@ -89,7 +97,10 @@ class GoogleCalendarParams {
 }
 
 final googleCalendarRangeEventsProvider =
-    FutureProvider.family<List<calendar.Event>, GoogleCalendarParams>((ref, params) async {
+    FutureProvider.family<List<calendar.Event>, GoogleCalendarParams>((
+      ref,
+      params,
+    ) async {
       final calendarService = ref.watch(googleCalendarServiceProvider);
       ref.watch(googleAuthServiceProvider);
       final clientReady = await ref
@@ -101,12 +112,12 @@ final googleCalendarRangeEventsProvider =
 
       calendarService.init(clientReady);
 
-      final start = DateTime(params.startDate.year, params.startDate.month, params.startDate.day);
+      final start = DateTime(
+        params.startDate.year,
+        params.startDate.month,
+        params.startDate.day,
+      );
       final end = start.add(Duration(days: params.days));
 
-      return await calendarService.fetchEvents(
-        start: start,
-        end: end,
-      );
+      return await calendarService.fetchEvents(start: start, end: end);
     });
-

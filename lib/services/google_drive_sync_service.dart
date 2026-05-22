@@ -411,7 +411,10 @@ class GoogleDriveSyncService {
   }
 
   bool _shouldSkipRemoteFolder(String name) {
-    return name == '_conflicts' || name == '_deleted' || name == '_backups';
+    return name == '_attachments' ||
+        name == '_conflicts' ||
+        name == '_deleted' ||
+        name == '_backups';
   }
 
   String calculateHash(String content) {

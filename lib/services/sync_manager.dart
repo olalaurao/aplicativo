@@ -23,6 +23,8 @@ final syncManagerProvider = Provider<SyncManager>((ref) {
 });
 
 class SyncManager {
+  static const Duration _syncTimeout = Duration(minutes: 5);
+
   final Ref _ref;
   Timer? _syncTimer;
   bool _isSyncing = false;
@@ -104,8 +106,13 @@ class SyncManager {
     if (_isSyncing) return;
 
     final authService = _ref.read(googleAuthServiceProvider);
-    final authClient =
-        authService.authClient ?? await authService.ensureClient();
+    final authClient = await authService.ensureClient().timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        debugPrint('[SyncManager] Google auth restore timed out.');
+        return null;
+      },
+    );
 
     if (authClient == null) {
       _ref.read(syncStatusProvider.notifier).setStatus(SyncStatus.offline);
@@ -116,7 +123,7 @@ class SyncManager {
     _ref.read(syncStatusProvider.notifier).setStatus(SyncStatus.syncing);
 
     try {
-      await _performSyncWithClient(authClient);
+      await _performSyncWithClient(authClient).timeout(_syncTimeout);
       _ref.read(syncStatusProvider.notifier).setStatus(SyncStatus.synced);
     } catch (e) {
       if (_isAuthError(e)) {
@@ -125,7 +132,7 @@ class SyncManager {
             forceRefresh: true,
           );
           if (refreshedClient != null) {
-            await _performSyncWithClient(refreshedClient);
+            await _performSyncWithClient(refreshedClient).timeout(_syncTimeout);
             _ref.read(syncStatusProvider.notifier).setStatus(SyncStatus.synced);
             return;
           }
@@ -148,6 +155,7 @@ class SyncManager {
 
     final settings = _ref.read(settingsProvider);
     driveSync.init(authClient);
+    debugPrint('[SyncManager] Preparing Drive folder.');
     if (settings.driveSyncFolderId.isNotEmpty) {
       await driveSync.useExistingVaultFolder(settings.driveSyncFolderId);
     } else {
@@ -156,6 +164,7 @@ class SyncManager {
 
     // 1. Push local queued edits first. Drive is the shared source of truth,
     // but offline mobile edits should reach it before we pull remote changes.
+    debugPrint('[SyncManager] Processing local sync queue.');
     await queue.processQueue((action) async {
       final relativePath = await _relativePathForAction(action);
       if (relativePath == null && action.operation != SyncOperation.delete) {
@@ -185,11 +194,14 @@ class SyncManager {
     });
 
     // 2. Pull remote changes after local queued edits are safely uploaded.
+    debugPrint('[SyncManager] Running full Drive sync.');
     await _runFullSync(driveSync, obsidian);
+    debugPrint('[SyncManager] Refreshing local notifications.');
     await _refreshNotificationsFromLocalVault();
 
     // 3. Regenerate Dataview queries in index.md files in each vault folder
     try {
+      debugPrint('[SyncManager] Regenerating Dataview indexes.');
       final gen = DataviewGenerator(obsidian);
       await gen.regenerateAll();
     } catch (e) {
@@ -233,9 +245,10 @@ class SyncManager {
         await driveSync.syncFile(relPath, content, localHash);
       } else {
         final remoteHash = remoteFile.appProperties?['citrine_hash'];
-        if (remoteHash != localHash) {
-          // Both modified? syncFile handles conflicts if we pass baseHash
-          // For now, simple syncFile
+        if (remoteHash != null && remoteHash != localHash) {
+          await driveSync.syncFile(relPath, content, localHash);
+        } else if (remoteHash == null &&
+            await _isLocalFileNewer(localFile, remoteFile)) {
           await driveSync.syncFile(relPath, content, localHash);
         }
       }
@@ -245,6 +258,7 @@ class SyncManager {
     for (final relPath in remoteMap.keys) {
       final remoteFile = remoteMap[relPath] as drive.File;
       if (remoteFile.mimeType == 'application/vnd.google-apps.folder') continue;
+      if (!relPath.endsWith('.md')) continue;
 
       final localFile = localMap[relPath];
       final remoteHash = remoteFile.appProperties?['citrine_hash'];
@@ -255,10 +269,10 @@ class SyncManager {
       } else {
         final content = await localFile.readAsString();
         final localHash = driveSync.calculateHash(content);
-        if (remoteHash != localHash) {
-          // If remote is different and we don't have a record of our last sync,
-          // we might have a conflict. For simplicity in "Download Inicial", we download.
-          // But a real app should check modifiedTime.
+        if (remoteHash != null && remoteHash != localHash) {
+          shouldDownload = true;
+        } else if (remoteHash == null &&
+            await _isRemoteFileNewer(remoteFile, localFile)) {
           shouldDownload = true;
         }
       }
@@ -271,6 +285,20 @@ class SyncManager {
         }
       }
     }
+  }
+
+  Future<bool> _isLocalFileNewer(File localFile, drive.File remoteFile) async {
+    final remoteModified = remoteFile.modifiedTime;
+    if (remoteModified == null) return false;
+    final localModified = await localFile.lastModified();
+    return localModified.toUtc().isAfter(remoteModified.toUtc());
+  }
+
+  Future<bool> _isRemoteFileNewer(drive.File remoteFile, File localFile) async {
+    final remoteModified = remoteFile.modifiedTime;
+    if (remoteModified == null) return false;
+    final localModified = await localFile.lastModified();
+    return remoteModified.toUtc().isAfter(localModified.toUtc());
   }
 
   String? _guessPathForAction(SyncAction action) {
