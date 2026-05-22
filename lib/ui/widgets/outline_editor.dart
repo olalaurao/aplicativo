@@ -1,0 +1,302 @@
+// lib/ui/widgets/outline_editor.dart
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../theme.dart';
+
+class OutlineNode {
+  String id;
+  String text;
+  int level;
+  bool isCompleted;
+  bool isCollapsed;
+  List<OutlineNode> children;
+
+  OutlineNode({
+    required this.id,
+    required this.text,
+    this.level = 0,
+    this.isCompleted = false,
+    this.isCollapsed = false,
+    this.children = const [],
+  });
+}
+
+class OutlineEditor extends StatefulWidget {
+  final String initialContent;
+  final Function(String) onChanged;
+
+  const OutlineEditor({
+    super.key,
+    required this.initialContent,
+    required this.onChanged,
+  });
+
+  @override
+  State<OutlineEditor> createState() => _OutlineEditorState();
+}
+
+class _OutlineEditorState extends State<OutlineEditor> {
+  late List<OutlineItem> _items;
+  int? _focusIndex; // For focus mode
+
+  @override
+  void initState() {
+    super.initState();
+    _parseContent();
+  }
+
+  void _parseContent() {
+    if (widget.initialContent.isEmpty) {
+      _items = [
+        OutlineItem(
+          text: '',
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+        ),
+      ];
+      return;
+    }
+
+    final lines = widget.initialContent.split('\n');
+    _items = lines.where((l) => l.trim().isNotEmpty).map((line) {
+      final indentMatch = RegExp(r'^(\s*)').firstMatch(line);
+      final indent = indentMatch?.group(1)?.length ?? 0;
+      final level = indent ~/ 2;
+
+      final content = line.trim();
+      bool completed = false;
+      String text = content;
+
+      if (content.startsWith('- [x]')) {
+        completed = true;
+        text = content.replaceFirst('- [x]', '').trim();
+      } else if (content.startsWith('- [ ]')) {
+        text = content.replaceFirst('- [ ]', '').trim();
+      } else if (content.startsWith('- ')) {
+        text = content.replaceFirst('- ', '').trim();
+      }
+
+      return OutlineItem(
+        text: text,
+        level: level,
+        isCompleted: completed,
+        id: '${DateTime.now().millisecondsSinceEpoch}_${line.hashCode}',
+      );
+    }).toList();
+
+    if (_items.isEmpty) _items = [OutlineItem(text: '', id: 'initial')];
+  }
+
+  void _updateContent() {
+    final content = _items
+        .map((item) {
+          final indent = '  ' * item.level;
+          final prefix = item.isCompleted ? '- [x] ' : '- [ ] ';
+          return '$indent$prefix${item.text}';
+        })
+        .join('\n');
+    widget.onChanged(content);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    List<int> visibleIndices = [];
+    if (_focusIndex == null) {
+      visibleIndices = List.generate(_items.length, (i) => i);
+    } else {
+      // Focus Mode: Show only the focused item and its descendants
+      final focusedLevel = _items[_focusIndex!].level;
+      visibleIndices.add(_focusIndex!);
+      for (int i = _focusIndex! + 1; i < _items.length; i++) {
+        if (_items[i].level > focusedLevel) {
+          visibleIndices.add(i);
+        } else {
+          break;
+        }
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_focusIndex != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: TextButton.icon(
+              onPressed: () => setState(() => _focusIndex = null),
+              icon: const Icon(Icons.arrow_back_rounded, size: 16),
+              label: const Text('Sair do Modo Focus'),
+              style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            ),
+          ),
+        ReorderableListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: visibleIndices.length,
+          onReorder: (oldIdx, newIdx) {
+            setState(() {
+              final actualOld = visibleIndices[oldIdx];
+              int actualNew =
+                  visibleIndices[newIdx == visibleIndices.length
+                      ? visibleIndices.length - 1
+                      : newIdx];
+
+              final item = _items.removeAt(actualOld);
+              _items.insert(newIdx > oldIdx ? actualNew : actualNew, item);
+            });
+            _updateContent();
+          },
+          itemBuilder: (context, idx) {
+            final actualIndex = visibleIndices[idx];
+            final item = _items[actualIndex];
+            return _buildItem(actualIndex, item);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildItem(int index, OutlineItem item) {
+    return Container(
+      key: ValueKey(item.id),
+      padding: EdgeInsets.only(left: item.level * 20.0 + 8, right: 8),
+      child: Row(
+        children: [
+          ReorderableDragStartListener(
+            index: index,
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Icon(
+                Icons.drag_indicator_rounded,
+                size: 16,
+                color: AppTheme.textMutedColor(context),
+              ),
+            ),
+          ),
+          Transform.scale(
+            scale: 0.8,
+            child: Checkbox(
+              value: item.isCompleted,
+              onChanged: (v) {
+                setState(() => item.isCompleted = v ?? false);
+                _updateContent();
+              },
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
+              activeColor: AppColors.primary,
+            ),
+          ),
+          Expanded(
+            child: KeyboardListener(
+              focusNode: FocusNode(),
+              onKeyEvent: (event) => _handleKeyEvent(event, index, item),
+              child: TextField(
+                onChanged: (v) {
+                  item.text = v;
+                  _updateContent();
+                },
+                controller: TextEditingController(text: item.text)
+                  ..selection = TextSelection.fromPosition(
+                    TextPosition(offset: item.text.length),
+                  ),
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                ),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: item.level == 0
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                  color: item.isCompleted
+                      ? AppTheme.textMutedColor(context)
+                      : AppTheme.textPrimaryColor(context),
+                  decoration: item.isCompleted
+                      ? TextDecoration.lineThrough
+                      : null,
+                ),
+                onSubmitted: (_) => _addItemAfter(index),
+              ),
+            ),
+          ),
+          if (_focusIndex == null)
+            IconButton(
+              icon: Icon(
+                Icons.center_focus_weak_rounded,
+                size: 16,
+                color: AppTheme.textMutedColor(context),
+              ),
+              onPressed: () => setState(() => _focusIndex = index),
+              tooltip: 'Focus',
+            ),
+          IconButton(
+            icon: Icon(
+              Icons.close_rounded,
+              size: 16,
+              color: AppTheme.textMutedColor(context),
+            ),
+            onPressed: () => _removeItem(index),
+            tooltip: 'Remover',
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleKeyEvent(KeyEvent event, int index, OutlineItem item) {
+    if (event is! KeyDownEvent) return;
+
+    if (event.logicalKey == LogicalKeyboardKey.tab) {
+      if (HardwareKeyboard.instance.isShiftPressed) {
+        if (item.level > 0) setState(() => item.level--);
+      } else {
+        if (item.level < 8) setState(() => item.level++);
+      }
+      _updateContent();
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.backspace &&
+        item.text.isEmpty &&
+        _items.length > 1) {
+      _removeItem(index);
+    }
+  }
+
+  void _addItemAfter(int index) {
+    setState(() {
+      _items.insert(
+        index + 1,
+        OutlineItem(
+          text: '',
+          level: _items[index].level,
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+        ),
+      );
+    });
+    _updateContent();
+  }
+
+  void _removeItem(int index) {
+    setState(() {
+      _items.removeAt(index);
+      if (_items.isEmpty) _items = [OutlineItem(text: '', id: 'initial')];
+      if (_focusIndex == index) _focusIndex = null;
+    });
+    _updateContent();
+  }
+}
+
+class OutlineItem {
+  String id;
+  String text;
+  int level;
+  bool isCompleted;
+
+  OutlineItem({
+    required this.id,
+    required this.text,
+    this.level = 0,
+    this.isCompleted = false,
+  });
+}

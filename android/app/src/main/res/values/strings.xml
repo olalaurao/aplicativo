@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Citrine</string>
+    <string name="widget_calendar_description">Citrine calendario</string>
+    <string name="widget_filter_description">Citrine filtro</string>
+    <string name="widget_pomodoro_description">Citrine pomodoro</string>
+</resources>

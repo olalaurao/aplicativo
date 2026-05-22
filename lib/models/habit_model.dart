@@ -1,0 +1,450 @@
+// lib/models/habit_model.dart
+import 'package:flutter/material.dart';
+import 'content_object.dart';
+import 'shared_types.dart';
+import 'scheduler.dart';
+import 'journal_entry.dart';
+import 'task_model.dart'; // For TaskPriority
+
+import 'reminder_config.dart';
+
+enum HabitStatus { active, paused, completed }
+
+enum HabitInputType { boolean, numeric, mood, duration }
+
+class HabitSlot {
+  DateTime? time;
+  bool completed;
+  String? label;
+  bool reminderEnabled;
+  TimeOfDay? reminderTime;
+  NotificationType notificationType;
+  List<ActionDef> actions;
+
+  HabitSlot({
+    this.time,
+    this.completed = false,
+    this.label,
+    this.reminderEnabled = false,
+    this.reminderTime,
+    this.notificationType = NotificationType.push,
+    List<ActionDef>? actions,
+  }) : actions = actions ?? [];
+}
+
+class CompletionRecord {
+  DateTime date;
+  int completions;
+  List<bool>? slotCompletions;
+  bool successful;
+  double? value;
+  List<Comment> comments;
+  List<JournalEntry> journalEntries; // Or references
+
+  CompletionRecord({
+    required this.date,
+    this.completions = 0,
+    this.slotCompletions,
+    this.successful = false,
+    this.value,
+    List<Comment>? comments,
+    List<JournalEntry>? journalEntries,
+  }) : comments = comments ?? [],
+       journalEntries = journalEntries ?? [];
+}
+
+class Habit extends ContentObject {
+  String? description;
+  String color;
+  String? icon;
+  String completionUnit;
+  int dailyGoal;
+  List<HabitSlot> slots;
+  List<Scheduler> schedulers;
+  String? linkedTrackerSlug;
+  String? timeBlock;
+  List<CompletionRecord> completionHistory;
+  List<ActionDef> actions;
+  HabitStatus status;
+  DateTime? habitStartDate;
+  TaskPriority priority;
+  int streak;
+  bool isNegative;
+  HabitInputType inputType;
+
+  Scheduler? get scheduler => schedulers.isNotEmpty ? schedulers.first : null;
+  set scheduler(Scheduler? s) {
+    if (s == null) {
+      schedulers = [];
+    } else {
+      schedulers = [s];
+    }
+  }
+
+  Habit({
+    super.id,
+    required super.title,
+    this.description,
+    required this.color,
+    this.icon,
+    this.completionUnit = 'times',
+    this.dailyGoal = 1,
+    List<HabitSlot>? slots,
+    List<Scheduler>? schedulers,
+    this.linkedTrackerSlug,
+    this.timeBlock,
+    this.streak = 0,
+    List<CompletionRecord>? completionHistory,
+    List<ActionDef>? actions,
+    this.status = HabitStatus.active,
+    this.habitStartDate,
+    this.priority = TaskPriority.none,
+    super.archived,
+    this.isNegative = false,
+    this.inputType = HabitInputType.boolean,
+    super.organizers,
+    super.categories,
+    super.tags,
+    super.moc,
+    super.createdAt,
+    super.updatedAt,
+    super.obsidianPath,
+  }) : slots = slots ?? [],
+       schedulers = schedulers ?? [],
+       completionHistory = completionHistory ?? [],
+       actions = actions ?? [];
+
+  @override
+  String get type => 'habit';
+
+  @override
+  List<ReminderConfig> get reminders {
+    final now = DateTime.now();
+    return slots
+        .asMap()
+        .entries
+        .where((e) => e.value.reminderEnabled && e.value.reminderTime != null)
+        .map((e) {
+          final slot = e.value;
+          final idx = e.key;
+          DateTime trigger = DateTime(
+            now.year,
+            now.month,
+            now.day,
+            slot.reminderTime!.hour,
+            slot.reminderTime!.minute,
+          );
+          if (trigger.isBefore(now)) {
+            trigger = trigger.add(
+              const Duration(days: 1),
+            ); // Schedule for next day if already passed today
+          }
+          return ReminderConfig(
+            id: '${id}_slot_$idx',
+            triggerTime: trigger,
+            type: slot.notificationType,
+            notificationBody: 'Hora de: $title',
+          );
+        })
+        .toList();
+  }
+
+  @override
+  set reminders(List<ReminderConfig> value) {
+    // We don't allow setting reminders directly on Habits, as they are derived from slots.
+  }
+
+  Habit copyWith({
+    String? title,
+    String? description,
+    String? color,
+    String? icon,
+    String? completionUnit,
+    int? dailyGoal,
+    List<HabitSlot>? slots,
+    List<Scheduler>? schedulers,
+    String? linkedTrackerSlug,
+    String? timeBlock,
+    int? streak,
+    List<CompletionRecord>? completionHistory,
+    List<ActionDef>? actions,
+    HabitStatus? status,
+    DateTime? habitStartDate,
+    TaskPriority? priority,
+    bool? archived,
+    bool? isNegative,
+    HabitInputType? inputType,
+    int? order,
+  }) {
+    return Habit(
+      id: id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      color: color ?? this.color,
+      icon: icon ?? this.icon,
+      completionUnit: completionUnit ?? this.completionUnit,
+      dailyGoal: dailyGoal ?? this.dailyGoal,
+      slots: slots ?? this.slots,
+      schedulers: schedulers ?? this.schedulers,
+      linkedTrackerSlug: linkedTrackerSlug ?? this.linkedTrackerSlug,
+      timeBlock: timeBlock ?? this.timeBlock,
+      streak: streak ?? this.streak,
+      completionHistory: completionHistory ?? this.completionHistory,
+      actions: actions ?? this.actions,
+      status: status ?? this.status,
+      habitStartDate: habitStartDate ?? this.habitStartDate,
+      priority: priority ?? this.priority,
+      archived: archived ?? this.archived,
+      isNegative: isNegative ?? this.isNegative,
+      inputType: inputType ?? this.inputType,
+      organizers: organizers,
+      categories: categories,
+      tags: tags,
+      moc: moc,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
+      obsidianPath: obsidianPath,
+    )..order = order ?? this.order;
+  }
+
+  bool get isCompletedToday => daysSinceLastCompletion == 0;
+
+  int get daysSinceLastCompletion {
+    if (completionHistory.isEmpty) return -1;
+
+    if (isNegative) {
+      // For negative habits, we want days since the last record (failure)
+      final lastFailure = completionHistory.last;
+      final now = DateTime.now();
+      final diff = DateTime(now.year, now.month, now.day).difference(
+        DateTime(
+          lastFailure.date.year,
+          lastFailure.date.month,
+          lastFailure.date.day,
+        ),
+      );
+      return diff.inDays;
+    } else {
+      final last = completionHistory.last;
+      final now = DateTime.now();
+      final diff = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).difference(DateTime(last.date.year, last.date.month, last.date.day));
+      return diff.inDays;
+    }
+  }
+
+  void calculateStreak() {
+    if (completionHistory.isEmpty) {
+      streak = 0;
+      return;
+    }
+
+    // Simple streak calculation: consecutive days with success
+    int currentStreak = 0;
+    final sortedHistory = [...completionHistory]
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    DateTime checkDate = DateTime.now();
+    checkDate = DateTime(checkDate.year, checkDate.month, checkDate.day);
+
+    // Check if there was success today or yesterday
+    bool foundStart = false;
+
+    for (final record in sortedHistory) {
+      final recordDate = DateTime(
+        record.date.year,
+        record.date.month,
+        record.date.day,
+      );
+      if (recordDate == checkDate ||
+          recordDate == checkDate.subtract(const Duration(days: 1))) {
+        if (record.successful || (isNegative && recordDate != checkDate)) {
+          currentStreak++;
+          checkDate = recordDate.subtract(const Duration(days: 1));
+          foundStart = true;
+        } else if (foundStart) {
+          break;
+        }
+      } else if (recordDate.isBefore(checkDate)) {
+        break;
+      }
+    }
+    streak = currentStreak;
+  }
+
+  @override
+  String toMarkdown() {
+    final frontmatter = toBaseMap();
+    frontmatter['color'] = color;
+    if (description != null) frontmatter['description'] = description;
+    if (icon != null) frontmatter['icon'] = icon;
+    frontmatter['completion_unit'] = completionUnit;
+    frontmatter['daily_goal'] = dailyGoal;
+    if (linkedTrackerSlug != null) {
+      frontmatter['linked_tracker_slug'] = linkedTrackerSlug;
+    }
+    if (timeBlock != null) frontmatter['time_block'] = timeBlock;
+
+    if (slots.isNotEmpty) {
+      frontmatter['slots'] = slots
+          .map(
+            (s) => {
+              if (s.time != null) 'time': s.time!.toIso8601String(),
+              'completed': s.completed,
+              if (s.label != null) 'label': s.label,
+              'reminder_enabled': s.reminderEnabled,
+              if (s.reminderTime != null)
+                'reminder_time':
+                    '${s.reminderTime!.hour}:${s.reminderTime!.minute}',
+              'notification_type': s.notificationType.name,
+            },
+          )
+          .toList();
+    }
+    if (schedulers.isNotEmpty) {
+      frontmatter['schedulers'] = schedulers.map((s) => s.toMap()).toList();
+    }
+    if (actions.isNotEmpty) {
+      frontmatter['actions'] = actions.map((a) => a.toJson()).toList();
+    }
+
+    frontmatter['streak'] = streak;
+    frontmatter['status'] = status.name;
+    if (habitStartDate != null) {
+      frontmatter['habit_start_date'] = habitStartDate!.toIso8601String();
+    }
+    frontmatter['priority'] = priority.name;
+    frontmatter['archived'] = archived;
+    frontmatter['is_negative'] = isNegative;
+    frontmatter['input_type'] = inputType.name;
+
+    // Yesplification for the body: a log of completions
+    final buffer = StringBuffer();
+    if (description != null) {
+      buffer.writeln(description);
+      buffer.writeln();
+    }
+
+    buffer.writeln('## History');
+    for (final record in completionHistory) {
+      final status = record.successful ? '[x]' : '[ ]';
+      final valStr = record.value != null ? ' value:${record.value}' : '';
+      buffer.writeln(
+        '- $status ${record.date.toIso8601String().split('T').first} (${record.completions}/$dailyGoal)$valStr',
+      );
+    }
+
+    return generateMarkdown(frontmatter, buffer.toString());
+  }
+
+  factory Habit.fromMarkdown(Map<String, dynamic> frontmatter, String body) {
+    final habit = Habit(
+      title: frontmatter['title'] as String? ?? '',
+      color: frontmatter['color'] as String? ?? '#000000',
+    );
+    habit.loadBaseMap(frontmatter);
+
+    habit.description = frontmatter['description'] as String?;
+    habit.icon = frontmatter['icon'] as String?;
+    habit.completionUnit = frontmatter['completion_unit'] as String? ?? 'times';
+    habit.linkedTrackerSlug = frontmatter['linked_tracker_slug'] as String?;
+    final dg = frontmatter['daily_goal'];
+    habit.dailyGoal = dg is int ? dg : int.tryParse(dg?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '') ?? 1;
+
+    final st = frontmatter['streak'];
+    habit.streak = st is int ? st : int.tryParse(st?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '') ?? 0;
+
+    if (frontmatter['slots'] != null && frontmatter['slots'] is List) {
+      habit.slots = (frontmatter['slots'] as List).map((s) {
+        if (s is Map) {
+          TimeOfDay? rTime;
+          if (s['reminder_time'] != null) {
+            final parts = s['reminder_time'].toString().split(':');
+            if (parts.length == 2) {
+              rTime = TimeOfDay(
+                hour: int.parse(parts[0]),
+                minute: int.parse(parts[1]),
+              );
+            }
+          }
+          return HabitSlot(
+            time: s['time'] != null
+                ? DateTime.tryParse(s['time'].toString())
+                : null,
+            completed: s['completed'] == true,
+            label: s['label']?.toString(),
+            reminderEnabled: s['reminder_enabled'] == true,
+            reminderTime: rTime,
+            notificationType: NotificationType.values.firstWhere(
+              (e) => e.name == s['notification_type'],
+              orElse: () => NotificationType.push,
+            ),
+          );
+        }
+        return HabitSlot();
+      }).toList();
+    }
+    if (frontmatter['schedulers'] != null &&
+        frontmatter['schedulers'] is List) {
+      habit.schedulers = (frontmatter['schedulers'] as List)
+          .whereType<Map>()
+          .map((s) => Scheduler.fromMap(Map<String, dynamic>.from(s)))
+          .toList();
+    }
+    if (frontmatter['actions'] != null && frontmatter['actions'] is List) {
+      habit.actions = (frontmatter['actions'] as List)
+          .whereType<Map>()
+          .map((a) => ActionDef.fromJson(Map<String, dynamic>.from(a)))
+          .toList();
+    }
+
+    if (frontmatter['status'] != null) {
+      habit.status = HabitStatus.values.firstWhere(
+        (e) => e.name == frontmatter['status'],
+        orElse: () => HabitStatus.active,
+      );
+    }
+    if (frontmatter['habit_start_date'] != null) {
+      habit.habitStartDate = DateTime.tryParse(frontmatter['habit_start_date']);
+    }
+    if (frontmatter['priority'] != null) {
+      habit.priority = TaskPriority.values.firstWhere(
+        (e) => e.name == frontmatter['priority'],
+        orElse: () => TaskPriority.none,
+      );
+    }
+    habit.archived = frontmatter['archived'] as bool? ?? false;
+    habit.isNegative = frontmatter['is_negative'] as bool? ?? false;
+    if (frontmatter['input_type'] != null) {
+      habit.inputType = HabitInputType.values.firstWhere(
+        (e) => e.name == frontmatter['input_type'],
+        orElse: () => HabitInputType.boolean,
+      );
+    }
+
+    // Parse history
+    final lines = body.split('\n');
+    for (final line in lines) {
+      if (line.startsWith('- [x] ') || line.startsWith('- [ ] ')) {
+        final successful = line.startsWith('- [x] ');
+        final dateStr = line.substring(6, 16); // Extract YYYY-MM-DD
+        final date = DateTime.tryParse(dateStr);
+        if (date != null) {
+          final valueMatch = RegExp(r'value:([\d.]+)').firstMatch(line);
+          final value = valueMatch != null
+              ? double.tryParse(valueMatch.group(1)!)
+              : null;
+
+          habit.completionHistory.add(
+            CompletionRecord(date: date, successful: successful, value: value),
+          );
+        }
+      }
+    }
+
+    return habit;
+  }
+}

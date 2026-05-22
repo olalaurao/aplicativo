@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1035885310387",
+    "project_id": "meu-app-b96b0",
+    "storage_bucket": "meu-app-b96b0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1035885310387:android:366e15c84d924c2f301bc6",
+        "android_client_info": {
+          "package_name": "com.example.meu_super_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOWbJkq3OBRyAOdtIuzIv8f9rXREj84M8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1035885310387:android:1337c4338719625c301bc6",
+        "android_client_info": {
+          "package_name": "com.productivity.citrine"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOWbJkq3OBRyAOdtIuzIv8f9rXREj84M8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

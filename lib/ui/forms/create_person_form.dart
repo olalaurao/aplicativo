@@ -1,0 +1,268 @@
+// lib/ui/forms/create_person_form.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/people_model.dart';
+import '../../models/task_model.dart';
+import '../theme.dart';
+import '../widgets/wiki_link_controller.dart';
+import '../../providers/vault_provider.dart';
+
+class CreatePersonForm extends ConsumerStatefulWidget {
+  final String? initialTitle;
+  final Person? existingPerson;
+  const CreatePersonForm({super.key, this.initialTitle, this.existingPerson});
+
+  @override
+  ConsumerState<CreatePersonForm> createState() => _CreatePersonFormState();
+}
+
+class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _photoUrlController;
+  int _contactFrequencyDays = 14;
+  TaskPriority _priority = TaskPriority.none;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = WikiLinkTextController(
+      context: context,
+      text: widget.existingPerson?.title ?? widget.initialTitle ?? '',
+    );
+    _photoUrlController = WikiLinkTextController(
+      context: context,
+      text: widget.existingPerson?.photo ?? '',
+    );
+
+    if (widget.existingPerson != null) {
+      final person = widget.existingPerson!;
+      _contactFrequencyDays = person.contactFrequency?.inDays ?? 14;
+      _priority = person.contactPriority;
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _photoUrlController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasName = _nameController.text.trim().isNotEmpty;
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            leading: IconButton(
+              icon: const Icon(Icons.close_rounded),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: const Text(
+              'New Person',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+            ),
+            centerTitle: true,
+          ),
+
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _nameController,
+                    onChanged: (_) => setState(() {}),
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.5,
+                    ),
+                    decoration: const InputDecoration(
+                      hintText: 'Full Name',
+                      hintStyle: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textMuted,
+                        letterSpacing: -0.5,
+                      ),
+                      border: InputBorder.none,
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  Container(
+                    decoration: AppTheme.cardDecoration(context),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        _buildFieldRow(
+                          'Photo URL',
+                          _photoUrlController,
+                          'https://...',
+                        ),
+                        const Divider(height: 32),
+                        _buildFrequencyRow(),
+                        const Divider(height: 32),
+                        _buildPriorityRow(),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+          child: SizedBox(
+            height: 52,
+            child: FilledButton(
+              onPressed: hasName ? _savePerson : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(
+                'Add Person',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFieldRow(
+    String label,
+    TextEditingController controller,
+    String hint,
+  ) {
+    return Row(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: TextField(
+            controller: controller,
+            textAlign: TextAlign.end,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            ),
+            decoration: InputDecoration(
+              hintText: hint,
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFrequencyRow() {
+    return Row(
+      children: [
+        const Text(
+          'Frequency',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+        const Spacer(),
+        DropdownButton<int>(
+          value: _contactFrequencyDays,
+          underline: const SizedBox(),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.primary,
+          ),
+          onChanged: (val) => setState(() => _contactFrequencyDays = val!),
+          items: [7, 14, 30, 90]
+              .map(
+                (d) => DropdownMenuItem(value: d, child: Text('EVERY $d DAYS')),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPriorityRow() {
+    return Row(
+      children: [
+        const Text(
+          'Contact Priority',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+        const Spacer(),
+        DropdownButton<TaskPriority>(
+          value: _priority,
+          underline: const SizedBox(),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.primary,
+          ),
+          onChanged: (val) => setState(() => _priority = val!),
+          items: TaskPriority.values
+              .map(
+                (p) => DropdownMenuItem(
+                  value: p,
+                  child: Text(p.name.toUpperCase()),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  void _savePerson() {
+    final person = Person(
+      id:
+          widget.existingPerson?.id ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
+      createdAt: widget.existingPerson?.createdAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
+      title: _nameController.text.trim(),
+      photo: _photoUrlController.text.trim().isEmpty
+          ? null
+          : _photoUrlController.text.trim(),
+      contactFrequency: Duration(days: _contactFrequencyDays),
+      contactPriority: _priority,
+      lastContactDate: widget.existingPerson?.lastContactDate ?? DateTime.now(),
+    );
+
+    if (widget.existingPerson != null) {
+      ref.read(vaultProvider.notifier).updateObject(person);
+    } else {
+      ref.read(peopleProvider.notifier).addPerson(person);
+    }
+
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Person "${person.title}" ${widget.existingPerson != null ? 'updated' : 'added'} successfully!',
+        ),
+      ),
+    );
+  }
+}

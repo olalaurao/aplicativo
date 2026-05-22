@@ -1,0 +1,1187 @@
+// lib/ui/widgets/timeline_day_view.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import '../../models/task_model.dart';
+import '../../providers/vault_provider.dart';
+import '../theme.dart';
+import 'package:googleapis/calendar/v3.dart' as google_calendar;
+import '../../models/habit_model.dart';
+import 'object_action_wrapper.dart';
+import '../screens/google_event_detail_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../screens/universal_detail_view.dart';
+
+class TimeLineDayView extends ConsumerStatefulWidget {
+  final List<Task> tasks;
+  final List<google_calendar.Event> googleEvents;
+  final List<dynamic> allDayEvents; // Can be tasks, habits, etc.
+  final DateTime selectedDate;
+  final Function(Task, DateTime)? onTaskDrop;
+  final Function(Habit, DateTime)? onHabitDrop;
+  final Function(dynamic, int)? onDurationChange;
+  final Function(Task)? onToggleComplete;
+  final Function(dynamic)? onPlay;
+  final Function(Habit, int)? onHabitToggle;
+  final String colorMode;
+
+  const TimeLineDayView({
+    super.key,
+    required this.selectedDate,
+    this.tasks = const [],
+    this.googleEvents = const [],
+    this.allDayEvents = const [],
+    this.onTaskDrop,
+    this.onHabitDrop,
+    this.onDurationChange,
+    this.onToggleComplete,
+    this.onPlay,
+    this.onHabitToggle,
+    this.colorMode = 'category',
+  });
+
+  @override
+  ConsumerState<TimeLineDayView> createState() => _TimeLineDayViewState();
+}
+
+class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
+  // Store local durations during active dragging to avoid continuous DB writes
+  final Map<String, int> _localDurations = {};
+
+  @override
+  void didUpdateWidget(covariant TimeLineDayView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If the tasks list changed, clean up local durations that now match the actual task duration
+    for (final task in widget.tasks) {
+      if (_localDurations.containsKey(task.id) &&
+          _localDurations[task.id] == task.duration) {
+        _localDurations.remove(task.id);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const double hourHeight = 80.0;
+    const double leftColumnWidth = 60.0;
+
+    return Container(
+      color: AppTheme.backgroundColor(context),
+      child: Column(
+        children: [
+          // ─── All-Day Strip ───
+          if (widget.allDayEvents.isNotEmpty) _buildAllDayStrip(context),
+
+          SizedBox(
+            height: 24 * hourHeight,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final double availableWidth =
+                    constraints.maxWidth - leftColumnWidth - 24;
+
+                final List<TimelineItem> items = [];
+
+                // 1. Scheduled Tasks
+                for (final task in widget.tasks.where(
+                  (t) => t.scheduledTime != null,
+                )) {
+                  final parts = task.scheduledTime!.split(':');
+                  if (parts.length < 2) continue;
+                  final hour = int.tryParse(parts[0]) ?? 0;
+                  final minute = int.tryParse(parts[1]) ?? 0;
+                  final start = hour * 60 + minute;
+                  final duration = _localDurations[task.id] ?? task.duration;
+                  items.add(
+                    TimelineItem(
+                      originalItem: task,
+                      startMinutes: start,
+                      endMinutes: start + duration,
+                      id: task.id,
+                    ),
+                  );
+                }
+
+                // 2. Scheduled Habits
+                for (final habit in widget.allDayEvents.whereType<Habit>()) {
+                  for (
+                    int slotIndex = 0;
+                    slotIndex < habit.slots.length;
+                    slotIndex++
+                  ) {
+                    final slot = habit.slots[slotIndex];
+                    if (slot.reminderEnabled && slot.reminderTime != null) {
+                      final rTime = slot.reminderTime!;
+                      final start = rTime.hour * 60 + rTime.minute;
+                      items.add(
+                        TimelineItem(
+                          originalItem: habit,
+                          startMinutes: start,
+                          endMinutes: start + 30,
+                          id: '${habit.id}_slot_$slotIndex',
+                          slotIndex: slotIndex,
+                        ),
+                      );
+                    }
+                  }
+                }
+
+                // 3. Google Calendar Events
+                for (final event in widget.googleEvents) {
+                  final start = event.start?.dateTime ?? event.start?.date;
+                  final end = event.end?.dateTime ?? event.end?.date;
+                  if (start == null || end == null) continue;
+
+                  final bool isAllDay = event.start?.date != null;
+                  if (isAllDay) continue;
+
+                  final startTime = start.toLocal();
+                  final endTime = end.toLocal();
+
+                  final startMinutes = startTime.hour * 60 + startTime.minute;
+                  final duration = endTime.difference(startTime).inMinutes;
+                  items.add(
+                    TimelineItem(
+                      originalItem: event,
+                      startMinutes: startMinutes,
+                      endMinutes:
+                          startMinutes + (duration < 20 ? 20 : duration),
+                      id: event.id ?? event.hashCode.toString(),
+                    ),
+                  );
+                }
+
+                // Sort items by startMinutes ascending, then by duration descending
+                items.sort((a, b) {
+                  if (a.startMinutes != b.startMinutes) {
+                    return a.startMinutes.compareTo(b.startMinutes);
+                  }
+                  return (b.endMinutes - b.startMinutes).compareTo(
+                    a.endMinutes - a.startMinutes,
+                  );
+                });
+
+                // Group items into groups of overlapping items
+                final List<List<TimelineItem>> groups = [];
+                List<TimelineItem> currentGroup = [];
+                int maxEnd = 0;
+
+                for (final item in items) {
+                  if (currentGroup.isEmpty) {
+                    currentGroup.add(item);
+                    maxEnd = item.endMinutes;
+                  } else if (item.startMinutes < maxEnd) {
+                    currentGroup.add(item);
+                    if (item.endMinutes > maxEnd) {
+                      maxEnd = item.endMinutes;
+                    }
+                  } else {
+                    groups.add(currentGroup);
+                    currentGroup = [item];
+                    maxEnd = item.endMinutes;
+                  }
+                }
+                if (currentGroup.isNotEmpty) {
+                  groups.add(currentGroup);
+                }
+
+                // Assign columns within each group
+                for (final group in groups) {
+                  final List<List<TimelineItem>> columns = [];
+                  for (final item in group) {
+                    int assignedCol = -1;
+                    for (int i = 0; i < columns.length; i++) {
+                      final colItems = columns[i];
+                      final lastItem = colItems.last;
+                      if (item.startMinutes >= lastItem.endMinutes) {
+                        assignedCol = i;
+                        break;
+                      }
+                    }
+                    if (assignedCol == -1) {
+                      columns.add([item]);
+                      assignedCol = columns.length - 1;
+                    } else {
+                      columns[assignedCol].add(item);
+                    }
+                    item.column = assignedCol;
+                  }
+
+                  final totalCols = columns.length;
+                  for (final item in group) {
+                    item.totalColumnsInGroup = totalCols;
+                  }
+                }
+
+                return Stack(
+                  children: [
+                    // ─── Hour Markers ───
+                    Column(
+                      children: List.generate(24, (index) {
+                        return SizedBox(
+                          height: hourHeight,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: leftColumnWidth,
+                                padding: const EdgeInsets.only(
+                                  top: 4,
+                                  right: 8,
+                                ),
+                                child: Text(
+                                  '${index.toString().padLeft(2, '0')}:00',
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textMutedColor(context),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    border: Border(
+                                      top: BorderSide(
+                                        color: AppTheme.dividerColor(
+                                          context,
+                                        ).withValues(alpha: 0.5),
+                                        width: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ),
+
+                    // Drop targets stay behind the scheduled cards so taps open items.
+                    ..._buildDropTargets(hourHeight, leftColumnWidth),
+
+                    // ─── Scheduled Blocks (Tasks, Habits, Google Events) ───
+                    ...items.map((item) {
+                      final startHour = item.startMinutes ~/ 60;
+                      final startMinute = item.startMinutes % 60;
+                      final durationMinutes =
+                          item.endMinutes - item.startMinutes;
+
+                      final topOffset =
+                          (startHour * hourHeight) +
+                          (startMinute / 60 * hourHeight);
+                      final height = (durationMinutes / 60 * hourHeight);
+
+                      final double colWidth =
+                          availableWidth / item.totalColumnsInGroup;
+                      final double leftOffset =
+                          leftColumnWidth + 8 + (item.column * colWidth);
+
+                      if (item.originalItem is Task) {
+                        final task = item.originalItem as Task;
+                        return Positioned(
+                          top: topOffset,
+                          left: leftOffset,
+                          width: colWidth - 4,
+                          height: height,
+                          child: LongPressDraggable<Task>(
+                            data: task,
+                            feedback: Material(
+                              color: Colors.transparent,
+                              child: Container(
+                                width: colWidth - 4,
+                                height: height,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.8,
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                padding: const EdgeInsets.all(12),
+                                child: Text(
+                                  task.title,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            childWhenDragging: Opacity(
+                              opacity: 0.3,
+                              child: _buildTaskBlock(context, task, height),
+                            ),
+                            child: _buildTaskBlock(context, task, height),
+                          ),
+                        );
+                      } else if (item.originalItem is Habit) {
+                        final habit = item.originalItem as Habit;
+                        final slotIndex = item.slotIndex ?? 0;
+                        return Positioned(
+                          top: topOffset,
+                          left: leftOffset,
+                          width: colWidth - 4,
+                          height: height,
+                          child: LongPressDraggable<Habit>(
+                            data: habit,
+                            feedback: Material(
+                              color: Colors.transparent,
+                              child: Container(
+                                width: colWidth - 4,
+                                height: height,
+                                decoration: BoxDecoration(
+                                  color: _getHabitColor(
+                                    habit,
+                                  ).withValues(alpha: 0.8),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                padding: const EdgeInsets.all(12),
+                                child: Text(
+                                  habit.title,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            childWhenDragging: Opacity(
+                              opacity: 0.3,
+                              child: _buildHabitBlock(
+                                context,
+                                habit,
+                                slotIndex,
+                                height,
+                              ),
+                            ),
+                            child: _buildHabitBlock(
+                              context,
+                              habit,
+                              slotIndex,
+                              height,
+                            ),
+                          ),
+                        );
+                      } else {
+                        final event =
+                            item.originalItem as google_calendar.Event;
+                        final startTime =
+                            event.start?.dateTime?.toLocal() ??
+                            event.start?.date?.toLocal() ??
+                            DateTime.now();
+                        final endTime =
+                            event.end?.dateTime?.toLocal() ??
+                            event.end?.date?.toLocal() ??
+                            DateTime.now();
+
+                        return Positioned(
+                          top: topOffset,
+                          left: leftOffset,
+                          width: colWidth - 4,
+                          height: height < 20 ? 20 : height, // Minimum height
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      GoogleEventDetailScreen(event: event),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.info.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                                border: const Border(
+                                  left: BorderSide(
+                                    color: AppColors.info,
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          event.summary ?? '(Untitled)',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.info,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        if (height > 40)
+                                          Text(
+                                            '${DateFormat('HH:mm').format(startTime)} - ${DateFormat('HH:mm').format(endTime)}',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.info.withValues(
+                                                alpha: 0.7,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(
+                                      Icons.more_horiz_rounded,
+                                      size: 14,
+                                      color: AppColors.info,
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    onSelected: (val) async {
+                                      if (val == 'open_google') {
+                                        final htmlLink = event.htmlLink;
+                                        if (htmlLink != null) {
+                                          launchUrl(
+                                            Uri.parse(htmlLink),
+                                            mode:
+                                                LaunchMode.externalApplication,
+                                          );
+                                        }
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'open_google',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.calendar_today_rounded,
+                                              size: 16,
+                                            ),
+                                            Spacer(),
+                                            Text('Abrir no Google Calendar'),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                    }),
+
+                    // ─── Current Time Indicator ───
+                    if (_isToday(widget.selectedDate))
+                      IgnorePointer(
+                        child: _buildCurrentTimeIndicator(
+                          hourHeight,
+                          leftColumnWidth,
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildDropTargets(double hourHeight, double leftColumnWidth) {
+    return List.generate(48, (index) {
+      final hour = index ~/ 2;
+      final minute = (index % 2) * 30;
+      return Positioned(
+        top: index * (hourHeight / 2),
+        left: leftColumnWidth,
+        right: 0,
+        height: hourHeight / 2,
+        child: DragTarget<Object>(
+          onWillAcceptWithDetails: (details) =>
+              details.data is Task || details.data is Habit,
+          onAcceptWithDetails: (details) {
+            final dropTime = DateTime(
+              widget.selectedDate.year,
+              widget.selectedDate.month,
+              widget.selectedDate.day,
+              hour,
+              minute,
+            );
+
+            if (details.data is Task) {
+              widget.onTaskDrop?.call(details.data as Task, dropTime);
+            } else if (details.data is Habit) {
+              widget.onHabitDrop?.call(details.data as Habit, dropTime);
+            }
+          },
+          builder: (context, candidateData, rejectedData) {
+            return Container(
+              color: candidateData.isNotEmpty
+                  ? AppColors.primary.withValues(alpha: 0.1)
+                  : Colors.transparent,
+              child: candidateData.isNotEmpty
+                  ? Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    )
+                  : null,
+            );
+          },
+        ),
+      );
+    });
+  }
+
+  Widget _buildTaskBlock(BuildContext context, Task task, double height) {
+    final baseColor = widget.colorMode == 'priority'
+        ? _getPriorityColor(task.priority)
+        : AppColors.secondary;
+
+    final isShort = height < 45;
+    final isTiny = height < 34;
+
+    return ObjectActionWrapper(
+      object: task,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UniversalDetailView(object: task),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: baseColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border(left: BorderSide(color: baseColor, width: 4)),
+            ),
+            child: Stack(
+              children: [
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isShort ? 8 : 12,
+                    vertical: isTiny ? 0 : (isShort ? 2 : 12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: (isShort || isTiny)
+                        ? MainAxisAlignment.center
+                        : MainAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          if (!isTiny) ...[
+                            SizedBox(
+                              width: isShort ? 16 : 20,
+                              height: isShort ? 16 : 20,
+                              child:
+                                  task.isBlocked(
+                                    ref.watch(allObjectsProvider).value ?? [],
+                                  )
+                                  ? IconButton(
+                                      padding: EdgeInsets.zero,
+                                      icon: Icon(
+                                        Icons.lock_rounded,
+                                        color: AppColors.error,
+                                        size: isShort ? 12 : 16,
+                                      ),
+                                      onPressed: () {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Esta tarefa está bloqueada por dependências incompletas.',
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    )
+                                  : Checkbox(
+                                      value: task.stage == TaskStage.finalized,
+                                      onChanged: (v) =>
+                                          widget.onToggleComplete?.call(task),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      activeColor: baseColor,
+                                      side: BorderSide(
+                                        color: baseColor,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                            ),
+                            SizedBox(width: isShort ? 6 : 8),
+                          ],
+                          Expanded(
+                            child: Text(
+                              task.title,
+                              style: TextStyle(
+                                fontSize: isTiny ? 10 : (isShort ? 11 : 13),
+                                fontWeight: FontWeight.w700,
+                                color: baseColor,
+                                decoration: task.stage == TaskStage.finalized
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (!isShort &&
+                              !isTiny &&
+                              task.subtasks.isNotEmpty) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              '${task.subtasks.where((s) => s.completed).length}/${task.subtasks.length}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: baseColor.withValues(alpha: 0.7),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (!isShort && !isTiny) ...[
+                        const SizedBox(height: 2),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 28),
+                          child: Text(
+                            '${task.scheduledTime} (${task.duration} min)',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: baseColor.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onVerticalDragUpdate: (details) {
+                      final newHeight = height + details.delta.dy;
+                      const hourHeight = 80.0;
+                      final newDuration = (newHeight / hourHeight * 60)
+                          .round()
+                          .clamp(10, 480);
+                      setState(() {
+                        _localDurations[task.id] = newDuration;
+                      });
+                    },
+                    onVerticalDragEnd: (_) {
+                      final finalDuration =
+                          _localDurations[task.id] ?? task.duration;
+                      widget.onDurationChange?.call(task, finalDuration);
+                    },
+                    child: Container(
+                      height: isTiny ? 8 : 16,
+                      color: Colors.transparent,
+                      child: Center(
+                        child: Container(
+                          width: isTiny ? 16 : 24,
+                          height: isTiny ? 2 : 3,
+                          decoration: BoxDecoration(
+                            color: baseColor.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(1.5),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (!isTiny && height > 34)
+                  Positioned(
+                    right: 8,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.play_circle_outline_rounded,
+                          color: baseColor,
+                          size: 24,
+                        ),
+                        onPressed: () => widget.onPlay?.call(task),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHabitBlock(
+    BuildContext context,
+    Habit habit,
+    int slotIndex,
+    double height,
+  ) {
+    final baseColor = _getHabitColor(habit);
+    final isShort = height < 45;
+    final isCompleted = _isHabitSlotCompleted(
+      habit,
+      widget.selectedDate,
+      slotIndex,
+    );
+
+    return ObjectActionWrapper(
+      object: habit,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UniversalDetailView(object: habit),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: baseColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border(left: BorderSide(color: baseColor, width: 4)),
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isShort ? 8 : 12,
+                vertical: isShort ? 2 : 12,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: isShort ? 16 : 20,
+                    height: isShort ? 16 : 20,
+                    child: Checkbox(
+                      value: isCompleted,
+                      onChanged: (v) =>
+                          widget.onHabitToggle?.call(habit, slotIndex),
+                      shape: const CircleBorder(),
+                      activeColor: baseColor,
+                      side: BorderSide(color: baseColor, width: 1.5),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          habit.title,
+                          style: TextStyle(
+                            fontSize: isShort ? 11 : 13,
+                            fontWeight: FontWeight.w700,
+                            color: baseColor,
+                            decoration: isCompleted
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (!isShort) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '🔥 ${habit.streak} dias • Slot ${slotIndex + 1}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: baseColor.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getHabitColor(Habit habit) {
+    try {
+      final colorStr = habit.color.replaceAll('#', '');
+      if (colorStr.length == 6) {
+        return Color(int.parse('0xFF$colorStr'));
+      } else if (colorStr.length == 8) {
+        return Color(int.parse('0x$colorStr'));
+      }
+    } catch (_) {}
+    return AppColors.habitGreen;
+  }
+
+  bool _isHabitSlotCompleted(Habit habit, DateTime date, int slotIndex) {
+    final targetDate = DateTime(date.year, date.month, date.day);
+    final record = habit.completionHistory.firstWhere((r) {
+      final rDate = DateTime(r.date.year, r.date.month, r.date.day);
+      return rDate == targetDate;
+    }, orElse: () => CompletionRecord(date: targetDate));
+    if (record.slotCompletions != null &&
+        slotIndex < record.slotCompletions!.length) {
+      return record.slotCompletions![slotIndex];
+    }
+    // Fallback if slotCompletions is null
+    if (habit.dailyGoal == 1) {
+      return record.successful;
+    }
+    return slotIndex < record.completions;
+  }
+
+  Widget _buildAllDayStrip(BuildContext context) {
+    final allDayItems = widget.allDayEvents.where((event) {
+      if (event is Habit) {
+        final hasScheduledSlots = event.slots.any(
+          (slot) => slot.reminderEnabled && slot.reminderTime != null,
+        );
+        return !hasScheduledSlots;
+      }
+      return true;
+    }).toList();
+
+    if (allDayItems.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: AppColors.divider, width: 0.5),
+        ),
+      ),
+      child: Column(
+        children: allDayItems.map((event) {
+          if (event is Habit) {
+            return _buildHabitStripItem(context, event);
+          } else if (event is Task) {
+            return _buildTaskStripItem(context, event);
+          }
+          return const SizedBox.shrink();
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildTaskStripItem(BuildContext context, Task task) {
+    final isBlocked = task.isBlocked(ref.watch(allObjectsProvider).value ?? []);
+    return ObjectActionWrapper(
+      object: task,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => UniversalDetailView(object: task),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.secondary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppColors.secondary.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: isBlocked
+                    ? IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(
+                          Icons.lock_rounded,
+                          size: 14,
+                          color: AppColors.error,
+                        ),
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Esta tarefa está bloqueada por dependências incompletas.',
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : Checkbox(
+                        value: task.stage == TaskStage.finalized,
+                        onChanged: (_) => widget.onToggleComplete?.call(task),
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        activeColor: AppColors.secondary,
+                      ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  task.title,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.secondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (task.stage == TaskStage.finalized)
+                const Padding(
+                  padding: EdgeInsets.only(left: 6),
+                  child: Icon(
+                    Icons.check_circle_rounded,
+                    size: 14,
+                    color: AppColors.secondary,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHabitStripItem(BuildContext context, Habit habit) {
+    final isDone = habit.daysSinceLastCompletion == 0;
+    final hasSlots = habit.dailyGoal > 1;
+
+    return ObjectActionWrapper(
+      object: habit,
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => UniversalDetailView(object: habit)),
+        ),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isDone
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    size: 18,
+                    color: isDone ? AppColors.habitGreen : AppColors.textMuted,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      habit.title,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDone
+                            ? AppColors.textMuted
+                            : AppColors.textPrimary,
+                        decoration: isDone ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
+                  ),
+                  if (habit.daysSinceLastCompletion > 1)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.priorityHigh.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '${habit.daysSinceLastCompletion}d ago',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.priorityHigh,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '🔥 ${habit.streak}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.priorityHigh,
+                    ),
+                  ),
+                ],
+              ),
+              if (hasSlots)
+                Padding(
+                  padding: const EdgeInsets.only(left: 30, top: 8),
+                  child: Row(
+                    children: List.generate(habit.dailyGoal, (index) {
+                      return Container(
+                        width: 24,
+                        height: 24,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceVariant,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: AppColors.divider,
+                            width: 1,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.check_rounded,
+                          size: 14,
+                          color: AppColors.textMuted,
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getPriorityColor(TaskPriority priority) {
+    switch (priority) {
+      case TaskPriority.high:
+        return AppColors.error;
+      case TaskPriority.medium:
+        return AppColors.warning;
+      case TaskPriority.low:
+        return AppColors.info;
+      case TaskPriority.none:
+        return AppColors.textMuted;
+    }
+  }
+
+  bool _isToday(DateTime date) {
+    final now = DateTime.now();
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
+  }
+
+  Widget _buildCurrentTimeIndicator(double hourHeight, double leftColumnWidth) {
+    final now = DateTime.now();
+    final topOffset = (now.hour * hourHeight) + (now.minute / 60 * hourHeight);
+
+    return Positioned(
+      top: topOffset - 1,
+      left: 0,
+      right: 0,
+      child: Row(
+        children: [
+          Container(
+            width: leftColumnWidth,
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.priorityHigh,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                DateFormat('HH:mm').format(now),
+                style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          const Expanded(
+            child: Divider(color: AppColors.priorityHigh, thickness: 1),
+          ),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: AppColors.priorityHigh,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class TimelineItem {
+  final dynamic originalItem; // Task, Habit, or google_calendar.Event
+  final int startMinutes;
+  final int endMinutes;
+  final String id;
+  final int? slotIndex; // For Habit slots
+
+  int column = 0;
+  int totalColumnsInGroup = 1;
+
+  TimelineItem({
+    required this.originalItem,
+    required this.startMinutes,
+    required this.endMinutes,
+    required this.id,
+    this.slotIndex,
+  });
+}

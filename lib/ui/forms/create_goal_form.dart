@@ -1,0 +1,743 @@
+// lib/ui/forms/create_goal_form.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import '../../models/goal_model.dart';
+import '../../models/kpi_model.dart';
+import '../../models/shared_types.dart' hide KPI;
+import '../../providers/vault_provider.dart';
+import '../widgets/wiki_link_controller.dart';
+import '../widgets/organizer_selector_field.dart';
+import '../theme.dart';
+
+class CreateGoalForm extends ConsumerStatefulWidget {
+  final String? initialTitle;
+  final Goal? existingGoal;
+  const CreateGoalForm({super.key, this.initialTitle, this.existingGoal});
+
+  @override
+  ConsumerState<CreateGoalForm> createState() => _CreateGoalFormState();
+}
+
+class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _descController;
+  GoalType _goalType = GoalType.oneTime;
+  DateTime? _deadline;
+  String _selectedColor = '#10B981';
+
+  static const _colorSwatches = [
+    '#DC2626',
+    '#F97316',
+    '#F59E0B',
+    '#10B981',
+    '#14B8A6',
+    '#3B82F6',
+    '#6366F1',
+    '#8B5CF6',
+    '#EC4899',
+    '#6B7280',
+  ];
+
+  GoalStatus _state = GoalStatus.active;
+  List<KPI> _kpis = [];
+  List<OrganizerReference> _organizers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = WikiLinkTextController(
+      context: context,
+      text: widget.existingGoal?.title ?? widget.initialTitle,
+    );
+    _descController = WikiLinkTextController(
+      context: context,
+      text: widget.existingGoal?.description ?? '',
+    );
+
+    if (widget.existingGoal != null) {
+      final goal = widget.existingGoal!;
+      _titleController.text = goal.title;
+      _selectedColor = goal.color ?? '#10B981';
+      _goalType = goal.goalType;
+      _deadline = goal.deadline;
+      _state = goal.state;
+      _kpis = List.from(goal.kpis);
+      _organizers = List.from(goal.organizers);
+    }
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasTitle = _titleController.text.trim().isNotEmpty;
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            leading: IconButton(
+              icon: const Icon(Icons.close_rounded),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: const Text(
+              'Novo Goal',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+            ),
+            centerTitle: true,
+          ),
+
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ─── Title ───
+                  TextField(
+                    controller: _titleController,
+                    onChanged: (_) => setState(() {}),
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.5,
+                    ),
+                    decoration: const InputDecoration(
+                      hintText: 'Goal title',
+                      hintStyle: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textMuted,
+                        letterSpacing: -0.5,
+                      ),
+                      border: InputBorder.none,
+                      filled: false,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ─── Color Swatches ───
+                  SizedBox(
+                    height: 44,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _colorSwatches.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        final hex = _colorSwatches[index];
+                        final color = _parseColor(hex);
+                        final selected = _selectedColor == hex;
+                        return GestureDetector(
+                          onTap: () => setState(() => _selectedColor = hex),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(10),
+                              border: selected
+                                  ? Border.all(color: Colors.white, width: 3)
+                                  : null,
+                              boxShadow: selected
+                                  ? [
+                                      BoxShadow(
+                                        color: color.withValues(alpha: 0.5),
+                                        blurRadius: 8,
+                                      ),
+                                    ]
+                                  : [],
+                            ),
+                            child: selected
+                                ? const Icon(
+                                    Icons.check_rounded,
+                                    color: Colors.white,
+                                    size: 18,
+                                  )
+                                : null,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ─── Status ───
+                  Container(
+                    decoration: AppTheme.cardDecoration(context),
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        const Text(
+                          'Status',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const Spacer(),
+                        DropdownButton<GoalStatus>(
+                          value: _state,
+                          underline: const SizedBox(),
+                          items: GoalStatus.values
+                              .map(
+                                (s) => DropdownMenuItem(
+                                  value: s,
+                                  child: Text(
+                                    s.name.toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) setState(() => _state = v);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ─── Goal Type Card ───
+                  Container(
+                    decoration: AppTheme.cardDecoration(context),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Tipo de Goal',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            _typeButton(
+                              GoalType.oneTime,
+                              'One time',
+                              Icons.flag_rounded,
+                            ),
+                            const SizedBox(width: 12),
+                            _typeButton(
+                              GoalType.repeating,
+                              'Recorrente',
+                              Icons.cached_rounded,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ─── Deadline Card ───
+                  GestureDetector(
+                    onTap: _pickDate,
+                    child: Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          const Text(
+                            'Prazo',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            _deadline != null
+                                ? DateFormat('d MMM, yyyy').format(_deadline!)
+                                : 'Definir prazo',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: _deadline != null
+                                  ? AppColors.primary
+                                  : AppColors.textMuted,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 18,
+                            color: AppColors.textMuted,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ─── KPIs ───
+                  Container(
+                    decoration: AppTheme.cardDecoration(context),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Indicadores de Desempenho (KPIs)',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ..._kpis.asMap().entries.map((e) {
+                          final isPrimary = e.key == 0;
+                          final kpi = e.value;
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.divider),
+                            ),
+                            child: Row(
+                              children: [
+                                if (isPrimary)
+                                  const Icon(
+                                    Icons.star_rounded,
+                                    size: 16,
+                                    color: AppColors.warning,
+                                  ),
+                                if (isPrimary) const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        kpi.title,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Meta: ${kpi.targetValue} (${kpi.sourceType.label})',
+                                        style: const TextStyle(
+                                          color: AppColors.textMuted,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 20,
+                                    color: AppColors.error,
+                                  ),
+                                  onPressed: () =>
+                                      setState(() => _kpis.removeAt(e.key)),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                        GestureDetector(
+                          onTap: _addKpi,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: const Text(
+                              '+ Add KPI',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ─── Organizers ───
+                  Container(
+                    decoration: AppTheme.cardDecoration(context),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: OrganizerSelectorField(
+                      selectedOrganizers: _organizers,
+                      onChanged: (val) => setState(() => _organizers = val),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ─── Description ───
+                  Container(
+                    decoration: AppTheme.cardDecoration(context),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Description',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _descController,
+                          maxLines: 4,
+                          style: const TextStyle(fontSize: 14),
+                          decoration: const InputDecoration(
+                            hintText: 'What do you want to achieve?',
+                            border: InputBorder.none,
+                            filled: false,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 100),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+
+      // ─── Save Button ───
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+          child: SizedBox(
+            height: 52,
+            child: FilledButton(
+              onPressed: hasTitle ? _saveGoal : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: _parseColor(_selectedColor),
+                disabledBackgroundColor: AppColors.textMuted.withValues(
+                  alpha: 0.2,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(
+                'Criar Goal',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _typeButton(GoalType type, String label, IconData icon) {
+    final selected = _goalType == type;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _goalType = type),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : AppColors.surfaceVariant,
+            borderRadius: BorderRadius.circular(12),
+            border: selected
+                ? Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.2),
+                    width: 1,
+                  )
+                : null,
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: selected ? Colors.white : AppColors.textSecondary,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _pickDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _deadline ?? DateTime.now().add(const Duration(days: 30)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2030),
+    );
+    if (date != null) setState(() => _deadline = date);
+  }
+
+  void _saveGoal() {
+    final goal = Goal(
+      id:
+          widget.existingGoal?.id ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
+      createdAt: widget.existingGoal?.createdAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
+      title: _titleController.text.trim(),
+      description: _descController.text.trim(),
+      goalType: _goalType,
+      state: _state,
+      deadline: _deadline,
+      color: _selectedColor,
+      kpis: _kpis,
+      organizers: _organizers,
+    );
+
+    if (widget.existingGoal != null) {
+      ref.read(vaultProvider.notifier).updateObject(goal);
+    } else {
+      ref.read(goalsProvider.notifier).addGoal(goal);
+    }
+
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Goal "${goal.title}" ${widget.existingGoal != null ? 'atualizado' : 'criado'} com sucesso!',
+        ),
+      ),
+    );
+  }
+
+  Color _parseColor(String hex) {
+    try {
+      return Color(int.parse(hex.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return AppColors.primary;
+    }
+  }
+
+  void _addKpi() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => _KpiBuilderSheet(
+        onSave: (kpi) {
+          setState(() => _kpis.add(kpi));
+        },
+      ),
+    );
+  }
+}
+
+class _KpiBuilderSheet extends ConsumerStatefulWidget {
+  final Function(KPI) onSave;
+  const _KpiBuilderSheet({required this.onSave});
+
+  @override
+  ConsumerState<_KpiBuilderSheet> createState() => _KpiBuilderSheetState();
+}
+
+class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
+  final _titleController = TextEditingController();
+  final _targetController = TextEditingController();
+  KPISourceType _sourceType = KPISourceType.customNumericInput;
+  String? _sourceId;
+  String? _fieldId;
+
+  @override
+  Widget build(BuildContext context) {
+    final habits = ref.watch(habitsProvider);
+    final trackers = ref.watch(trackersProvider);
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 16,
+        right: 16,
+        top: 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Add KPI',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _titleController,
+            decoration: const InputDecoration(
+              labelText: 'KPI Title',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<KPISourceType>(
+            initialValue: _sourceType,
+            decoration: const InputDecoration(
+              labelText: 'Tipo de Fonte',
+              border: OutlineInputBorder(),
+            ),
+            items: KPISourceType.values
+                .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
+                .toList(),
+            onChanged: (v) {
+              setState(() {
+                _sourceType = v!;
+                _sourceId = null;
+                _fieldId = null;
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+
+          if (_sourceType.name.startsWith('habit'))
+            DropdownButtonFormField<String>(
+              initialValue: _sourceId,
+              decoration: const InputDecoration(
+                labelText: 'Selecionar Habit',
+                border: OutlineInputBorder(),
+              ),
+              items: habits
+                  .map(
+                    (h) => DropdownMenuItem(value: h.id, child: Text(h.title)),
+                  )
+                  .toList(),
+              onChanged: (v) => setState(() => _sourceId = v),
+            ),
+
+          if (_sourceType.name.startsWith('tracker')) ...[
+            DropdownButtonFormField<String>(
+              initialValue: _sourceId,
+              decoration: const InputDecoration(
+                labelText: 'Selecionar Rastreador',
+                border: OutlineInputBorder(),
+              ),
+              items: trackers
+                  .map(
+                    (t) => DropdownMenuItem(value: t.id, child: Text(t.title)),
+                  )
+                  .toList(),
+              onChanged: (v) => setState(() {
+                _sourceId = v;
+                _fieldId = null;
+              }),
+            ),
+            const SizedBox(height: 12),
+            if (_sourceId != null) ...[
+              Builder(
+                builder: (context) {
+                  final tracker = trackers.firstWhere(
+                    (t) => t.id == _sourceId,
+                    orElse: () => trackers.first,
+                  );
+                  final allFields = tracker.sections
+                      .expand((s) => s.inputFields)
+                      .toList();
+                  return DropdownButtonFormField<String>(
+                    initialValue: _fieldId,
+                    decoration: const InputDecoration(
+                      labelText: 'Selecionar Campo',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: allFields
+                        .map(
+                          (f) => DropdownMenuItem(
+                            value: f.id,
+                            child: Text(f.title),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setState(() => _fieldId = v),
+                  );
+                },
+              ),
+            ],
+          ],
+
+          if (_sourceType.name.startsWith('habit') ||
+              _sourceType.name.startsWith('tracker'))
+            const SizedBox(height: 12),
+
+          TextField(
+            controller: _targetController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Valor Meta',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () {
+                if (_titleController.text.isEmpty ||
+                    _targetController.text.isEmpty) {
+                  return;
+                }
+                final kpi = KPI(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  title: _titleController.text,
+                  sourceType: _sourceType,
+                  sourceId: _sourceId,
+                  fieldId: _fieldId,
+                  targetValue: double.tryParse(_targetController.text) ?? 100,
+                );
+                widget.onSave(kpi);
+                Navigator.pop(context);
+              },
+              child: const Text('Save KPI'),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+}
