@@ -5,7 +5,6 @@ import '../../models/reminder_model.dart';
 import '../../models/reminder_config.dart';
 import '../../models/scheduler.dart';
 import '../../models/shared_types.dart';
-import '../../providers/day_theme_provider.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import 'scheduler_picker.dart';

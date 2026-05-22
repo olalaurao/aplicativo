@@ -192,8 +192,8 @@ class CitrineChart extends StatelessWidget {
   Widget _buildHeatmap(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = 7;
-        final spacing = 4.0;
+        const crossAxisCount = 7;
+        const spacing = 4.0;
         final availableWidth = constraints.maxWidth;
         // Limit max cell size to 32 to avoid huge squares on wide screens
         final cellSize =

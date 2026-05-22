@@ -97,7 +97,8 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                   _buildWidgetHeader(
                     key: 'calendar',
                     title: 'Calendário (4x2)',
-                    desc: 'Visão semanal/mensal integrada com tarefas e hábitos.',
+                    desc:
+                        'Visão semanal/mensal integrada com tarefas e hábitos.',
                     icon: Icons.calendar_today_rounded,
                   ),
                   if (_expanded['calendar'] == true) ...[
@@ -121,7 +122,8 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                   _buildWidgetHeader(
                     key: 'filter',
                     title: 'Filtro (4x2)',
-                    desc: 'Filtro de tarefas, hábitos e outros por organizador.',
+                    desc:
+                        'Filtro de tarefas, hábitos e outros por organizador.',
                     icon: Icons.filter_alt_rounded,
                   ),
                   if (_expanded['filter'] == true) ...[
@@ -133,7 +135,8 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                   _buildWidgetHeader(
                     key: 'note',
                     title: 'Nota Fixada (2x2)',
-                    desc: 'Fixe uma nota específica do Obsidian na tela inicial.',
+                    desc:
+                        'Fixe uma nota específica do Obsidian na tela inicial.',
                     icon: Icons.sticky_note_2_rounded,
                   ),
                   if (_expanded['note'] == true) ...[
@@ -150,7 +153,9 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
               // Trigger sync visual feedback
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Configurações dos Widgets sincronizadas com sucesso!'),
+                  content: Text(
+                    'Configurações dos Widgets sincronizadas com sucesso!',
+                  ),
                   backgroundColor: AppColors.primary,
                 ),
               );
@@ -201,7 +206,9 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
             color: AppTheme.surfaceVariantColor(context),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isExpanded ? AppColors.primary.withOpacity(0.3) : Colors.transparent,
+              color: isExpanded
+                  ? AppColors.primary.withValues(alpha: 0.3)
+                  : Colors.transparent,
               width: 1.5,
             ),
           ),
@@ -210,12 +217,16 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: isExpanded ? AppColors.primary.withOpacity(0.1) : AppTheme.surfaceColor(context),
+                  color: isExpanded
+                      ? AppColors.primary.withValues(alpha: 0.1)
+                      : AppTheme.surfaceColor(context),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   icon,
-                  color: isExpanded ? AppColors.primary : AppTheme.textMutedColor(context),
+                  color: isExpanded
+                      ? AppColors.primary
+                      : AppTheme.textMutedColor(context),
                   size: 24,
                 ),
               ),
@@ -243,7 +254,9 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                 ),
               ),
               Icon(
-                isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                isExpanded
+                    ? Icons.keyboard_arrow_up_rounded
+                    : Icons.keyboard_arrow_down_rounded,
                 color: AppTheme.textMutedColor(context),
               ),
             ],
@@ -258,7 +271,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
       margin: const EdgeInsets.symmetric(horizontal: 4),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceVariantColor(context).withOpacity(0.5),
+        color: AppTheme.surfaceVariantColor(context).withValues(alpha: 0.5),
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
       ),
       child: Column(
@@ -278,10 +291,17 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
-                  controller: TextEditingController(text: settings.quickAddWidgetButton1Label)
-                    ..selection = TextSelection.collapsed(offset: settings.quickAddWidgetButton1Label.length),
+                  controller:
+                      TextEditingController(
+                          text: settings.quickAddWidgetButton1Label,
+                        )
+                        ..selection = TextSelection.collapsed(
+                          offset: settings.quickAddWidgetButton1Label.length,
+                        ),
                   onChanged: (val) {
-                    ref.read(settingsProvider.notifier).updateWidgetQuickAddSettings(btn1Label: val);
+                    ref
+                        .read(settingsProvider.notifier)
+                        .updateWidgetQuickAddSettings(btn1Label: val);
                   },
                 ),
               ),
@@ -293,7 +313,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
-                  value: settings.quickAddWidgetButton1Target,
+                  initialValue: settings.quickAddWidgetButton1Target,
                   items: const [
                     DropdownMenuItem(value: 'journal', child: Text('Diário')),
                     DropdownMenuItem(value: 'task', child: Text('Tarefa')),
@@ -302,7 +322,9 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                   ],
                   onChanged: (val) {
                     if (val != null) {
-                      ref.read(settingsProvider.notifier).updateWidgetQuickAddSettings(btn1Target: val);
+                      ref
+                          .read(settingsProvider.notifier)
+                          .updateWidgetQuickAddSettings(btn1Target: val);
                     }
                   },
                 ),
@@ -324,10 +346,17 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
-                  controller: TextEditingController(text: settings.quickAddWidgetButton2Label)
-                    ..selection = TextSelection.collapsed(offset: settings.quickAddWidgetButton2Label.length),
+                  controller:
+                      TextEditingController(
+                          text: settings.quickAddWidgetButton2Label,
+                        )
+                        ..selection = TextSelection.collapsed(
+                          offset: settings.quickAddWidgetButton2Label.length,
+                        ),
                   onChanged: (val) {
-                    ref.read(settingsProvider.notifier).updateWidgetQuickAddSettings(btn2Label: val);
+                    ref
+                        .read(settingsProvider.notifier)
+                        .updateWidgetQuickAddSettings(btn2Label: val);
                   },
                 ),
               ),
@@ -339,7 +368,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
-                  value: settings.quickAddWidgetButton2Target,
+                  initialValue: settings.quickAddWidgetButton2Target,
                   items: const [
                     DropdownMenuItem(value: 'journal', child: Text('Diário')),
                     DropdownMenuItem(value: 'task', child: Text('Tarefa')),
@@ -348,7 +377,9 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                   ],
                   onChanged: (val) {
                     if (val != null) {
-                      ref.read(settingsProvider.notifier).updateWidgetQuickAddSettings(btn2Target: val);
+                      ref
+                          .read(settingsProvider.notifier)
+                          .updateWidgetQuickAddSettings(btn2Target: val);
                     }
                   },
                 ),
@@ -365,7 +396,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
       margin: const EdgeInsets.symmetric(horizontal: 4),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceVariantColor(context).withOpacity(0.5),
+        color: AppTheme.surfaceVariantColor(context).withValues(alpha: 0.5),
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
       ),
       child: Column(
@@ -381,14 +412,16 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
               border: OutlineInputBorder(),
               isDense: true,
             ),
-            value: settings.calendarWidgetType,
+            initialValue: settings.calendarWidgetType,
             items: const [
               DropdownMenuItem(value: 'week', child: Text('Semana')),
               DropdownMenuItem(value: 'month', child: Text('Mês')),
             ],
             onChanged: (val) {
               if (val != null) {
-                ref.read(settingsProvider.notifier).updateWidgetCalendarSettings(type: val);
+                ref
+                    .read(settingsProvider.notifier)
+                    .updateWidgetCalendarSettings(type: val);
               }
             },
           ),
@@ -399,33 +432,48 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
           ),
           const SizedBox(height: 8),
           SwitchListTile.adaptive(
-            title: const Text('Tarefas agendadas', style: TextStyle(fontSize: 13)),
+            title: const Text(
+              'Tarefas agendadas',
+              style: TextStyle(fontSize: 13),
+            ),
             value: settings.calendarWidgetShowTasks,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
             contentPadding: EdgeInsets.zero,
             dense: true,
             onChanged: (val) {
-              ref.read(settingsProvider.notifier).updateWidgetCalendarSettings(showTasks: val);
+              ref
+                  .read(settingsProvider.notifier)
+                  .updateWidgetCalendarSettings(showTasks: val);
             },
           ),
           SwitchListTile.adaptive(
-            title: const Text('Hábitos frequentes', style: TextStyle(fontSize: 13)),
+            title: const Text(
+              'Hábitos frequentes',
+              style: TextStyle(fontSize: 13),
+            ),
             value: settings.calendarWidgetShowHabits,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
             contentPadding: EdgeInsets.zero,
             dense: true,
             onChanged: (val) {
-              ref.read(settingsProvider.notifier).updateWidgetCalendarSettings(showHabits: val);
+              ref
+                  .read(settingsProvider.notifier)
+                  .updateWidgetCalendarSettings(showHabits: val);
             },
           ),
           SwitchListTile.adaptive(
-            title: const Text('Foco do Dia e Pomodoros', style: TextStyle(fontSize: 13)),
+            title: const Text(
+              'Foco do Dia e Pomodoros',
+              style: TextStyle(fontSize: 13),
+            ),
             value: settings.calendarWidgetShowSessions,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
             contentPadding: EdgeInsets.zero,
             dense: true,
             onChanged: (val) {
-              ref.read(settingsProvider.notifier).updateWidgetCalendarSettings(showSessions: val);
+              ref
+                  .read(settingsProvider.notifier)
+                  .updateWidgetCalendarSettings(showSessions: val);
             },
           ),
         ],
@@ -433,12 +481,15 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
     );
   }
 
-  Widget _buildHabitConfig(AppSettings settings, List<OrganizerReference> organizers) {
+  Widget _buildHabitConfig(
+    AppSettings settings,
+    List<OrganizerReference> organizers,
+  ) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 4),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceVariantColor(context).withOpacity(0.5),
+        color: AppTheme.surfaceVariantColor(context).withValues(alpha: 0.5),
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
       ),
       child: Column(
@@ -454,14 +505,22 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
               border: OutlineInputBorder(),
               isDense: true,
             ),
-            value: settings.habitWidgetFilterType,
+            initialValue: settings.habitWidgetFilterType,
             items: const [
-              DropdownMenuItem(value: 'all', child: Text('Todos os hábitos ativos')),
-              DropdownMenuItem(value: 'organizer', child: Text('Por Organizador (Área/Projeto)')),
+              DropdownMenuItem(
+                value: 'all',
+                child: Text('Todos os hábitos ativos'),
+              ),
+              DropdownMenuItem(
+                value: 'organizer',
+                child: Text('Por Organizador (Área/Projeto)'),
+              ),
             ],
             onChanged: (val) {
               if (val != null) {
-                ref.read(settingsProvider.notifier).updateWidgetHabitSettings(filterType: val);
+                ref
+                    .read(settingsProvider.notifier)
+                    .updateWidgetHabitSettings(filterType: val);
               }
             },
           ),
@@ -477,7 +536,9 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
-              value: settings.habitWidgetOrganizer.isEmpty ? null : settings.habitWidgetOrganizer,
+              initialValue: settings.habitWidgetOrganizer.isEmpty
+                  ? null
+                  : settings.habitWidgetOrganizer,
               hint: const Text('Selecione uma área/projeto'),
               items: organizers.map((o) {
                 return DropdownMenuItem(
@@ -487,7 +548,9 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
               }).toList(),
               onChanged: (val) {
                 if (val != null) {
-                  ref.read(settingsProvider.notifier).updateWidgetHabitSettings(organizer: val);
+                  ref
+                      .read(settingsProvider.notifier)
+                      .updateWidgetHabitSettings(organizer: val);
                 }
               },
             ),
@@ -502,7 +565,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
       margin: const EdgeInsets.symmetric(horizontal: 4),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceVariantColor(context).withOpacity(0.5),
+        color: AppTheme.surfaceVariantColor(context).withValues(alpha: 0.5),
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
       ),
       child: Column(
@@ -518,15 +581,25 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
               border: OutlineInputBorder(),
               isDense: true,
             ),
-            value: settings.universalWidgetType == 'note' ? 'fixed' : 'latest',
+            initialValue: settings.universalWidgetType == 'note'
+                ? 'fixed'
+                : 'latest',
             items: const [
-              DropdownMenuItem(value: 'latest', child: Text('Última nota modificada')),
-              DropdownMenuItem(value: 'fixed', child: Text('Nota fixada específica')),
+              DropdownMenuItem(
+                value: 'latest',
+                child: Text('Última nota modificada'),
+              ),
+              DropdownMenuItem(
+                value: 'fixed',
+                child: Text('Nota fixada específica'),
+              ),
             ],
             onChanged: (val) {
               if (val != null) {
                 final type = val == 'fixed' ? 'note' : 'daily';
-                ref.read(settingsProvider.notifier).updateUniversalWidgetSettings(type: type);
+                ref
+                    .read(settingsProvider.notifier)
+                    .updateUniversalWidgetSettings(type: type);
               }
             },
           ),
@@ -555,7 +628,8 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
     ]..sort((a, b) => a.title.compareTo(b.title));
 
     final metadata = block.metadata;
-    var organizerSlug = metadata['organizerSlug'] as String? ??
+    var organizerSlug =
+        metadata['organizerSlug'] as String? ??
         (organizers.isNotEmpty ? organizers.first.slug : null);
 
     final rawTypes = metadata['filterObjectTypes'] ?? metadata['objectTypes'];
@@ -594,7 +668,9 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
               border: OutlineInputBorder(),
               isDense: true,
             ),
-            value: organizers.any((o) => o.slug == organizerSlug) ? organizerSlug : null,
+            initialValue: organizers.any((o) => o.slug == organizerSlug)
+                ? organizerSlug
+                : null,
             hint: const Text('Selecione uma área/projeto/goal'),
             items: organizers.map((o) {
               return DropdownMenuItem(
@@ -608,11 +684,13 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
             }).toList(),
             onChanged: (val) {
               if (val != null) {
-                final updatedMetadata = Map<String, dynamic>.from(block.metadata);
+                final updatedMetadata = Map<String, dynamic>.from(
+                  block.metadata,
+                );
                 updatedMetadata['organizerSlug'] = val;
-                ref.read(dashboardProvider.notifier).updateBlock(
-                      block.copyWith(metadata: updatedMetadata),
-                    );
+                ref
+                    .read(dashboardProvider.notifier)
+                    .updateBlock(block.copyWith(metadata: updatedMetadata));
               }
             },
           ),
@@ -633,12 +711,14 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                 onSelected: (value) {
                   final next = Set<String>.from(selectedObjectTypes);
                   value ? next.add(entry.key) : next.remove(entry.key);
-                  final updatedMetadata = Map<String, dynamic>.from(block.metadata);
+                  final updatedMetadata = Map<String, dynamic>.from(
+                    block.metadata,
+                  );
                   updatedMetadata['filterObjectTypes'] = next.toList();
                   updatedMetadata['objectTypes'] = next.toList();
-                  ref.read(dashboardProvider.notifier).updateBlock(
-                        block.copyWith(metadata: updatedMetadata),
-                      );
+                  ref
+                      .read(dashboardProvider.notifier)
+                      .updateBlock(block.copyWith(metadata: updatedMetadata));
                 },
                 selectedColor: AppColors.primary.withValues(alpha: 0.16),
                 checkmarkColor: AppColors.primary,

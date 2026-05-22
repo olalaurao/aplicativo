@@ -171,7 +171,7 @@ class Subtask {
     this.isHeader = false,
     this.isCollapsed = false,
     this.session,
-  }) : this.id = id ?? const Uuid().v4();
+  }) : id = id ?? const Uuid().v4();
 }
 
 class KPI {

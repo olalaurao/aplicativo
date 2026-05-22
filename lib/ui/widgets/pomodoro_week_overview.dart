@@ -111,7 +111,7 @@ class PomodoroWeekOverview extends ConsumerWidget {
           height: 120,
           child: BarChart(
             BarChartData(
-              barTouchData: BarTouchData(enabled: false),
+              barTouchData: const BarTouchData(enabled: false),
               titlesData: FlTitlesData(
                 show: true,
                 bottomTitles: AxisTitles(

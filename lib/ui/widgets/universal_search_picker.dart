@@ -76,7 +76,10 @@ class _UniversalSearchPickerSheetState
             children: [
               Text(
                 widget.title,
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               IconButton(
                 onPressed: () => Navigator.pop(context),
@@ -99,8 +102,10 @@ class _UniversalSearchPickerSheetState
               ),
               filled: true,
               fillColor: AppColors.surfaceVariant.withValues(alpha: 0.5),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -133,12 +138,14 @@ class _UniversalSearchPickerSheetState
                   if (_selectedFilter != 'all') {
                     if (_selectedFilter == 'area') {
                       if (obj is! Organizer ||
-                          (obj as Organizer).organizerType != OrganizerType.area) return false;
+                          (obj).organizerType != OrganizerType.area) {
+                        return false;
+                      }
                     } else if (_selectedFilter == 'project') {
                       // Allow both Project objects and Organizer objects of type project
                       if (obj.type != 'project' &&
                           (obj is! Organizer ||
-                              (obj as Organizer).organizerType != OrganizerType.project)) {
+                              (obj).organizerType != OrganizerType.project)) {
                         return false;
                       }
                     } else {
@@ -187,8 +194,7 @@ class _UniversalSearchPickerSheetState
                   },
                 );
               },
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Erro: $e')),
             ),
           ),
@@ -353,8 +359,6 @@ class _UniversalSearchPickerSheetState
           return 'Pessoa';
         case OrganizerType.place:
           return 'Lugar';
-        default:
-          return 'Organizador';
       }
     }
     switch (obj.type) {
@@ -377,14 +381,34 @@ class _UniversalSearchPickerSheetState
 
   void _showCreateTypeChoiceDialog(BuildContext context, String newTitle) {
     final types = [
-      {'type': 'task', 'label': 'Tarefa', 'icon': Icons.check_circle_outline_rounded},
+      {
+        'type': 'task',
+        'label': 'Tarefa',
+        'icon': Icons.check_circle_outline_rounded,
+      },
       {'type': 'habit', 'label': 'Hábito', 'icon': Icons.loop_rounded},
-      {'type': 'goal', 'label': 'Objetivo', 'icon': Icons.track_changes_rounded},
+      {
+        'type': 'goal',
+        'label': 'Objetivo',
+        'icon': Icons.track_changes_rounded,
+      },
       {'type': 'note', 'label': 'Nota', 'icon': Icons.article_outlined},
       {'type': 'project', 'label': 'Projeto', 'icon': Icons.folder_outlined},
-      {'type': 'area', 'label': 'Área (Organizador)', 'icon': Icons.layers_outlined},
-      {'type': 'person', 'label': 'Pessoa', 'icon': Icons.person_outline_rounded},
-      {'type': 'resource', 'label': 'Recurso', 'icon': Icons.menu_book_outlined},
+      {
+        'type': 'area',
+        'label': 'Área (Organizador)',
+        'icon': Icons.layers_outlined,
+      },
+      {
+        'type': 'person',
+        'label': 'Pessoa',
+        'icon': Icons.person_outline_rounded,
+      },
+      {
+        'type': 'resource',
+        'label': 'Recurso',
+        'icon': Icons.menu_book_outlined,
+      },
     ];
 
     showModalBottomSheet<void>(
@@ -419,7 +443,10 @@ class _UniversalSearchPickerSheetState
                 itemBuilder: (context, index) {
                   final t = types[index];
                   return ListTile(
-                    leading: Icon(t['icon'] as IconData, color: AppColors.primary),
+                    leading: Icon(
+                      t['icon'] as IconData,
+                      color: AppColors.primary,
+                    ),
                     title: Text(t['label'] as String),
                     onTap: () async {
                       Navigator.pop(sheetContext); // Close type sheet
@@ -485,11 +512,7 @@ class _UniversalSearchPickerSheetState
         createdAt: DateTime.now(),
       );
     } else if (type == 'person') {
-      newObj = Person(
-        id: id,
-        title: title,
-        createdAt: DateTime.now(),
-      );
+      newObj = Person(id: id, title: title, createdAt: DateTime.now());
     } else if (type == 'resource') {
       newObj = Resource(
         id: id,
@@ -513,9 +536,9 @@ class _UniversalSearchPickerSheetState
       widget.onSelected(newObj);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao criar objeto: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro ao criar objeto: $e')));
       }
     }
   }

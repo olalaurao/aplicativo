@@ -341,8 +341,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                             icon: const Icon(Icons.delete_outline_rounded),
                             color: AppColors.error,
                             onPressed: () => setSheetState(() {
-                              if (_selectedType == filter)
+                              if (_selectedType == filter) {
                                 _selectedType = 'All';
+                              }
                               filters.removeAt(index);
                             }),
                           ),
@@ -427,7 +428,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                       ? Image.network(
                           resource.coverImage!,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Icon(
+                          errorBuilder: (_, _, _) => const Icon(
                             Icons.broken_image_outlined,
                             color: AppColors.textMuted,
                           ),
@@ -538,7 +539,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                       ? DecorationImage(
                           image: NetworkImage(resource.coverImage!),
                           fit: BoxFit.cover,
-                          onError: (_, __) {},
+                          onError: (_, _) {},
                         )
                       : null,
                 ),

@@ -139,9 +139,17 @@ Future<void> showObjectActionSheet(
   );
 }
 
-void _showChangeTypeSheet(BuildContext context, WidgetRef ref, ContentObject object) {
+void _showChangeTypeSheet(
+  BuildContext context,
+  WidgetRef ref,
+  ContentObject object,
+) {
   final types = [
-    {'type': 'task', 'label': 'Tarefa', 'icon': Icons.check_circle_outline_rounded},
+    {
+      'type': 'task',
+      'label': 'Tarefa',
+      'icon': Icons.check_circle_outline_rounded,
+    },
     {'type': 'habit', 'label': 'Hábito', 'icon': Icons.loop_rounded},
     {'type': 'goal', 'label': 'Objetivo', 'icon': Icons.track_changes_rounded},
     {'type': 'note', 'label': 'Nota', 'icon': Icons.article_outlined},
@@ -152,7 +160,11 @@ void _showChangeTypeSheet(BuildContext context, WidgetRef ref, ContentObject obj
     {'type': 'person', 'label': 'Pessoa', 'icon': Icons.person_outline_rounded},
     {'type': 'place', 'label': 'Lugar', 'icon': Icons.place_outlined},
     {'type': 'resource', 'label': 'Recurso', 'icon': Icons.menu_book_outlined},
-    {'type': 'tracker_definition', 'label': 'Rastreador', 'icon': Icons.analytics_outlined},
+    {
+      'type': 'tracker_definition',
+      'label': 'Rastreador',
+      'icon': Icons.analytics_outlined,
+    },
   ];
 
   showModalBottomSheet<void>(
@@ -182,7 +194,10 @@ void _showChangeTypeSheet(BuildContext context, WidgetRef ref, ContentObject obj
           const SizedBox(height: 4),
           Text(
             'Converter "${object.title}" para:',
-            style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 12),
           Flexible(
@@ -192,11 +207,20 @@ void _showChangeTypeSheet(BuildContext context, WidgetRef ref, ContentObject obj
               itemBuilder: (context, index) {
                 final t = types[index];
                 return ListTile(
-                  leading: Icon(t['icon'] as IconData, color: AppColors.primary),
+                  leading: Icon(
+                    t['icon'] as IconData,
+                    color: AppColors.primary,
+                  ),
                   title: Text(t['label'] as String),
                   onTap: () async {
                     Navigator.pop(sheetContext);
-                    await _confirmAndChangeType(context, ref, object, t['type'] as String, t['label'] as String);
+                    await _confirmAndChangeType(
+                      context,
+                      ref,
+                      object,
+                      t['type'] as String,
+                      t['label'] as String,
+                    );
                   },
                 );
               },
@@ -247,18 +271,24 @@ Future<void> _confirmAndChangeType(
       extraFields['organizerType'] = targetType;
     }
 
-    await ref.read(vaultProvider.notifier).changeObjectType(object, newType, extraFields: extraFields);
+    await ref
+        .read(vaultProvider.notifier)
+        .changeObjectType(object, newType, extraFields: extraFields);
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"${object.title}" convertido para $targetLabel com sucesso!')),
+        SnackBar(
+          content: Text(
+            '"${object.title}" convertido para $targetLabel com sucesso!',
+          ),
+        ),
       );
     }
   } catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao converter tipo: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erro ao converter tipo: $e')));
     }
   }
 }
@@ -406,8 +436,6 @@ String _typeLabel(ContentObject object) {
         return 'Pessoa';
       case OrganizerType.place:
         return 'Lugar';
-      default:
-        return 'Organizador';
     }
   }
   if (object is Reminder) return 'Lembrete';

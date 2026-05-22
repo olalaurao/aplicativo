@@ -36,7 +36,11 @@ class OrganizerSelectorField extends ConsumerWidget {
         color: Colors.transparent,
         child: Row(
           children: [
-            const Icon(Icons.link_rounded, size: 20, color: AppColors.textSecondary),
+            const Icon(
+              Icons.link_rounded,
+              size: 20,
+              color: AppColors.textSecondary,
+            ),
             const SizedBox(width: 12),
             Text(
               label,
@@ -73,7 +77,9 @@ class OrganizerSelectorField extends ConsumerWidget {
 
   void _pickOrganizers(BuildContext context, WidgetRef ref) async {
     final allObjects = await ref.read(allObjectsProvider.future);
-    final List<ContentObject> mutableObjects = List.from(allObjects.where((o) => o.title.isNotEmpty));
+    final List<ContentObject> mutableObjects = List.from(
+      allObjects.where((o) => o.title.isNotEmpty),
+    );
 
     if (!context.mounted) return;
 
@@ -96,9 +102,16 @@ class OrganizerSelectorField extends ConsumerWidget {
             var displayObjects = mutableObjects.where((obj) {
               if (selectedFilter != 'all') {
                 if (selectedFilter == 'area') {
-                  if (obj is! Organizer || (obj as Organizer).organizerType != OrganizerType.area) return false;
+                  if (obj is! Organizer ||
+                      (obj).organizerType != OrganizerType.area) {
+                    return false;
+                  }
                 } else if (selectedFilter == 'project') {
-                  if (obj.type != 'project' && (obj is! Organizer || (obj as Organizer).organizerType != OrganizerType.project)) return false;
+                  if (obj.type != 'project' &&
+                      (obj is! Organizer ||
+                          (obj).organizerType != OrganizerType.project)) {
+                    return false;
+                  }
                 } else {
                   if (obj.type != selectedFilter) return false;
                 }
@@ -108,7 +121,10 @@ class OrganizerSelectorField extends ConsumerWidget {
 
             // Apply search query
             if (searchQuery.trim().isNotEmpty) {
-              displayObjects = searchService.search(displayObjects, searchQuery.trim());
+              displayObjects = searchService.search(
+                displayObjects,
+                searchQuery.trim(),
+              );
             }
 
             return Container(
@@ -149,12 +165,17 @@ class OrganizerSelectorField extends ConsumerWidget {
                       hintText: 'Pesquisar...',
                       prefixIcon: const Icon(Icons.search_rounded),
                       filled: true,
-                      fillColor: AppColors.surfaceVariant.withValues(alpha: 0.5),
+                      fillColor: AppColors.surfaceVariant.withValues(
+                        alpha: 0.5,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -166,28 +187,50 @@ class OrganizerSelectorField extends ConsumerWidget {
                         _buildFilterChip('all', 'Tudo', selectedFilter, (val) {
                           setModalState(() => selectedFilter = val);
                         }),
-                        _buildFilterChip('task', 'Tarefas', selectedFilter, (val) {
+                        _buildFilterChip('task', 'Tarefas', selectedFilter, (
+                          val,
+                        ) {
                           setModalState(() => selectedFilter = val);
                         }),
-                        _buildFilterChip('habit', 'Hábitos', selectedFilter, (val) {
+                        _buildFilterChip('habit', 'Hábitos', selectedFilter, (
+                          val,
+                        ) {
                           setModalState(() => selectedFilter = val);
                         }),
-                        _buildFilterChip('goal', 'Objetivos', selectedFilter, (val) {
+                        _buildFilterChip('goal', 'Objetivos', selectedFilter, (
+                          val,
+                        ) {
                           setModalState(() => selectedFilter = val);
                         }),
-                        _buildFilterChip('project', 'Projetos', selectedFilter, (val) {
+                        _buildFilterChip(
+                          'project',
+                          'Projetos',
+                          selectedFilter,
+                          (val) {
+                            setModalState(() => selectedFilter = val);
+                          },
+                        ),
+                        _buildFilterChip('area', 'Áreas', selectedFilter, (
+                          val,
+                        ) {
                           setModalState(() => selectedFilter = val);
                         }),
-                        _buildFilterChip('area', 'Áreas', selectedFilter, (val) {
+                        _buildFilterChip('note', 'Notas', selectedFilter, (
+                          val,
+                        ) {
                           setModalState(() => selectedFilter = val);
                         }),
-                        _buildFilterChip('note', 'Notas', selectedFilter, (val) {
-                          setModalState(() => selectedFilter = val);
-                        }),
-                        _buildFilterChip('resource', 'Recursos', selectedFilter, (val) {
-                          setModalState(() => selectedFilter = val);
-                        }),
-                        _buildFilterChip('person', 'Pessoas', selectedFilter, (val) {
+                        _buildFilterChip(
+                          'resource',
+                          'Recursos',
+                          selectedFilter,
+                          (val) {
+                            setModalState(() => selectedFilter = val);
+                          },
+                        ),
+                        _buildFilterChip('person', 'Pessoas', selectedFilter, (
+                          val,
+                        ) {
                           setModalState(() => selectedFilter = val);
                         }),
                       ],
@@ -200,11 +243,18 @@ class OrganizerSelectorField extends ConsumerWidget {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.search_off_rounded, size: 48, color: AppColors.textMuted),
+                                Icon(
+                                  Icons.search_off_rounded,
+                                  size: 48,
+                                  color: AppColors.textMuted,
+                                ),
                                 SizedBox(height: 12),
                                 Text(
                                   'Nenhum objeto encontrado',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ],
                             ),
@@ -250,7 +300,11 @@ class OrganizerSelectorField extends ConsumerWidget {
                                 onTap: () {
                                   setModalState(() {
                                     if (isSelected) {
-                                      selected.removeWhere((o) => o.slug == obj.id || o.slug == obj.slug);
+                                      selected.removeWhere(
+                                        (o) =>
+                                            o.slug == obj.id ||
+                                            o.slug == obj.slug,
+                                      );
                                     } else {
                                       selected.add(
                                         OrganizerReference(
@@ -349,14 +403,34 @@ class OrganizerSelectorField extends ConsumerWidget {
     ValueChanged<ContentObject> onCreated,
   ) {
     final types = [
-      {'type': 'task', 'label': 'Tarefa', 'icon': Icons.check_circle_outline_rounded},
+      {
+        'type': 'task',
+        'label': 'Tarefa',
+        'icon': Icons.check_circle_outline_rounded,
+      },
       {'type': 'habit', 'label': 'Hábito', 'icon': Icons.loop_rounded},
-      {'type': 'goal', 'label': 'Objetivo', 'icon': Icons.track_changes_rounded},
+      {
+        'type': 'goal',
+        'label': 'Objetivo',
+        'icon': Icons.track_changes_rounded,
+      },
       {'type': 'note', 'label': 'Nota', 'icon': Icons.article_outlined},
       {'type': 'project', 'label': 'Projeto', 'icon': Icons.folder_outlined},
-      {'type': 'area', 'label': 'Área (Organizador)', 'icon': Icons.layers_outlined},
-      {'type': 'person', 'label': 'Pessoa', 'icon': Icons.person_outline_rounded},
-      {'type': 'resource', 'label': 'Recurso', 'icon': Icons.menu_book_outlined},
+      {
+        'type': 'area',
+        'label': 'Área (Organizador)',
+        'icon': Icons.layers_outlined,
+      },
+      {
+        'type': 'person',
+        'label': 'Pessoa',
+        'icon': Icons.person_outline_rounded,
+      },
+      {
+        'type': 'resource',
+        'label': 'Recurso',
+        'icon': Icons.menu_book_outlined,
+      },
     ];
 
     showModalBottomSheet<void>(
@@ -391,7 +465,10 @@ class OrganizerSelectorField extends ConsumerWidget {
                 itemBuilder: (context, index) {
                   final t = types[index];
                   return ListTile(
-                    leading: Icon(t['icon'] as IconData, color: AppColors.primary),
+                    leading: Icon(
+                      t['icon'] as IconData,
+                      color: AppColors.primary,
+                    ),
                     title: Text(t['label'] as String),
                     onTap: () async {
                       Navigator.pop(sheetContext); // Close type sheet
@@ -467,7 +544,9 @@ class OrganizerSelectorField extends ConsumerWidget {
                       }
 
                       try {
-                        await ref.read(vaultProvider.notifier).createObject(newObj);
+                        await ref
+                            .read(vaultProvider.notifier)
+                            .createObject(newObj);
                         onCreated(newObj);
                       } catch (e) {
                         if (context.mounted) {
@@ -527,8 +606,6 @@ class OrganizerSelectorField extends ConsumerWidget {
           return 'Pessoa';
         case OrganizerType.place:
           return 'Lugar';
-        default:
-          return 'Organizador';
       }
     }
     switch (obj.type) {

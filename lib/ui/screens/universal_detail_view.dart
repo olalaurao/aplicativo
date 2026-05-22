@@ -68,7 +68,8 @@ class UniversalDetailView extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<UniversalDetailView> createState() => _UniversalDetailViewState();
+  ConsumerState<UniversalDetailView> createState() =>
+      _UniversalDetailViewState();
 }
 
 class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
@@ -129,8 +130,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   onPressed: () => _handleAction(context, ref, 'export_google'),
                   tooltip: 'Export to Google Calendar',
                 ),
-              if (object is Task ||
-                  object is Project)
+              if (object is Task || object is Project)
                 IconButton(
                   icon: const Icon(
                     Icons.timer_outlined,
@@ -164,7 +164,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                   Text(
+                  Text(
                     _typeLabel(object),
                     style: const TextStyle(
                       fontSize: 14,
@@ -172,7 +172,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     ),
                   ),
                   if (object is Project) _buildProjectProgress(context, ref),
-                  if (widget.searchSnippet != null && widget.searchSnippet!.trim().isNotEmpty)
+                  if (widget.searchSnippet != null &&
+                      widget.searchSnippet!.trim().isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 16),
                       child: Container(
@@ -283,71 +284,78 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                       decoration: AppTheme.cardDecoration(context),
                       child: Column(
                         children: [
-                          ...object.organizers.asMap().entries.map(
-                            (entry) {
-                              final idx = entry.key;
-                              final refObj = entry.value;
-                              return Column(
-                                children: [
-                                  Consumer(
-                                    builder: (context, ref, _) {
-                                      final allObjects = ref.watch(allObjectsProvider).value ?? [];
-                                      final linkedObj = allObjects.cast<ContentObject?>().firstWhere(
-                                        (o) => o != null && o.id == refObj.slug,
-                                        orElse: () => null,
-                                      );
+                          ...object.organizers.asMap().entries.map((entry) {
+                            final idx = entry.key;
+                            final refObj = entry.value;
+                            return Column(
+                              children: [
+                                Consumer(
+                                  builder: (context, ref, _) {
+                                    final allObjects =
+                                        ref.watch(allObjectsProvider).value ??
+                                        [];
+                                    final linkedObj = allObjects
+                                        .cast<ContentObject?>()
+                                        .firstWhere(
+                                          (o) =>
+                                              o != null && o.id == refObj.slug,
+                                          orElse: () => null,
+                                        );
 
-                                      return ListTile(
-                                        leading: CircleAvatar(
-                                          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                                          child: Icon(
-                                            _typeIcon(refObj.type),
-                                            size: 18,
-                                            color: AppColors.primary,
-                                          ),
+                                    return ListTile(
+                                      leading: CircleAvatar(
+                                        backgroundColor: AppColors.primary
+                                            .withValues(alpha: 0.1),
+                                        child: Icon(
+                                          _typeIcon(refObj.type),
+                                          size: 18,
+                                          color: AppColors.primary,
                                         ),
-                                        title: Text(
-                                          linkedObj?.title ?? refObj.title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                      ),
+                                      title: Text(
+                                        linkedObj?.title ?? refObj.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
                                         ),
-                                        subtitle: Text(
-                                          refObj.type.toUpperCase(),
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            letterSpacing: 1,
-                                          ),
+                                      ),
+                                      subtitle: Text(
+                                        refObj.type.toUpperCase(),
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          letterSpacing: 1,
                                         ),
-                                        trailing: const Icon(
-                                          Icons.chevron_right_rounded,
-                                          size: 16,
-                                          color: AppColors.textMuted,
-                                        ),
-                                        onTap: linkedObj != null
-                                            ? () => Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) => UniversalDetailView(object: linkedObj!),
-                                                ),
-                                              )
-                                            : null,
-                                      );
-                                    },
+                                      ),
+                                      trailing: const Icon(
+                                        Icons.chevron_right_rounded,
+                                        size: 16,
+                                        color: AppColors.textMuted,
+                                      ),
+                                      onTap: linkedObj != null
+                                          ? () => Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    UniversalDetailView(
+                                                      object: linkedObj,
+                                                    ),
+                                              ),
+                                            )
+                                          : null,
+                                    );
+                                  },
+                                ),
+                                if (idx != object.organizers.length - 1)
+                                  const Divider(
+                                    height: 1,
+                                    indent: 56,
+                                    color: AppColors.divider,
                                   ),
-                                  if (idx != object.organizers.length - 1)
-                                    const Divider(
-                                      height: 1,
-                                      indent: 56,
-                                      color: AppColors.divider,
-                                    ),
-                                ],
-                              );
-                            },
-                          ),
+                              ],
+                            );
+                          }),
                         ],
                       ),
                     ),
@@ -472,7 +480,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                             color: AppColors.textMuted.withValues(alpha: 0.5),
                           ),
                           const SizedBox(width: 12),
-                          Text(
+                          const Text(
                             'No reminders set',
                             style: TextStyle(
                               color: AppColors.textMuted,
@@ -488,29 +496,30 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                       decoration: AppTheme.cardDecoration(context),
                       child: Column(
                         children: [
-                          ...object.reminders.map(
-                            (rem) {
-                              final triggerTime = rem.calculateTriggerTime(object.baseTime ?? object.createdAt);
-                              return Column(
-                                children: [
-                                  ListTile(
-                                    leading: Icon(
-                                      rem.type == NotificationType.alarm
-                                          ? Icons.alarm_rounded
-                                          : (rem.type == NotificationType.popup
-                                                ? Icons.picture_in_picture_rounded
-                                                : Icons
-                                                      .notifications_active_rounded),
-                                      color: AppColors.primary,
-                                      size: 20,
+                          ...object.reminders.map((rem) {
+                            final triggerTime = rem.calculateTriggerTime(
+                              object.baseTime ?? object.createdAt,
+                            );
+                            return Column(
+                              children: [
+                                ListTile(
+                                  leading: Icon(
+                                    rem.type == NotificationType.alarm
+                                        ? Icons.alarm_rounded
+                                        : (rem.type == NotificationType.popup
+                                              ? Icons.picture_in_picture_rounded
+                                              : Icons
+                                                    .notifications_active_rounded),
+                                    color: AppColors.primary,
+                                    size: 20,
+                                  ),
+                                  title: Text(
+                                    '${triggerTime.hour}:${triggerTime.minute.toString().padLeft(2, '0')} - ${triggerTime.day}/${triggerTime.month}',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                    title: Text(
-                                      '${triggerTime.hour}:${triggerTime.minute.toString().padLeft(2, '0')} - ${triggerTime.day}/${triggerTime.month}',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                                  ),
                                   subtitle: Text(
                                     rem.notificationBody ??
                                         (rem.type == NotificationType.alarm
@@ -632,23 +641,46 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
   Widget _buildOverflowMenu(BuildContext context, WidgetRef ref) {
     final Map<String, List<String>> typeActions = {
-      'task': ['focus', 'edit', 'change_type', 'save_template', 'archive', 'delete', 'obsidian'],
+      'task': [
+        'focus',
+        'edit',
+        'change_type',
+        'save_template',
+        'archive',
+        'delete',
+        'obsidian',
+      ],
       'habit': ['edit', 'change_type', 'archive', 'delete'],
-      'note': ['edit', 'change_type', 'save_template', 'archive', 'delete', 'obsidian'],
+      'note': [
+        'edit',
+        'change_type',
+        'save_template',
+        'archive',
+        'delete',
+        'obsidian',
+      ],
       'project': ['edit', 'change_type', 'archive', 'delete'],
       'person': ['edit', 'change_type', 'delete'],
       'resource': ['edit', 'change_type', 'archive', 'delete'],
-      'journal_entry': ['edit', 'change_type', 'save_template', 'delete', 'obsidian'],
+      'journal_entry': [
+        'edit',
+        'change_type',
+        'save_template',
+        'delete',
+        'obsidian',
+      ],
       'goal': ['edit', 'change_type', 'archive', 'delete'],
     };
 
-    final actions = typeActions[object.type] ?? ['edit', 'change_type', 'delete'];
+    final actions =
+        typeActions[object.type] ?? ['edit', 'change_type', 'delete'];
 
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_horiz_rounded),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       onSelected: (val) {
-        if (val == 'edit' && (object is Note || object is Resource || object is JournalEntry)) {
+        if (val == 'edit' &&
+            (object is Note || object is Resource || object is JournalEntry)) {
           setState(() => _isEditing = !_isEditing);
         } else {
           _handleAction(context, ref, val);
@@ -890,11 +922,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         ),
         if (mood != null) ...[
           _divider(),
-          _buildPropertyRow(
-            context,
-            'Mood',
-            '${mood.emoji} ${mood.title}',
-          ),
+          _buildPropertyRow(context, 'Mood', '${mood.emoji} ${mood.title}'),
         ] else if (entry.moodSlug != null && entry.moodSlug!.isNotEmpty) ...[
           _divider(),
           _buildPropertyRow(
@@ -1055,7 +1083,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   _buildSubtaskList(context, ref, task.subtasks),
                 ],
                 // ── V2.8.3 Time Estimates vs Actuals ──
-                if (task.estimatedMinutes != null || (task.pomodoroCount != null && task.pomodoroCount! > 0)) ...[
+                if (task.estimatedMinutes != null ||
+                    (task.pomodoroCount != null &&
+                        task.pomodoroCount! > 0)) ...[
                   const SizedBox(height: 24),
                   const Text(
                     'Tempo',
@@ -1338,7 +1368,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                               resource.coverImage!,
                               width: double.infinity,
                               fit: BoxFit.contain, // Not cropped
-                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                              errorBuilder: (_, _, _) =>
+                                  const SizedBox.shrink(),
                             ),
                           ),
                         ),
@@ -1371,7 +1402,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                           content: resource.synopsis ?? '',
                           onChanged: (newVal) {
                             final updated = resource.copyWith(synopsis: newVal);
-                            ref.read(vaultProvider.notifier).updateObject(updated);
+                            ref
+                                .read(vaultProvider.notifier)
+                                .updateObject(updated);
                             setState(() => object = updated);
                           },
                         )
@@ -1926,10 +1959,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         ),
 
         // ─── Records List ───
-        SliverToBoxAdapter(
+        const SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 32, 20, 8),
-            child: const Text(
+            padding: EdgeInsets.fromLTRB(20, 32, 20, 8),
+            child: Text(
               'Records History',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
@@ -2064,17 +2097,17 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             child: Container(
               decoration: AppTheme.cardDecoration(context),
               padding: const EdgeInsets.all(16),
-              child: _isEditing 
-                ? _buildNoteEditor(context, note)
-                : MarkdownBodyView(content: note.body),
+              child: _isEditing
+                  ? _buildNoteEditor(context, note)
+                  : MarkdownBodyView(content: note.body),
             ),
           ),
         ),
         if (childNotes.isNotEmpty) ...[
-          SliverToBoxAdapter(
+          const SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 32, 20, 8),
-              child: const Text(
+              padding: EdgeInsets.fromLTRB(20, 32, 20, 8),
+              child: Text(
                 'Nested Notes',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
               ),
@@ -2385,7 +2418,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   }
 
   void _saveAsTemplate(BuildContext context, WidgetRef ref) async {
-    final titleController = TextEditingController(text: '${object.title} Template');
+    final titleController = TextEditingController(
+      text: '${object.title} Template',
+    );
     String bodyContent = '';
     String templateType = 'note';
     Map<String, dynamic> fmDefaults = {};
@@ -2453,7 +2488,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Template "${newTemplate.title}" criado com sucesso!'),
+            content: Text(
+              'Template "${newTemplate.title}" criado com sucesso!',
+            ),
           ),
         );
       }
@@ -2463,18 +2500,42 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
   void _showChangeTypeSheet(BuildContext context, WidgetRef ref) {
     final types = [
-      {'type': 'task', 'label': 'Tarefa', 'icon': Icons.check_circle_outline_rounded},
+      {
+        'type': 'task',
+        'label': 'Tarefa',
+        'icon': Icons.check_circle_outline_rounded,
+      },
       {'type': 'habit', 'label': 'Hábito', 'icon': Icons.loop_rounded},
-      {'type': 'goal', 'label': 'Objetivo', 'icon': Icons.track_changes_rounded},
+      {
+        'type': 'goal',
+        'label': 'Objetivo',
+        'icon': Icons.track_changes_rounded,
+      },
       {'type': 'note', 'label': 'Nota', 'icon': Icons.article_outlined},
       {'type': 'project', 'label': 'Projeto', 'icon': Icons.folder_outlined},
       {'type': 'area', 'label': 'Área', 'icon': Icons.layers_outlined},
       {'type': 'activity', 'label': 'Atividade', 'icon': Icons.sports_outlined},
-      {'type': 'label', 'label': 'Etiqueta', 'icon': Icons.label_outline_rounded},
-      {'type': 'person', 'label': 'Pessoa', 'icon': Icons.person_outline_rounded},
+      {
+        'type': 'label',
+        'label': 'Etiqueta',
+        'icon': Icons.label_outline_rounded,
+      },
+      {
+        'type': 'person',
+        'label': 'Pessoa',
+        'icon': Icons.person_outline_rounded,
+      },
       {'type': 'place', 'label': 'Lugar', 'icon': Icons.place_outlined},
-      {'type': 'resource', 'label': 'Recurso', 'icon': Icons.menu_book_outlined},
-      {'type': 'tracker_definition', 'label': 'Rastreador', 'icon': Icons.analytics_outlined},
+      {
+        'type': 'resource',
+        'label': 'Recurso',
+        'icon': Icons.menu_book_outlined,
+      },
+      {
+        'type': 'tracker_definition',
+        'label': 'Rastreador',
+        'icon': Icons.analytics_outlined,
+      },
     ];
 
     showModalBottomSheet<void>(
@@ -2504,7 +2565,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             const SizedBox(height: 4),
             Text(
               'Converter "${object.title}" para:',
-              style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: 12),
             Flexible(
@@ -2514,11 +2578,19 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 itemBuilder: (context, index) {
                   final t = types[index];
                   return ListTile(
-                    leading: Icon(t['icon'] as IconData, color: AppColors.primary),
+                    leading: Icon(
+                      t['icon'] as IconData,
+                      color: AppColors.primary,
+                    ),
                     title: Text(t['label'] as String),
                     onTap: () async {
                       Navigator.pop(sheetContext);
-                      await _confirmAndChangeType(context, ref, t['type'] as String, t['label'] as String);
+                      await _confirmAndChangeType(
+                        context,
+                        ref,
+                        t['type'] as String,
+                        t['label'] as String,
+                      );
                     },
                   );
                 },
@@ -2568,19 +2640,25 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         extraFields['organizerType'] = targetType;
       }
 
-      await ref.read(vaultProvider.notifier).changeObjectType(object, newType, extraFields: extraFields);
+      await ref
+          .read(vaultProvider.notifier)
+          .changeObjectType(object, newType, extraFields: extraFields);
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('"${object.title}" convertido para $targetLabel com sucesso!')),
+          SnackBar(
+            content: Text(
+              '"${object.title}" convertido para $targetLabel com sucesso!',
+            ),
+          ),
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao converter tipo: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro ao converter tipo: $e')));
       }
     }
   }
@@ -2621,9 +2699,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         if (exportedId != null && exportedId != task.exportedCalendarId) {
           await ref
               .read(vaultProvider.notifier)
-              .updateObject(
-                task.copyWith(exportedCalendarId: exportedId),
-              );
+              .updateObject(task.copyWith(exportedCalendarId: exportedId));
         }
       }
 
@@ -2724,11 +2800,16 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
   String _translateStage(TaskStage stage) {
     switch (stage) {
-      case TaskStage.idea: return 'Ideia';
-      case TaskStage.todo: return 'A Fazer';
-      case TaskStage.inProgress: return 'Em Progresso';
-      case TaskStage.pending: return 'Pendente';
-      case TaskStage.finalized: return 'Finalizado';
+      case TaskStage.idea:
+        return 'Ideia';
+      case TaskStage.todo:
+        return 'A Fazer';
+      case TaskStage.inProgress:
+        return 'Em Progresso';
+      case TaskStage.pending:
+        return 'Pendente';
+      case TaskStage.finalized:
+        return 'Finalizado';
     }
   }
 
@@ -2984,8 +3065,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           return 'Pessoa';
         case OrganizerType.place:
           return 'Lugar';
-        default:
-          return 'Organizador';
       }
     }
     switch (obj.type) {
@@ -3144,12 +3223,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   Widget _buildTimeEstimateCard(BuildContext context, Task task) {
     final estimated = task.estimatedMinutes ?? 0;
     final actual = task.actualMinutes;
-    
+
     double progress = 0;
     if (estimated > 0) {
       progress = (actual / estimated).clamp(0.0, 1.0);
     }
-    
+
     final isOvertime = actual > estimated && estimated > 0;
 
     String formatTime(int minutes) {
@@ -3172,21 +3251,35 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Estimado', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                  Text(formatTime(estimated), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Estimado',
+                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                  ),
+                  Text(
+                    formatTime(estimated),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text('Real', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                  const Text(
+                    'Real',
+                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                  ),
                   Text(
-                    formatTime(actual), 
+                    formatTime(actual),
                     style: TextStyle(
-                      fontSize: 16, 
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: isOvertime ? AppColors.warning : AppColors.textPrimary,
-                    )
+                      color: isOvertime
+                          ? AppColors.warning
+                          : AppColors.textPrimary,
+                    ),
                   ),
                 ],
               ),
@@ -3211,48 +3304,77 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
-  Widget _buildDependsOnList(BuildContext context, WidgetRef ref, List<String> dependsOnSlugs) {
+  Widget _buildDependsOnList(
+    BuildContext context,
+    WidgetRef ref,
+    List<String> dependsOnSlugs,
+  ) {
     return Container(
       decoration: AppTheme.cardDecoration(context),
       child: Column(
         children: dependsOnSlugs.asMap().entries.map((entry) {
           final idx = entry.key;
           final slug = entry.value;
-          return Consumer(builder: (context, ref, _) {
-            final allObjects = ref.watch(allObjectsProvider).value ?? [];
-            final cleanRef = slug.replaceAll('[[', '').replaceAll(']]', '').trim();
-            final blockingTask = allObjects.cast<ContentObject?>().firstWhere(
-              (o) => o is Task && (o.slug == cleanRef || o.id == cleanRef),
-              orElse: () => null,
-            ) as Task?;
+          return Consumer(
+            builder: (context, ref, _) {
+              final allObjects = ref.watch(allObjectsProvider).value ?? [];
+              final cleanRef = slug
+                  .replaceAll('[[', '')
+                  .replaceAll(']]', '')
+                  .trim();
+              final blockingTask =
+                  allObjects.cast<ContentObject?>().firstWhere(
+                        (o) =>
+                            o is Task &&
+                            (o.slug == cleanRef || o.id == cleanRef),
+                        orElse: () => null,
+                      )
+                      as Task?;
 
-            final isFinalized = blockingTask?.stage == TaskStage.finalized;
-            
-            return Column(
-              children: [
-                ListTile(
-                  leading: Icon(
-                    isFinalized ? Icons.check_circle_rounded : Icons.lock_rounded,
-                    color: isFinalized ? AppColors.habitGreen : AppColors.error,
-                  ),
-                  title: Text(
-                    blockingTask?.title ?? slug,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      decoration: isFinalized ? TextDecoration.lineThrough : null,
+              final isFinalized = blockingTask?.stage == TaskStage.finalized;
+
+              return Column(
+                children: [
+                  ListTile(
+                    leading: Icon(
+                      isFinalized
+                          ? Icons.check_circle_rounded
+                          : Icons.lock_rounded,
+                      color: isFinalized
+                          ? AppColors.habitGreen
+                          : AppColors.error,
                     ),
+                    title: Text(
+                      blockingTask?.title ?? slug,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        decoration: isFinalized
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded, size: 16),
+                    onTap: blockingTask != null
+                        ? () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  UniversalDetailView(object: blockingTask),
+                            ),
+                          )
+                        : null,
                   ),
-                  trailing: const Icon(Icons.chevron_right_rounded, size: 16),
-                  onTap: blockingTask != null 
-                    ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => UniversalDetailView(object: blockingTask)))
-                    : null,
-                ),
-                if (idx != dependsOnSlugs.length - 1)
-                  const Divider(height: 1, indent: 48, color: AppColors.divider),
-              ],
-            );
-          });
+                  if (idx != dependsOnSlugs.length - 1)
+                    const Divider(
+                      height: 1,
+                      indent: 48,
+                      color: AppColors.divider,
+                    ),
+                ],
+              );
+            },
+          );
         }).toList(),
       ),
     );
@@ -4017,5 +4139,4 @@ class _SubtaskListViewState extends State<_SubtaskListView> {
       ),
     );
   }
-
 }

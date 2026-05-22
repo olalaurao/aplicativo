@@ -96,7 +96,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           ),
           _SwitchTabIntent: CallbackAction<_SwitchTabIntent>(
             onInvoke: (intent) {
-              final tabIndex = (intent as _SwitchTabIntent).tabIndex;
+              final tabIndex = (intent).tabIndex;
               _onItemTapped(tabIndex, context, bottomBarItems);
               return null;
             },
@@ -566,9 +566,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       backgroundColor: isDark ? AppColors.darkSurface : AppColors.surface,
       child: Column(
         children: [
-          DrawerHeader(
+          const DrawerHeader(
             decoration: BoxDecoration(gradient: AppTheme.primaryGradient),
-            child: const Center(
+            child: Center(
               child: Text(
                 'History',
                 style: TextStyle(

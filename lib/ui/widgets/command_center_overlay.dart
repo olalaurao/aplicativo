@@ -2,7 +2,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../theme.dart';
 import '../../providers/vault_provider.dart';
@@ -46,7 +45,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
       curve: Curves.easeOutCubic,
     );
     _animationController.forward();
-    
+
     // Auto-focus after the build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _searchFocus.requestFocus();
@@ -110,16 +109,17 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
   }
 
   void _openObject(ContentObject item) {
+    final navigator = Navigator.of(context);
     _close();
     Future.delayed(const Duration(milliseconds: 200), () {
       if (item is Organizer) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => OrganizerDetailScreen(organizer: item)),
+        navigator.push(
+          MaterialPageRoute(
+            builder: (_) => OrganizerDetailScreen(organizer: item),
+          ),
         );
       } else {
-        Navigator.push(
-          context,
+        navigator.push(
           MaterialPageRoute(builder: (_) => UniversalDetailView(object: item)),
         );
       }
@@ -129,33 +129,53 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
   @override
   Widget build(BuildContext context) {
     final query = _searchController.text.toLowerCase();
-    
+
     // Providers
     final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
     final history = ref.watch(historyProvider);
     final notes = ref.watch(notesProvider);
     final organizers = ref.watch(organizersProvider);
     // Instead of sessions, let's just fetch tasks due today or upcoming
-    final upcomingTasks = allObjects.whereType<Task>().where((t) => t.deadline != null && t.deadline!.isAfter(DateTime.now().subtract(const Duration(days: 1)))).toList()
-      ..sort((a, b) => a.deadline!.compareTo(b.deadline!));
+    final upcomingTasks =
+        allObjects
+            .whereType<Task>()
+            .where(
+              (t) =>
+                  t.deadline != null &&
+                  t.deadline!.isAfter(
+                    DateTime.now().subtract(const Duration(days: 1)),
+                  ),
+            )
+            .toList()
+          ..sort((a, b) => a.deadline!.compareTo(b.deadline!));
     final nextTasks = upcomingTasks.take(3).toList();
 
     // Notes sorted by updated at
-    final sortedNotes = List<Note>.from(notes)..sort((a, b) {
-      final aTime = a.updatedAt ?? a.createdAt ?? DateTime(0);
-      final bTime = b.updatedAt ?? b.createdAt ?? DateTime(0);
-      return bTime.compareTo(aTime);
-    });
+    final sortedNotes = List<Note>.from(notes)
+      ..sort((a, b) {
+        final aTime = a.updatedAt;
+        final bTime = b.updatedAt;
+        return bTime.compareTo(aTime);
+      });
     final recentNotes = sortedNotes.take(5).toList();
 
     // Organizers sorted by access frequency - actually we just take first 5
     final topOrganizers = organizers.take(5).toList();
 
     // Map history ids to real objects
-    final recentObjects = history.map((h) => allObjects.where((o) => o.id == h.id).firstOrNull).whereType<ContentObject>().take(8).toList();
+    final recentObjects = history
+        .map((h) => allObjects.where((o) => o.id == h.id).firstOrNull)
+        .whereType<ContentObject>()
+        .take(8)
+        .toList();
 
     final isSearching = query.isNotEmpty;
-    final searchResults = isSearching ? allObjects.where((o) => o.title.toLowerCase().contains(query)).take(15).toList() : <ContentObject>[];
+    final searchResults = isSearching
+        ? allObjects
+              .where((o) => o.title.toLowerCase().contains(query))
+              .take(15)
+              .toList()
+        : <ContentObject>[];
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -177,14 +197,18 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                 ),
               ),
             ),
-            
+
             // Sliding Panel
             SafeArea(
               child: AnimatedBuilder(
                 animation: _slideAnimation,
                 builder: (context, child) {
                   return Transform.translate(
-                    offset: Offset(0, -MediaQuery.of(context).size.height * (1 - _slideAnimation.value)),
+                    offset: Offset(
+                      0,
+                      -MediaQuery.of(context).size.height *
+                          (1 - _slideAnimation.value),
+                    ),
                     child: child,
                   );
                 },
@@ -197,7 +221,9 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                         decoration: BoxDecoration(
                           color: AppTheme.cardFillColor(context),
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppTheme.dividerColor(context)),
+                          border: Border.all(
+                            color: AppTheme.dividerColor(context),
+                          ),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.05),
@@ -210,48 +236,105 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                           controller: _searchController,
                           focusNode: _searchFocus,
                           onChanged: (_) => setState(() {}),
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                          ),
                           decoration: InputDecoration(
                             hintText: 'O que você precisa?',
                             border: InputBorder.none,
-                            prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary),
-                            suffixIcon: isSearching ? IconButton(
-                              icon: const Icon(Icons.close_rounded, size: 20),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {});
-                              },
-                            ) : null,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            prefixIcon: const Icon(
+                              Icons.search_rounded,
+                              color: AppColors.primary,
+                            ),
+                            suffixIcon: isSearching
+                                ? IconButton(
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      size: 20,
+                                    ),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {});
+                                    },
+                                  )
+                                : null,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                    
+
                     // Quick Actions (always visible)
                     if (!isSearching)
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: Row(
                             children: [
-                              _buildQuickAction(context, 'Nova Entrada', Icons.menu_book_rounded, () {
-                                _close();
-                                Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateEntryForm()));
-                              }),
-                              _buildQuickAction(context, 'Nova Task', Icons.check_box_outlined, () {
-                                _close();
-                                Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateTaskForm()));
-                              }),
-                              _buildQuickAction(context, 'Novo Registro', Icons.analytics_outlined, () {
-                                _close();
-                                Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateTrackerForm()));
-                              }),
-                              _buildQuickAction(context, 'Nova Nota', Icons.description_outlined, () {
-                                _close();
-                                Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateNoteForm()));
-                              }),
+                              _buildQuickAction(
+                                context,
+                                'Nova Entrada',
+                                Icons.menu_book_rounded,
+                                () {
+                                  _close();
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const CreateEntryForm(),
+                                    ),
+                                  );
+                                },
+                              ),
+                              _buildQuickAction(
+                                context,
+                                'Nova Task',
+                                Icons.check_box_outlined,
+                                () {
+                                  _close();
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const CreateTaskForm(),
+                                    ),
+                                  );
+                                },
+                              ),
+                              _buildQuickAction(
+                                context,
+                                'Novo Registro',
+                                Icons.analytics_outlined,
+                                () {
+                                  _close();
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const CreateTrackerForm(),
+                                    ),
+                                  );
+                                },
+                              ),
+                              _buildQuickAction(
+                                context,
+                                'Nova Nota',
+                                Icons.description_outlined,
+                                () {
+                                  _close();
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const CreateNoteForm(),
+                                    ),
+                                  );
+                                },
+                              ),
                             ],
                           ),
                         ),
@@ -261,7 +344,12 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                     Expanded(
                       child: isSearching
                           ? _buildSearchResults(searchResults)
-                          : _buildDashboardSections(recentObjects, recentNotes, nextTasks, topOrganizers),
+                          : _buildDashboardSections(
+                              recentObjects,
+                              recentNotes,
+                              nextTasks,
+                              topOrganizers,
+                            ),
                     ),
                   ],
                 ),
@@ -273,7 +361,12 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
     );
   }
 
-  Widget _buildQuickAction(BuildContext context, String label, IconData icon, VoidCallback onTap) {
+  Widget _buildQuickAction(
+    BuildContext context,
+    String label,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Material(
@@ -293,7 +386,13 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
               children: [
                 Icon(icon, size: 16, color: AppColors.primary),
                 const SizedBox(width: 8),
-                Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
@@ -302,23 +401,48 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
     );
   }
 
-  Widget _buildDashboardSections(List<ContentObject> recent, List<Note> notes, List<Task> tasks, List<Organizer> organizers) {
+  Widget _buildDashboardSections(
+    List<ContentObject> recent,
+    List<Note> notes,
+    List<Task> tasks,
+    List<Organizer> organizers,
+  ) {
     return ListView(
       padding: const EdgeInsets.only(bottom: 24),
       children: [
         if (recent.isNotEmpty)
-          _buildHorizontalSection('Recentes', recent, (obj) => _buildObjectChip(obj)),
+          _buildHorizontalSection(
+            'Recentes',
+            recent,
+            (obj) => _buildObjectChip(obj),
+          ),
         if (notes.isNotEmpty)
-          _buildHorizontalSection('Notas Recentes', notes, (obj) => _buildObjectChip(obj)),
+          _buildHorizontalSection(
+            'Notas Recentes',
+            notes,
+            (obj) => _buildObjectChip(obj),
+          ),
         if (tasks.isNotEmpty)
-          _buildHorizontalSection('Próximas Tasks', tasks, (obj) => _buildObjectChip(obj)),
+          _buildHorizontalSection(
+            'Próximas Tasks',
+            tasks,
+            (obj) => _buildObjectChip(obj),
+          ),
         if (organizers.isNotEmpty)
-          _buildHorizontalSection('Organizers', organizers, (obj) => _buildObjectChip(obj)),
+          _buildHorizontalSection(
+            'Organizers',
+            organizers,
+            (obj) => _buildObjectChip(obj),
+          ),
       ],
     );
   }
 
-  Widget _buildHorizontalSection<T extends ContentObject>(String title, List<T> items, Widget Function(T) builder) {
+  Widget _buildHorizontalSection<T extends ContentObject>(
+    String title,
+    List<T> items,
+    Widget Function(T) builder,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(top: 20),
       child: Column(
@@ -328,7 +452,11 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
               title,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textMuted),
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textMuted,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -336,10 +464,14 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
-              children: items.map((e) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: builder(e),
-              )).toList(),
+              children: items
+                  .map(
+                    (e) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: builder(e),
+                    ),
+                  )
+                  .toList(),
             ),
           ),
         ],
@@ -359,7 +491,9 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.dividerColor(context).withValues(alpha: 0.5)),
+            border: Border.all(
+              color: AppTheme.dividerColor(context).withValues(alpha: 0.5),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -370,7 +504,10 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                 obj.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),
@@ -398,7 +535,10 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
             child: _buildTypeIcon(obj.type),
           ),
           title: Text(obj.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-          subtitle: Text(obj.type.toUpperCase(), style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
+          subtitle: Text(
+            obj.type.toUpperCase(),
+            style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+          ),
           onTap: () => _openObject(obj),
         );
       },

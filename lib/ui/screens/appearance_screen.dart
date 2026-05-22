@@ -33,18 +33,18 @@ class AppearanceScreen extends StatelessWidget {
           Container(
             decoration: AppTheme.cardDecoration(context),
             padding: const EdgeInsets.all(16),
-            child: Column(
+            child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Accent Colors',
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: const [
+                  children: [
                     _Swatch(AppColors.primary),
                     _Swatch(AppColors.info),
                     _Swatch(AppColors.habitGreen),

@@ -216,7 +216,7 @@ class Task extends ContentObject {
         if (currentSessionName != null) {
           derivedSessions.add(
             SubtaskSession(
-              id: currentSessionId ?? Uuid().v4(),
+              id: currentSessionId ?? const Uuid().v4(),
               name: currentSessionName,
               subtaskIds: currentSubtaskIds,
             ),
@@ -236,13 +236,13 @@ class Task extends ContentObject {
     if (currentSessionName != null) {
       derivedSessions.add(
         SubtaskSession(
-          id: currentSessionId ?? Uuid().v4(),
+          id: currentSessionId ?? const Uuid().v4(),
           name: currentSessionName,
           subtaskIds: currentSubtaskIds,
         ),
       );
     }
-    this.sessions = derivedSessions;
+    sessions = derivedSessions;
 
     if (sessions.isNotEmpty) {
       frontmatter['sessions'] = sessions.map((s) => s.toMap()).toList();

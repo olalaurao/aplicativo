@@ -238,7 +238,7 @@ class _NavigationShortcutPickerState
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
+            child: const Text(
               'Pin to Footer',
               style: TextStyle(color: AppColors.primary),
             ),

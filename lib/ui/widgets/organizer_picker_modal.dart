@@ -21,7 +21,9 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
   List<OrganizerReference> initialSelected,
 ) async {
   final allObjects = await ref.read(allObjectsProvider.future);
-  final List<ContentObject> mutableObjects = List.from(allObjects.where((o) => o.title.isNotEmpty));
+  final List<ContentObject> mutableObjects = List.from(
+    allObjects.where((o) => o.title.isNotEmpty),
+  );
 
   if (!context.mounted) return null;
 
@@ -70,8 +72,6 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
           return 'Pessoa';
         case OrganizerType.place:
           return 'Lugar';
-        default:
-          return 'Organizador';
       }
     }
     switch (obj.type) {
@@ -127,14 +127,34 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
     ValueChanged<ContentObject> onCreated,
   ) {
     final types = [
-      {'type': 'task', 'label': 'Tarefa', 'icon': Icons.check_circle_outline_rounded},
+      {
+        'type': 'task',
+        'label': 'Tarefa',
+        'icon': Icons.check_circle_outline_rounded,
+      },
       {'type': 'habit', 'label': 'Hábito', 'icon': Icons.loop_rounded},
-      {'type': 'goal', 'label': 'Objetivo', 'icon': Icons.track_changes_rounded},
+      {
+        'type': 'goal',
+        'label': 'Objetivo',
+        'icon': Icons.track_changes_rounded,
+      },
       {'type': 'note', 'label': 'Nota', 'icon': Icons.article_outlined},
       {'type': 'project', 'label': 'Projeto', 'icon': Icons.folder_outlined},
-      {'type': 'area', 'label': 'Área (Organizador)', 'icon': Icons.layers_outlined},
-      {'type': 'person', 'label': 'Pessoa', 'icon': Icons.person_outline_rounded},
-      {'type': 'resource', 'label': 'Recurso', 'icon': Icons.menu_book_outlined},
+      {
+        'type': 'area',
+        'label': 'Área (Organizador)',
+        'icon': Icons.layers_outlined,
+      },
+      {
+        'type': 'person',
+        'label': 'Pessoa',
+        'icon': Icons.person_outline_rounded,
+      },
+      {
+        'type': 'resource',
+        'label': 'Recurso',
+        'icon': Icons.menu_book_outlined,
+      },
     ];
 
     showModalBottomSheet<void>(
@@ -169,7 +189,10 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
                 itemBuilder: (context, index) {
                   final t = types[index];
                   return ListTile(
-                    leading: Icon(t['icon'] as IconData, color: AppColors.primary),
+                    leading: Icon(
+                      t['icon'] as IconData,
+                      color: AppColors.primary,
+                    ),
                     title: Text(t['label'] as String),
                     onTap: () async {
                       Navigator.pop(sheetContext); // Close type sheet
@@ -245,7 +268,9 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
                       }
 
                       try {
-                        await ref.read(vaultProvider.notifier).createObject(newObj);
+                        await ref
+                            .read(vaultProvider.notifier)
+                            .createObject(newObj);
                         onCreated(newObj);
                       } catch (e) {
                         if (context.mounted) {
@@ -279,9 +304,16 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
           var displayObjects = mutableObjects.where((obj) {
             if (selectedFilter != 'all') {
               if (selectedFilter == 'area') {
-                if (obj is! Organizer || (obj as Organizer).organizerType != OrganizerType.area) return false;
+                if (obj is! Organizer ||
+                    (obj).organizerType != OrganizerType.area) {
+                  return false;
+                }
               } else if (selectedFilter == 'project') {
-                if (obj.type != 'project' && (obj is! Organizer || (obj as Organizer).organizerType != OrganizerType.project)) return false;
+                if (obj.type != 'project' &&
+                    (obj is! Organizer ||
+                        (obj).organizerType != OrganizerType.project)) {
+                  return false;
+                }
               } else {
                 if (obj.type != selectedFilter) return false;
               }
@@ -291,7 +323,10 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
 
           // Apply search query
           if (searchQuery.trim().isNotEmpty) {
-            displayObjects = searchService.search(displayObjects, searchQuery.trim());
+            displayObjects = searchService.search(
+              displayObjects,
+              searchQuery.trim(),
+            );
           }
 
           return Container(
@@ -337,7 +372,10 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide.none,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -352,13 +390,19 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
                       buildFilterChip('task', 'Tarefas', selectedFilter, (val) {
                         setModalState(() => selectedFilter = val);
                       }),
-                      buildFilterChip('habit', 'Hábitos', selectedFilter, (val) {
+                      buildFilterChip('habit', 'Hábitos', selectedFilter, (
+                        val,
+                      ) {
                         setModalState(() => selectedFilter = val);
                       }),
-                      buildFilterChip('goal', 'Objetivos', selectedFilter, (val) {
+                      buildFilterChip('goal', 'Objetivos', selectedFilter, (
+                        val,
+                      ) {
                         setModalState(() => selectedFilter = val);
                       }),
-                      buildFilterChip('project', 'Projetos', selectedFilter, (val) {
+                      buildFilterChip('project', 'Projetos', selectedFilter, (
+                        val,
+                      ) {
                         setModalState(() => selectedFilter = val);
                       }),
                       buildFilterChip('area', 'Áreas', selectedFilter, (val) {
@@ -367,10 +411,14 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
                       buildFilterChip('note', 'Notas', selectedFilter, (val) {
                         setModalState(() => selectedFilter = val);
                       }),
-                      buildFilterChip('resource', 'Recursos', selectedFilter, (val) {
+                      buildFilterChip('resource', 'Recursos', selectedFilter, (
+                        val,
+                      ) {
                         setModalState(() => selectedFilter = val);
                       }),
-                      buildFilterChip('person', 'Pessoas', selectedFilter, (val) {
+                      buildFilterChip('person', 'Pessoas', selectedFilter, (
+                        val,
+                      ) {
                         setModalState(() => selectedFilter = val);
                       }),
                     ],
@@ -383,11 +431,18 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.search_off_rounded, size: 48, color: AppColors.textMuted),
+                              Icon(
+                                Icons.search_off_rounded,
+                                size: 48,
+                                color: AppColors.textMuted,
+                              ),
                               SizedBox(height: 12),
                               Text(
                                 'Nenhum objeto encontrado',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ],
                           ),
@@ -433,7 +488,11 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
                               onTap: () {
                                 setModalState(() {
                                   if (isSelected) {
-                                    selected.removeWhere((o) => o.slug == obj.id || o.slug == obj.slug);
+                                    selected.removeWhere(
+                                      (o) =>
+                                          o.slug == obj.id ||
+                                          o.slug == obj.slug,
+                                    );
                                   } else {
                                     selected.add(
                                       OrganizerReference(

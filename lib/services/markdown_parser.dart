@@ -198,9 +198,6 @@ class MarkdownParser {
   static final _tagRegex = RegExp(r'#(\w+)');
   static final _mentionRegex = RegExp(r'@(\w+)');
   static final _subtaskRegex = RegExp(r'^\s*-\s*\[([ xX])\]\s*(.*)$');
-  static final _dateRegex = RegExp(r'(\d{4}-\d{2}-\d{2})');
-  static final _journalTimeRegex = RegExp(r'^(\d{1,2}:\d{2})(?:\s*-\s*(.*))?');
-  static final _moodRegex = RegExp(r'mood::\s*\[\[(.*?)\]\]');
   static final _orgsRegex = RegExp(r'organizers::\s*(.*)');
   static final _pomodoroHeaderRegex = RegExp(r'^(\d{2}:\d{2})\s*[—-]\s*(.*)');
 
@@ -370,9 +367,15 @@ class MarkdownParser {
 
         final entryBody = entryBodyLines.join('\n').trim();
 
-        // Extract inline dataview fields like mood:: [[good]]
-        final moodMatch = _moodRegex.firstMatch(section);
-        final moodSlug = moodMatch?.group(1);
+        // Extract inline dataview fields like mood:: [[good]], [[calm]]
+        final moodLineMatch = RegExp(
+          r'^mood::\s*(.*)$',
+          multiLine: true,
+        ).firstMatch(section);
+        final moodLinks = moodLineMatch == null
+            ? const <String>[]
+            : extractWikiLinks(moodLineMatch.group(1)!);
+        final moodSlug = moodLinks.isEmpty ? null : moodLinks.join(', ');
 
         final orgsMatch = _orgsRegex.firstMatch(section);
         final orgsList = <OrganizerReference>[];
@@ -522,7 +525,14 @@ class MarkdownParser {
         buffer.writeln(entry['body'].toString().trim());
         buffer.writeln();
         if (entry['mood'] != null) {
-          buffer.writeln('mood:: [[${entry['mood']}]]');
+          final moods = entry['mood']
+              .toString()
+              .split(RegExp(r'[,;|]'))
+              .map((mood) => mood.trim())
+              .where((mood) => mood.isNotEmpty)
+              .map((mood) => mood.startsWith('[[') ? mood : '[[$mood]]')
+              .join(', ');
+          if (moods.isNotEmpty) buffer.writeln('mood:: $moods');
         }
         if (entry['organizers'] != null &&
             (entry['organizers'] as List).isNotEmpty) {

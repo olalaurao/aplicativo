@@ -18,21 +18,25 @@ class JournalBodyView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ops = MarkdownParser.tryParseDeltaOps(body);
-    final effectiveStyle =
-        style ??
-        TextStyle(
-          fontSize: 14,
-          color: Theme.of(context).brightness == Brightness.dark
-              ? AppColors.darkTextSecondary
-              : AppColors.textSecondary,
-          height: 1.4,
-        );
+    final defaultStyle = TextStyle(
+      fontSize: 14,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? AppColors.darkTextSecondary
+          : AppColors.textSecondary,
+      height: 1.4,
+    );
+    final effectiveStyle = defaultStyle.merge(style);
 
     if (ops == null) {
-      return MarkdownBodyView(
-        content: body,
-        shrinkWrap: true,
-      );
+      if (maxLines != null) {
+        return Text(
+          MarkdownParser.getPlainTextFromBody(body),
+          maxLines: maxLines,
+          overflow: TextOverflow.ellipsis,
+          style: effectiveStyle,
+        );
+      }
+      return MarkdownBodyView(content: body, shrinkWrap: true);
     }
 
     final spans = <InlineSpan>[];

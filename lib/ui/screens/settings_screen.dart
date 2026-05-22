@@ -71,649 +71,800 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             padding: const EdgeInsets.all(20),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-          _section('Obsidian Link'),
-          const SizedBox(height: 12),
-          Container(
-            decoration: AppTheme.cardDecoration(context),
-            child: Column(
-              children: [
-                ListTile(
-                  title: const Text(
-                    'Vault Folder (Local)',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: Text(
-                    settings.vaultPath.isEmpty
-                        ? 'Default (Documents/Citrine)'
-                        : settings.vaultPath,
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(
-                    Icons.folder_open_rounded,
-                    size: 20,
-                    color: AppColors.primary,
-                  ),
-                  onTap: () async {
-                    String? result = await FilePicker.platform
-                        .getDirectoryPath();
-                    if (result != null) {
-                      await notifier.updateVaultPath(result);
-                      await ref
-                          .read(obsidianServiceProvider)
-                          .initVault(settings.vaultName, customPath: result);
-                    }
-                  },
-                ),
-                const Divider(height: 1, indent: 16),
-                ListTile(
-                  title: const Text(
-                    'Vault Name',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: Text(
-                    settings.vaultName,
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(Icons.edit_note_rounded, size: 20),
-                  onTap: () => _showVaultDialog(context, notifier),
-                ),
-                const Divider(height: 1, indent: 16),
-                ListTile(
-                  title: const Text(
-                    'Importar Vault Existente',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: const Text(
-                    'Copia arquivos .md de um diretório externo para o vault interno.',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(Icons.drive_folder_upload_rounded, size: 20, color: AppColors.primary),
-                  onTap: () async {
-                    String? result = await FilePicker.platform.getDirectoryPath();
-                    if (result != null) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Importando vault...')));
-                      await ref.read(vaultProvider.notifier).importExistingVault(result);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vault importado com sucesso!')));
-                      }
-                    }
-                  },
-                ),
-                const Divider(height: 1, indent: 16),
-                _switchTileSimple('Sync Hidden Files', false, (v) {}),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          _section('Interface Customization'),
-          const SizedBox(height: 12),
-          _buildBottomBarEditor(),
-          const SizedBox(height: 12),
-          Container(
-            decoration: AppTheme.cardDecoration(context),
-            child: ListTile(
-              title: const Text(
-                'Mood Definitions',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const MoodSettingsScreen()),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            decoration: AppTheme.cardDecoration(context),
-            child: ListTile(
-              title: const Text(
-                'Schedules Management',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const SchedulerManagementScreen(),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            decoration: AppTheme.cardDecoration(context),
-            child: ListTile(
-              title: const Text(
-                'Day Themes & Time Blocks',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const DayThemeScreen(),
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            decoration: AppTheme.cardDecoration(context),
-            child: ListTile(
-              title: const Text(
-                'Manage Categories',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const CategoryManagementScreen(),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _switchTile(
-            'Natural Language Task Parsing',
-            settings.nlpTaskParsingEnabled,
-            (v) => notifier.updateNlpTaskParsingEnabled(v),
-          ),
-
-          const SizedBox(height: 24),
-          _section('External Connections'),
-          const SizedBox(height: 12),
-          _buildGoogleCalendarTile(),
-          const SizedBox(height: 24),
-          _section('Synchronization'),
-          const SizedBox(height: 12),
-          _switchTile('Auto-Sync in Background', settings.autoSync, (
-            value,
-          ) async {
-            await notifier.updateAutoSync(value);
-            await PomodoroBackgroundService.setAutoSyncEnabled(value);
-          }),
-          _switchTile(
-            'Conflicts: Keep Most Recent',
-            settings.conflictKeepNewest,
-            notifier.updateConflictResolution,
-          ),
-          const SizedBox(height: 12),
-          Container(
-            decoration: AppTheme.cardDecoration(context),
-            child: ListTile(
-              title: const Text(
-                'Google Drive Folder',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-              ),
-              subtitle: Text(
-                settings.driveSyncFolderPath.isNotEmpty
-                    ? settings.driveSyncFolderPath
-                    : settings.driveSyncFolder,
-                style: const TextStyle(fontSize: 12),
-              ),
-              trailing: const Icon(
-                Icons.cloud_sync_rounded,
-                size: 20,
-                color: AppColors.info,
-              ),
-              onTap: () => _showDriveFolderPicker(context, notifier),
-            ),
-          ),
-          const SizedBox(height: 24),
-          _section('Notifications'),
-          const SizedBox(height: 12),
-          _switchTile(
-            'Habit Reminders',
-            settings.habitReminders,
-            notifier.updateHabitReminders,
-          ),
-          _switchTile(
-            'Pomodoro Sounds',
-            settings.pomodoroSounds,
-            notifier.updatePomodoroSounds,
-          ),
-          Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            decoration: AppTheme.cardDecoration(context),
-            child: ListTile(
-              title: const Text(
-                'Notification Appearance',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-              ),
-              subtitle: const Text(
-                'Customize colors and buttons for popups & alarms',
-                style: TextStyle(fontSize: 12),
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NotificationSettingsScreen()),
-              ),
-            ),
-          ),
-          Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            decoration: AppTheme.cardDecoration(context),
-            child: Column(
-              children: [
-                ListTile(
-                  title: const Text(
-                    'Dormir Até Mais Tarde',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: Text(
-                    settings.sleepInTomorrow
-                        ? 'Ignorar alarmes de hábitos amanhã até ${settings.sleepInUntil}'
-                        : 'Ignorar alarmes de hábitos do dia seguinte',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: Switch.adaptive(
-                    value: settings.sleepInTomorrow,
-                    onChanged: (v) async {
-                      await notifier.updateSleepInTomorrow(v);
-                      await ref.read(vaultProvider.notifier).rescheduleAllHabits();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(v
-                                ? 'Modo dormir ativado: alarmes de hábitos ignorados até ${settings.sleepInUntil} de amanhã.'
-                                : 'Alarmes de hábitos restaurados.'),
+                _section('Obsidian Link'),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        title: const Text(
+                          'Vault Folder (Local)',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
                           ),
-                        );
-                      }
-                    },
-                    activeThumbColor: AppColors.primary,
+                        ),
+                        subtitle: Text(
+                          settings.vaultPath.isEmpty
+                              ? 'Default (Documents/Citrine)'
+                              : settings.vaultPath,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        trailing: const Icon(
+                          Icons.folder_open_rounded,
+                          size: 20,
+                          color: AppColors.primary,
+                        ),
+                        onTap: () async {
+                          String? result = await FilePicker.platform
+                              .getDirectoryPath();
+                          if (result != null) {
+                            await notifier.updateVaultPath(result);
+                            await ref
+                                .read(obsidianServiceProvider)
+                                .initVault(
+                                  settings.vaultName,
+                                  customPath: result,
+                                );
+                          }
+                        },
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      ListTile(
+                        title: const Text(
+                          'Vault Name',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(
+                          settings.vaultName,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        trailing: const Icon(Icons.edit_note_rounded, size: 20),
+                        onTap: () => _showVaultDialog(context, notifier),
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      ListTile(
+                        title: const Text(
+                          'Importar Vault Existente',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Copia arquivos .md de um diretório externo para o vault interno.',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        trailing: const Icon(
+                          Icons.drive_folder_upload_rounded,
+                          size: 20,
+                          color: AppColors.primary,
+                        ),
+                        onTap: () async {
+                          String? result = await FilePicker.platform
+                              .getDirectoryPath();
+                          if (!context.mounted) return;
+                          if (result != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Importando vault...'),
+                              ),
+                            );
+                            await ref
+                                .read(vaultProvider.notifier)
+                                .importExistingVault(result);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Vault importado com sucesso!'),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      _switchTileSimple('Sync Hidden Files', false, (v) {}),
+                    ],
                   ),
                 ),
-                if (settings.sleepInTomorrow) ...[
-                  const Divider(height: 1, indent: 16),
-                  ListTile(
+                const SizedBox(height: 24),
+                _section('Interface Customization'),
+                const SizedBox(height: 12),
+                _buildBottomBarEditor(),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: ListTile(
                     title: const Text(
-                      'Silenciar alarmes até',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                      'Mood Definitions',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MoodSettingsScreen(),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: ListTile(
+                    title: const Text(
+                      'Schedules Management',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SchedulerManagementScreen(),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: ListTile(
+                    title: const Text(
+                      'Day Themes & Time Blocks',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DayThemeScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: ListTile(
+                    title: const Text(
+                      'Manage Categories',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const CategoryManagementScreen(),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _switchTile(
+                  'Natural Language Task Parsing',
+                  settings.nlpTaskParsingEnabled,
+                  (v) => notifier.updateNlpTaskParsingEnabled(v),
+                ),
+
+                const SizedBox(height: 24),
+                _section('External Connections'),
+                const SizedBox(height: 12),
+                _buildGoogleCalendarTile(),
+                const SizedBox(height: 24),
+                _section('Synchronization'),
+                const SizedBox(height: 12),
+                _switchTile('Auto-Sync in Background', settings.autoSync, (
+                  value,
+                ) async {
+                  await notifier.updateAutoSync(value);
+                  await PomodoroBackgroundService.setAutoSyncEnabled(value);
+                }),
+                _switchTile(
+                  'Conflicts: Keep Most Recent',
+                  settings.conflictKeepNewest,
+                  notifier.updateConflictResolution,
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: ListTile(
+                    title: const Text(
+                      'Google Drive Folder',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     subtitle: Text(
-                      settings.sleepInUntil,
-                      style: const TextStyle(fontSize: 12, color: AppColors.primary),
+                      settings.driveSyncFolderPath.isNotEmpty
+                          ? settings.driveSyncFolderPath
+                          : settings.driveSyncFolder,
+                      style: const TextStyle(fontSize: 12),
                     ),
-                    trailing: const Icon(Icons.access_time_rounded, color: AppColors.primary),
-                    onTap: () async {
-                      final parts = settings.sleepInUntil.split(':');
-                      final hour = int.tryParse(parts.first) ?? 10;
-                      final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
-                      final picked = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay(hour: hour, minute: minute),
-                      );
-                      if (picked != null) {
-                        final formattedTime = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
-                        await notifier.updateSleepInUntil(formattedTime);
-                        await ref.read(vaultProvider.notifier).rescheduleAllHabits();
-                        if (context.mounted) {
+                    trailing: const Icon(
+                      Icons.cloud_sync_rounded,
+                      size: 20,
+                      color: AppColors.info,
+                    ),
+                    onTap: () => _showDriveFolderPicker(context, notifier),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _section('Notifications'),
+                const SizedBox(height: 12),
+                _switchTile(
+                  'Habit Reminders',
+                  settings.habitReminders,
+                  notifier.updateHabitReminders,
+                ),
+                _switchTile(
+                  'Pomodoro Sounds',
+                  settings.pomodoroSounds,
+                  notifier.updatePomodoroSounds,
+                ),
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: AppTheme.cardDecoration(context),
+                  child: ListTile(
+                    title: const Text(
+                      'Notification Appearance',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Customize colors and buttons for popups & alarms',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationSettingsScreen(),
+                      ),
+                    ),
+                  ),
+                ),
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: AppTheme.cardDecoration(context),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        title: const Text(
+                          'Dormir Até Mais Tarde',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(
+                          settings.sleepInTomorrow
+                              ? 'Ignorar alarmes de hábitos amanhã até ${settings.sleepInUntil}'
+                              : 'Ignorar alarmes de hábitos do dia seguinte',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        trailing: Switch.adaptive(
+                          value: settings.sleepInTomorrow,
+                          onChanged: (v) async {
+                            await notifier.updateSleepInTomorrow(v);
+                            await ref
+                                .read(vaultProvider.notifier)
+                                .rescheduleAllHabits();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    v
+                                        ? 'Modo dormir ativado: alarmes de hábitos ignorados até ${settings.sleepInUntil} de amanhã.'
+                                        : 'Alarmes de hábitos restaurados.',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          activeThumbColor: AppColors.primary,
+                        ),
+                      ),
+                      if (settings.sleepInTomorrow) ...[
+                        const Divider(height: 1, indent: 16),
+                        ListTile(
+                          title: const Text(
+                            'Silenciar alarmes até',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          subtitle: Text(
+                            settings.sleepInUntil,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          trailing: const Icon(
+                            Icons.access_time_rounded,
+                            color: AppColors.primary,
+                          ),
+                          onTap: () async {
+                            final parts = settings.sleepInUntil.split(':');
+                            final hour = int.tryParse(parts.first) ?? 10;
+                            final minute = parts.length > 1
+                                ? int.tryParse(parts[1]) ?? 0
+                                : 0;
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime: TimeOfDay(
+                                hour: hour,
+                                minute: minute,
+                              ),
+                            );
+                            if (picked != null) {
+                              final formattedTime =
+                                  '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                              await notifier.updateSleepInUntil(formattedTime);
+                              await ref
+                                  .read(vaultProvider.notifier)
+                                  .rescheduleAllHabits();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Alarmes de hábitos serão silenciados até $formattedTime de amanhã.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (Platform.isAndroid) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: AppTheme.cardDecoration(context),
+                    child: Column(
+                      children: [
+                        FutureBuilder<bool>(
+                          future: PermissionService.canScheduleExactAlarms(),
+                          builder: (context, snap) {
+                            final granted = snap.data ?? true;
+                            return ListTile(
+                              leading: Icon(
+                                granted
+                                    ? Icons.check_circle_rounded
+                                    : Icons.warning_amber_rounded,
+                                color: granted
+                                    ? AppColors.success
+                                    : AppColors.warning,
+                                size: 20,
+                              ),
+                              title: const Text(
+                                'Exact Alarm Permission',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              subtitle: Text(
+                                granted
+                                    ? 'Granted — alarms fire at exact times'
+                                    : 'Not granted — alarms may be delayed',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              trailing: granted
+                                  ? null
+                                  : TextButton(
+                                      onPressed: () async {
+                                        await PermissionService.showExactAlarmPermissionDialog(
+                                          context,
+                                        );
+                                        setState(() {}); // Refresh status
+                                      },
+                                      child: const Text(
+                                        'Grant',
+                                        style: TextStyle(fontSize: 13),
+                                      ),
+                                    ),
+                            );
+                          },
+                        ),
+                        const Divider(height: 1, indent: 16),
+                        FutureBuilder<bool>(
+                          future: PermissionService.checkFullScreenIntent(),
+                          builder: (context, snap) {
+                            final granted = snap.data ?? true;
+                            return ListTile(
+                              leading: Icon(
+                                granted
+                                    ? Icons.check_circle_rounded
+                                    : Icons.warning_amber_rounded,
+                                color: granted
+                                    ? AppColors.success
+                                    : AppColors.warning,
+                                size: 20,
+                              ),
+                              title: const Text(
+                                'Full-Screen Intent',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              subtitle: Text(
+                                granted
+                                    ? 'Granted — popups show over lock screen'
+                                    : 'Not granted — popups may not show on lock screen',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              trailing: granted
+                                  ? null
+                                  : TextButton(
+                                      onPressed: () async {
+                                        await PermissionService.requestFullScreenIntent();
+                                        setState(() {}); // Refresh status
+                                      },
+                                      child: const Text(
+                                        'Grant',
+                                        style: TextStyle(fontSize: 13),
+                                      ),
+                                    ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                _section('Planner'),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        title: const Text(
+                          'Color Scheme',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(
+                          settings.plannerColorMode == 'category'
+                              ? 'By Category'
+                              : 'By Priority',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        trailing: const Icon(
+                          Icons.palette_outlined,
+                          size: 20,
+                          color: AppColors.primary,
+                        ),
+                        onTap: () => _showColorModeDialog(
+                          context,
+                          notifier,
+                          settings.plannerColorMode,
+                        ),
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      ListTile(
+                        title: const Text(
+                          'Start of Week',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(
+                          settings.startOfWeek == 1 ? 'Monday' : 'Sunday',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        trailing: const Icon(
+                          Icons.calendar_view_week_rounded,
+                          size: 20,
+                          color: AppColors.textMuted,
+                        ),
+                        onTap: () => _showStartOfWeekDialog(
+                          context,
+                          notifier,
+                          settings.startOfWeek,
+                        ),
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      ListTile(
+                        title: const Text(
+                          'Processamento de Linguagem Natural',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Detectar datas, horários e prioridades ao digitar tarefas',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        trailing: Switch.adaptive(
+                          value: settings.nlpTaskParsingEnabled,
+                          onChanged: (v) =>
+                              notifier.updateNlpTaskParsingEnabled(v),
+                          activeThumbColor: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _section('Object Structure'),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        title: const Text(
+                          'Object Identification',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Configure how tasks, habits and projects are recognized in your Vault.',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const TypeSignaturesScreen(),
+                          ),
+                        ),
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      _buildDailyReviewTemplateTile(),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _section('Automatic Categorization'),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        title: const Text(
+                          'Categorization Rules',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${settings.autoCategoryRules.length} active rules',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        trailing: const Icon(
+                          Icons.auto_awesome_rounded,
+                          size: 20,
+                          color: AppColors.info,
+                        ),
+                        onTap: () => _showAutoCategoryRulesDialog(
+                          context,
+                          settings,
+                          notifier,
+                        ),
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      ListTile(
+                        title: const Text(
+                          'Category Colors',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${settings.categoryColors.length} custom colors',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        trailing: const Icon(
+                          Icons.color_lens_outlined,
+                          size: 20,
+                          color: AppColors.warning,
+                        ),
+                        onTap: () => _showCategoryColorsDialog(
+                          context,
+                          settings,
+                          notifier,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _section('Obsidian Integration'),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: const Icon(
+                          Icons.auto_fix_high_rounded,
+                          color: AppColors.primary,
+                        ),
+                        title: const Text(
+                          'Regenerar queries Dataview',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Gera index.md com queries Dataview em cada pasta do vault',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => _regenerateDataview(context),
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      ListTile(
+                        leading: const Icon(
+                          Icons.folder_zip_outlined,
+                          color: AppColors.info,
+                        ),
+                        title: const Text(
+                          'Importar vault Obsidian existente',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Aponta para uma pasta de vault e indexa os arquivos compatíveis',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => _importObsidianVault(context, notifier),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _section('Maintenance'),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: const Icon(
+                          Icons.backup_rounded,
+                          color: AppColors.primary,
+                        ),
+                        title: const Text(
+                          'Backup Now',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Creates a copy on Google Drive',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        onTap: () async {
+                          try {
+                            final backupService = ref.read(
+                              backupServiceProvider,
+                            );
+                            final driveSync = ref.read(
+                              googleDriveSyncServiceProvider,
+                            );
+                            final auth = ref.read(
+                              drive_auth.googleAuthServiceProvider,
+                            );
+                            if (auth.authClient == null) {
+                              throw Exception('Google Drive not connected');
+                            }
+
+                            driveSync.init(auth.authClient!);
+                            final settings = ref.read(settingsProvider);
+
+                            // 1. Garantir que a pasta do vault existe no Drive
+                            if (settings.driveSyncFolderId.isNotEmpty) {
+                              await driveSync.useExistingVaultFolder(
+                                settings.driveSyncFolderId,
+                              );
+                            } else {
+                              await driveSync.setupVaultFolder(
+                                settings.driveSyncFolder,
+                              );
+                            }
+
+                            // 2. Criar backup local (ZIP completo com anexos)
+                            final zipFile = await backupService.createBackup();
+                            if (zipFile == null) {
+                              throw Exception('Failed to generate backup file');
+                            }
+
+                            // 3. Upload para o Drive
+                            await driveSync.createBackupFromFile(zipFile);
+
+                            if (!context.mounted) return;
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Backup sent to Google Drive!'),
+                              ),
+                            );
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Backup error: $e')),
+                            );
+                          }
+                        },
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      ListTile(
+                        leading: const Icon(
+                          Icons.delete_sweep_rounded,
+                          color: AppColors.error,
+                        ),
+                        title: const Text(
+                          'Clear Data Cache',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Reloads all Vault files',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        onTap: () {
+                          ref.invalidate(allObjectsProvider);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Alarmes de hábitos serão silenciados até $formattedTime de amanhã.'),
+                            const SnackBar(
+                              content: Text(
+                                'Cache cleared. Data will be reloaded.',
+                              ),
                             ),
                           );
-                        }
-                      }
-                    },
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (Platform.isAndroid) ...[
-            const SizedBox(height: 12),
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: AppTheme.cardDecoration(context),
-              child: Column(
-                children: [
-                  FutureBuilder<bool>(
-                    future: PermissionService.canScheduleExactAlarms(),
-                    builder: (context, snap) {
-                      final granted = snap.data ?? true;
-                      return ListTile(
-                        leading: Icon(
-                          granted ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
-                          color: granted ? AppColors.success : AppColors.warning,
-                          size: 20,
-                        ),
-                        title: const Text(
-                          'Exact Alarm Permission',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                        ),
-                        subtitle: Text(
-                          granted ? 'Granted — alarms fire at exact times' : 'Not granted — alarms may be delayed',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        trailing: granted
-                            ? null
-                            : TextButton(
-                                onPressed: () async {
-                                  await PermissionService.showExactAlarmPermissionDialog(context);
-                                  setState(() {}); // Refresh status
-                                },
-                                child: const Text('Grant', style: TextStyle(fontSize: 13)),
-                              ),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1, indent: 16),
-                  FutureBuilder<bool>(
-                    future: PermissionService.checkFullScreenIntent(),
-                    builder: (context, snap) {
-                      final granted = snap.data ?? true;
-                      return ListTile(
-                        leading: Icon(
-                          granted ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
-                          color: granted ? AppColors.success : AppColors.warning,
-                          size: 20,
-                        ),
-                        title: const Text(
-                          'Full-Screen Intent',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                        ),
-                        subtitle: Text(
-                          granted ? 'Granted — popups show over lock screen' : 'Not granted — popups may not show on lock screen',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        trailing: granted
-                            ? null
-                            : TextButton(
-                                onPressed: () async {
-                                  await PermissionService.requestFullScreenIntent();
-                                  setState(() {}); // Refresh status
-                                },
-                                child: const Text('Grant', style: TextStyle(fontSize: 13)),
-                              ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 24),
-          _section('Planner'),
-          const SizedBox(height: 12),
-          Container(
-            decoration: AppTheme.cardDecoration(context),
-            child: Column(
-              children: [
-                ListTile(
-                  title: const Text(
-                    'Color Scheme',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: Text(
-                    settings.plannerColorMode == 'category'
-                        ? 'By Category'
-                        : 'By Priority',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(
-                    Icons.palette_outlined,
-                    size: 20,
-                    color: AppColors.primary,
-                  ),
-                  onTap: () => _showColorModeDialog(
-                    context,
-                    notifier,
-                    settings.plannerColorMode,
-                  ),
-                ),
-                const Divider(height: 1, indent: 16),
-                ListTile(
-                  title: const Text(
-                    'Start of Week',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: Text(
-                    settings.startOfWeek == 1 ? 'Monday' : 'Sunday',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(
-                    Icons.calendar_view_week_rounded,
-                    size: 20,
-                    color: AppColors.textMuted,
-                  ),
-                  onTap: () => _showStartOfWeekDialog(
-                    context,
-                    notifier,
-                    settings.startOfWeek,
-                  ),
-                ),
-                const Divider(height: 1, indent: 16),
-                ListTile(
-                  title: const Text(
-                    'Processamento de Linguagem Natural',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: const Text(
-                    'Detectar datas, horários e prioridades ao digitar tarefas',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  trailing: Switch.adaptive(
-                    value: settings.nlpTaskParsingEnabled,
-                    onChanged: (v) => notifier.updateNlpTaskParsingEnabled(v),
-                    activeThumbColor: AppColors.primary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          _section('Object Structure'),
-          const SizedBox(height: 12),
-          Container(
-            decoration: AppTheme.cardDecoration(context),
-            child: Column(
-              children: [
-                ListTile(
-                  title: const Text(
-                    'Object Identification',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: const Text(
-                    'Configure how tasks, habits and projects are recognized in your Vault.',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const TypeSignaturesScreen()),
-                  ),
-                ),
-                const Divider(height: 1, indent: 16),
-                _buildDailyReviewTemplateTile(),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          _section('Automatic Categorization'),
-          const SizedBox(height: 12),
-          Container(
-            decoration: AppTheme.cardDecoration(context),
-            child: Column(
-              children: [
-                ListTile(
-                  title: const Text(
-                    'Categorization Rules',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: Text(
-                    '${settings.autoCategoryRules.length} active rules',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(
-                    Icons.auto_awesome_rounded,
-                    size: 20,
-                    color: AppColors.info,
-                  ),
-                  onTap: () =>
-                      _showAutoCategoryRulesDialog(context, settings, notifier),
-                ),
-                const Divider(height: 1, indent: 16),
-                ListTile(
-                  title: const Text(
-                    'Category Colors',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: Text(
-                    '${settings.categoryColors.length} custom colors',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(
-                    Icons.color_lens_outlined,
-                    size: 20,
-                    color: AppColors.warning,
-                  ),
-                  onTap: () =>
-                      _showCategoryColorsDialog(context, settings, notifier),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          _section('Obsidian Integration'),
-          const SizedBox(height: 12),
-          Container(
-            decoration: AppTheme.cardDecoration(context),
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.auto_fix_high_rounded, color: AppColors.primary),
-                  title: const Text(
-                    'Regenerar queries Dataview',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: const Text(
-                    'Gera index.md com queries Dataview em cada pasta do vault',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => _regenerateDataview(context),
-                ),
-                const Divider(height: 1, indent: 16),
-                ListTile(
-                  leading: const Icon(Icons.folder_zip_outlined, color: AppColors.info),
-                  title: const Text(
-                    'Importar vault Obsidian existente',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: const Text(
-                    'Aponta para uma pasta de vault e indexa os arquivos compatíveis',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => _importObsidianVault(context, notifier),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          _section('Maintenance'),
-          const SizedBox(height: 12),
-          Container(
-            decoration: AppTheme.cardDecoration(context),
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(
-                    Icons.backup_rounded,
-                    color: AppColors.primary,
-                  ),
-                  title: const Text(
-                    'Backup Now',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: const Text(
-                    'Creates a copy on Google Drive',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  onTap: () async {
-                    try {
-                      final backupService = ref.read(backupServiceProvider);
-                      final driveSync = ref.read(
-                        googleDriveSyncServiceProvider,
-                      );
-                      final auth = ref.read(
-                        drive_auth.googleAuthServiceProvider,
-                      );
-                      if (auth.authClient == null) {
-                        throw Exception('Google Drive not connected');
-                      }
-
-                      driveSync.init(auth.authClient!);
-                      final settings = ref.read(settingsProvider);
-
-                      // 1. Garantir que a pasta do vault existe no Drive
-                      if (settings.driveSyncFolderId.isNotEmpty) {
-                        await driveSync.useExistingVaultFolder(
-                          settings.driveSyncFolderId,
-                        );
-                      } else {
-                        await driveSync.setupVaultFolder(
-                          settings.driveSyncFolder,
-                        );
-                      }
-
-                      // 2. Criar backup local (ZIP completo com anexos)
-                      final zipFile = await backupService.createBackup();
-                      if (zipFile == null) {
-                        throw Exception('Failed to generate backup file');
-                      }
-
-                      // 3. Upload para o Drive
-                      await driveSync.createBackupFromFile(zipFile);
-
-                      if (!context.mounted) return;
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Backup sent to Google Drive!'),
-                        ),
-                      );
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Backup error: $e')),
-                      );
-                    }
-                  },
-                ),
-                const Divider(height: 1, indent: 16),
-                ListTile(
-                  leading: const Icon(
-                    Icons.delete_sweep_rounded,
-                    color: AppColors.error,
-                  ),
-                  title: const Text(
-                    'Clear Data Cache',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: const Text(
-                    'Reloads all Vault files',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  onTap: () {
-                    ref.invalidate(allObjectsProvider);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Cache cleared. Data will be reloaded.'),
+                        },
                       ),
-                    );
-                  },
+                    ],
+                  ),
                 ),
-              ],
-            ),
-          ),
               ]),
             ),
           ),
@@ -730,13 +881,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await gen.regenerateAll();
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Queries Dataview regeneradas com sucesso!')),
+        const SnackBar(
+          content: Text('Queries Dataview regeneradas com sucesso!'),
+        ),
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao regenerar: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erro ao regenerar: $e')));
     }
   }
 
@@ -775,10 +928,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     // Update the vault path to the imported vault
     await notifier.updateVaultPath(result);
-    await ref.read(obsidianServiceProvider).initVault(
-      ref.read(settingsProvider).vaultName,
-      customPath: result,
-    );
+    await ref
+        .read(obsidianServiceProvider)
+        .initVault(ref.read(settingsProvider).vaultName, customPath: result);
     // Reload all objects from new vault
     ref.invalidate(allObjectsProvider);
 
@@ -939,12 +1091,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget _buildDailyReviewTemplateTile() {
     final settings = ref.watch(settingsProvider);
     final templates = ref.watch(templatesProvider);
-    final entryTemplates = templates.where((t) => t.templateType == 'entry').toList();
+    final entryTemplates = templates
+        .where((t) => t.templateType == 'entry')
+        .toList();
 
-    final selectedTemplate = entryTemplates.cast<TemplateDefinition?>().firstWhere(
-      (t) => t?.id == settings.reviewDailyTemplateId,
-      orElse: () => null,
-    );
+    final selectedTemplate = entryTemplates
+        .cast<TemplateDefinition?>()
+        .firstWhere(
+          (t) => t?.id == settings.reviewDailyTemplateId,
+          orElse: () => null,
+        );
 
     return ListTile(
       title: const Text(
@@ -991,7 +1147,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.textMuted.withOpacity(0.3),
+                  color: AppColors.textMuted.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -1025,12 +1181,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           if (index == 0) {
                             final isSelected = currentId.isEmpty;
                             return ListTile(
-                              title: const Text('Nenhum', style: TextStyle(fontWeight: FontWeight.w500)),
+                              title: const Text(
+                                'Nenhum',
+                                style: TextStyle(fontWeight: FontWeight.w500),
+                              ),
                               trailing: isSelected
-                                  ? const Icon(Icons.check_circle, color: AppColors.primary)
+                                  ? const Icon(
+                                      Icons.check_circle,
+                                      color: AppColors.primary,
+                                    )
                                   : null,
                               onTap: () {
-                                ref.read(settingsProvider.notifier).updateReviewDailyTemplateId('');
+                                ref
+                                    .read(settingsProvider.notifier)
+                                    .updateReviewDailyTemplateId('');
                                 Navigator.pop(ctx);
                               },
                             );
@@ -1038,13 +1202,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           final template = entryTemplates[index - 1];
                           final isSelected = template.id == currentId;
                           return ListTile(
-                            title: Text(template.title, style: const TextStyle(fontWeight: FontWeight.w500)),
-                            subtitle: const Text('Prompt de revisão diária', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                            title: Text(
+                              template.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            subtitle: const Text(
+                              'Prompt de revisão diária',
+                              style: TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
                             trailing: isSelected
-                                ? const Icon(Icons.check_circle, color: AppColors.primary)
+                                ? const Icon(
+                                    Icons.check_circle,
+                                    color: AppColors.primary,
+                                  )
                                 : null,
                             onTap: () {
-                              ref.read(settingsProvider.notifier).updateReviewDailyTemplateId(template.id);
+                              ref
+                                  .read(settingsProvider.notifier)
+                                  .updateReviewDailyTemplateId(template.id);
                               Navigator.pop(ctx);
                             },
                           );

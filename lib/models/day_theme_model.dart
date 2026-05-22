@@ -1,6 +1,4 @@
 // lib/models/day_theme_model.dart
-import 'dart:convert';
-import 'package:uuid/uuid.dart';
 import 'content_object.dart';
 
 class TimeRange {
@@ -40,12 +38,12 @@ class TimeBlock extends ContentObject {
   String? color;
 
   TimeBlock({
-    String? id,
-    required String title,
+    super.id,
+    required super.title,
     this.timeRanges = const [],
     this.color,
-    int? order,
-  }) : super(id: id, title: title, order: order);
+    super.order,
+  });
 
   @override
   String get type => 'time_block';
@@ -78,12 +76,12 @@ class DayTheme extends ContentObject {
   String? color;
 
   DayTheme({
-    String? id,
-    required String title,
+    super.id,
+    required super.title,
     this.blockIds = const [],
     this.daysOfWeek = const [],
     this.color,
-  }) : super(id: id, title: title);
+  });
 
   @override
   String get type => 'day_theme';

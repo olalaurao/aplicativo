@@ -597,7 +597,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
             ),
           ),
           const SizedBox(width: 4),
-          Icon(
+          const Icon(
             Icons.chevron_right_rounded,
             size: 18,
             color: AppColors.textMuted,

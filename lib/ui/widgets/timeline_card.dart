@@ -10,6 +10,8 @@ class JournalEntryCard extends StatelessWidget {
   final String body;
   final String time;
   final String? moodEmoji;
+  final String? moodLabel;
+  final List<Widget> moodChips;
   final String? location;
   final List<Widget> chips;
   final List<String> photoUrls;
@@ -21,6 +23,8 @@ class JournalEntryCard extends StatelessWidget {
     required this.body,
     required this.time,
     this.moodEmoji,
+    this.moodLabel,
+    this.moodChips = const [],
     this.location,
     this.chips = const [],
     this.photoUrls = const [],
@@ -63,13 +67,15 @@ class JournalEntryCard extends StatelessWidget {
                     if (moodEmoji != null)
                       Padding(
                         padding: const EdgeInsets.only(left: 12),
-                        child: Text(
-                          moodEmoji!,
-                          style: const TextStyle(fontSize: 24),
-                        ),
+                        child: _MoodFlag(emoji: moodEmoji!, label: moodLabel),
                       ),
                   ],
                 ),
+
+                if (moodChips.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 6, runSpacing: 6, children: moodChips),
+                ],
 
                 const SizedBox(height: 6),
 
@@ -163,6 +169,47 @@ class JournalEntryCard extends StatelessWidget {
   }
 }
 
+class _MoodFlag extends StatelessWidget {
+  final String emoji;
+  final String? label;
+
+  const _MoodFlag({required this.emoji, this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 12)),
+          if (label != null && label!.isNotEmpty) ...[
+            const SizedBox(width: 4),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 96),
+              child: Text(
+                label!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 /// A card for tasks on the timeline
 class TaskCard extends StatelessWidget {
   final String title;
@@ -214,9 +261,17 @@ class TaskCard extends StatelessWidget {
             children: [
               // Checkbox circle
               GestureDetector(
-                onTap: isBlocked ? () {
-                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Esta tarefa está bloqueada por dependências incompletas.')));
-                } : onToggle,
+                onTap: isBlocked
+                    ? () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Esta tarefa está bloqueada por dependências incompletas.',
+                            ),
+                          ),
+                        );
+                      }
+                    : onToggle,
                 child: Container(
                   width: 22,
                   height: 22,
@@ -225,18 +280,26 @@ class TaskCard extends StatelessWidget {
                     border: Border.all(
                       color: completed
                           ? AppColors.success
-                          : isBlocked 
-                              ? AppColors.error 
-                              : AppColors.textMuted,
+                          : isBlocked
+                          ? AppColors.error
+                          : AppColors.textMuted,
                       width: 2,
                     ),
-                    color: completed ? AppColors.success : (isBlocked ? AppColors.error.withValues(alpha: 0.1) : Colors.transparent),
+                    color: completed
+                        ? AppColors.success
+                        : (isBlocked
+                              ? AppColors.error.withValues(alpha: 0.1)
+                              : Colors.transparent),
                   ),
                   child: completed
                       ? const Icon(Icons.check, size: 14, color: Colors.white)
-                      : isBlocked 
-                          ? const Icon(Icons.lock_rounded, size: 12, color: AppColors.error)
-                          : null,
+                      : isBlocked
+                      ? const Icon(
+                          Icons.lock_rounded,
+                          size: 12,
+                          color: AppColors.error,
+                        )
+                      : null,
                 ),
               ),
 

@@ -516,19 +516,31 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
 
   Widget _buildScheduledPomodoros(BuildContext context) {
     final tasks = ref.watch(tasksProvider);
-    final pomodoroTasks = tasks.where((t) => t.pomodoroCount != null && t.pomodoroCount! > 0 && t.endDate != null).toList()
-      ..sort((a, b) {
-        if (a.endDate == null || b.endDate == null) return 0;
-        final aTime = a.endDate!.add(Duration(
-          hours: int.parse(a.scheduledTime?.split(':')[0] ?? '0'),
-          minutes: int.parse(a.scheduledTime?.split(':')[1] ?? '0'),
-        ));
-        final bTime = b.endDate!.add(Duration(
-          hours: int.parse(b.scheduledTime?.split(':')[0] ?? '0'),
-          minutes: int.parse(b.scheduledTime?.split(':')[1] ?? '0'),
-        ));
-        return aTime.compareTo(bTime);
-      });
+    final pomodoroTasks =
+        tasks
+            .where(
+              (t) =>
+                  t.pomodoroCount != null &&
+                  t.pomodoroCount! > 0 &&
+                  t.endDate != null,
+            )
+            .toList()
+          ..sort((a, b) {
+            if (a.endDate == null || b.endDate == null) return 0;
+            final aTime = a.endDate!.add(
+              Duration(
+                hours: int.parse(a.scheduledTime?.split(':')[0] ?? '0'),
+                minutes: int.parse(a.scheduledTime?.split(':')[1] ?? '0'),
+              ),
+            );
+            final bTime = b.endDate!.add(
+              Duration(
+                hours: int.parse(b.scheduledTime?.split(':')[0] ?? '0'),
+                minutes: int.parse(b.scheduledTime?.split(':')[1] ?? '0'),
+              ),
+            );
+            return aTime.compareTo(bTime);
+          });
 
     if (pomodoroTasks.isEmpty) return const SizedBox.shrink();
 
@@ -828,33 +840,6 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
         },
       ),
     );
-  }
-
-  Widget _getIconForType(String type) {
-    IconData icon;
-    Color color;
-    switch (type) {
-      case 'task':
-        icon = Icons.check_circle_outline_rounded;
-        color = AppColors.info;
-        break;
-      case 'goal':
-        icon = Icons.flag_rounded;
-        color = AppColors.habitOrange;
-        break;
-      case 'habit':
-        icon = Icons.repeat_rounded;
-        color = AppColors.habitGreen;
-        break;
-      case 'project':
-        icon = Icons.assignment_rounded;
-        color = AppColors.habitPurple;
-        break;
-      default:
-        icon = Icons.radio_button_unchecked_rounded;
-        color = AppColors.textMuted;
-    }
-    return Icon(icon, color: color);
   }
 
   void _showCompactTimer(BuildContext context, WidgetRef ref) {

@@ -1,6 +1,5 @@
 // lib/models/inbox_model.dart
 import 'content_object.dart';
-import 'package:uuid/uuid.dart';
 
 class InboxItem extends ContentObject {
   final String content;

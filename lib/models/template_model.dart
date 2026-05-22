@@ -64,25 +64,32 @@ class TemplateDefinition extends ContentObject {
     );
   }
 
-  factory TemplateDefinition.fromMap(Map<String, dynamic> map, String id, {String? body}) {
-    final fmDefaults = map['frontmatterDefaults'] != null 
+  factory TemplateDefinition.fromMap(
+    Map<String, dynamic> map,
+    String id, {
+    String? body,
+  }) {
+    final fmDefaults = map['frontmatterDefaults'] != null
         ? Map<String, dynamic>.from(map['frontmatterDefaults'] as Map)
         : <String, dynamic>{};
-        
+
     final t = TemplateDefinition(
       id: id,
       title: map['title'] as String? ?? 'Sem Título',
       templateType: map['templateType'] as String? ?? 'note',
       body: body ?? '',
       frontmatterDefaults: fmDefaults,
-      createdAt: map['created_at'] != null ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
-      updatedAt: map['updated_at'] != null ? DateTime.tryParse(map['updated_at'].toString()) ?? DateTime.now() : DateTime.now(),
+      createdAt: map['created_at'] != null
+          ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      updatedAt: map['updated_at'] != null
+          ? DateTime.tryParse(map['updated_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
     );
     t.loadBaseMap(map, fallbackId: id);
     return t;
   }
 
-  @override
   Map<String, dynamic> toMap() {
     final map = toBaseMap();
     map.addAll({

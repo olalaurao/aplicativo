@@ -151,7 +151,7 @@ class _GoogleEventDetailScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'PESSOAS',
           style: TextStyle(
             fontSize: 11,
@@ -320,7 +320,7 @@ class _GoogleEventDetailScreenState
               children: [
                 Text(
                   title.toUpperCase(),
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                     color: AppColors.info,

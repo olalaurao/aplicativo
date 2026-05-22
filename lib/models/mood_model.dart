@@ -6,7 +6,6 @@ class MoodDefinition extends ContentObject {
   final String emoji;
   final int numericValue;
   final String color;
-  final int order;
 
   MoodDefinition({
     super.id, // slug like 'good', 'bad'
@@ -15,7 +14,7 @@ class MoodDefinition extends ContentObject {
     required this.emoji,
     required this.numericValue,
     required this.color,
-    required this.order,
+    required super.order,
     super.obsidianPath,
   });
 
@@ -42,7 +41,6 @@ class MoodDefinition extends ContentObject {
     copy.loadBaseMap(toBaseMap());
     return copy;
   }
-
 
   @override
   String get type => 'mood_definition';

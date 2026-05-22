@@ -180,7 +180,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                     vertical: 8,
                   ),
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (ctx, i) {
                     final item = items[i];
                     return _InboxItemCard(

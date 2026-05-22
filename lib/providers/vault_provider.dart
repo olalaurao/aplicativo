@@ -884,7 +884,7 @@ class MoodsNotifier extends Notifier<List<MoodDefinition>> {
 
     if (data != null) {
       return data.whereType<MoodDefinition>().toList()
-        ..sort((a, b) => a.order.compareTo(b.order));
+        ..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
     }
 
     return [];
@@ -899,7 +899,7 @@ class MoodsNotifier extends Notifier<List<MoodDefinition>> {
     state = [
       for (final m in state)
         if (m.id == mood.id) mood else m,
-    ]..sort((a, b) => a.order.compareTo(b.order));
+    ]..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
     await ref.read(vaultProvider.notifier).updateObject(mood);
   }
 

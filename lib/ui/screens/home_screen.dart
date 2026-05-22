@@ -943,6 +943,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
+  // ignore: unused_element
   Widget _buildCalendarBlock() {
     final tasks = ref
         .watch(tasksProvider)
@@ -1144,7 +1145,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   context,
                   Icons.timer_rounded,
                   'Focus',
-                  PomodoroScreen(),
+                  const PomodoroScreen(),
                   route: '/pomodoro',
                 ),
                 _shortcutItem(
@@ -1642,6 +1643,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             body: item.body,
             time: DateFormat('HH:mm').format(item.date),
             moodEmoji: _moodEmojiFor(item.moodSlug, moods),
+            moodLabel: _moodLabelFor(item.moodSlug, moods),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -1669,6 +1671,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       'great' => '😄',
       _ => '😐',
     };
+  }
+
+  String? _moodLabelFor(String? moodSlug, List<MoodDefinition> moods) {
+    if (moodSlug == null || moodSlug.isEmpty) return null;
+    final mood = moods
+        .where((m) => m.id == moodSlug || m.slug == moodSlug)
+        .firstOrNull;
+    return mood?.title ?? moodSlug;
   }
 
   Widget _buildNotesBlock() {
@@ -1806,7 +1816,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           IconButton(
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => PomodoroScreen()),
+              MaterialPageRoute(builder: (_) => const PomodoroScreen()),
             ),
             icon: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
           ),
@@ -2579,7 +2589,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           }
         },
         loading: () => const LinearProgressIndicator(minHeight: 2),
-        error: (_, __) => const Padding(
+        error: (_, _) => const Padding(
           padding: EdgeInsets.symmetric(vertical: 8.0),
           child: Text(
             'Não foi possível carregar o Google Agenda',
@@ -3165,8 +3175,8 @@ extension on _HomeScreenState {
             (ref) => ref.matches(organizer.id, organizer.slug, organizer.title),
           );
         }).toList()..sort((a, b) {
-          final aTime = a.updatedAt ?? a.createdAt ?? DateTime(0);
-          final bTime = b.updatedAt ?? b.createdAt ?? DateTime(0);
+          final aTime = a.updatedAt;
+          final bTime = b.updatedAt;
           return bTime.compareTo(aTime);
         });
 
@@ -3956,6 +3966,7 @@ extension on _HomeScreenState {
     );
   }
 
+  // ignore: unused_element
   Widget _buildPomodoroSummaryBlock() {
     final timerState = ref.watch(pomodoroProvider);
     final history = timerState.history;
@@ -4103,6 +4114,7 @@ extension on _HomeScreenState {
     );
   }
 
+  // ignore: unused_element
   Widget _buildOrganizerSummaryBlock(DashboardBlock block) {
     final allObjects = ref
         .watch(allObjectsProvider)

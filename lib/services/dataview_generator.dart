@@ -131,7 +131,7 @@ for (const habit of habitFiles) {
     if (val === true || (typeof val === "number" && val > 0)) streak++;
     else break;
   }
-  dv.paragraph(\`**\${habit.title}**: streak \${streak} dias\`);
+  dv.paragraph(`**\${habit.title}**: streak \${streak} dias`);
 }
 ```
 ''';

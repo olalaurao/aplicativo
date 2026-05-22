@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../providers/vault_provider.dart';
 import '../../models/habit_model.dart';
@@ -28,19 +27,11 @@ class HabitsScreen extends ConsumerStatefulWidget {
 class _HabitsScreenState extends ConsumerState<HabitsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  HabitsView _currentView = HabitsView.today;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        setState(() {
-          _currentView = HabitsView.values[_tabController.index];
-        });
-      }
-    });
   }
 
   @override
@@ -112,7 +103,6 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen>
   Widget _buildHeader(BuildContext context, List<Habit> habits) {
     final now = DateTime.now();
     final weekday = DateFormat('EEEE', 'pt_BR').format(now);
-    final dateStr = DateFormat("d 'de' MMMM", 'pt_BR').format(now);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -293,8 +283,9 @@ class _TodayView extends ConsumerWidget {
     if (val == null) return false;
     if (val is bool) return val;
     if (val is num) return val >= habit.dailyGoal;
-    if (val is List)
+    if (val is List) {
       return val.every((v) => v == true) && val.length >= habit.dailyGoal;
+    }
     return false;
   }
 
@@ -367,9 +358,13 @@ class _TodayHabitCard extends ConsumerWidget {
         states[i] = val[i] == true || (val[i] is num && val[i] > 0);
       }
     } else if (val is bool && val) {
-      for (int i = 0; i < numSlots; i++) states[i] = true;
+      for (int i = 0; i < numSlots; i++) {
+        states[i] = true;
+      }
     } else if (val is num) {
-      for (int i = 0; i < val.toInt() && i < numSlots; i++) states[i] = true;
+      for (int i = 0; i < val.toInt() && i < numSlots; i++) {
+        states[i] = true;
+      }
     }
     return states;
   }
@@ -787,7 +782,6 @@ class _WeekCalendarRow extends StatelessWidget {
         final isFuture = day.isAfter(now);
         final isCompleted =
             !isFuture && totalHabits > 0 && count == totalHabits;
-        final isPast = day.isBefore(DateTime(now.year, now.month, now.day));
 
         return Expanded(
           child: Column(
@@ -1004,7 +998,6 @@ class _HabitWeekCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final color = _parseColor();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final now = DateTime.now();
 
     return GestureDetector(
@@ -1202,7 +1195,6 @@ class _HabitMonthCard extends StatelessWidget {
     final now = DateTime.now();
 
     // Build completion map for this month
-    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
     final completedDays = <String>{};
     for (final record in habit.completionHistory) {
       if (record.date.year == now.year &&

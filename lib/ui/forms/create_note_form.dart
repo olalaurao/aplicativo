@@ -12,7 +12,6 @@ import '../widgets/wiki_link_controller.dart';
 import '../widgets/metadata_strip.dart';
 import '../widgets/organizer_picker_modal.dart';
 import 'package:go_router/go_router.dart';
-import '../../models/template_model.dart';
 
 
 enum NoteType { text, outline, collection }
@@ -433,12 +432,10 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
                       _richContent += '\n$body';
                     }
 
-                    if (t.frontmatterDefaults != null) {
-                      if (t.frontmatterDefaults!.containsKey('pinned')) {
-                        _pinned = t.frontmatterDefaults!['pinned'] == true;
-                      }
+                    if (t.frontmatterDefaults.containsKey('pinned')) {
+                      _pinned = t.frontmatterDefaults['pinned'] == true;
                     }
-                  });
+                                    });
                   Navigator.pop(context);
                 },
               ),

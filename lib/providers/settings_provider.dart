@@ -561,14 +561,18 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     String? btn2Target,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    if (btn1Label != null)
+    if (btn1Label != null) {
       await prefs.setString('quickAddWidgetButton1Label', btn1Label);
-    if (btn1Target != null)
+    }
+    if (btn1Target != null) {
       await prefs.setString('quickAddWidgetButton1Target', btn1Target);
-    if (btn2Label != null)
+    }
+    if (btn2Label != null) {
       await prefs.setString('quickAddWidgetButton2Label', btn2Label);
-    if (btn2Target != null)
+    }
+    if (btn2Target != null) {
       await prefs.setString('quickAddWidgetButton2Target', btn2Target);
+    }
     state = state.copyWith(
       quickAddWidgetButton1Label: btn1Label,
       quickAddWidgetButton1Target: btn1Target,
@@ -585,12 +589,15 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     if (type != null) await prefs.setString('calendarWidgetType', type);
-    if (showTasks != null)
+    if (showTasks != null) {
       await prefs.setBool('calendarWidgetShowTasks', showTasks);
-    if (showHabits != null)
+    }
+    if (showHabits != null) {
       await prefs.setBool('calendarWidgetShowHabits', showHabits);
-    if (showSessions != null)
+    }
+    if (showSessions != null) {
       await prefs.setBool('calendarWidgetShowSessions', showSessions);
+    }
     state = state.copyWith(
       calendarWidgetType: type,
       calendarWidgetShowTasks: showTasks,
@@ -604,10 +611,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     String? organizer,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    if (filterType != null)
+    if (filterType != null) {
       await prefs.setString('habitWidgetFilterType', filterType);
-    if (organizer != null)
+    }
+    if (organizer != null) {
       await prefs.setString('habitWidgetOrganizer', organizer);
+    }
     state = state.copyWith(
       habitWidgetFilterType: filterType,
       habitWidgetOrganizer: organizer,

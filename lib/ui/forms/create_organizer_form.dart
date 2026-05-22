@@ -46,7 +46,7 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
       _type = organizer.organizerType;
       _selectedColor = organizer.color ?? _selectedColor;
       _parentId = organizer.parentId;
-      _organizers = organizer.organizers != null ? List.from(organizer.organizers) : [];
+      _organizers = List.from(organizer.organizers);
     }
   }
 

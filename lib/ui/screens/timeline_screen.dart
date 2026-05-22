@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../providers/vault_provider.dart';
 import '../../models/task_model.dart';
 import '../../models/journal_entry.dart';
+import '../../models/mood_model.dart';
 import '../theme.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../widgets/journal_body_view.dart';
@@ -36,8 +37,8 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
 
     // Sort by creation date
     allItems.sort((a, b) {
-      final aTime = a.createdAt ?? DateTime(0);
-      final bTime = b.createdAt ?? DateTime(0);
+      final aTime = a.createdAt;
+      final bTime = b.createdAt;
       return bTime.compareTo(aTime);
     });
 
@@ -188,6 +189,13 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
   }
 
   Widget _buildTimelineItem(BuildContext context, ContentObject item) {
+    final moods = item is JournalEntry
+        ? ref.watch(moodsProvider)
+        : const <MoodDefinition>[];
+    final moodSlugs = item is JournalEntry
+        ? _moodSlugsForEntry(item)
+        : const <String>[];
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: ObjectActionWrapper(
@@ -232,8 +240,18 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
                           ),
                         ],
                       ),
-                      if (item is JournalEntry && item.body.isNotEmpty) ...[
+                      if (moodSlugs.isNotEmpty) ...[
                         const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: moodSlugs
+                              .map((slug) => _buildMoodFlag(slug, moods))
+                              .toList(),
+                        ),
+                      ],
+                      if (item is JournalEntry && item.body.isNotEmpty) ...[
+                        const SizedBox(height: 6),
                         JournalBodyView(
                           body: item.body,
                           maxLines: 2,
@@ -253,6 +271,67 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildMoodFlag(String moodSlug, List<MoodDefinition> moods) {
+    final mood = moods
+        .where((m) => m.id == moodSlug || m.slug == moodSlug)
+        .firstOrNull;
+    final emoji = mood?.emoji ?? _fallbackMoodEmoji(moodSlug);
+    final label = mood?.title ?? moodSlug;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 12)),
+          const SizedBox(width: 4),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 112),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<String> _moodSlugsForEntry(JournalEntry entry) {
+    final moodSlug = entry.moodSlug;
+    if (moodSlug == null || moodSlug.trim().isEmpty) return const [];
+    return moodSlug
+        .replaceAll('[[', '')
+        .replaceAll(']]', '')
+        .split(RegExp(r'[,;|]'))
+        .map((slug) => slug.trim())
+        .where((slug) => slug.isNotEmpty)
+        .toSet()
+        .toList();
+  }
+
+  String _fallbackMoodEmoji(String moodSlug) {
+    return switch (moodSlug) {
+      'terrible' => '😞',
+      'bad' => '😕',
+      'neutral' => '😐',
+      'good' => '🙂',
+      'great' => '😄',
+      _ => '😐',
+    };
   }
 
   Widget _buildTypeIcon(ContentObject item) {

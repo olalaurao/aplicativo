@@ -117,7 +117,7 @@ class _PopupBannerState extends State<_PopupBanner>
 
     // Auto-dismiss timer
     _autoTimer = Timer(
-      Duration(milliseconds: _autoDismissMs),
+      const Duration(milliseconds: _autoDismissMs),
       _animateOut,
     );
 

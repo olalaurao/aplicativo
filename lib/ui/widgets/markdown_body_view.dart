@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/vault_provider.dart';
 import '../screens/universal_detail_view.dart';
 import '../theme.dart';
-import 'object_action_wrapper.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
@@ -115,12 +114,12 @@ class MarkdownBodyView extends ConsumerWidget {
           color: AppTheme.textMutedColor(context),
           fontStyle: FontStyle.italic,
         ),
-        blockquoteDecoration: BoxDecoration(
+        blockquoteDecoration: const BoxDecoration(
           border: Border(
             left: BorderSide(color: AppColors.primary, width: 4),
           ),
         ),
-        listBullet: TextStyle(color: AppColors.primary),
+        listBullet: const TextStyle(color: AppColors.primary),
       ),
     );
   }

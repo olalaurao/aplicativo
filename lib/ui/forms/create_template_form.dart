@@ -101,7 +101,7 @@ class _CreateTemplateFormState extends ConsumerState<CreateTemplateForm> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     DropdownButtonFormField<String>(
-                      value: propertyType,
+                      initialValue: propertyType,
                       decoration: const InputDecoration(labelText: 'Tipo de Propriedade'),
                       items: [
                         const DropdownMenuItem(value: 'custom', child: Text('Personalizada')),
@@ -133,7 +133,7 @@ class _CreateTemplateFormState extends ConsumerState<CreateTemplateForm> {
                       ),
                     ] else if (propertyType == 'priority') ...[
                       DropdownButtonFormField<String>(
-                        value: selectedPriority,
+                        initialValue: selectedPriority,
                         decoration: const InputDecoration(labelText: 'Prioridade'),
                         items: const [
                           DropdownMenuItem(value: 'none', child: Text('Nenhuma')),
@@ -276,7 +276,7 @@ class _CreateTemplateFormState extends ConsumerState<CreateTemplateForm> {
         actions: [
           TextButton(
             onPressed: _saveTemplate,
-            child: Text(
+            child: const Text(
               'Salvar',
               style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold),
             ),
@@ -303,7 +303,7 @@ class _CreateTemplateFormState extends ConsumerState<CreateTemplateForm> {
                   const Text('Tipo de Objeto', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: _selectedType,
+                    initialValue: _selectedType,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),

@@ -14,17 +14,19 @@ import '../widgets/time_block_picker.dart';
 import '../../models/scheduler.dart';
 import '../widgets/universal_search_picker.dart';
 import 'package:go_router/go_router.dart';
-import '../../models/template_model.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/nlp_task_parser.dart';
-
-
 
 class CreateTaskForm extends ConsumerStatefulWidget {
   final String? initialTitle;
   final Task? existingTask;
   final String? initialTimeBlock;
-  const CreateTaskForm({super.key, this.initialTitle, this.existingTask, this.initialTimeBlock});
+  const CreateTaskForm({
+    super.key,
+    this.initialTitle,
+    this.existingTask,
+    this.initialTimeBlock,
+  });
 
   @override
   ConsumerState<CreateTaskForm> createState() => _CreateTaskFormState();
@@ -114,7 +116,6 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     final hasTitle = _titleController.text.trim().isNotEmpty;
     final settings = ref.watch(settingsProvider);
 
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
@@ -133,7 +134,10 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
             centerTitle: true,
             actions: [
               IconButton(
-                icon: const Icon(Icons.copy_all_rounded, color: AppColors.primary),
+                icon: const Icon(
+                  Icons.copy_all_rounded,
+                  color: AppColors.primary,
+                ),
                 tooltip: 'Usar Template',
                 onPressed: _showTemplatePicker,
               ),
@@ -186,9 +190,9 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                       fontWeight: FontWeight.w700,
                       letterSpacing: -0.5,
                     ),
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       hintText: 'Task title',
-                      hintStyle: const TextStyle(
+                      hintStyle: TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textMuted,
@@ -205,7 +209,6 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                   _buildNlpSuggestions(settings),
 
                   const SizedBox(height: 20),
-
 
                   // ─── Status Selector (Card) ───
                   Container(
@@ -340,7 +343,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                           child: Row(
                             children: [
                               const Text(
-                               'Duration',
+                                'Duration',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
@@ -492,7 +495,8 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                         const Divider(height: 24),
                         TimeBlockPicker(
                           selectedBlockId: _timeBlock,
-                          onBlockSelected: (val) => setState(() => _timeBlock = val),
+                          onBlockSelected: (val) =>
+                              setState(() => _timeBlock = val),
                         ),
                       ],
                     ),
@@ -530,43 +534,59 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                             ),
                             const Spacer(),
                             IconButton(
-                              icon: const Icon(Icons.add_rounded, color: AppColors.primary),
+                              icon: const Icon(
+                                Icons.add_rounded,
+                                color: AppColors.primary,
+                              ),
                               onPressed: () {
                                 showModalBottomSheet(
                                   context: context,
                                   isScrollControlled: true,
                                   backgroundColor: Colors.transparent,
-                                  builder: (context) => UniversalSearchPickerSheet(
-                                    title: 'Depende de',
-                                    initialFilter: 'task',
-                                    onSelected: (obj) {
-                                      if (!_dependsOn.contains(obj.slug)) {
-                                        setState(() => _dependsOn.add(obj.slug));
-                                      }
-                                      Navigator.pop(context);
-                                    },
-                                  ),
+                                  builder: (context) =>
+                                      UniversalSearchPickerSheet(
+                                        title: 'Depende de',
+                                        initialFilter: 'task',
+                                        onSelected: (obj) {
+                                          if (!_dependsOn.contains(obj.slug)) {
+                                            setState(
+                                              () => _dependsOn.add(obj.slug),
+                                            );
+                                          }
+                                          Navigator.pop(context);
+                                        },
+                                      ),
                                 );
                               },
                             ),
                           ],
                         ),
-                        if (_dependsOn.isNotEmpty)
-                          const SizedBox(height: 8),
+                        if (_dependsOn.isNotEmpty) const SizedBox(height: 8),
                         for (final slug in _dependsOn)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 8),
                             child: Row(
                               children: [
-                                const Icon(Icons.lock_rounded, size: 16, color: AppColors.textMuted),
+                                const Icon(
+                                  Icons.lock_rounded,
+                                  size: 16,
+                                  color: AppColors.textMuted,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Consumer(
                                     builder: (context, ref, _) {
-                                      final objects = ref.watch(allObjectsProvider).value ?? [];
+                                      final objects =
+                                          ref.watch(allObjectsProvider).value ??
+                                          [];
                                       final task = objects.firstWhere(
                                         (o) => o is Task && o.slug == slug,
-                                        orElse: () => Task(id: slug, title: slug, stage: TaskStage.todo, createdAt: DateTime.now()),
+                                        orElse: () => Task(
+                                          id: slug,
+                                          title: slug,
+                                          stage: TaskStage.todo,
+                                          createdAt: DateTime.now(),
+                                        ),
                                       );
                                       return Text(
                                         task.title,
@@ -578,7 +598,11 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.textMuted),
+                                  icon: const Icon(
+                                    Icons.close_rounded,
+                                    size: 16,
+                                    color: AppColors.textMuted,
+                                  ),
                                   onPressed: () {
                                     setState(() {
                                       _dependsOn.remove(slug);
@@ -699,7 +723,6 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     });
   }
 
-
   Widget _buildStageSegmentedControl() {
     return Container(
       decoration: BoxDecoration(
@@ -798,8 +821,12 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
               onChanged: (v) => subtask.title = v,
               style: TextStyle(
                 fontSize: 14,
-                decoration: subtask.completed ? TextDecoration.lineThrough : null,
-                color: subtask.completed ? AppColors.textMuted : AppColors.textPrimary,
+                decoration: subtask.completed
+                    ? TextDecoration.lineThrough
+                    : null,
+                color: subtask.completed
+                    ? AppColors.textMuted
+                    : AppColors.textPrimary,
               ),
               decoration: const InputDecoration(
                 hintText: 'Subtask title',
@@ -900,7 +927,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                 ),
               ),
               const SizedBox(width: 4),
-              Icon(
+              const Icon(
                 Icons.chevron_right_rounded,
                 size: 18,
                 color: AppColors.textMuted,
@@ -931,7 +958,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                 ),
               ),
               const SizedBox(width: 4),
-              Icon(
+              const Icon(
                 Icons.chevron_right_rounded,
                 size: 18,
                 color: AppColors.textMuted,
@@ -1024,7 +1051,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
   Future<void> _editDuration() async {
     final initialValue = _durationMinutes ?? 15;
     final controller = TextEditingController(text: initialValue.toString());
-    
+
     final result = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1050,7 +1077,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         ],
       ),
     );
-    
+
     if (result != null && result > 0) {
       setState(() => _durationMinutes = result);
     }
@@ -1060,7 +1087,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
   Future<void> _editPomodoros() async {
     final initialValue = _pomodoroCount ?? 0;
     final controller = TextEditingController(text: initialValue.toString());
-    
+
     final result = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1086,7 +1113,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         ],
       ),
     );
-    
+
     if (result != null) {
       setState(() => _pomodoroCount = result > 0 ? result : null);
     }
@@ -1095,8 +1122,10 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
 
   Future<void> _editEstimatedTime() async {
     final initialValue = _estimatedMinutes ?? 0;
-    final controller = TextEditingController(text: initialValue > 0 ? initialValue.toString() : '');
-    
+    final controller = TextEditingController(
+      text: initialValue > 0 ? initialValue.toString() : '',
+    );
+
     final result = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1122,7 +1151,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         ],
       ),
     );
-    
+
     if (result != null) {
       setState(() => _estimatedMinutes = result > 0 ? result : null);
     }
@@ -1169,14 +1198,17 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                       reminder.minutesBefore != null
                           ? '${reminder.minutesBefore} min before'
                           : reminder.triggerTime != null
-                              ? DateFormat('MMM d, HH:mm').format(reminder.triggerTime!)
-                              : 'Set Time',
+                          ? DateFormat(
+                              'MMM d, HH:mm',
+                            ).format(reminder.triggerTime!)
+                          : 'Set Time',
                       style: const TextStyle(fontSize: 13),
                     ),
                     const Spacer(),
                     IconButton(
                       icon: const Icon(Icons.close_rounded, size: 16),
-                      onPressed: () => setState(() => _customReminders.removeAt(idx)),
+                      onPressed: () =>
+                          setState(() => _customReminders.removeAt(idx)),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                     ),
@@ -1210,7 +1242,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
 
     int minutesBefore = existing?.minutesBefore ?? (hasTime ? 15 : 0);
     int daysBefore = existing?.daysBefore ?? 0;
-    TimeOfDay timeOfDay = existing?.timeOfDay != null 
+    TimeOfDay timeOfDay = existing?.timeOfDay != null
         ? TimeOfDay(
             hour: int.tryParse(existing!.timeOfDay!.split(':')[0]) ?? 9,
             minute: int.tryParse(existing.timeOfDay!.split(':')[1]) ?? 0,
@@ -1223,22 +1255,33 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(index != null ? 'Edit Reminder' : 'Add Reminder', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          title: Text(
+            index != null ? 'Edit Reminder' : 'Add Reminder',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (hasTime) ...[
-                  const Text('Time Before Event', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Time Before Event',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
                         child: TextField(
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Days', isDense: true),
-                          controller: TextEditingController(text: daysBefore.toString()),
+                          decoration: const InputDecoration(
+                            labelText: 'Days',
+                            isDense: true,
+                          ),
+                          controller: TextEditingController(
+                            text: daysBefore.toString(),
+                          ),
                           onChanged: (v) => daysBefore = int.tryParse(v) ?? 0,
                         ),
                       ),
@@ -1246,24 +1289,41 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                       Expanded(
                         child: TextField(
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Minutes', isDense: true),
-                          controller: TextEditingController(text: minutesBefore.toString()),
-                          onChanged: (v) => minutesBefore = int.tryParse(v) ?? 0,
+                          decoration: const InputDecoration(
+                            labelText: 'Minutes',
+                            isDense: true,
+                          ),
+                          controller: TextEditingController(
+                            text: minutesBefore.toString(),
+                          ),
+                          onChanged: (v) =>
+                              minutesBefore = int.tryParse(v) ?? 0,
                         ),
                       ),
                     ],
                   ),
                 ] else ...[
-                  const Text('Days Before Event', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Days Before Event',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 8),
                   TextField(
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Days (0 = on day)', isDense: true),
-                    controller: TextEditingController(text: daysBefore.toString()),
+                    decoration: const InputDecoration(
+                      labelText: 'Days (0 = on day)',
+                      isDense: true,
+                    ),
+                    controller: TextEditingController(
+                      text: daysBefore.toString(),
+                    ),
                     onChanged: (v) => daysBefore = int.tryParse(v) ?? 0,
                   ),
                   const SizedBox(height: 16),
-                  const Text('Time of Day', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Time of Day',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 8),
                   GestureDetector(
                     onTap: () async {
@@ -1276,14 +1336,20 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                       }
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.surfaceVariant,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
-                          Text(timeOfDay.format(context), style: const TextStyle(fontSize: 16)),
+                          Text(
+                            timeOfDay.format(context),
+                            style: const TextStyle(fontSize: 16),
+                          ),
                           const Spacer(),
                           const Icon(Icons.access_time_rounded, size: 20),
                         ],
@@ -1292,7 +1358,10 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                   ),
                 ],
                 const SizedBox(height: 24),
-                const Text('Notification Type', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const Text(
+                  'Notification Type',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -1303,7 +1372,9 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                         IconButton(
                           icon: Icon(
                             _getNotificationIcon(t),
-                            color: isSelected ? AppColors.primary : AppColors.textMuted,
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.textMuted,
                           ),
                           onPressed: () => setDialogState(() => type = t),
                         ),
@@ -1311,8 +1382,12 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                           t.name.toUpperCase(),
                           style: TextStyle(
                             fontSize: 10,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            color: isSelected ? AppColors.primary : AppColors.textMuted,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.textMuted,
                           ),
                         ),
                       ],
@@ -1323,20 +1398,26 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: () {
                 final config = ReminderConfig(
-                  id: existing?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                  id:
+                      existing?.id ??
+                      DateTime.now().millisecondsSinceEpoch.toString(),
                   type: type,
                   notificationBody: 'Task: ${_titleController.text}',
                 );
-                
+
                 if (hasTime) {
                   config.minutesBefore = minutesBefore + (daysBefore * 24 * 60);
                 } else {
                   config.daysBefore = daysBefore;
-                  config.timeOfDay = '${timeOfDay.hour.toString().padLeft(2, '0')}:${timeOfDay.minute.toString().padLeft(2, '0')}';
+                  config.timeOfDay =
+                      '${timeOfDay.hour.toString().padLeft(2, '0')}:${timeOfDay.minute.toString().padLeft(2, '0')}';
                 }
                 Navigator.pop(ctx, config);
               },
@@ -1406,7 +1487,9 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     }
 
     final task = Task(
-      id: widget.existingTask?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      id:
+          widget.existingTask?.id ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
       createdAt: widget.existingTask?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
       title: _titleController.text.trim(),
@@ -1439,7 +1522,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     } else {
       ref.read(tasksProvider.notifier).addTask(task);
     }
-    
+
     await _createPromotedSubtasks(task);
     if (mounted) Navigator.pop(context);
   }
@@ -1462,8 +1545,8 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
           TextButton(
             onPressed: () {
               ref.read(tasksProvider.notifier).deleteTask(widget.existingTask!);
-              Navigator.pop(ctx); 
-              Navigator.pop(context); 
+              Navigator.pop(ctx);
+              Navigator.pop(context);
             },
             style: TextButton.styleFrom(
               foregroundColor: AppColors.priorityHigh,
@@ -1491,7 +1574,11 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         notes: ['Promoted from [[${parentTask.slug}]].'],
         organizers: [
           ...parentTask.organizers,
-          OrganizerReference(type: 'task', slug: parentTask.slug, title: parentTask.title),
+          OrganizerReference(
+            type: 'task',
+            slug: parentTask.slug,
+            title: parentTask.title,
+          ),
         ],
       );
       await tasksNotifier.addTask(child);
@@ -1561,9 +1648,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       builder: (context) => SizedBox(
         height: MediaQuery.of(context).size.height * 0.85,
         child: SchedulerPicker(initialScheduler: _scheduler),
@@ -1601,7 +1686,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.primary.withOpacity(0.3),
+          color: AppColors.primary.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -1618,10 +1703,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
               const SizedBox(width: 6),
               const Text(
                 'Sugestões inteligentes detectadas',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
               const Spacer(),
               TextButton.icon(
@@ -1644,7 +1726,11 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                     }
                   });
                 },
-                icon: const Icon(Icons.check_rounded, size: 14, color: AppColors.primary),
+                icon: const Icon(
+                  Icons.check_rounded,
+                  size: 14,
+                  color: AppColors.primary,
+                ),
                 label: const Text(
                   'Aplicar',
                   style: TextStyle(
@@ -1654,7 +1740,10 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                   ),
                 ),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -1705,12 +1794,9 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: color.withOpacity(0.3),
-          width: 1,
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1752,18 +1838,28 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         return 'A cada ${rule.interval} dias';
       case RepeatType.daysOfWeek:
         if (rule.daysOfWeek != null && rule.daysOfWeek!.isNotEmpty) {
-          final days = rule.daysOfWeek!.map((d) {
-            switch (d) {
-              case '1': return 'Seg';
-              case '2': return 'Ter';
-              case '3': return 'Qua';
-              case '4': return 'Qui';
-              case '5': return 'Sex';
-              case '6': return 'Sáb';
-              case '7': return 'Dom';
-              default: return d;
-            }
-          }).join(', ');
+          final days = rule.daysOfWeek!
+              .map((d) {
+                switch (d) {
+                  case '1':
+                    return 'Seg';
+                  case '2':
+                    return 'Ter';
+                  case '3':
+                    return 'Qua';
+                  case '4':
+                    return 'Qui';
+                  case '5':
+                    return 'Sex';
+                  case '6':
+                    return 'Sáb';
+                  case '7':
+                    return 'Dom';
+                  default:
+                    return d;
+                }
+              })
+              .join(', ');
           return 'Toda semana ($days)';
         }
         return 'Semanal';
@@ -1777,7 +1873,10 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
   }
 
   void _showTemplatePicker() async {
-    final templates = ref.read(templatesProvider).where((t) => t.templateType == 'task').toList();
+    final templates = ref
+        .read(templatesProvider)
+        .where((t) => t.templateType == 'task')
+        .toList();
 
     showModalBottomSheet(
       context: context,
@@ -1800,7 +1899,10 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                 TextButton.icon(
                   onPressed: () {
                     Navigator.pop(context);
-                    context.push('/create/template', extra: {'initialType': 'task'});
+                    context.push(
+                      '/create/template',
+                      extra: {'initialType': 'task'},
+                    );
                   },
                   icon: const Icon(Icons.add_rounded),
                   label: const Text('Novo'),
@@ -1809,17 +1911,34 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
             ),
             const SizedBox(height: 16),
             if (templates.isEmpty)
-              const Text('Nenhum template encontrado.', style: TextStyle(color: AppColors.textMuted)),
+              const Text(
+                'Nenhum template encontrado.',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
             ...templates.map(
               (t) => ListTile(
                 title: Text(t.title),
                 onTap: () {
                   String body = t.body;
                   final refDate = _startDate ?? DateTime.now();
-                  body = body.replaceAll('{{date}}', DateFormat('dd/MM/yyyy').format(refDate));
-                  body = body.replaceAll('{{time}}', DateFormat('HH:mm').format(refDate));
-                  body = body.replaceAll('{{weekday}}', DateFormat('EEEE').format(refDate));
-                  body = body.replaceAll('{{title}}', _titleController.text.isNotEmpty ? _titleController.text : 'Nova Task');
+                  body = body.replaceAll(
+                    '{{date}}',
+                    DateFormat('dd/MM/yyyy').format(refDate),
+                  );
+                  body = body.replaceAll(
+                    '{{time}}',
+                    DateFormat('HH:mm').format(refDate),
+                  );
+                  body = body.replaceAll(
+                    '{{weekday}}',
+                    DateFormat('EEEE').format(refDate),
+                  );
+                  body = body.replaceAll(
+                    '{{title}}',
+                    _titleController.text.isNotEmpty
+                        ? _titleController.text
+                        : 'Nova Task',
+                  );
 
                   setState(() {
                     if (_notesContent.isEmpty) {
@@ -1828,17 +1947,22 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                       _notesContent += '\n$body';
                     }
 
-                    if (t.frontmatterDefaults != null) {
-                      if (t.frontmatterDefaults!.containsKey('priority')) {
-                        final p = t.frontmatterDefaults!['priority'];
-                        if (p == 'high') _priority = TaskPriority.high;
-                        else if (p == 'medium') _priority = TaskPriority.medium;
-                        else if (p == 'low') _priority = TaskPriority.low;
-                        else if (p == 'urgent') _priority = TaskPriority.high;
+                    if (t.frontmatterDefaults.containsKey('priority')) {
+                      final p = t.frontmatterDefaults['priority'];
+                      if (p == 'high') {
+                        _priority = TaskPriority.high;
+                      } else if (p == 'medium') {
+                        _priority = TaskPriority.medium;
+                      } else if (p == 'low') {
+                        _priority = TaskPriority.low;
+                      } else if (p == 'urgent') {
+                        _priority = TaskPriority.high;
                       }
-                      if (t.frontmatterDefaults!.containsKey('duration')) {
-                        _durationMinutes = int.tryParse(t.frontmatterDefaults!['duration'].toString());
-                      }
+                    }
+                    if (t.frontmatterDefaults.containsKey('duration')) {
+                      _durationMinutes = int.tryParse(
+                        t.frontmatterDefaults['duration'].toString(),
+                      );
                     }
                   });
                   Navigator.pop(context);

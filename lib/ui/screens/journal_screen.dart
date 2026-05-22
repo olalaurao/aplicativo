@@ -178,7 +178,8 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
 
     final filteredEntries =
         entries.where((e) {
-          if (_filterMood != null && !_entryMatchesMood(e, _filterMood!, moods)) {
+          if (_filterMood != null &&
+              !_entryMatchesMood(e, _filterMood!, moods)) {
             return false;
           }
           if (_filterHasPhoto && !e.body.contains('![[')) return false;
@@ -398,9 +399,11 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
   ) {
     final counts = <String, int>{};
     for (final entry in entries) {
-      final mood = _moodForSlug(entry.moodSlug, moods);
-      final key = mood?.id ?? entry.moodSlug!;
-      counts[key] = (counts[key] ?? 0) + 1;
+      for (final moodSlug in _moodSlugsForEntry(entry)) {
+        final mood = _moodForSlug(moodSlug, moods);
+        final key = mood?.id ?? moodSlug;
+        counts[key] = (counts[key] ?? 0) + 1;
+      }
     }
 
     final items = counts.entries.toList()
@@ -417,7 +420,8 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
           final item = items[index];
           final mood = _moodForSlug(item.key, moods);
           final selected =
-              _filterMood != null && _moodKeysMatch(_filterMood!, item.key, moods);
+              _filterMood != null &&
+              _moodKeysMatch(_filterMood!, item.key, moods);
           final emoji = mood?.emoji ?? _getMoodEmoji(item.key);
 
           return InkWell(
@@ -722,12 +726,8 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
 
   Widget _buildJournalEntryCard(BuildContext context, JournalEntry entry) {
     final displayDate = _journalEntryDisplayDate(entry);
-    final mood = entry.moodSlug == null
-        ? null
-        : ref
-              .watch(moodsProvider)
-              .where((m) => m.id == entry.moodSlug || m.slug == entry.moodSlug)
-              .firstOrNull;
+    final moods = ref.watch(moodsProvider);
+    final moodSlugs = _moodSlugsForEntry(entry);
 
     return ObjectActionWrapper(
       object: entry,
@@ -750,13 +750,6 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
             children: [
               Row(
                 children: [
-                  if (entry.moodSlug != null) ...[
-                    Text(
-                      mood?.emoji ?? _getMoodEmoji(entry.moodSlug!),
-                      style: const TextStyle(fontSize: 18),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
                   Text(
                     DateFormat('HH:mm').format(displayDate),
                     style: TextStyle(
@@ -766,32 +759,6 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                     ),
                   ),
                   const Spacer(),
-                  if (mood != null) ...[
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 120),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          mood.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
                   Icon(
                     Icons.more_horiz_rounded,
                     size: 18,
@@ -799,7 +766,17 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
+              if (moodSlugs.isNotEmpty) ...[
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: moodSlugs
+                      .map((slug) => _buildMoodFlag(context, slug, moods))
+                      .toList(),
+                ),
+                const SizedBox(height: 8),
+              ],
               if (entry.title.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
@@ -824,6 +801,48 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMoodFlag(
+    BuildContext context,
+    String moodSlug,
+    List<MoodDefinition> moods,
+  ) {
+    final mood = _moodForSlug(moodSlug, moods);
+    final label = mood?.title ?? moodSlug;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 132),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              mood?.emoji ?? _getMoodEmoji(moodSlug),
+              style: const TextStyle(fontSize: 12),
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1014,16 +1033,27 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
     String filterMood,
     List<MoodDefinition> moods,
   ) {
-    final moodSlug = entry.moodSlug;
-    if (moodSlug == null || moodSlug.isEmpty) return false;
-    return _moodKeysMatch(moodSlug, filterMood, moods);
+    final moodSlugs = _moodSlugsForEntry(entry);
+    if (moodSlugs.isEmpty) return false;
+    return moodSlugs.any(
+      (moodSlug) => _moodKeysMatch(moodSlug, filterMood, moods),
+    );
   }
 
-  bool _moodKeysMatch(
-    String left,
-    String right,
-    List<MoodDefinition> moods,
-  ) {
+  List<String> _moodSlugsForEntry(JournalEntry entry) {
+    final moodSlug = entry.moodSlug;
+    if (moodSlug == null || moodSlug.trim().isEmpty) return const [];
+    return moodSlug
+        .replaceAll('[[', '')
+        .replaceAll(']]', '')
+        .split(RegExp(r'[,;|]'))
+        .map((slug) => slug.trim())
+        .where((slug) => slug.isNotEmpty)
+        .toSet()
+        .toList();
+  }
+
+  bool _moodKeysMatch(String left, String right, List<MoodDefinition> moods) {
     if (left == right) return true;
     final leftMood = _moodForSlug(left, moods);
     final rightMood = _moodForSlug(right, moods);

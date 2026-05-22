@@ -541,8 +541,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           return 'Pessoa';
         case OrganizerType.place:
           return 'Lugar';
-        default:
-          return 'Organizador';
       }
     }
     switch (obj.type) {

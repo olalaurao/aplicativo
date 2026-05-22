@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import 'package:go_router/go_router.dart';
 
 import '../theme.dart';
 import '../../providers/vault_provider.dart';
@@ -15,9 +14,7 @@ import '../../models/journal_entry.dart';
 import '../../models/pomodoro_session.dart';
 import '../../models/mood_model.dart';
 import '../../models/goal_model.dart';
-import '../../models/shared_types.dart' hide KPI;
 import '../forms/create_entry_form.dart';
-import '../../services/kpi_engine.dart';
 
 class StatisticsScreen extends ConsumerStatefulWidget {
   const StatisticsScreen({super.key});
@@ -26,7 +23,8 @@ class StatisticsScreen extends ConsumerStatefulWidget {
   ConsumerState<StatisticsScreen> createState() => _StatisticsScreenState();
 }
 
-class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with SingleTickerProviderStateMixin {
+class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   Goal? _selectedGoalForKPIChart;
 
@@ -211,7 +209,9 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
 
       Color cellColor = AppColors.textMuted.withValues(alpha: 0.1);
       if (count > 0) {
-        cellColor = AppColors.primary.withValues(alpha: math.min(1.0, 0.2 + (count * 0.25)));
+        cellColor = AppColors.primary.withValues(
+          alpha: math.min(1.0, 0.2 + (count * 0.25)),
+        );
       }
 
       dayWidgets.add(
@@ -254,16 +254,22 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              const Text('Menos', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+              const Text(
+                'Menos',
+                style: TextStyle(fontSize: 10, color: AppColors.textMuted),
+              ),
               const SizedBox(width: 4),
               _buildLegendCell(0.1),
               _buildLegendCell(0.35),
               _buildLegendCell(0.6),
               _buildLegendCell(0.85),
               const SizedBox(width: 4),
-              const Text('Mais', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+              const Text(
+                'Mais',
+                style: TextStyle(fontSize: 10, color: AppColors.textMuted),
+              ),
             ],
-          )
+          ),
         ],
       ),
     );
@@ -304,14 +310,18 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
           final history = habit.completionHistory;
           final totalDays = history.length;
           final completedDays = history.where((h) => h.successful).length;
-          final successRate = totalDays > 0 ? (completedDays / totalDays) * 100 : 0.0;
+          final successRate = totalDays > 0
+              ? (completedDays / totalDays) * 100
+              : 0.0;
 
           // Streak calculation (record and current)
           int currentStreak = 0;
           int recordStreak = 0;
           int tempStreak = 0;
           final nowStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
-          final yesterdayStr = DateFormat('yyyy-MM-dd').format(DateTime.now().subtract(const Duration(days: 1)));
+          final yesterdayStr = DateFormat(
+            'yyyy-MM-dd',
+          ).format(DateTime.now().subtract(const Duration(days: 1)));
 
           for (final record in history) {
             if (record.successful) {
@@ -328,7 +338,9 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
           bool isCurrentActive = false;
           if (history.isNotEmpty) {
             final lastRecord = history.last;
-            final lastRecordStr = DateFormat('yyyy-MM-dd').format(lastRecord.date);
+            final lastRecordStr = DateFormat(
+              'yyyy-MM-dd',
+            ).format(lastRecord.date);
             if (lastRecordStr == nowStr || lastRecordStr == yesterdayStr) {
               isCurrentActive = true;
             }
@@ -350,15 +362,22 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
                     children: [
                       Text(
                         habit.title,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
                           value: totalDays > 0 ? completedDays / totalDays : 0,
-                          backgroundColor: AppColors.textMuted.withValues(alpha: 0.1),
-                          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.habitGreen),
+                          backgroundColor: AppColors.textMuted.withValues(
+                            alpha: 0.1,
+                          ),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            AppColors.habitGreen,
+                          ),
                           minHeight: 6,
                         ),
                       ),
@@ -371,22 +390,36 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.local_fire_department_rounded, color: AppColors.accent, size: 16),
+                        const Icon(
+                          Icons.local_fire_department_rounded,
+                          color: AppColors.accent,
+                          size: 16,
+                        ),
                         const SizedBox(width: 2),
                         Text(
                           '$currentStreak',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.accent),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: AppColors.accent,
+                          ),
                         ),
                         Text(
                           ' / $recordStreak max',
-                          style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppColors.textMuted,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '${successRate.toStringAsFixed(0)}% taxa',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -404,11 +437,12 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
     final rolling30Days = now.subtract(const Duration(days: 30));
 
     final tasksIn30Days = tasks.where((t) {
-      if (t.createdAt == null) return false;
-      return t.createdAt!.isAfter(rolling30Days);
+      return t.createdAt.isAfter(rolling30Days);
     }).toList();
 
-    final completedTasks = tasksIn30Days.where((t) => t.stage == TaskStage.finalized).length;
+    final completedTasks = tasksIn30Days
+        .where((t) => t.stage == TaskStage.finalized)
+        .length;
     final totalTasks = tasksIn30Days.length;
     final completionRate = totalTasks > 0 ? (completedTasks / totalTasks) : 0.0;
 
@@ -429,15 +463,22 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
                     child: CircularProgressIndicator(
                       value: completionRate,
                       strokeWidth: 8,
-                      backgroundColor: AppColors.textMuted.withValues(alpha: 0.1),
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      backgroundColor: AppColors.textMuted.withValues(
+                        alpha: 0.1,
+                      ),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppColors.primary,
+                      ),
                     ),
                   ),
                 ),
                 Center(
                   child: Text(
                     '${(completionRate * 100).toStringAsFixed(0)}%',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
                   ),
                 ),
               ],
@@ -455,14 +496,20 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
                 const SizedBox(height: 4),
                 Text(
                   '$completedTasks tarefas concluídas de um total de $totalTasks criadas.',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     _buildTaskLegend(AppColors.primary, 'Concluídas'),
                     const SizedBox(width: 16),
-                    _buildTaskLegend(AppColors.textMuted.withValues(alpha: 0.2), 'Abertas'),
+                    _buildTaskLegend(
+                      AppColors.textMuted.withValues(alpha: 0.2),
+                      'Abertas',
+                    ),
                   ],
                 ),
               ],
@@ -482,7 +529,10 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
-        Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+        ),
       ],
     );
   }
@@ -510,7 +560,9 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
       final difference = now.difference(session.startTime);
       final weeksAgo = (difference.inDays / 7).floor();
       if (weeksAgo < 4) {
-        weeklyMinutes[weeksAgo] = (weeklyMinutes[weeksAgo] ?? 0.0) + (session.duration.inMinutes.toDouble());
+        weeklyMinutes[weeksAgo] =
+            (weeklyMinutes[weeksAgo] ?? 0.0) +
+            (session.duration.inMinutes.toDouble());
       }
     }
 
@@ -553,14 +605,21 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
                 gridData: const FlGridData(show: false),
                 borderData: FlBorderData(show: false),
                 titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (val, meta) => Text(
                         '${val.toInt()}h',
-                        style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AppColors.textMuted,
+                        ),
                       ),
                       reservedSize: 28,
                     ),
@@ -569,12 +628,20 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (val, meta) {
-                        final labels = ['Há 3 sem', 'Há 2 sem', 'Semana Ant', 'Esta Sem'];
+                        final labels = [
+                          'Há 3 sem',
+                          'Há 2 sem',
+                          'Semana Ant',
+                          'Esta Sem',
+                        ];
                         return Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
                             labels[val.toInt()],
-                            style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppColors.textMuted,
+                            ),
                           ),
                         );
                       },
@@ -590,10 +657,15 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
   }
 
   // 5. Mood Donut Chart
-  Widget _buildMoodDonutCard(List<JournalEntry> entries, List<MoodDefinition> moods) {
+  Widget _buildMoodDonutCard(
+    List<JournalEntry> entries,
+    List<MoodDefinition> moods,
+  ) {
     final now = DateTime.now();
     final thirtyDaysAgo = now.subtract(const Duration(days: 30));
-    final relevantEntries = entries.where((e) => e.date.isAfter(thirtyDaysAgo) && e.moodSlug != null).toList();
+    final relevantEntries = entries
+        .where((e) => e.date.isAfter(thirtyDaysAgo) && e.moodSlug != null)
+        .toList();
 
     if (relevantEntries.isEmpty || moods.isEmpty) {
       return Container(
@@ -622,9 +694,11 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
       colorMap[mood.id] = val != null ? Color(val) : AppColors.primary;
     }
 
-    int index = 0;
     moodCounts.forEach((moodId, count) {
-      final moodDef = moods.firstWhere((m) => m.id == moodId, orElse: () => moods.first);
+      final moodDef = moods.firstWhere(
+        (m) => m.id == moodId,
+        orElse: () => moods.first,
+      );
       final percentage = (count / relevantEntries.length) * 100;
       sections.add(
         PieChartSectionData(
@@ -632,10 +706,13 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
           value: count.toDouble(),
           title: '${moodDef.emoji} ${percentage.toStringAsFixed(0)}%',
           radius: 40,
-          titleStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+          titleStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
       );
-      index++;
     });
 
     return Container(
@@ -659,7 +736,10 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: moodCounts.entries.map((e) {
-                final moodDef = moods.firstWhere((m) => m.id == e.key, orElse: () => moods.first);
+                final moodDef = moods.firstWhere(
+                  (m) => m.id == e.key,
+                  orElse: () => moods.first,
+                );
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2.5),
                   child: Row(
@@ -675,7 +755,10 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
                       const SizedBox(width: 8),
                       Text(
                         '${moodDef.emoji} ${moodDef.label}: ${e.value} dia(s)',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ],
                   ),
@@ -705,7 +788,10 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
 
     int totalWords = 0;
     for (final entry in entries) {
-      totalWords += entry.body.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+      totalWords += entry.body
+          .split(RegExp(r'\s+'))
+          .where((w) => w.isNotEmpty)
+          .length;
     }
     final avgWords = totalWords / entries.length;
 
@@ -715,15 +801,35 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatIndicator(Icons.edit_note_rounded, '${entries.length}', 'Registros Totais', AppColors.primary),
-          _buildStatIndicator(Icons.text_fields_rounded, '$totalWords', 'Palavras Escritas', AppColors.accent),
-          _buildStatIndicator(Icons.analytics_outlined, avgWords.toStringAsFixed(0), 'Palavras / Entrada', AppColors.habitGreen),
+          _buildStatIndicator(
+            Icons.edit_note_rounded,
+            '${entries.length}',
+            'Registros Totais',
+            AppColors.primary,
+          ),
+          _buildStatIndicator(
+            Icons.text_fields_rounded,
+            '$totalWords',
+            'Palavras Escritas',
+            AppColors.accent,
+          ),
+          _buildStatIndicator(
+            Icons.analytics_outlined,
+            avgWords.toStringAsFixed(0),
+            'Palavras / Entrada',
+            AppColors.habitGreen,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatIndicator(IconData icon, String value, String label, Color color) {
+  Widget _buildStatIndicator(
+    IconData icon,
+    String value,
+    String label,
+    Color color,
+  ) {
     return Column(
       children: [
         Container(
@@ -738,7 +844,11 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
         const SizedBox(height: 8),
         Text(
           value,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
         ),
         const SizedBox(height: 2),
         Text(
@@ -829,19 +939,28 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
                 gridData: const FlGridData(show: false),
                 borderData: FlBorderData(show: false),
                 titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (val, meta) => Text(
                         val.toStringAsFixed(0),
-                        style: const TextStyle(fontSize: 9, color: AppColors.textMuted),
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: AppColors.textMuted,
+                        ),
                       ),
                       reservedSize: 24,
                     ),
                   ),
-                  bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                 ),
                 lineBarsData: [
                   LineChartBarData(
@@ -881,41 +1000,64 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
     // 1. Date Range Title
     final startRangeStr = DateFormat('dd/MM').format(sevenDaysAgo);
     final endRangeStr = DateFormat('dd/MM').format(now);
-    final weekReviewTitle = 'Weekly Review: Semana de $startRangeStr a $endRangeStr';
+    final weekReviewTitle =
+        'Weekly Review: Semana de $startRangeStr a $endRangeStr';
 
     // 2. Compute Habits success rate
     final List<String> habitsSummary = [];
     for (final habit in habits) {
-      final relevantHistory = habit.completionHistory.where((h) => h.date.isAfter(sevenDaysAgo)).toList();
+      final relevantHistory = habit.completionHistory
+          .where((h) => h.date.isAfter(sevenDaysAgo))
+          .toList();
       final completedDays = relevantHistory.where((h) => h.successful).length;
       final totalDays = relevantHistory.length;
-      final percentage = totalDays > 0 ? (completedDays / totalDays) * 100 : 0.0;
-      habitsSummary.add('- ${habit.title}: $completedDays/$totalDays dias (${percentage.toStringAsFixed(0)}%)');
+      final percentage = totalDays > 0
+          ? (completedDays / totalDays) * 100
+          : 0.0;
+      habitsSummary.add(
+        '- ${habit.title}: $completedDays/$totalDays dias (${percentage.toStringAsFixed(0)}%)',
+      );
     }
 
     // 3. Tasks completed vs created vs open
-    final tasksCreatedInWeek = tasks.where((t) => t.createdAt != null && t.createdAt!.isAfter(sevenDaysAgo)).toList();
+    final tasksCreatedInWeek = tasks
+        .where((t) => t.createdAt.isAfter(sevenDaysAgo))
+        .toList();
     final tasksCompletedInWeek = tasks.where((t) {
-      if (t.updatedAt == null || t.stage != TaskStage.finalized) return false;
-      return t.updatedAt!.isAfter(sevenDaysAgo);
+      if (t.stage != TaskStage.finalized) return false;
+      return t.updatedAt.isAfter(sevenDaysAgo);
     }).toList();
-    final tasksOpen = tasks.where((t) => t.stage != TaskStage.finalized).toList();
+    final tasksOpen = tasks
+        .where((t) => t.stage != TaskStage.finalized)
+        .toList();
 
     // 4. Pomodoro weekly total & projects
-    final weekPomodoros = pomodoroHistory.where((p) => p.startTime.isAfter(sevenDaysAgo)).toList();
-    final double pomodoroMinutesTotal = weekPomodoros.fold(0.0, (sum, p) => sum + p.duration.inMinutes.toDouble());
+    final weekPomodoros = pomodoroHistory
+        .where((p) => p.startTime.isAfter(sevenDaysAgo))
+        .toList();
+    final double pomodoroMinutesTotal = weekPomodoros.fold(
+      0.0,
+      (sum, p) => sum + p.duration.inMinutes.toDouble(),
+    );
     final double pomodoroHoursTotal = pomodoroMinutesTotal / 60.0;
 
     final Map<String, double> pomodoroByProject = {};
     for (final session in weekPomodoros) {
-      final projKey = session.taskTitle.isNotEmpty == true ? session.taskTitle : 'Outros';
-      pomodoroByProject[projKey] = (pomodoroByProject[projKey] ?? 0.0) + (session.duration.inMinutes.toDouble() / 60.0);
+      final projKey = session.taskTitle.isNotEmpty == true
+          ? session.taskTitle
+          : 'Outros';
+      pomodoroByProject[projKey] =
+          (pomodoroByProject[projKey] ?? 0.0) +
+          (session.duration.inMinutes.toDouble() / 60.0);
     }
-    final sortedProjects = pomodoroByProject.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final sortedProjects = pomodoroByProject.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
     final List<String> pomodorosSummary = [];
     for (int i = 0; i < math.min(3, sortedProjects.length); i++) {
       final item = sortedProjects[i];
-      pomodorosSummary.add('  ${i + 1}. ${item.key}: ${item.value.toStringAsFixed(1)} horas');
+      pomodorosSummary.add(
+        '  ${i + 1}. ${item.key}: ${item.value.toStringAsFixed(1)} horas',
+      );
     }
 
     // 5. Goals progress KPI deltas
@@ -923,16 +1065,23 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
     for (final goal in goals) {
       if (goal.kpis.isNotEmpty) {
         final kpi = goal.kpis.first;
-        goalsSummary.add('- [[${goal.title}]]: KPI "${kpi.title}" em ${kpi.currentValue}/${kpi.targetValue}');
+        goalsSummary.add(
+          '- [[${goal.title}]]: KPI "${kpi.title}" em ${kpi.currentValue}/${kpi.targetValue}',
+        );
       }
     }
 
     // 6. Mood trend last 7 days
-    final weekMoodEntries = entries.where((e) => e.date.isAfter(sevenDaysAgo) && e.moodSlug != null).toList();
+    final weekMoodEntries = entries
+        .where((e) => e.date.isAfter(sevenDaysAgo) && e.moodSlug != null)
+        .toList();
     double avgMoodValue = 0;
     if (weekMoodEntries.isNotEmpty && moods.isNotEmpty) {
       final values = weekMoodEntries.map((e) {
-        final m = moods.firstWhere((m) => m.id == e.moodSlug, orElse: () => moods.first);
+        final m = moods.firstWhere(
+          (m) => m.id == e.moodSlug,
+          orElse: () => moods.first,
+        );
         return m.numericValue.toDouble();
       }).toList();
       avgMoodValue = values.fold(0.0, (a, b) => a + b) / values.length;
@@ -951,7 +1100,8 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> with Single
     }
 
     // Compose final Review Markdown Body
-    final reviewMarkdownBody = '''# Resumo Semanal ($startRangeStr a $endRangeStr)
+    final reviewMarkdownBody =
+        '''# Resumo Semanal ($startRangeStr a $endRangeStr)
 
 ## 📊 Estatísticas Consolidadas
 
@@ -965,7 +1115,7 @@ ${habitsSummary.isEmpty ? '- Nenhum hábito registrado nesta semana.' : habitsSu
 
 ### ⏱️ Tempo de Foco (Pomodoro)
 - Foco Total: ${pomodoroHoursTotal.toStringAsFixed(1)} horas (${weekPomodoros.length} sessões)
-${pomodorosSummary.isEmpty ? '- Nenhuma sessão registrada.' : '- Principais Projetos/Focos:\n' + pomodorosSummary.join('\n')}
+${pomodorosSummary.isEmpty ? '- Nenhuma sessão registrada.' : '- Principais Projetos/Focos:\n${pomodorosSummary.join('\n')}'}
 
 ### 🎯 KPIs & Evolução de Metas
 ${goalsSummary.isEmpty ? '- Nenhuma meta ativa monitorada nesta semana.' : goalsSummary.join('\n')}
@@ -1005,7 +1155,10 @@ ${goalsSummary.isEmpty ? '- Nenhuma meta ativa monitorada nesta semana.' : goals
                 SizedBox(height: 6),
                 Text(
                   'Gere um relatório consolidado com o resumo das suas métricas da semana diretamente em uma nova entrada do seu diário para reflexão.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -1020,11 +1173,18 @@ ${goalsSummary.isEmpty ? '- Nenhuma meta ativa monitorada nesta semana.' : goals
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.copy_all_rounded, size: 20, color: AppColors.primary),
+                      const Icon(
+                        Icons.copy_all_rounded,
+                        size: 20,
+                        color: AppColors.primary,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         weekReviewTitle,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),

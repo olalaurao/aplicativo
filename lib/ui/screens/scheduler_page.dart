@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../providers/vault_provider.dart';
-import '../../providers/day_theme_provider.dart';
 import '../../models/task_model.dart';
 import '../../models/habit_model.dart';
 import '../../models/day_theme_model.dart';
@@ -43,7 +42,9 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
     final timeBlocks = ref.watch(timeBlocksProvider);
 
     final scheduledTasks = tasks.where((t) => t.scheduler != null).toList();
-    final scheduledHabits = habits.where((h) => h.schedulers.isNotEmpty).toList();
+    final scheduledHabits = habits
+        .where((h) => h.schedulers.isNotEmpty)
+        .toList();
 
     // Helper functions for theme and block rules
     bool isThemeActive(String themeId, DateTime date) {
@@ -65,32 +66,62 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
     }
 
     bool isItemScheduled(String linkedItemId, DateTime date) {
-      final targetSlug = linkedItemId.replaceAll('[[', '').replaceAll(']]', '').trim().toLowerCase();
+      final targetSlug = linkedItemId
+          .replaceAll('[[', '')
+          .replaceAll(']]', '')
+          .trim()
+          .toLowerCase();
       final reminders = ref.read(remindersProvider);
-      
+
       final hasLinkedTask = tasks.any((t) {
-        final isScheduled = (t.deadline != null && t.deadline!.year == date.year && t.deadline!.month == date.month && t.deadline!.day == date.day) ||
-            (t.scheduler != null && SchedulerService.shouldFire(t.scheduler!, date, isThemeActive: isThemeActive, isBlockActive: isBlockActive));
+        final isScheduled =
+            (t.deadline != null &&
+                t.deadline!.year == date.year &&
+                t.deadline!.month == date.month &&
+                t.deadline!.day == date.day) ||
+            (t.scheduler != null &&
+                SchedulerService.shouldFire(
+                  t.scheduler!,
+                  date,
+                  isThemeActive: isThemeActive,
+                  isBlockActive: isBlockActive,
+                ));
         if (!isScheduled) return false;
-        return t.id == linkedItemId || t.slug == targetSlug || t.organizers.any((o) => o.slug == targetSlug || o.title.toLowerCase() == targetSlug);
+        return t.id == linkedItemId ||
+            t.slug == targetSlug ||
+            t.organizers.any(
+              (o) =>
+                  o.slug == targetSlug || o.title.toLowerCase() == targetSlug,
+            );
       });
       if (hasLinkedTask) return true;
 
       final hasLinkedReminder = reminders.any((r) {
-        final isScheduled = (r.time.year == date.year && r.time.month == date.month && r.time.day == date.day) ||
-            (r.scheduler != null && SchedulerService.shouldFire(r.scheduler!, date, isThemeActive: isThemeActive, isBlockActive: isBlockActive));
+        final isScheduled =
+            (r.time.year == date.year &&
+                r.time.month == date.month &&
+                r.time.day == date.day) ||
+            (r.scheduler != null &&
+                SchedulerService.shouldFire(
+                  r.scheduler!,
+                  date,
+                  isThemeActive: isThemeActive,
+                  isBlockActive: isBlockActive,
+                ));
         if (!isScheduled) return false;
-        return r.id == linkedItemId || r.slug == targetSlug || r.organizers.any((o) => o.slug == targetSlug || o.title.toLowerCase() == targetSlug);
+        return r.id == linkedItemId ||
+            r.slug == targetSlug ||
+            r.organizers.any(
+              (o) =>
+                  o.slug == targetSlug || o.title.toLowerCase() == targetSlug,
+            );
       });
       return hasLinkedReminder;
     }
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Agendador Global'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Agendador Global'), elevation: 0),
       body: SafeArea(
         child: Column(
           children: [
@@ -130,7 +161,9 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: _selectedTab == 'list' ? AppColors.surface : Colors.transparent,
+                  color: _selectedTab == 'list'
+                      ? AppColors.surface
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: _selectedTab == 'list'
                       ? [
@@ -138,7 +171,7 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
                             color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
-                          )
+                          ),
                         ]
                       : null,
                 ),
@@ -146,8 +179,12 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
                   'Todos Agendados',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontWeight: _selectedTab == 'list' ? FontWeight.bold : FontWeight.normal,
-                    color: _selectedTab == 'list' ? AppColors.textPrimary : AppColors.textMuted,
+                    fontWeight: _selectedTab == 'list'
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: _selectedTab == 'list'
+                        ? AppColors.textPrimary
+                        : AppColors.textMuted,
                     fontSize: 14,
                   ),
                 ),
@@ -160,7 +197,9 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: _selectedTab == 'theme' ? AppColors.surface : Colors.transparent,
+                  color: _selectedTab == 'theme'
+                      ? AppColors.surface
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: _selectedTab == 'theme'
                       ? [
@@ -168,7 +207,7 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
                             color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
-                          )
+                          ),
                         ]
                       : null,
                 ),
@@ -176,8 +215,12 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
                   'Previsão por Tema',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontWeight: _selectedTab == 'theme' ? FontWeight.bold : FontWeight.normal,
-                    color: _selectedTab == 'theme' ? AppColors.textPrimary : AppColors.textMuted,
+                    fontWeight: _selectedTab == 'theme'
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: _selectedTab == 'theme'
+                        ? AppColors.textPrimary
+                        : AppColors.textMuted,
                     fontSize: 14,
                   ),
                 ),
@@ -196,7 +239,11 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
         children: [
           const Text(
             'Período da Previsão:',
-            style: TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textMuted,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const Spacer(),
           ChoiceChip(
@@ -208,8 +255,12 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
             selectedColor: AppColors.primary.withValues(alpha: 0.15),
             checkmarkColor: AppColors.primary,
             labelStyle: TextStyle(
-              color: _timeframeDays == 7 ? AppColors.primary : AppColors.textMuted,
-              fontWeight: _timeframeDays == 7 ? FontWeight.bold : FontWeight.normal,
+              color: _timeframeDays == 7
+                  ? AppColors.primary
+                  : AppColors.textMuted,
+              fontWeight: _timeframeDays == 7
+                  ? FontWeight.bold
+                  : FontWeight.normal,
               fontSize: 12,
             ),
           ),
@@ -223,8 +274,12 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
             selectedColor: AppColors.primary.withValues(alpha: 0.15),
             checkmarkColor: AppColors.primary,
             labelStyle: TextStyle(
-              color: _timeframeDays == 30 ? AppColors.primary : AppColors.textMuted,
-              fontWeight: _timeframeDays == 30 ? FontWeight.bold : FontWeight.normal,
+              color: _timeframeDays == 30
+                  ? AppColors.primary
+                  : AppColors.textMuted,
+              fontWeight: _timeframeDays == 30
+                  ? FontWeight.bold
+                  : FontWeight.normal,
               fontSize: 12,
             ),
           ),
@@ -233,7 +288,10 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
     );
   }
 
-  Widget _buildListView(List<Task> scheduledTasks, List<Habit> scheduledHabits) {
+  Widget _buildListView(
+    List<Task> scheduledTasks,
+    List<Habit> scheduledHabits,
+  ) {
     if (scheduledTasks.isEmpty && scheduledHabits.isEmpty) {
       return const Center(
         child: Text(
@@ -251,7 +309,11 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
               padding: EdgeInsets.fromLTRB(20, 10, 20, 10),
               child: Text(
                 'Tarefas Agendadas',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ),
           ),
@@ -259,7 +321,8 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildSchedulerItem(context, scheduledTasks[index]),
+                (context, index) =>
+                    _buildSchedulerItem(context, scheduledTasks[index]),
                 childCount: scheduledTasks.length,
               ),
             ),
@@ -271,7 +334,11 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
               padding: EdgeInsets.fromLTRB(20, 24, 20, 10),
               child: Text(
                 'Hábitos Agendados',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ),
           ),
@@ -279,7 +346,8 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildSchedulerItem(context, scheduledHabits[index]),
+                (context, index) =>
+                    _buildSchedulerItem(context, scheduledHabits[index]),
                 childCount: scheduledHabits.length,
               ),
             ),
@@ -291,7 +359,9 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
   }
 
   Widget _buildSchedulerItem(BuildContext context, dynamic item) {
-    final scheduler = item is Task ? item.scheduler : (item as Habit).schedulers.first;
+    final scheduler = item is Task
+        ? item.scheduler
+        : (item as Habit).schedulers.first;
     final nextDate = SchedulerService.nextOccurrence(scheduler!);
 
     return Container(
@@ -366,29 +436,35 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
     });
 
     final forecasts = dayThemes.map((theme) {
-      final activeDates = dates.where((d) => isThemeActive(theme.id, d)).toList();
+      final activeDates = dates
+          .where((d) => isThemeActive(theme.id, d))
+          .toList();
 
       final themeTasks = tasks.where((t) {
         if (t.scheduler == null) return false;
-        return activeDates.any((date) => SchedulerService.shouldFire(
-              t.scheduler!,
-              date,
-              isThemeActive: isThemeActive,
-              isBlockActive: isBlockActive,
-              isItemScheduled: isItemScheduled,
-            ));
+        return activeDates.any(
+          (date) => SchedulerService.shouldFire(
+            t.scheduler!,
+            date,
+            isThemeActive: isThemeActive,
+            isBlockActive: isBlockActive,
+            isItemScheduled: isItemScheduled,
+          ),
+        );
       }).toList();
 
       final themeHabits = habits.where((h) {
         if (h.schedulers.isEmpty) return false;
         return activeDates.any((date) {
-          return h.schedulers.any((s) => SchedulerService.shouldFire(
-                s,
-                date,
-                isThemeActive: isThemeActive,
-                isBlockActive: isBlockActive,
-                isItemScheduled: isItemScheduled,
-              ));
+          return h.schedulers.any(
+            (s) => SchedulerService.shouldFire(
+              s,
+              date,
+              isThemeActive: isThemeActive,
+              isBlockActive: isBlockActive,
+              isItemScheduled: isItemScheduled,
+            ),
+          );
         });
       }).toList();
 
@@ -403,7 +479,13 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 40),
       itemCount: forecasts.length,
-      itemBuilder: (context, index) => _buildThemeForecastCard(context, forecasts[index], isThemeActive, isBlockActive, isItemScheduled),
+      itemBuilder: (context, index) => _buildThemeForecastCard(
+        context,
+        forecasts[index],
+        isThemeActive,
+        isBlockActive,
+        isItemScheduled,
+      ),
     );
   }
 
@@ -417,19 +499,28 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
     final hasItems = forecast.tasks.isNotEmpty || forecast.habits.isNotEmpty;
     forecast.activeDates.sort();
 
-    const weekDaysPt = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
-    final daysStr = forecast.theme.daysOfWeek.map((day) {
-      switch (day) {
-        case 'Mon': return 'Seg';
-        case 'Tue': return 'Ter';
-        case 'Wed': return 'Qua';
-        case 'Thu': return 'Qui';
-        case 'Fri': return 'Sex';
-        case 'Sat': return 'Sáb';
-        case 'Sun': return 'Dom';
-        default: return day;
-      }
-    }).join(', ');
+    final daysStr = forecast.theme.daysOfWeek
+        .map((day) {
+          switch (day) {
+            case 'Mon':
+              return 'Seg';
+            case 'Tue':
+              return 'Ter';
+            case 'Wed':
+              return 'Qua';
+            case 'Thu':
+              return 'Qui';
+            case 'Fri':
+              return 'Sex';
+            case 'Sat':
+              return 'Sáb';
+            case 'Sun':
+              return 'Dom';
+            default:
+              return day;
+          }
+        })
+        .join(', ');
 
     final themeColor = forecast.theme.color != null
         ? Color(int.tryParse(forecast.theme.color!) ?? 0xFFE0E0E0)
@@ -438,9 +529,7 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       decoration: AppTheme.cardDecoration(context).copyWith(
-        border: Border(
-          left: BorderSide(color: themeColor, width: 4),
-        ),
+        border: Border(left: BorderSide(color: themeColor, width: 4)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -457,14 +546,21 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
               style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
             ),
             leading: Icon(Icons.dashboard_customize_rounded, color: themeColor),
-            childrenPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            childrenPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
             children: [
               if (!hasItems)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
                   child: Text(
                     'Nenhum item agendado para este tema no período.',
-                    style: TextStyle(fontStyle: FontStyle.italic, fontSize: 13, color: AppColors.textMuted),
+                    style: TextStyle(
+                      fontStyle: FontStyle.italic,
+                      fontSize: 13,
+                      color: AppColors.textMuted,
+                    ),
                   ),
                 )
               else ...[
@@ -484,7 +580,16 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
                       ),
                     ),
                   ),
-                  ...forecast.tasks.map((task) => _buildForecastItem(context, task, forecast.activeDates, isThemeActive, isBlockActive, isItemScheduled)),
+                  ...forecast.tasks.map(
+                    (task) => _buildForecastItem(
+                      context,
+                      task,
+                      forecast.activeDates,
+                      isThemeActive,
+                      isBlockActive,
+                      isItemScheduled,
+                    ),
+                  ),
                 ],
                 if (forecast.habits.isNotEmpty) ...[
                   const Align(
@@ -502,9 +607,18 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
                       ),
                     ),
                   ),
-                  ...forecast.habits.map((habit) => _buildForecastItem(context, habit, forecast.activeDates, isThemeActive, isBlockActive, isItemScheduled)),
+                  ...forecast.habits.map(
+                    (habit) => _buildForecastItem(
+                      context,
+                      habit,
+                      forecast.activeDates,
+                      isThemeActive,
+                      isBlockActive,
+                      isItemScheduled,
+                    ),
+                  ),
                 ],
-              ]
+              ],
             ],
           ),
         ),
@@ -530,13 +644,15 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
           isItemScheduled: isItemScheduled,
         );
       } else {
-        return (item as Habit).schedulers.any((s) => SchedulerService.shouldFire(
-              s,
-              date,
-              isThemeActive: isThemeActive,
-              isBlockActive: isBlockActive,
-              isItemScheduled: isItemScheduled,
-            ));
+        return (item as Habit).schedulers.any(
+          (s) => SchedulerService.shouldFire(
+            s,
+            date,
+            isThemeActive: isThemeActive,
+            isBlockActive: isBlockActive,
+            isItemScheduled: isItemScheduled,
+          ),
+        );
       }
     }).toList();
 
@@ -550,7 +666,9 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
           Row(
             children: [
               Icon(
-                item is Task ? Icons.check_circle_outline_rounded : Icons.repeat_rounded,
+                item is Task
+                    ? Icons.check_circle_outline_rounded
+                    : Icons.repeat_rounded,
                 size: 16,
                 color: item is Task ? AppColors.info : AppColors.habitOrange,
               ),
@@ -558,7 +676,10 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
               Expanded(
                 child: Text(
                   item.title,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -573,7 +694,10 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
                 final dateLabel = _formatOccurrenceDate(date);
                 return Container(
                   margin: const EdgeInsets.only(right: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceVariant,
                     borderRadius: BorderRadius.circular(6),
@@ -583,7 +707,11 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
                   ),
                   child: Text(
                     dateLabel,
-                    style: const TextStyle(fontSize: 10, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 );
               }).toList(),
@@ -599,8 +727,14 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
   String _formatOccurrenceDate(DateTime date) {
     final today = DateTime.now();
     final tomorrow = today.add(const Duration(days: 1));
-    final isToday = date.year == today.year && date.month == today.month && date.day == today.day;
-    final isTomorrow = date.year == tomorrow.year && date.month == tomorrow.month && date.day == tomorrow.day;
+    final isToday =
+        date.year == today.year &&
+        date.month == today.month &&
+        date.day == today.day;
+    final isTomorrow =
+        date.year == tomorrow.year &&
+        date.month == tomorrow.month &&
+        date.day == tomorrow.day;
     if (isToday) return 'Hoje';
     if (isTomorrow) return 'Amanhã';
 

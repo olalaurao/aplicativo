@@ -184,7 +184,7 @@ class _GoalCard extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              Icon(
+                              const Icon(
                                 Icons.chevron_right_rounded,
                                 color: AppColors.textMuted,
                                 size: 20,
@@ -321,7 +321,7 @@ class _GoalCard extends ConsumerWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.analytics_outlined,
                 size: 12,
                 color: AppColors.textMuted,
@@ -336,7 +336,7 @@ class _GoalCard extends ConsumerWidget {
               ),
               if (goal.subtasks.isNotEmpty) ...[
                 const SizedBox(width: 12),
-                Icon(
+                const Icon(
                   Icons.checklist_rounded,
                   size: 12,
                   color: AppColors.textMuted,

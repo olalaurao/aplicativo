@@ -23,7 +23,8 @@ class CombinedAnalysisScreen extends ConsumerStatefulWidget {
       _CombinedAnalysisScreenState();
 }
 
-class _CombinedAnalysisScreenState extends ConsumerState<CombinedAnalysisScreen> {
+class _CombinedAnalysisScreenState
+    extends ConsumerState<CombinedAnalysisScreen> {
   final DateTime _currentMonth = DateTime.now();
   CombinedAnalysis? _currentAnalysis;
   bool _loadedSavedAnalysis = false;
@@ -82,7 +83,10 @@ class _CombinedAnalysisScreenState extends ConsumerState<CombinedAnalysisScreen>
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -225,7 +229,9 @@ class _CombinedAnalysisScreenState extends ConsumerState<CombinedAnalysisScreen>
   }
 
   Widget _buildAnalysisSelector(
-      BuildContext context, List<CombinedAnalysis> analyses) {
+    BuildContext context,
+    List<CombinedAnalysis> analyses,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: AppTheme.cardDecoration(context),
@@ -268,12 +274,18 @@ class _CombinedAnalysisScreenState extends ConsumerState<CombinedAnalysisScreen>
                 else
                   DropdownButtonHideUnderline(
                     child: DropdownButton<CombinedAnalysis>(
-                      value: _currentAnalysis != null &&
+                      value:
+                          _currentAnalysis != null &&
                               analyses.any((a) => a.id == _currentAnalysis!.id)
-                          ? analyses.firstWhere((a) => a.id == _currentAnalysis!.id)
+                          ? analyses.firstWhere(
+                              (a) => a.id == _currentAnalysis!.id,
+                            )
                           : null,
                       isDense: true,
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+                      icon: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 20,
+                      ),
                       dropdownColor: AppTheme.surfaceColor(context),
                       hint: Text(
                         'Selecione uma análise...',
@@ -302,7 +314,9 @@ class _CombinedAnalysisScreenState extends ConsumerState<CombinedAnalysisScreen>
                             _currentAnalysis = val;
                             _activeSources
                               ..clear()
-                              ..addAll(val.charts.expand((chart) => chart.sources));
+                              ..addAll(
+                                val.charts.expand((chart) => chart.sources),
+                              );
                           });
                         }
                       },
@@ -315,13 +329,18 @@ class _CombinedAnalysisScreenState extends ConsumerState<CombinedAnalysisScreen>
             IconButton(
               icon: const Icon(Icons.tune_rounded, size: 20),
               tooltip: 'Editar Configuração',
-              onPressed: () => _showAnalysisFormSheet(context, _currentAnalysis),
+              onPressed: () =>
+                  _showAnalysisFormSheet(context, _currentAnalysis),
             ),
             IconButton(
-              icon: const Icon(Icons.delete_outline_rounded,
-                  color: AppColors.error, size: 20),
+              icon: const Icon(
+                Icons.delete_outline_rounded,
+                color: AppColors.error,
+                size: 20,
+              ),
               tooltip: 'Excluir Análise',
-              onPressed: () => _confirmDeleteAnalysis(context, _currentAnalysis!),
+              onPressed: () =>
+                  _confirmDeleteAnalysis(context, _currentAnalysis!),
             ),
           ],
         ],
@@ -384,12 +403,17 @@ class _CombinedAnalysisScreenState extends ConsumerState<CombinedAnalysisScreen>
     );
   }
 
-  void _confirmDeleteAnalysis(BuildContext context, CombinedAnalysis analysis) async {
+  void _confirmDeleteAnalysis(
+    BuildContext context,
+    CombinedAnalysis analysis,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Excluir análise?'),
-        content: Text('Deseja realmente excluir a configuração "${analysis.title}"? Esta ação pode ser desfeita em até 30 dias.'),
+        content: Text(
+          'Deseja realmente excluir a configuração "${analysis.title}"? Esta ação pode ser desfeita em até 30 dias.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -406,8 +430,10 @@ class _CombinedAnalysisScreenState extends ConsumerState<CombinedAnalysisScreen>
 
     if (confirmed == true) {
       final originalPath = analysis.obsidianPath;
-      await ref.read(combinedAnalysisProvider.notifier).deleteAnalysis(analysis);
-      if (!mounted) return;
+      await ref
+          .read(combinedAnalysisProvider.notifier)
+          .deleteAnalysis(analysis);
+      if (!context.mounted) return;
 
       setState(() {
         _currentAnalysis = null;
@@ -422,7 +448,9 @@ class _CombinedAnalysisScreenState extends ConsumerState<CombinedAnalysisScreen>
             label: 'Desfazer',
             textColor: AppColors.accent,
             onPressed: () async {
-              await ref.read(vaultProvider.notifier).restoreObject(analysis, originalPath);
+              await ref
+                  .read(vaultProvider.notifier)
+                  .restoreObject(analysis, originalPath);
             },
           ),
         ),
@@ -430,7 +458,10 @@ class _CombinedAnalysisScreenState extends ConsumerState<CombinedAnalysisScreen>
     }
   }
 
-  void _showAnalysisFormSheet(BuildContext context, CombinedAnalysis? analysis) {
+  void _showAnalysisFormSheet(
+    BuildContext context,
+    CombinedAnalysis? analysis,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -656,11 +687,13 @@ class _CombinedAnalysisScreenState extends ConsumerState<CombinedAnalysisScreen>
   double _getPomodoroValueForDate(DateTime date) {
     try {
       final pState = ref.read(pomodoroProvider);
-      final sessions = pState.history.where((s) =>
-          s.startTime.year == date.year &&
-          s.startTime.month == date.month &&
-          s.startTime.day == date.day &&
-          s.completed);
+      final sessions = pState.history.where(
+        (s) =>
+            s.startTime.year == date.year &&
+            s.startTime.month == date.month &&
+            s.startTime.day == date.day &&
+            s.completed,
+      );
       return sessions.fold<double>(0, (sum, s) => sum + s.duration.inMinutes);
     } catch (_) {
       return 0;
@@ -722,11 +755,7 @@ class _AnalysisFormSheet extends ConsumerStatefulWidget {
   final CombinedAnalysis? analysis;
   final Function(CombinedAnalysis) onSaved;
 
-  const _AnalysisFormSheet({
-    super.key,
-    this.analysis,
-    required this.onSaved,
-  });
+  const _AnalysisFormSheet({this.analysis, required this.onSaved});
 
   @override
   ConsumerState<_AnalysisFormSheet> createState() => _AnalysisFormSheetState();
@@ -751,9 +780,12 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.analysis?.title ?? '');
-    _descriptionController =
-        TextEditingController(text: widget.analysis?.description ?? '');
+    _titleController = TextEditingController(
+      text: widget.analysis?.title ?? '',
+    );
+    _descriptionController = TextEditingController(
+      text: widget.analysis?.description ?? '',
+    );
     if (widget.analysis != null && widget.analysis!.charts.isNotEmpty) {
       _tempSources.addAll(widget.analysis!.charts.first.sources);
     } else {
@@ -831,7 +863,9 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                   children: [
                     TextFormField(
                       controller: _titleController,
-                      style: TextStyle(color: AppTheme.textPrimaryColor(context)),
+                      style: TextStyle(
+                        color: AppTheme.textPrimaryColor(context),
+                      ),
                       decoration: const InputDecoration(
                         labelText: 'Título da Análise',
                         hintText: 'Ex: Humor vs Foco',
@@ -846,10 +880,13 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _descriptionController,
-                      style: TextStyle(color: AppTheme.textPrimaryColor(context)),
+                      style: TextStyle(
+                        color: AppTheme.textPrimaryColor(context),
+                      ),
                       decoration: const InputDecoration(
                         labelText: 'Descrição',
-                        hintText: 'Ex: Entenda como sessões de Pomodoro impactam seu humor',
+                        hintText:
+                            'Ex: Entenda como sessões de Pomodoro impactam seu humor',
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -883,7 +920,9 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                         child: Center(
                           child: Text(
                             'Nenhuma métrica adicionada.',
-                            style: TextStyle(color: AppTheme.textMutedColor(context)),
+                            style: TextStyle(
+                              color: AppTheme.textMutedColor(context),
+                            ),
                           ),
                         ),
                       )
@@ -908,7 +947,8 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                           },
                           itemBuilder: (context, index) {
                             final source = _tempSources[index];
-                            final uniqueKey = '${source.id}_${source.fieldId ?? ''}_$index';
+                            final uniqueKey =
+                                '${source.id}_${source.fieldId ?? ''}_$index';
                             return _buildSourceCard(source, index, uniqueKey);
                           },
                         ),
@@ -923,7 +963,10 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                         label: const Text('Adicionar Fonte de Dados'),
                         style: TextButton.styleFrom(
                           foregroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                             side: BorderSide(
@@ -986,7 +1029,9 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: (source.color ?? AppColors.primary).withValues(alpha: 0.1),
+                        color: (source.color ?? AppColors.primary).withValues(
+                          alpha: 0.1,
+                        ),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -1019,7 +1064,10 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                   decoration: const InputDecoration(
                     labelText: 'Rótulo de Exibição',
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                   ),
                   onChanged: (val) {
                     _tempSources[index] = MetricSource(
@@ -1045,7 +1093,8 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                 const SizedBox(height: 6),
                 Row(
                   children: _colorPresets.map((color) {
-                    final isSelected = source.color?.value == color.value;
+                    final isSelected =
+                        source.color?.toARGB32() == color.toARGB32();
                     return GestureDetector(
                       onTap: () {
                         setState(() {
@@ -1077,7 +1126,7 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                                     color: color.withValues(alpha: 0.3),
                                     blurRadius: 4,
                                     spreadRadius: 1,
-                                  )
+                                  ),
                                 ]
                               : [],
                         ),
@@ -1098,7 +1147,11 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
 
           // Delete Button
           IconButton(
-            icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 20),
+            icon: const Icon(
+              Icons.delete_outline_rounded,
+              color: AppColors.error,
+              size: 20,
+            ),
             onPressed: () {
               setState(() {
                 _tempSources.removeAt(index);
@@ -1157,12 +1210,14 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                 title: 'Média de Humor',
                 subtitle: 'Humor diário baseado no Journal',
                 onTap: () {
-                  _onSourceSelected(MetricSource(
-                    type: MetricType.mood,
-                    id: 'mood',
-                    label: 'Humor',
-                    color: AppColors.primary,
-                  ));
+                  _onSourceSelected(
+                    MetricSource(
+                      type: MetricType.mood,
+                      id: 'mood',
+                      label: 'Humor',
+                      color: AppColors.primary,
+                    ),
+                  );
                   Navigator.pop(ctx);
                 },
               ),
@@ -1175,12 +1230,14 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                 title: 'Minutos de Foco (Pomodoro)',
                 subtitle: 'Tempo diário focado no Pomodoro',
                 onTap: () {
-                  _onSourceSelected(MetricSource(
-                    type: MetricType.pomodoro,
-                    id: 'pomodoro',
-                    label: 'Foco (Pomodoro)',
-                    color: AppColors.habitPurple,
-                  ));
+                  _onSourceSelected(
+                    MetricSource(
+                      type: MetricType.pomodoro,
+                      id: 'pomodoro',
+                      label: 'Foco (Pomodoro)',
+                      color: AppColors.habitPurple,
+                    ),
+                  );
                   Navigator.pop(ctx);
                 },
               ),
@@ -1207,12 +1264,14 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                     title: h.title,
                     subtitle: 'Frequência de conclusão do hábito',
                     onTap: () {
-                      _onSourceSelected(MetricSource(
-                        type: MetricType.habit,
-                        id: h.id,
-                        label: h.title,
-                        color: AppColors.habitGreen,
-                      ));
+                      _onSourceSelected(
+                        MetricSource(
+                          type: MetricType.habit,
+                          id: h.id,
+                          label: h.title,
+                          color: AppColors.habitGreen,
+                        ),
+                      );
                       Navigator.pop(ctx);
                     },
                   ),
@@ -1233,27 +1292,27 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                     ),
                   ),
                 ),
-                ...trackers.map(
-                  (t) {
-                    final trackerColor = _parseColor(t.color);
-                    return _buildPickerItem(
-                      ctx,
-                      icon: Icons.analytics_rounded,
-                      color: trackerColor,
-                      title: 'Total: ${t.title}',
-                      subtitle: 'Quantidade de registros diários',
-                      onTap: () {
-                        _onSourceSelected(MetricSource(
+                ...trackers.map((t) {
+                  final trackerColor = _parseColor(t.color);
+                  return _buildPickerItem(
+                    ctx,
+                    icon: Icons.analytics_rounded,
+                    color: trackerColor,
+                    title: 'Total: ${t.title}',
+                    subtitle: 'Quantidade de registros diários',
+                    onTap: () {
+                      _onSourceSelected(
+                        MetricSource(
                           type: MetricType.trackerScore,
                           id: t.id,
                           label: 'Registros: ${t.title}',
                           color: trackerColor,
-                        ));
-                        Navigator.pop(ctx);
-                      },
-                    );
-                  },
-                ),
+                        ),
+                      );
+                      Navigator.pop(ctx);
+                    },
+                  );
+                }),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
                   child: Text(
@@ -1266,42 +1325,42 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                     ),
                   ),
                 ),
-                ...trackers.expand(
-                  (t) {
-                    final trackerColor = _parseColor(t.color);
-                    return t.sections.expand(
-                      (s) => s.inputFields
-                          .where(
-                            (f) =>
-                                f.type == InputFieldType.quantity ||
-                                f.type == InputFieldType.range ||
-                                f.type == InputFieldType.mood ||
-                                f.type == InputFieldType.duration ||
-                                f.type == InputFieldType.checkbox ||
-                                f.type == InputFieldType.checklist,
-                          )
-                          .map(
-                            (f) => _buildPickerItem(
-                              ctx,
-                              icon: _getIconForField(f.type),
-                              color: trackerColor,
-                              title: '${t.title}: ${f.title}',
-                              subtitle: 'Valores numéricos de ${f.title}',
-                              onTap: () {
-                                _onSourceSelected(MetricSource(
+                ...trackers.expand((t) {
+                  final trackerColor = _parseColor(t.color);
+                  return t.sections.expand(
+                    (s) => s.inputFields
+                        .where(
+                          (f) =>
+                              f.type == InputFieldType.quantity ||
+                              f.type == InputFieldType.range ||
+                              f.type == InputFieldType.mood ||
+                              f.type == InputFieldType.duration ||
+                              f.type == InputFieldType.checkbox ||
+                              f.type == InputFieldType.checklist,
+                        )
+                        .map(
+                          (f) => _buildPickerItem(
+                            ctx,
+                            icon: _getIconForField(f.type),
+                            color: trackerColor,
+                            title: '${t.title}: ${f.title}',
+                            subtitle: 'Valores numéricos de ${f.title}',
+                            onTap: () {
+                              _onSourceSelected(
+                                MetricSource(
                                   type: MetricType.trackerField,
                                   id: t.id,
                                   label: '${t.title}: ${f.title}',
                                   fieldId: f.id,
                                   color: trackerColor,
-                                ));
-                                Navigator.pop(ctx);
-                              },
-                            ),
+                                ),
+                              );
+                              Navigator.pop(ctx);
+                            },
                           ),
-                    );
-                  },
-                ),
+                        ),
+                  );
+                }),
               ],
 
               // Google Calendar
@@ -1312,12 +1371,14 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                 title: 'Eventos (Google Calendar)',
                 subtitle: 'Quantidade de compromissos externos',
                 onTap: () {
-                  _onSourceSelected(MetricSource(
-                    type: MetricType.googleCalendar,
-                    id: 'google',
-                    label: 'Compromissos',
-                    color: AppColors.info,
-                  ));
+                  _onSourceSelected(
+                    MetricSource(
+                      type: MetricType.googleCalendar,
+                      id: 'google',
+                      label: 'Compromissos',
+                      color: AppColors.info,
+                    ),
+                  );
                   Navigator.pop(ctx);
                 },
               ),
@@ -1361,10 +1422,7 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
       ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(
-          fontSize: 12,
-          color: AppTheme.textMutedColor(context),
-        ),
+        style: TextStyle(fontSize: 12, color: AppTheme.textMutedColor(context)),
       ),
       onTap: onTap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1395,14 +1453,18 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
     if (widget.analysis == null) {
       await ref.read(combinedAnalysisProvider.notifier).addAnalysis(analysis);
     } else {
-      await ref.read(combinedAnalysisProvider.notifier).updateAnalysis(analysis);
+      await ref
+          .read(combinedAnalysisProvider.notifier)
+          .updateAnalysis(analysis);
     }
 
     widget.onSaved(analysis);
     if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Configuração de análise salva com sucesso')),
+      const SnackBar(
+        content: Text('Configuração de análise salva com sucesso'),
+      ),
     );
   }
 

@@ -19,7 +19,6 @@ import '../../providers/google_calendar_provider.dart';
 import 'package:googleapis/calendar/v3.dart' as google_calendar;
 import '../../providers/pomodoro_provider.dart';
 import '../../models/people_model.dart';
-import '../../providers/day_theme_provider.dart';
 import '../../models/day_theme_model.dart';
 import '../widgets/object_action_wrapper.dart';
 import 'pomodoro_screen.dart';
@@ -353,6 +352,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                           await ref
                               .read(habitsProvider.notifier)
                               .updateHabit(updatedHabit);
+                          if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
@@ -779,9 +779,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Tracker Record',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                     Text(
                       '${record.fieldValues.length} fields filled',
@@ -1375,9 +1375,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                       ),
                     );
                   },
-                  child: Padding(
-                    padding: const EdgeInsets.all(4.0),
-                    child: const Icon(
+                  child: const Padding(
+                    padding: EdgeInsets.all(4.0),
+                    child: Icon(
                       Icons.do_not_disturb_on_rounded,
                       size: 20,
                       color: AppColors.priorityHigh,

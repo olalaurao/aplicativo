@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../theme.dart';
 import '../../services/notification_service.dart';
 import '../../providers/vault_provider.dart';
 import '../../models/reminder_config.dart';
