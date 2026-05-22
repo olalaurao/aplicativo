@@ -9,7 +9,6 @@ abstract class ContentObject {
   List<OrganizerReference> organizers;
   List<String> categories;
   List<String> tags;
-  List<String> moc;
   DateTime createdAt;
   DateTime updatedAt;
   String obsidianPath;
@@ -25,7 +24,6 @@ abstract class ContentObject {
     List<OrganizerReference>? organizers,
     List<String>? categories,
     List<String>? tags,
-    List<String>? moc,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.obsidianPath = '',
@@ -37,7 +35,6 @@ abstract class ContentObject {
        organizers = organizers ?? [],
        categories = categories ?? [],
        tags = tags ?? [],
-       moc = moc ?? [],
        reminders = reminders ?? [],
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
@@ -52,7 +49,6 @@ abstract class ContentObject {
       'title': title,
       'categories': categories,
       'tags': tags,
-      'moc': moc,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'archived': archived,
@@ -68,7 +64,6 @@ abstract class ContentObject {
     title = map['title'] as String? ?? title;
     categories = List<String>.from(map['categories'] as List? ?? []);
     tags = List<String>.from(map['tags'] as List? ?? []);
-    moc = List<String>.from(map['moc'] as List? ?? []);
     if (map['created_at'] != null) {
       createdAt = DateTime.tryParse(map['created_at'].toString()) ?? createdAt;
     }

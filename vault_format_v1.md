@@ -22,7 +22,6 @@ archived: false
 pinned: false
 categories: []
 tags: []
-moc: []
 organizers: []
 reminders: []
 ```

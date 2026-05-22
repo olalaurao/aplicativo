@@ -6,6 +6,7 @@ import '../../models/shared_types.dart';
 import '../theme.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/organizer_selector_field.dart';
+import '../../providers/settings_provider.dart';
 import '../../providers/vault_provider.dart';
 
 class CreateResourceForm extends ConsumerStatefulWidget {
@@ -72,6 +73,13 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
       _rating = resource.rating;
       _readDate = resource.readDate;
       _organizers = List.from(resource.organizers);
+    } else {
+      final defaultType = ref
+          .read(settingsProvider)
+          .resourceTypeFilters
+          .where((type) => type.trim().isNotEmpty)
+          .firstOrNull;
+      if (defaultType != null) _resourceType = defaultType;
     }
   }
 
@@ -273,6 +281,13 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
   }
 
   Widget _buildTypeRow() {
+    final configuredTypes = ref.watch(settingsProvider).resourceTypeFilters;
+    final types = {
+      if (_resourceType.trim().isNotEmpty) _resourceType.trim(),
+      ...configuredTypes.where((type) => type.trim().isNotEmpty),
+    }.toList()
+      ..sort();
+
     return Row(
       children: [
         const Text(
@@ -289,9 +304,19 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
             color: AppColors.primary,
           ),
           onChanged: (val) => setState(() => _resourceType = val!),
-          items: ['Book', 'Movie', 'Series', 'Podcast', 'Course', 'Game']
+          items: types
               .map(
-                (t) => DropdownMenuItem(value: t, child: Text(t.toUpperCase())),
+                (t) => DropdownMenuItem(
+                  value: t,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 180),
+                    child: Text(
+                      t.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
               )
               .toList(),
         ),
@@ -447,7 +472,6 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
       obsidianPath: widget.existingResource?.obsidianPath ?? '',
       organizers: _organizers,
       categories: widget.existingResource?.categories,
-      moc: widget.existingResource?.moc,
     );
 
     if (widget.existingResource != null) {

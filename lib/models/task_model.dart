@@ -60,7 +60,6 @@ class Task extends ContentObject {
     super.organizers,
     super.categories,
     super.tags,
-    super.moc,
     super.createdAt,
     super.updatedAt,
     super.obsidianPath,
@@ -92,7 +91,7 @@ class Task extends ContentObject {
           triggerTime: value,
           type: NotificationType.push,
           notificationBody: 'Reminder: $title',
-        )
+        ),
       ];
     }
   }
@@ -108,10 +107,12 @@ class Task extends ContentObject {
     if (dependsOn.isEmpty) return false;
     for (final rawRef in dependsOn) {
       final ref = rawRef.replaceAll('[[', '').replaceAll(']]', '').trim();
-      final blockingTask = allObjects.cast<ContentObject?>().firstWhere(
-        (o) => o is Task && (o.slug == ref || o.id == ref),
-        orElse: () => null,
-      ) as Task?;
+      final blockingTask =
+          allObjects.cast<ContentObject?>().firstWhere(
+                (o) => o is Task && (o.slug == ref || o.id == ref),
+                orElse: () => null,
+              )
+              as Task?;
       if (blockingTask != null && blockingTask.stage != TaskStage.finalized) {
         return true;
       }
@@ -131,7 +132,7 @@ class Task extends ContentObject {
     // Start date is the primary reference for tasks
     final refDate = startDate ?? endDate;
     if (refDate == null) return null;
-    
+
     if (scheduledTime != null) {
       try {
         final parts = scheduledTime!.split(':');
@@ -152,7 +153,7 @@ class Task extends ContentObject {
   List<ReminderConfig> get reminders {
     // If user has defined custom reminders, use them
     if (super.reminders.isNotEmpty) return super.reminders;
-    
+
     // Fallback to auto reminder if there's a base time
     final base = baseTime;
     if (base == null || isCompleted) return [];
@@ -213,11 +214,13 @@ class Task extends ContentObject {
     for (final subtask in subtasks) {
       if (subtask.isHeader) {
         if (currentSessionName != null) {
-          derivedSessions.add(SubtaskSession(
-            id: currentSessionId ?? Uuid().v4(),
-            name: currentSessionName,
-            subtaskIds: currentSubtaskIds,
-          ));
+          derivedSessions.add(
+            SubtaskSession(
+              id: currentSessionId ?? Uuid().v4(),
+              name: currentSessionName,
+              subtaskIds: currentSubtaskIds,
+            ),
+          );
         }
         currentSessionName = subtask.title;
         currentSessionId = subtask.id;
@@ -231,11 +234,13 @@ class Task extends ContentObject {
       }
     }
     if (currentSessionName != null) {
-      derivedSessions.add(SubtaskSession(
-        id: currentSessionId ?? Uuid().v4(),
-        name: currentSessionName,
-        subtaskIds: currentSubtaskIds,
-      ));
+      derivedSessions.add(
+        SubtaskSession(
+          id: currentSessionId ?? Uuid().v4(),
+          name: currentSessionName,
+          subtaskIds: currentSubtaskIds,
+        ),
+      );
     }
     this.sessions = derivedSessions;
 
@@ -270,7 +275,9 @@ class Task extends ContentObject {
 
   factory Task.fromMarkdown(Map<String, dynamic> frontmatter, String body) {
     final task = Task(
-      title: frontmatter['title'] is List ? (frontmatter['title'] as List).join(', ') : frontmatter['title']?.toString() ?? '',
+      title: frontmatter['title'] is List
+          ? (frontmatter['title'] as List).join(', ')
+          : frontmatter['title']?.toString() ?? '',
       notes: [],
       subtasks: [],
       sessions: [],
@@ -290,12 +297,19 @@ class Task extends ContentObject {
     if (frontmatter['end_date'] != null) {
       task.endDate = DateTime.tryParse(frontmatter['end_date'] as String);
     }
-    task.color = frontmatter['color'] is List ? (frontmatter['color'] as List).join(', ') : frontmatter['color']?.toString();
+    task.color = frontmatter['color'] is List
+        ? (frontmatter['color'] as List).join(', ')
+        : frontmatter['color']?.toString();
     task.untilDone = frontmatter['until_done'] as bool? ?? false;
     task.allDay = frontmatter['all_day'] as bool? ?? false;
     final d = frontmatter['duration'];
-    task.duration = d is int ? d : int.tryParse(d?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '') ?? 15;
-    task.scheduledTime = frontmatter['scheduled_time'] is List ? (frontmatter['scheduled_time'] as List).join(', ') : frontmatter['scheduled_time']?.toString();
+    task.duration = d is int
+        ? d
+        : int.tryParse(d?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '') ??
+              15;
+    task.scheduledTime = frontmatter['scheduled_time'] is List
+        ? (frontmatter['scheduled_time'] as List).join(', ')
+        : frontmatter['scheduled_time']?.toString();
     task.archived = frontmatter['archived'] as bool? ?? false;
     task.pinned = frontmatter['pinned'] as bool? ?? false;
     if (frontmatter['reminder_date'] != null) {
@@ -303,17 +317,30 @@ class Task extends ContentObject {
         frontmatter['reminder_date'] as String,
       );
     }
-    task.exportedCalendarId = frontmatter['calendar_id'] is List ? (frontmatter['calendar_id'] as List).join(', ') : frontmatter['calendar_id']?.toString();
-    task.reflection = frontmatter['reflection'] is List ? (frontmatter['reflection'] as List).join(', ') : frontmatter['reflection']?.toString();
-    
+    task.exportedCalendarId = frontmatter['calendar_id'] is List
+        ? (frontmatter['calendar_id'] as List).join(', ')
+        : frontmatter['calendar_id']?.toString();
+    task.reflection = frontmatter['reflection'] is List
+        ? (frontmatter['reflection'] as List).join(', ')
+        : frontmatter['reflection']?.toString();
+
     final pc = frontmatter['pomodoro_count'];
-    task.pomodoroCount = pc is num ? pc.toInt() : int.tryParse(pc?.toString() ?? '');
-    task.timeBlock = frontmatter['time_block'] is List ? (frontmatter['time_block'] as List).join(', ') : frontmatter['time_block']?.toString();
-    if (frontmatter['depends_on'] != null && frontmatter['depends_on'] is List) {
-      task.dependsOn = (frontmatter['depends_on'] as List).map((e) => e.toString()).toList();
+    task.pomodoroCount = pc is num
+        ? pc.toInt()
+        : int.tryParse(pc?.toString() ?? '');
+    task.timeBlock = frontmatter['time_block'] is List
+        ? (frontmatter['time_block'] as List).join(', ')
+        : frontmatter['time_block']?.toString();
+    if (frontmatter['depends_on'] != null &&
+        frontmatter['depends_on'] is List) {
+      task.dependsOn = (frontmatter['depends_on'] as List)
+          .map((e) => e.toString())
+          .toList();
     }
     final em = frontmatter['estimated_minutes'];
-    task.estimatedMinutes = em is num ? em.toInt() : int.tryParse(em?.toString() ?? '');
+    task.estimatedMinutes = em is num
+        ? em.toInt()
+        : int.tryParse(em?.toString() ?? '');
     if (frontmatter['scheduler'] != null) {
       task.scheduler = Scheduler.fromMap(
         Map<String, dynamic>.from(frontmatter['scheduler'] as Map),
@@ -328,8 +355,11 @@ class Task extends ContentObject {
 
     final List<SubtaskSession> fmSessions = [];
     if (frontmatter['sessions'] != null && frontmatter['sessions'] is List) {
-      fmSessions.addAll((frontmatter['sessions'] as List)
-          .map((e) => SubtaskSession.fromMap(Map<String, dynamic>.from(e as Map))));
+      fmSessions.addAll(
+        (frontmatter['sessions'] as List).map(
+          (e) => SubtaskSession.fromMap(Map<String, dynamic>.from(e as Map)),
+        ),
+      );
     }
     task.sessions = fmSessions;
 
@@ -367,7 +397,12 @@ class Task extends ContentObject {
             }
           }
           task.subtasks.add(
-            Subtask(id: subtaskId, title: content, completed: completed, slug: slug),
+            Subtask(
+              id: subtaskId,
+              title: content,
+              completed: completed,
+              slug: slug,
+            ),
           );
           subtaskInSessionIndex++;
         }
@@ -381,7 +416,9 @@ class Task extends ContentObject {
           if (sessionIndex >= 0 && sessionIndex < fmSessions.length) {
             sessionId = fmSessions[sessionIndex].id;
           }
-          task.subtasks.add(Subtask(id: sessionId, title: title, isHeader: true));
+          task.subtasks.add(
+            Subtask(id: sessionId, title: title, isHeader: true),
+          );
         }
       } else if (line.trim().isNotEmpty && !line.startsWith('## ')) {
         task.notes.add(line);
@@ -419,6 +456,9 @@ class Task extends ContentObject {
     String? timeBlock,
     List<String>? dependsOn,
     int? estimatedMinutes,
+    List<OrganizerReference>? organizers,
+    List<String>? categories,
+    List<String>? tags,
     int? order,
   }) {
     return Task(
@@ -450,10 +490,9 @@ class Task extends ContentObject {
       timeBlock: timeBlock ?? this.timeBlock,
       dependsOn: dependsOn ?? this.dependsOn,
       estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
-      organizers: organizers,
-      categories: categories,
-      tags: tags,
-      moc: moc,
+      organizers: organizers ?? this.organizers,
+      categories: categories ?? this.categories,
+      tags: tags ?? this.tags,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
       obsidianPath: obsidianPath,

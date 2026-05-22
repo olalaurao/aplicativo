@@ -113,7 +113,6 @@ class TrackerDefinition extends ContentObject {
     super.organizers,
     super.categories,
     super.tags,
-    super.moc,
     super.createdAt,
     super.updatedAt,
     super.obsidianPath,

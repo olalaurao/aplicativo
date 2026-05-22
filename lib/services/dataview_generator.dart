@@ -23,16 +23,6 @@ class DataviewGenerator {
     ]);
   }
 
-  /// Generates a MOC-filtered query string to copy to clipboard.
-  static String mocDataviewQuery(String mocSlug, String mocTitle) {
-    return '''```dataview
-TABLE type AS "Tipo", updated AS "Atualizado"
-FROM "app"
-WHERE contains(moc, [[${mocSlug}]])
-SORT file.mtime DESC
-```''';
-  }
-
   /// Generates a tracker chart block for Obsidian Charts plugin.
   static String trackerChartBlock({
     required String trackerSlug,

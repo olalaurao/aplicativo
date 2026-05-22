@@ -1,7 +1,4 @@
 // lib/ui/screens/universal_detail_view.dart
-import '../../models/moc_model.dart';
-import '../widgets/moc_picker_modal.dart';
-import 'moc_detail_screen.dart';
 import 'package:flutter/material.dart';
 import '../../models/reminder_config.dart';
 import '../../services/notification_service.dart';
@@ -28,6 +25,7 @@ import '../../models/shared_types.dart' hide KPI;
 import '../../models/kpi_model.dart';
 import '../../providers/pomodoro_provider.dart';
 import '../../services/kpi_engine.dart';
+import '../../services/markdown_parser.dart';
 import '../../providers/vault_provider.dart';
 import 'pomodoro_screen.dart';
 import '../theme.dart';
@@ -249,123 +247,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     ..._buildTypeSpecificProperties(context, ref),
                   ],
                 ),
-              ),
-            ),
-          ),
-
-          // ─── MOCs ───
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.layers_outlined,
-                            size: 18,
-                            color: AppColors.textSecondary,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'MOC',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          if (object.moc.isNotEmpty) ...[
-                            const SizedBox(width: 8),
-                            _badge(object.moc.length.toString()),
-                          ],
-                        ],
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.add_circle_outline_rounded,
-                          size: 20,
-                          color: AppColors.primary,
-                        ),
-                        onPressed: () => showMocPickerModal(context, ref, object),
-                        tooltip: 'Adicionar a MOC',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  if (object.moc.isEmpty)
-                    GestureDetector(
-                      onTap: () => showMocPickerModal(context, ref, object),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceVariant.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.divider.withValues(alpha: 0.3)),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.add_rounded, size: 16, color: AppColors.textMuted),
-                            SizedBox(width: 6),
-                            Text(
-                              'Associar a um MOC',
-                              style: TextStyle(color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w500),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  else
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        ...ref.watch(mocsProvider).where((moc) {
-                          final link = '[[${moc.slug}]]';
-                          return object.moc.contains(link) || moc.children.contains('[[${object.slug}]]');
-                        }).map((moc) {
-                          return InputChip(
-                            avatar: CircleAvatar(
-                              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                              child: const Icon(Icons.layers_outlined, size: 12, color: AppColors.primary),
-                            ),
-                            label: Text(moc.title),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => MocDetailScreen(moc: moc),
-                                ),
-                              );
-                            },
-                            deleteIcon: const Icon(Icons.close_rounded, size: 14),
-                            onDeleted: () async {
-                              final objectSlugLink = '[[${object.slug}]]';
-                              final mocLink = '[[${moc.slug}]]';
-
-                              final updatedMocChildren = List<String>.from(moc.children)..remove(objectSlugLink);
-                              final updatedObjectMocs = List<String>.from(object.moc)..remove(mocLink);
-
-                              final updatedMoc = moc.copyWith(children: updatedMocChildren);
-                              final updatedObject = _copyWithMoc(object, updatedObjectMocs);
-
-                              await ref.read(vaultProvider.notifier).updateObject(updatedMoc);
-                              await ref.read(vaultProvider.notifier).updateObject(updatedObject);
-                            },
-                            backgroundColor: AppColors.surfaceVariant,
-                            labelStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            side: BorderSide.none,
-                          );
-                        }),
-                      ],
-                    ),
-                ],
               ),
             ),
           ),
@@ -991,6 +872,39 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         ],
       ];
     }
+    if (object is JournalEntry) {
+      final entry = object as JournalEntry;
+      final mood = _moodForEntry(entry);
+      return [
+        _divider(),
+        _buildPropertyRow(
+          context,
+          'Date',
+          DateFormat('EEE, d MMM, yyyy').format(entry.date),
+        ),
+        _divider(),
+        _buildPropertyRow(
+          context,
+          'Time',
+          DateFormat('HH:mm').format(entry.date),
+        ),
+        if (mood != null) ...[
+          _divider(),
+          _buildPropertyRow(
+            context,
+            'Mood',
+            '${mood.emoji} ${mood.title}',
+          ),
+        ] else if (entry.moodSlug != null && entry.moodSlug!.isNotEmpty) ...[
+          _divider(),
+          _buildPropertyRow(
+            context,
+            'Mood',
+            '${_fallbackMoodEmoji(entry.moodSlug!)} ${entry.moodSlug}',
+          ),
+        ],
+      ];
+    }
     if (object is Resource) {
       final resource = object as Resource;
       return [
@@ -1159,6 +1073,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
     if (object is JournalEntry) {
       final entry = object as JournalEntry;
+      final mood = _moodForEntry(entry);
+      final plainBody = MarkdownParser.getPlainTextFromBody(entry.body).trim();
       return [
         SliverToBoxAdapter(
           child: Padding(
@@ -1166,19 +1082,103 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             child: Container(
               decoration: AppTheme.cardDecoration(context),
               padding: const EdgeInsets.all(20),
-              child: _isEditing
-                  ? RichTextEditor(
-                      content: entry.body,
-                      onChanged: (newVal) {
-                        final updated = entry.copyWith(body: newVal);
-                        ref.read(vaultProvider.notifier).updateObject(updated);
-                        setState(() => object = updated);
-                      },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          mood?.emoji ??
+                              (entry.moodSlug != null
+                                  ? _fallbackMoodEmoji(entry.moodSlug!)
+                                  : '📝'),
+                          style: const TextStyle(fontSize: 22),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              DateFormat(
+                                'EEE, d MMM yyyy • HH:mm',
+                              ).format(entry.date),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textMutedColor(context),
+                              ),
+                            ),
+                            if (mood != null)
+                              Text(
+                                mood.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (entry.title.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      entry.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  if (_isEditing)
+                    SizedBox(
+                      height: 360,
+                      child: RichTextEditor(
+                        content: entry.body,
+                        onChanged: (newVal) {
+                          final updated = entry.copyWith(body: newVal);
+                          ref
+                              .read(vaultProvider.notifier)
+                              .updateObject(updated);
+                          setState(() => object = updated);
+                        },
+                      ),
                     )
-                  : JournalBodyView(
+                  else if (plainBody.isEmpty)
+                    Text(
+                      'Sem texto nesta entry.',
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.5,
+                        color: AppTheme.textMutedColor(context),
+                      ),
+                    )
+                  else
+                    JournalBodyView(
                       body: entry.body,
                       style: const TextStyle(fontSize: 16, height: 1.6),
                     ),
+                ],
+              ),
             ),
           ),
         ),
@@ -2332,6 +2332,26 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     if (obj is Resource) return obj.status.name.toUpperCase();
     if (obj is Goal) return obj.state.name.toUpperCase();
     return 'ACTIVE';
+  }
+
+  MoodDefinition? _moodForEntry(JournalEntry entry) {
+    final moodSlug = entry.moodSlug;
+    if (moodSlug == null || moodSlug.isEmpty) return null;
+    return ref
+        .read(moodsProvider)
+        .where((mood) => mood.id == moodSlug || mood.slug == moodSlug)
+        .firstOrNull;
+  }
+
+  String _fallbackMoodEmoji(String moodSlug) {
+    return switch (moodSlug) {
+      'terrible' => '😞',
+      'bad' => '😕',
+      'neutral' => '😐',
+      'good' => '🙂',
+      'great' => '😄',
+      _ => '😐',
+    };
   }
 
   void _handleAction(BuildContext context, WidgetRef ref, String action) {
@@ -3857,15 +3877,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         ),
       ),
     );
-  }
-
-  ContentObject _copyWithMoc(ContentObject obj, List<String> newMocs) {
-    try {
-      return (obj as dynamic).copyWith(moc: newMocs) as ContentObject;
-    } catch (e) {
-      obj.moc = newMocs;
-      return obj;
-    }
   }
 }
 

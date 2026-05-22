@@ -42,7 +42,6 @@ V2.14.1 — Weekly Review automático ✅
 Problema: L545 especifica template de revisão semanal gerado todo sexta/domingo com dados pré-preenchidos (hábitos, tasks, pomodoro, goals, mood). Nenhum código de geração automática ou agendamento de notificação semanal foi encontrado.
 Correção: Adicionar em NotificationService agendamento de notificação recorrente semanal. Ao disparar, chamar método que gera Entry com os dados da semana pré-preenchidos via template "Weekly Review".
 ⚠️ Discrepâncias menores / inconsistências com guidelines.md
-moc_service.dart não foi substituído: L219 diz "substituir por MOC definido pelo usuário". O moc_service.dart ainda gera index.md automático por pasta (lógica antiga). O novo sistema de MocDefinition em mocos/SLUG.md existe, mas o serviço antigo ainda está lá e pode ser chamado.
 
 google_calendar_service.dart não tem fetchEvents por múltiplos calendários: L160 especifica "múltiplos calendários com cores distintas; toggle por calendário em Settings". O fetchEvents atual só busca 'primary' — sem suporte a múltiplos calendários.
 

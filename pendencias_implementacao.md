@@ -47,7 +47,6 @@ Este arquivo usa o código como fonte de verdade: itens marcados como concluído
    - escrever markdown;
    - invalidar providers afetados;
    - enfileirar sync;
-   - atualizar backlinks/MOC/widgets quando aplicável;
    - mostrar undo quando for destrutiva.
 
 ## 4. Consolidar o formato canônico do vault

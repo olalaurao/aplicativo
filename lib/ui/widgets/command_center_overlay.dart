@@ -18,8 +18,6 @@ import '../forms/create_note_form.dart';
 import '../forms/create_tracker_form.dart';
 import '../screens/universal_detail_view.dart';
 import '../screens/organizer_detail_screen.dart';
-import '../screens/moc_detail_screen.dart';
-import '../../models/moc_model.dart';
 
 class CommandCenterOverlay extends ConsumerStatefulWidget {
   const CommandCenterOverlay({super.key});
@@ -104,10 +102,6 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
         icon = Icons.analytics_outlined;
         color = AppColors.error;
         break;
-      case 'moc':
-        icon = Icons.layers_outlined;
-        color = AppColors.primary;
-        break;
       default:
         icon = Icons.insert_drive_file_outlined;
         color = Colors.grey;
@@ -122,11 +116,6 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => OrganizerDetailScreen(organizer: item)),
-        );
-      } else if (item is MocDefinition) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => MocDetailScreen(moc: item)),
         );
       } else {
         Navigator.push(

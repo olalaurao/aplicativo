@@ -14,8 +14,6 @@ Alguns modelos já foram parcialmente construídos para o V2 durante o V1:
 | `day_theme_model.dart` | `DayTheme` e `TimeBlock` com `TimeRange` completos |
 | `scheduler.dart` | `RepeatType` já inclui `daysOfTheme`, `daysWithBlock`, `linkedItemAppears`, `nDaysAfterLinkedItem` no enum |
 | `google_calendar_service.dart` | `pushSessionToCalendar`, `fetchEvents`, `deleteSessionFromCalendar` implementados — só falta OAuth |
-| `moc_service.dart` | Gera `index.md` por pasta; `moc` property em todos os models |
-| `content_object.dart` | `moc: List<String>` em todos os objetos |
 | `voice_recording_sheet.dart` | UI completa (117 linhas) — sem gravação real |
 
 ---
@@ -205,45 +203,25 @@ Os tipos `linkedItemAppears` e `nDaysAfterLinkedItem` existem no enum mas não t
 
 ---
 
-## Fase V2.5 — MOC (Map of Content): grafo de conhecimento
 
 **Duração estimada: 1 semana**
 **Depende: V1 Universal Links + Backlinks funcionando**
 
-O V1 cria backlinks (`[[slug]]` em rich text). O MOC vai um passo além: cada objeto pode declarar explicitamente a quais mapas de conteúdo pertence, e o app exibe esses mapas como páginas navegáveis com o grafo de conexões.
 
-### V2.5.1 — MOC como objeto de primeiro nível
 
-- ✅ **MOC definition file**: `mocos/SLUG.md` com frontmatter `type: moc`, `title`, `description`, lista de `children` (WikiLinks ordenados)
-- ✅ **MOC provider**: `mocsProvider` que carrega todos os `mocos/*.md` e constrói `List<MocDefinition>`
-- ✅ **MOC creation form**: título, description, lista de WikiLinks (reordernáveis); o `moc_service.dart` atual gera apenas index automático por pasta — substituir por MOC definido pelo usuário
 
-### V2.5.2 — Editar propriedade `moc` em qualquer objeto
 
-- ✅ **MOC chip no detail view**: seção "Mapas de conteúdo" com chips dos MOCs do objeto; "+" abre seletor de MOCs existentes
-- ✅ **MOC picker**: modal searchable listando todos os `mocos/*.md`; tap toggle; opção "Criar novo MOC" no fim da lista
-- ✅ Ao adicionar um objeto a um MOC: atualizar `moc: ["[[moc-slug]]"]` no frontmatter do objeto E adicionar o objeto à lista de `children` do MOC
 
-### V2.5.3 — MOC detail view (navegação)
 
-- ✅ **MOC detail screen**: título + description + lista de children como cards tappáveis
 - ✅ Cada child: ícone do tipo (Task/Habit/Note/Goal...) + título + preview de 1 linha
-- ✅ **"Abrir no Obsidian"**: deep link para `mocos/SLUG.md`
-- ✅ **MOC aninhado**: children podem ser outros MOCs; mostrar hierarquia com indent
 
-### V2.5.4 — MOC como filtro em outras telas
 
-- ✅ **Filtro por MOC no Journal**: mostrar só entradas cujo `moc` contém `[[moc-slug]]`
-- ✅ **Filtro por MOC no Planner**: colorir items do dia pelo MOC do objeto (cor configurável por MOC)
-- ✅ **MOC na busca**: filtro "Buscar dentro de [MOC]" na search screen
 
 ### V2.5.5 — Dataview queries geradas automaticamente
 
-- ✅ Cada MOC detail view tem botão "Ver Dataview": gera e copia para clipboard uma query Dataview que lista todos os objetos deste MOC, ordenados por `updated_at`:
   ```dataview
   TABLE type AS "Tipo", updated AS "Atualizado"
   FROM "app"
-  WHERE contains(moc, [[nome-do-moc]])
   SORT file.mtime DESC
   ```
 
@@ -581,7 +559,6 @@ Esta fase gera conteúdo que funciona no Obsidian nativo, tornando o vault utili
 | V2.2 | ✅ Combined Analysis multi-fonte | Alto — feature diferenciadora | V1 Trackers + Mood | 1,5 sem |
 | V2.3 | ✅ Google Calendar completo | Alto — integração esperada | V1 OAuth (Drive) | 1 sem |
 | V2.4 | ✅ Scheduler: regras avançadas | Médio — edge cases de scheduler | V2.1 (daysOfTheme) | 4–5 dias |
-| V2.5 | ✅ MOC e grafo de conhecimento | Médio — usuários Obsidian avançados | V1 Backlinks | 1 sem |
 | V2.6 | ✅ Command Center + Inbox | Médio — velocidade de captura | V1 estável | 1 sem |
 | V2.7 | ✅ Templates | Médio — reduz fricção de criação | V1 rich text | 1 sem |
 | V2.8 | ✅ Subtask sessions + dependencies | Baixo–Médio — power users | V1 Tasks | 4–5 dias |

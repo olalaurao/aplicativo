@@ -2,8 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/vault_provider.dart';
-import '../../models/moc_model.dart';
-import 'moc_detail_screen.dart';
 import '../../models/organizer_model.dart';
 import '../theme.dart';
 import 'organizer_detail_screen.dart';
@@ -52,55 +50,52 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        IconButton(
-                          icon: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.add_rounded,
-                              size: 20,
-                              color: AppColors.primary,
-                            ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        icon: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const CreateOrganizerForm(),
-                              ),
-                            );
-                          },
+                          child: const Icon(
+                            Icons.add_rounded,
+                            size: 20,
+                            color: AppColors.primary,
+                          ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    // Search bar
-                    TextField(
-                      onChanged: (value) =>
-                          setState(() => _searchQuery = value),
-                      decoration: InputDecoration(
-                        hintText: 'Search...',
-                        prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                        ),
-                        filled: true,
-                        fillColor: AppTheme.surfaceVariantColor(context),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const CreateOrganizerForm(),
+                            ),
+                          );
+                        },
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  // Search bar
+                  TextField(
+                    onChanged: (value) => setState(() => _searchQuery = value),
+                    decoration: InputDecoration(
+                      hintText: 'Search...',
+                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      filled: true,
+                      fillColor: AppTheme.surfaceVariantColor(context),
                     ),
-                    const SizedBox(height: 12),
-                    _buildFilterChips(),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFilterChips(),
+                ],
               ),
             ),
+          ),
 
           // ─── Sections ───
           ..._buildSections(context, organizers),
@@ -201,14 +196,6 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
             .where((o) => o.organizerType == OrganizerType.label)
             .toList(),
       ),
-      _OrganizerSection(
-        'MOC',
-        Icons.layers_outlined,
-        AppColors.primary,
-        ref.watch(mocsProvider)
-            .where((m) => m.title.toLowerCase().contains(_searchQuery.toLowerCase()))
-            .toList(),
-      ),
     ];
 
     final filteredSections = sections.where((s) {
@@ -217,7 +204,6 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
       if (_activeFilter == 'Goals') return s.title == 'Goals';
       if (_activeFilter == 'Projects') return s.title == 'Projetos';
       if (_activeFilter == 'People') return s.title == 'People';
-      if (_activeFilter == 'MOC') return s.title == 'MOC';
       return true;
     }).toList();
 
@@ -346,8 +332,7 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
               vertical: 4,
             ),
             childrenPadding: EdgeInsets.zero,
-            initiallyExpanded:
-                section.items.isNotEmpty || _searchQuery.isNotEmpty,
+            initiallyExpanded: _searchQuery.isNotEmpty,
             children: [
               Divider(
                 height: 1,
@@ -397,13 +382,6 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
                 builder: (_) => OrganizerDetailScreen(organizer: item),
               ),
             );
-          } else if (item is MocDefinition) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => MocDetailScreen(moc: item),
-              ),
-            );
           } else {
             Navigator.push(
               context,
@@ -450,7 +428,7 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
   }
 
   Widget _buildFilterChips() {
-    final filters = ['All', 'Families', 'Goals', 'Projects', 'People', 'MOC'];
+    final filters = ['All', 'Families', 'Goals', 'Projects', 'People'];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(

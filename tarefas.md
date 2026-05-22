@@ -56,7 +56,6 @@ Auditoria completa do `roadmap.md` comparado ao estado atual do código. Tudo qu
 
 ### 2.2 Task (Seção G do roadmap)
 - [x] **Task model** com stage/priority/subtasks (existe)
-- [x] **Task Creation Form completo**: Title, Stage selector (6 botões: Ideia/Backlog/A fazer/Em progresso/Pendente/Finalizada), Date card com toggles (date range, until_done, all_day, duration), Priority flags (3 ícones), Subtasks inline, Links, Reminders, Notes rich text, Categories/MOC, Color
 - [x] **Scheduler Integration**: Integrado no Date card para recorrência
 - [x] **Voice Recording**: Botão de gravação de voz no form
 - [x] **Backlog confirmation**: Dialog ao salvar tarefa sem data (mover para backlog?).
@@ -204,7 +203,6 @@ Auditoria completa do `roadmap.md` comparado ao estado atual do código. Tudo qu
 - [x] **Broken Link handling**: Links para arquivos inexistentes abrem modal de criação rápida.
 - [x] **Backlinks/Mentions section em todo detail view**: Listar todos objetos que referenciam `[[this-slug]]`
 - [x] **Scan do vault para backlinks**: Buscar `[[slug]]` em todos os arquivos `.md` do vault
-- [x] **MOC (Map of Content) support**: Property `moc` com WikiLinks no frontmatter, editável no detail view
 
 ---
 
@@ -274,7 +272,6 @@ Auditoria completa do `roadmap.md` comparado ao estado atual do código. Tudo qu
 
 - [x] **Settings Screen** (existe, 8KB)
 - [x] **More Screen / Bottom bar config** (existe)
-- [x] **Categories Management (B3)**: Definir condições de categorização automática, Default Tags/MOC/Categories
 - [x] **Obsidian Integration settings**: Vault Name (para deep link), Vault Path
 - [x] **Planner Settings**: Color scheme (by category/priority), category colors, priority colors, start of week, default view, time range
 - [x] **Notification Settings**: Global defaults para push/popup/alarm

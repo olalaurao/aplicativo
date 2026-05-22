@@ -1620,6 +1620,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _buildTimelineList() {
     final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final data = ref.watch(dailyNoteDataProvider(todayStr));
+    final moods = ref.watch(moodsProvider);
 
     final entries = (data['entries'] as List?)?.cast<JournalEntry>() ?? [];
 
@@ -1640,7 +1641,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             title: item.title,
             body: item.body,
             time: DateFormat('HH:mm').format(item.date),
-            moodEmoji: item.moodSlug != null ? '😊' : null,
+            moodEmoji: _moodEmojiFor(item.moodSlug, moods),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -1651,6 +1652,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         );
       }).toList(),
     );
+  }
+
+  String? _moodEmojiFor(String? moodSlug, List<MoodDefinition> moods) {
+    if (moodSlug == null || moodSlug.isEmpty) return null;
+    final mood = moods
+        .where((m) => m.id == moodSlug || m.slug == moodSlug)
+        .firstOrNull;
+    if (mood != null) return mood.emoji;
+
+    return switch (moodSlug) {
+      'terrible' => '😞',
+      'bad' => '😕',
+      'neutral' => '😐',
+      'good' => '🙂',
+      'great' => '😄',
+      _ => '😐',
+    };
   }
 
   Widget _buildNotesBlock() {

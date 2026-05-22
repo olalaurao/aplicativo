@@ -21,7 +21,6 @@ class Reminder extends ContentObject {
     this.timeBlockId,
     super.organizers,
     super.categories,
-    super.moc,
     super.createdAt,
     super.updatedAt,
     super.obsidianPath,

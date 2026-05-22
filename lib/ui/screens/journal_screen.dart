@@ -10,6 +10,9 @@ import '../widgets/journal_body_view.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../../models/journal_entry.dart';
 import '../../models/habit_model.dart';
+import '../../models/mood_model.dart';
+import '../../models/reminder_model.dart';
+import '../../services/scheduler_service.dart';
 import '../forms/create_entry_form.dart';
 import 'universal_detail_view.dart';
 
@@ -167,39 +170,82 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
   Widget build(BuildContext context) {
     final entries = ref.watch(allEntriesProvider);
     final habits = ref.watch(habitsProvider);
+    final reminders = ref.watch(remindersProvider);
+    final moods = ref.watch(moodsProvider);
 
     // Grouping by date
     final Map<String, List<dynamic>> groupedItems = {};
 
-    final filteredEntries = entries.where((e) {
-      if (_filterMood != null && e.moodSlug != _filterMood) return false;
-      if (_filterHasPhoto && !e.body.contains('![[')) return false;
+    final filteredEntries =
+        entries.where((e) {
+          if (_filterMood != null && !_entryMatchesMood(e, _filterMood!, moods)) {
+            return false;
+          }
+          if (_filterHasPhoto && !e.body.contains('![[')) return false;
 
-      // Date filter
-      if (_onlySelectedDate) {
-        final sameDay =
-            e.date.year == _selectedDate.year &&
-            e.date.month == _selectedDate.month &&
-            e.date.day == _selectedDate.day;
-        if (!sameDay) return false;
+          // Date filter
+          if (_onlySelectedDate) {
+            if (!_isSameDay(_journalEntryDisplayDate(e), _selectedDate)) {
+              return false;
+            }
+          }
+
+          // Search filter
+          if (_searchQuery.isNotEmpty) {
+            final query = _searchQuery.toLowerCase();
+            final titleMatch = e.title.toLowerCase().contains(query);
+            final bodyText = MarkdownParser.getPlainTextFromBody(
+              e.body,
+            ).toLowerCase();
+            final bodyMatch = bodyText.contains(query);
+            if (!titleMatch && !bodyMatch) return false;
+          }
+
+          return true;
+        }).toList()..sort(
+          (a, b) => _journalEntryDisplayDate(
+            b,
+          ).compareTo(_journalEntryDisplayDate(a)),
+        );
+
+    final moodOverviewEntries = entries.where((entry) {
+      if (_filterHasPhoto && !entry.body.contains('![[')) return false;
+      if (_onlySelectedDate &&
+          !_isSameDay(_journalEntryDisplayDate(entry), _selectedDate)) {
+        return false;
       }
-
-      // Search filter
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
-        final titleMatch = e.title.toLowerCase().contains(query);
-        final bodyText = MarkdownParser.getPlainTextFromBody(
-          e.body,
-        ).toLowerCase();
-        final bodyMatch = bodyText.contains(query);
+        final titleMatch = entry.title.toLowerCase().contains(query);
+        final bodyMatch = MarkdownParser.getPlainTextFromBody(
+          entry.body,
+        ).toLowerCase().contains(query);
         if (!titleMatch && !bodyMatch) return false;
       }
-
-      return true;
+      return entry.moodSlug != null && entry.moodSlug!.isNotEmpty;
     }).toList();
 
+    final showDailyReminderSummary =
+        _onlySelectedDate &&
+        _filterMood == null &&
+        !_filterHasPhoto &&
+        _searchQuery.isEmpty;
+    final pendingReminders = showDailyReminderSummary
+        ? (reminders.where((reminder) {
+            if (reminder.isCompleted) return false;
+            return _isSameDay(reminder.time, _selectedDate) ||
+                (reminder.scheduler != null &&
+                    SchedulerService.shouldFire(
+                      reminder.scheduler!,
+                      _selectedDate,
+                    ));
+          }).toList()..sort((a, b) => a.time.compareTo(b.time)))
+        : <Reminder>[];
+
     for (final entry in filteredEntries) {
-      final dateKey = DateFormat('yyyy-MM-dd').format(entry.date);
+      final dateKey = DateFormat(
+        'yyyy-MM-dd',
+      ).format(_journalEntryDisplayDate(entry));
       groupedItems.putIfAbsent(dateKey, () => []).add(entry);
     }
 
@@ -224,6 +270,10 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
           }
         }
       }
+    }
+
+    for (final items in groupedItems.values) {
+      items.sort((a, b) => _itemDate(b).compareTo(_itemDate(a)));
     }
 
     final sortedDates = groupedItems.keys.toList()
@@ -279,10 +329,16 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
               children: [
                 _buildDateStrip(),
                 _buildSearchAndFilterRow(),
+                if (moodOverviewEntries.isNotEmpty)
+                  _buildMoodOverview(moodOverviewEntries, moods),
                 const Divider(height: 1),
               ],
             ),
           ),
+          if (pendingReminders.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _buildPendingRemindersSummary(pendingReminders),
+            ),
           if (sortedDates.isEmpty)
             SliverFillRemaining(hasScrollBody: false, child: _buildEmptyState())
           else
@@ -332,6 +388,78 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
         },
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+      ),
+    );
+  }
+
+  Widget _buildMoodOverview(
+    List<JournalEntry> entries,
+    List<MoodDefinition> moods,
+  ) {
+    final counts = <String, int>{};
+    for (final entry in entries) {
+      final mood = _moodForSlug(entry.moodSlug, moods);
+      final key = mood?.id ?? entry.moodSlug!;
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+
+    final items = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return SizedBox(
+      height: 54,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+        itemCount: items.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final mood = _moodForSlug(item.key, moods);
+          final selected =
+              _filterMood != null && _moodKeysMatch(_filterMood!, item.key, moods);
+          final emoji = mood?.emoji ?? _getMoodEmoji(item.key);
+
+          return InkWell(
+            onTap: () {
+              setState(() {
+                _filterMood = selected ? null : (mood?.id ?? item.key);
+              });
+            },
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: selected
+                    ? AppColors.primary.withValues(alpha: 0.12)
+                    : AppTheme.surfaceVariantColor(context),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: selected
+                      ? AppColors.primary
+                      : AppTheme.dividerColor(context),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(emoji, style: const TextStyle(fontSize: 18)),
+                  const SizedBox(width: 6),
+                  Text(
+                    item.value.toString(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: selected
+                          ? AppColors.primary
+                          : AppTheme.textSecondaryColor(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -571,12 +699,8 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
 
   Widget _buildDateHeader(DateTime date) {
     final now = DateTime.now();
-    final isToday =
-        date.year == now.year && date.month == now.month && date.day == now.day;
-    final isYesterday =
-        date.year == now.year &&
-        date.month == now.month &&
-        date.day == now.day - 1;
+    final isToday = _isSameDay(date, now);
+    final isYesterday = _isSameDay(date, now.subtract(const Duration(days: 1)));
 
     String label = DateFormat('EEEE, d MMM').format(date);
     if (isToday) label = 'Today, ${DateFormat('d MMM').format(date)}';
@@ -597,6 +721,14 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
   }
 
   Widget _buildJournalEntryCard(BuildContext context, JournalEntry entry) {
+    final displayDate = _journalEntryDisplayDate(entry);
+    final mood = entry.moodSlug == null
+        ? null
+        : ref
+              .watch(moodsProvider)
+              .where((m) => m.id == entry.moodSlug || m.slug == entry.moodSlug)
+              .firstOrNull;
+
     return ObjectActionWrapper(
       object: entry,
       child: InkWell(
@@ -620,13 +752,13 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                 children: [
                   if (entry.moodSlug != null) ...[
                     Text(
-                      _getMoodEmoji(entry.moodSlug!),
+                      mood?.emoji ?? _getMoodEmoji(entry.moodSlug!),
                       style: const TextStyle(fontSize: 18),
                     ),
                     const SizedBox(width: 8),
                   ],
                   Text(
-                    DateFormat('HH:mm').format(entry.date),
+                    DateFormat('HH:mm').format(displayDate),
                     style: TextStyle(
                       fontSize: 12,
                       color: AppTheme.textMutedColor(context),
@@ -634,6 +766,32 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                     ),
                   ),
                   const Spacer(),
+                  if (mood != null) ...[
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 120),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          mood.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   Icon(
                     Icons.more_horiz_rounded,
                     size: 18,
@@ -651,6 +809,8 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               JournalBodyView(
@@ -735,11 +895,95 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
     );
   }
 
+  Widget _buildPendingRemindersSummary(List<Reminder> reminders) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.warning.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.warning.withValues(alpha: 0.18)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.notifications_active_outlined,
+                  color: AppColors.warning,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${reminders.length} lembrete(s) pendente(s) para revisar',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.warning,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ...reminders
+                .take(3)
+                .map(
+                  (reminder) => Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 48,
+                          child: Text(
+                            DateFormat('HH:mm').format(reminder.time),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textMutedColor(context),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            reminder.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppTheme.textPrimaryColor(context),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            if (reminders.length > 3)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  '+${reminders.length - 3} outros',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textMutedColor(context),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   String _getMoodEmoji(String moodId) {
-    final mood = ref
-        .read(moodsProvider)
-        .where((m) => m.id == moodId || m.slug == moodId)
-        .firstOrNull;
+    final mood = _moodForSlug(moodId, ref.read(moodsProvider));
     if (mood != null) return mood.emoji;
 
     switch (moodId) {
@@ -756,5 +1000,67 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
       default:
         return '😐';
     }
+  }
+
+  MoodDefinition? _moodForSlug(String? moodSlug, List<MoodDefinition> moods) {
+    if (moodSlug == null || moodSlug.isEmpty) return null;
+    return moods
+        .where((mood) => mood.id == moodSlug || mood.slug == moodSlug)
+        .firstOrNull;
+  }
+
+  bool _entryMatchesMood(
+    JournalEntry entry,
+    String filterMood,
+    List<MoodDefinition> moods,
+  ) {
+    final moodSlug = entry.moodSlug;
+    if (moodSlug == null || moodSlug.isEmpty) return false;
+    return _moodKeysMatch(moodSlug, filterMood, moods);
+  }
+
+  bool _moodKeysMatch(
+    String left,
+    String right,
+    List<MoodDefinition> moods,
+  ) {
+    if (left == right) return true;
+    final leftMood = _moodForSlug(left, moods);
+    final rightMood = _moodForSlug(right, moods);
+    if (leftMood == null || rightMood == null) return false;
+    return leftMood.id == rightMood.id || leftMood.slug == rightMood.slug;
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  DateTime _itemDate(dynamic item) {
+    if (item is JournalEntry) return _journalEntryDisplayDate(item);
+    if (item is Map && item['type'] == 'habit_completion') {
+      return (item['record'] as CompletionRecord).date;
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  DateTime _journalEntryDisplayDate(JournalEntry entry) {
+    final match = RegExp(
+      r'daily[/\\](\d{4}-\d{2}-\d{2})\.md$',
+    ).firstMatch(entry.obsidianPath);
+    if (match == null) return entry.date;
+
+    final dailyDate = DateTime.tryParse(match.group(1)!);
+    if (dailyDate == null) return entry.date;
+
+    return DateTime(
+      dailyDate.year,
+      dailyDate.month,
+      dailyDate.day,
+      entry.date.hour,
+      entry.date.minute,
+      entry.date.second,
+      entry.date.millisecond,
+      entry.date.microsecond,
+    );
   }
 }

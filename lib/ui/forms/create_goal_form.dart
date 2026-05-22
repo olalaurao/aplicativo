@@ -392,7 +392,10 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
                   // ─── Organizers ───
                   Container(
                     decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
                     child: OrganizerSelectorField(
                       selectedOrganizers: _organizers,
                       onChanged: (val) => setState(() => _organizers = val),
@@ -619,12 +622,31 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
           const SizedBox(height: 12),
           DropdownButtonFormField<KPISourceType>(
             initialValue: _sourceType,
+            isExpanded: true,
             decoration: const InputDecoration(
               labelText: 'Tipo de Fonte',
               border: OutlineInputBorder(),
             ),
             items: KPISourceType.values
-                .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
+                .map(
+                  (t) => DropdownMenuItem(
+                    value: t,
+                    child: Text(
+                      t.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(),
+            selectedItemBuilder: (context) => KPISourceType.values
+                .map(
+                  (t) => Text(
+                    t.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                )
                 .toList(),
             onChanged: (v) {
               setState(() {

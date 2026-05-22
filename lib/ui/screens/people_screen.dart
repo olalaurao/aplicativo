@@ -58,7 +58,7 @@ class PeopleScreen extends ConsumerWidget {
                   crossAxisCount: 2,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
-                  childAspectRatio: 0.8,
+                  childAspectRatio: 0.62,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) =>
@@ -90,14 +90,14 @@ class PeopleScreen extends ConsumerWidget {
         ),
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: AppTheme.cardDecoration(context),
           child: Column(
             children: [
               Stack(
                 children: [
                   CircleAvatar(
-                    radius: 36,
+                    radius: 30,
                     backgroundColor: AppColors.surfaceVariant,
                     backgroundImage: person.photo != null
                         ? NetworkImage(person.photo!)
@@ -105,7 +105,7 @@ class PeopleScreen extends ConsumerWidget {
                     child: person.photo == null
                         ? const Icon(
                             Icons.person,
-                            size: 36,
+                            size: 30,
                             color: AppColors.textMuted,
                           )
                         : null,
@@ -129,7 +129,7 @@ class PeopleScreen extends ConsumerWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Text(
                 person.title,
                 style: const TextStyle(
@@ -149,8 +149,21 @@ class PeopleScreen extends ConsumerWidget {
                   fontWeight: FontWeight.bold,
                   color: isOverdue ? AppColors.error : AppColors.textMuted,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              const Spacer(),
+              const SizedBox(height: 4),
+              if (person.contactFrequency != null)
+                Text(
+                  'Every ${person.contactFrequency!.inDays} days',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: AppTheme.textMutedColor(context),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

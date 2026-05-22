@@ -37,66 +37,64 @@ class TrackersScreen extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                        IconButton(
-                          icon: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.add_rounded,
-                              size: 20,
-                              color: AppColors.primary,
-                            ),
+                      IconButton(
+                        icon: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const CreateTrackerForm(),
-                              ),
-                            );
-                          },
+                          child: const Icon(
+                            Icons.add_rounded,
+                            size: 20,
+                            color: AppColors.primary,
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: AppColors.habitPurple.withValues(
-                                alpha: 0.1,
-                              ),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.auto_graph_rounded,
-                              size: 20,
-                              color: AppColors.habitPurple,
-                            ),
-                          ),
-                          onPressed: () => Navigator.push(
+                        onPressed: () {
+                          Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const CombinedAnalysisScreen(),
+                              builder: (_) => const CreateTrackerForm(),
                             ),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: AppColors.habitPurple.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.auto_graph_rounded,
+                            size: 20,
+                            color: AppColors.habitPurple,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Monitor custom data points daily',
-                      style: TextStyle(
-                        color: AppTheme.textSecondaryColor(context),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const CombinedAnalysisScreen(),
+                          ),
+                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Monitor custom data points daily',
+                    style: TextStyle(
+                      color: AppTheme.textSecondaryColor(context),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
+          ),
 
           SliverToBoxAdapter(
             child: Padding(
@@ -170,7 +168,8 @@ class TrackersScreen extends ConsumerWidget {
                 childAspectRatio: 0.85,
               ),
               delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildTrackerCard(context, trackers[index]),
+                (context, index) =>
+                    _buildTrackerCard(context, ref, trackers[index]),
                 childCount: trackers.length,
               ),
             ),
@@ -194,8 +193,26 @@ class TrackersScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTrackerCard(BuildContext context, dynamic tracker) {
+  Widget _buildTrackerCard(
+    BuildContext context,
+    WidgetRef ref,
+    dynamic tracker,
+  ) {
     final color = _parseColor(tracker.color);
+    final records = ref.watch(trackingRecordsProvider);
+    final trackerRecords =
+        records
+            .where(
+              (record) =>
+                  record.trackerId == tracker.id ||
+                  record.trackerId == tracker.slug ||
+                  record.title == tracker.title,
+            )
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
+    final daysSince = trackerRecords.isEmpty
+        ? null
+        : DateTime.now().difference(trackerRecords.first.date).inDays;
 
     return ObjectActionWrapper(
       object: tracker,
@@ -241,6 +258,21 @@ class TrackersScreen extends ConsumerWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
+              if (daysSince != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  daysSince == 0
+                      ? 'Registrado hoje'
+                      : '$daysSince dias desde o último registro',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textMutedColor(context),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,

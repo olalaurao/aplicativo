@@ -10,7 +10,8 @@ class GoogleCalendarService {
     _calendarApi = calendar.CalendarApi(client);
   }
 
-  Future<String?> pushSessionToCalendar(Task task) async => pushTaskToCalendar(task);
+  Future<String?> pushSessionToCalendar(Task task) async =>
+      pushTaskToCalendar(task);
 
   Future<String?> pushTaskToCalendar(Task task) async {
     if (_calendarApi == null) throw Exception('Calendar API not initialized');
@@ -29,9 +30,7 @@ class GoogleCalendarService {
           )
         : task.endDate!;
 
-    final endDateTime = startDateTime.add(
-      Duration(minutes: task.duration),
-    );
+    final endDateTime = startDateTime.add(Duration(minutes: task.duration));
 
     final event = calendar.Event()
       ..summary = task.title
@@ -77,5 +76,11 @@ class GoogleCalendarService {
     );
 
     return events.items ?? [];
+  }
+
+  Future<calendar.Event> updateEvent(calendar.Event event) async {
+    if (_calendarApi == null) throw Exception('Calendar API not initialized');
+    if (event.id == null) throw Exception('Event id is missing');
+    return _calendarApi!.events.update(event, 'primary', event.id!);
   }
 }

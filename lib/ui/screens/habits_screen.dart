@@ -52,7 +52,9 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen>
   @override
   Widget build(BuildContext context) {
     final habits = ref.watch(habitsProvider);
-    final activeHabits = habits.where((h) => h.status == HabitStatus.active && !h.archived).toList();
+    final activeHabits = habits
+        .where((h) => h.status == HabitStatus.active && !h.archived)
+        .toList();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -73,11 +75,14 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen>
                   ? EmptyState(
                       icon: Icons.loop_rounded,
                       headline: 'Nenhum hábito ainda',
-                      subtext: 'Crie hábitos para acompanhar sua consistência e crescimento diário.',
+                      subtext:
+                          'Crie hábitos para acompanhar sua consistência e crescimento diário.',
                       ctaLabel: 'Criar Hábito',
                       onCta: () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const CreateHabitForm()),
+                        MaterialPageRoute(
+                          builder: (_) => const CreateHabitForm(),
+                        ),
                       ),
                     )
                   : TabBarView(
@@ -149,7 +154,11 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen>
                 color: AppColors.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.add_rounded, color: AppColors.primary, size: 20),
+              child: const Icon(
+                Icons.add_rounded,
+                color: AppColors.primary,
+                size: 20,
+              ),
             ),
           ),
         ],
@@ -178,8 +187,14 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen>
           dividerColor: Colors.transparent,
           labelColor: Colors.white,
           unselectedLabelColor: AppTheme.textMutedColor(context),
-          labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-          unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          labelStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
           tabs: const [
             Tab(text: 'HOJE'),
             Tab(text: 'SEMANA'),
@@ -217,7 +232,8 @@ class _TodayView extends ConsumerWidget {
     streakDays = _computeAllCompleteStreak(habits);
 
     final weekday = DateFormat('EEEE', 'pt_BR').format(now);
-    final dateLabel = '${weekday.substring(0, 1).toUpperCase()}${weekday.substring(1)}, ${DateFormat("d 'de' MMMM", 'pt_BR').format(now)}';
+    final dateLabel =
+        '${weekday.substring(0, 1).toUpperCase()}${weekday.substring(1)}, ${DateFormat("d 'de' MMMM", 'pt_BR').format(now)}';
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -225,7 +241,11 @@ class _TodayView extends ConsumerWidget {
         // Date label
         Row(
           children: [
-            const Icon(Icons.calendar_today_rounded, size: 14, color: AppColors.textMuted),
+            const Icon(
+              Icons.calendar_today_rounded,
+              size: 14,
+              color: AppColors.textMuted,
+            ),
             const SizedBox(width: 6),
             Text(
               dateLabel,
@@ -262,11 +282,7 @@ class _TodayView extends ConsumerWidget {
           final val = habitsMap[habit.slug];
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: _TodayHabitCard(
-              habit: habit,
-              currentVal: val,
-              date: now,
-            ),
+            child: _TodayHabitCard(habit: habit, currentVal: val, date: now),
           );
         }),
       ],
@@ -277,7 +293,8 @@ class _TodayView extends ConsumerWidget {
     if (val == null) return false;
     if (val is bool) return val;
     if (val is num) return val >= habit.dailyGoal;
-    if (val is List) return val.every((v) => v == true) && val.length >= habit.dailyGoal;
+    if (val is List)
+      return val.every((v) => v == true) && val.length >= habit.dailyGoal;
     return false;
   }
 
@@ -339,7 +356,9 @@ class _TodayHabitCard extends ConsumerWidget {
   }
 
   List<bool> get _slotStates {
-    final numSlots = habit.slots.isNotEmpty ? habit.slots.length : habit.dailyGoal;
+    final numSlots = habit.slots.isNotEmpty
+        ? habit.slots.length
+        : habit.dailyGoal;
     if (numSlots <= 0) return [];
     final states = List<bool>.filled(numSlots, false);
     final val = currentVal;
@@ -371,9 +390,7 @@ class _TodayHabitCard extends ConsumerWidget {
         decoration: BoxDecoration(
           color: AppTheme.cardFillColor(context),
           borderRadius: BorderRadius.circular(16),
-          border: Border(
-            left: BorderSide(color: color, width: 4),
-          ),
+          border: Border(left: BorderSide(color: color, width: 4)),
           boxShadow: isDark
               ? []
               : [
@@ -476,7 +493,9 @@ class _TodayHabitCard extends ConsumerWidget {
       return GestureDetector(
         onTap: () {
           HapticFeedback.lightImpact();
-          ref.read(habitsProvider.notifier).toggleHabit(
+          ref
+              .read(habitsProvider.notifier)
+              .toggleHabit(
                 habit,
                 date,
                 slotIndex: habit.dailyGoal > 1 ? 0 : null,
@@ -505,7 +524,9 @@ class _TodayHabitCard extends ConsumerWidget {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        ref.read(habitsProvider.notifier).toggleHabit(habit, date, slotIndex: 0);
+        ref
+            .read(habitsProvider.notifier)
+            .toggleHabit(habit, date, slotIndex: 0);
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -538,7 +559,9 @@ class _TodayHabitCard extends ConsumerWidget {
         return GestureDetector(
           onTap: () {
             HapticFeedback.lightImpact();
-            ref.read(habitsProvider.notifier).toggleHabit(habit, date, slotIndex: i);
+            ref
+                .read(habitsProvider.notifier)
+                .toggleHabit(habit, date, slotIndex: i);
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
@@ -620,13 +643,12 @@ class _WeekView extends ConsumerWidget {
         ),
 
         // Each habit week row
-        ...habits.map((habit) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _HabitWeekCard(
-                habit: habit,
-                weekDays: weekDays,
-              ),
-            )),
+        ...habits.map(
+          (habit) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _HabitWeekCard(habit: habit, weekDays: weekDays),
+          ),
+        ),
       ],
     );
   }
@@ -689,10 +711,12 @@ class _MonthView extends ConsumerWidget {
         ),
 
         // Each habit month
-        ...habits.map((habit) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _HabitMonthCard(habit: habit),
-            )),
+        ...habits.map(
+          (habit) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _HabitMonthCard(habit: habit),
+          ),
+        ),
       ],
     );
   }
@@ -756,9 +780,13 @@ class _WeekCalendarRow extends StatelessWidget {
       children: List.generate(7, (i) {
         final day = weekDays[i];
         final count = i < completions.length ? completions[i] : 0;
-        final isToday = day.year == now.year && day.month == now.month && day.day == now.day;
+        final isToday =
+            day.year == now.year &&
+            day.month == now.month &&
+            day.day == now.day;
         final isFuture = day.isAfter(now);
-        final isCompleted = !isFuture && totalHabits > 0 && count == totalHabits;
+        final isCompleted =
+            !isFuture && totalHabits > 0 && count == totalHabits;
         final isPast = day.isBefore(DateTime(now.year, now.month, now.day));
 
         return Expanded(
@@ -825,17 +853,19 @@ class _MonthCalendarGrid extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: _dayLabels
-              .map((d) => Expanded(
-                    child: Text(
-                      d,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: AppTheme.textMutedColor(context),
-                      ),
-                      textAlign: TextAlign.center,
+              .map(
+                (d) => Expanded(
+                  child: Text(
+                    d,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.textMutedColor(context),
                     ),
-                  ))
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
               .toList(),
         ),
         const SizedBox(height: 8),
@@ -856,9 +886,12 @@ class _MonthCalendarGrid extends StatelessWidget {
                 final ds = date.toIso8601String().split('T').first;
                 final count = completionsPerDay[ds] ?? 0;
                 final isToday =
-                    date.year == now.year && date.month == now.month && date.day == now.day;
+                    date.year == now.year &&
+                    date.month == now.month &&
+                    date.day == now.day;
                 final isFuture = date.isAfter(now);
-                final isCompleted = !isFuture && totalHabits > 0 && count == totalHabits;
+                final isCompleted =
+                    !isFuture && totalHabits > 0 && count == totalHabits;
 
                 return Expanded(
                   child: _DayCell(
@@ -1012,6 +1045,21 @@ class _HabitWeekCard extends ConsumerWidget {
 
             // Week day row
             _HabitWeekRow(habit: habit, weekDays: weekDays, color: color),
+            if (habit.streak <= 0 && habit.daysSinceLastCompletion >= 0) ...[
+              const SizedBox(height: 10),
+              Text(
+                habit.daysSinceLastCompletion == 0
+                    ? 'Concluído hoje'
+                    : '${habit.daysSinceLastCompletion} dias desde a última conclusão',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textMutedColor(context),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ],
         ),
       ),
@@ -1049,7 +1097,9 @@ class _HabitWeekRow extends ConsumerWidget {
         final day = weekDays[i];
         final isCompleted = _isCompletedOn(day);
         final isToday =
-            day.year == now.year && day.month == now.month && day.day == now.day;
+            day.year == now.year &&
+            day.month == now.month &&
+            day.day == now.day;
         final isFuture = day.isAfter(now);
 
         return Expanded(
@@ -1070,7 +1120,9 @@ class _HabitWeekRow extends ConsumerWidget {
                     ? null
                     : () {
                         HapticFeedback.lightImpact();
-                        ref.read(habitsProvider.notifier).toggleHabit(habit, day);
+                        ref
+                            .read(habitsProvider.notifier)
+                            .toggleHabit(habit, day);
                       },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
@@ -1081,28 +1133,40 @@ class _HabitWeekRow extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: isFuture
-                          ? AppTheme.textMutedColor(context).withValues(alpha: 0.2)
+                          ? AppTheme.textMutedColor(
+                              context,
+                            ).withValues(alpha: 0.2)
                           : isCompleted
-                              ? color
-                              : isToday
-                                  ? color
-                                  : AppTheme.textMutedColor(context).withValues(alpha: 0.35),
+                          ? color
+                          : isToday
+                          ? color
+                          : AppTheme.textMutedColor(
+                              context,
+                            ).withValues(alpha: 0.35),
                       width: isToday && !isCompleted ? 1.5 : 1,
                     ),
                   ),
                   child: Center(
                     child: isCompleted
-                        ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                        ? const Icon(
+                            Icons.check_rounded,
+                            size: 14,
+                            color: Colors.white,
+                          )
                         : Text(
                             '${day.day}',
                             style: TextStyle(
                               fontSize: 11,
-                              fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
+                              fontWeight: isToday
+                                  ? FontWeight.w800
+                                  : FontWeight.w500,
                               color: isFuture
-                                  ? AppTheme.textMutedColor(context).withValues(alpha: 0.4)
+                                  ? AppTheme.textMutedColor(
+                                      context,
+                                    ).withValues(alpha: 0.4)
                                   : isToday
-                                      ? color
-                                      : AppTheme.textMutedColor(context),
+                                  ? color
+                                  : AppTheme.textMutedColor(context),
                             ),
                           ),
                   ),
@@ -1162,7 +1226,10 @@ class _HabitMonthCard extends StatelessWidget {
                 Container(
                   width: 10,
                   height: 10,
-                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -1225,72 +1292,86 @@ class _CompactMonthGrid extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: _dayLabels
-              .map((d) => Expanded(
-                    child: Text(
-                      d,
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w500,
-                        color: AppTheme.textMutedColor(context),
-                      ),
-                      textAlign: TextAlign.center,
+              .map(
+                (d) => Expanded(
+                  child: Text(
+                    d,
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.textMutedColor(context),
                     ),
-                  ))
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
               .toList(),
         ),
         const SizedBox(height: 6),
-        ...List.generate(rows, (row) => Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(7, (col) {
-                  final cellIndex = row * 7 + col;
-                  final dayNum = cellIndex - startOffset + 1;
+        ...List.generate(
+          rows,
+          (row) => Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(7, (col) {
+                final cellIndex = row * 7 + col;
+                final dayNum = cellIndex - startOffset + 1;
 
-                  if (dayNum < 1 || dayNum > daysInMonth) {
-                    return const Expanded(child: SizedBox());
-                  }
+                if (dayNum < 1 || dayNum > daysInMonth) {
+                  return const Expanded(child: SizedBox());
+                }
 
-                  final date = DateTime(year, month, dayNum);
-                  final ds = date.toIso8601String().split('T').first;
-                  final isCompleted = completedDays.contains(ds);
-                  final isToday = date.year == now.year &&
-                      date.month == now.month &&
-                      date.day == now.day;
-                  final isFuture = date.isAfter(now);
+                final date = DateTime(year, month, dayNum);
+                final ds = date.toIso8601String().split('T').first;
+                final isCompleted = completedDays.contains(ds);
+                final isToday =
+                    date.year == now.year &&
+                    date.month == now.month &&
+                    date.day == now.day;
+                final isFuture = date.isAfter(now);
 
-                  return Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 1),
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: isCompleted ? color : Colors.transparent,
-                        borderRadius: BorderRadius.circular(6),
-                        border: isToday && !isCompleted
-                            ? Border.all(color: color, width: 1.5)
-                            : null,
-                      ),
-                      child: Center(
-                        child: isCompleted
-                            ? const Icon(Icons.check_rounded, size: 12, color: Colors.white)
-                            : Text(
-                                '$dayNum',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: isToday ? FontWeight.w800 : FontWeight.w400,
-                                  color: isFuture
-                                      ? AppTheme.textMutedColor(context).withValues(alpha: 0.3)
-                                      : isToday
-                                          ? color
-                                          : AppTheme.textMutedColor(context),
-                                ),
-                              ),
-                      ),
+                return Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 1),
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: isCompleted ? color : Colors.transparent,
+                      borderRadius: BorderRadius.circular(6),
+                      border: isToday && !isCompleted
+                          ? Border.all(color: color, width: 1.5)
+                          : null,
                     ),
-                  );
-                }),
-              ),
-            )),
+                    child: Center(
+                      child: isCompleted
+                          ? const Icon(
+                              Icons.check_rounded,
+                              size: 12,
+                              color: Colors.white,
+                            )
+                          : Text(
+                              '$dayNum',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: isToday
+                                    ? FontWeight.w800
+                                    : FontWeight.w400,
+                                color: isFuture
+                                    ? AppTheme.textMutedColor(
+                                        context,
+                                      ).withValues(alpha: 0.3)
+                                    : isToday
+                                    ? color
+                                    : AppTheme.textMutedColor(context),
+                              ),
+                            ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ),
       ],
     );
   }

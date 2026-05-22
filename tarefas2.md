@@ -15,7 +15,6 @@ Estas features existem na spec mas **não pertencem ao V1**:
 | Day Themes & Time Blocks | Nenhum dado no vault ainda, zero usuários usarão na primeira semana |
 | Command Center (scroll-up launcher) | Conveniência, não bloqueante |
 | Inbox (quick capture) | Pode ser feito com Journal; V1 não precisa dos dois |
-| MOC (Map of Content) links | Avançado, para usuários de Obsidian experientes |
 | Scheduler tipos `linked_item_appears` e `n_days_after_linked_item` | Edge cases — os 9 tipos restantes cobrem 95% dos casos de uso |
 | Native Widgets (iOS/Android) | Exige plataforma estável primeiro; V2 após lançamento |
 | Google Calendar integration | Útil mas não essencial; V2 |
@@ -334,7 +333,6 @@ Qualquer objeto pode ser criado, editado e deletado com dados reais salvos no va
 - ✅ **Source type: `collection`**: count de items de uma Collection Note
 - 🔧 **KPI auto-complete**: quando `current >= target`, marcar KPI como concluído + trigger action
 - ✅ **KPI Source Picker UI**: `_KpiBuilderSheet` no `create_goal_form.dart` with dropdown de source types + title + target — drill-down funcional para sources comuns
-- ✅ **Goal Detail View**: `_buildKPICard` with progress bars, properties card, MOC, Mentions, Reminders
 - ✅ **Project Detail View**: `_buildProjectProgress` with barra, properties, KPI cards, Mentions
 - ✅ **Snapshots**: `_buildSnapshotsSection` em detail view with lista + botão "New" + `_createSnapshot` (stub)
 
@@ -464,7 +462,6 @@ Estas features são válidas mas não devem ser iniciadas antes do V1 estar est�
 - **Google Calendar integration**: OAuth + display de eventos no Planner; útil mas não essencial for o loop central
 - **Native Widgets** (iOS/Android): quick-add, calendar, habits — exigem plataforma estável primeiro; `CitrineWidget` existe no Android mas tem `ClassNotFoundException` a resolver
 - **Command Center** (scroll-up launcher) e **Inbox** (quick capture): conveniências pós-lançamento
-- **MOC (Map of Content) links**: avançado; for usuários de Obsidian experientes
 - **Scheduler tipos `linked_item_appears` e `n_days_after_linked_item`**: edge cases, os 9 tipos do V1 cobrem 95% dos casos
 - **Subtask sessions** (grupos temáticos colapsáveis dentro do painel de subtasks)
 - **Obsidian Web Clipper** (importar recursos de Amazon/IMDb/Goodreads): o app apenas lê o que já foi clippado

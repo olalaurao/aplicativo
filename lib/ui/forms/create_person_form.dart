@@ -19,6 +19,7 @@ class CreatePersonForm extends ConsumerStatefulWidget {
 class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
   late final TextEditingController _nameController;
   late final TextEditingController _photoUrlController;
+  late final TextEditingController _frequencyController;
   int _contactFrequencyDays = 14;
   TaskPriority _priority = TaskPriority.none;
 
@@ -33,10 +34,12 @@ class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
       context: context,
       text: widget.existingPerson?.photo ?? '',
     );
+    _frequencyController = TextEditingController(text: '14');
 
     if (widget.existingPerson != null) {
       final person = widget.existingPerson!;
       _contactFrequencyDays = person.contactFrequency?.inDays ?? 14;
+      _frequencyController.text = _contactFrequencyDays.toString();
       _priority = person.contactPriority;
     }
   }
@@ -45,6 +48,7 @@ class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
   void dispose() {
     _nameController.dispose();
     _photoUrlController.dispose();
+    _frequencyController.dispose();
     super.dispose();
   }
 
@@ -180,25 +184,39 @@ class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
   Widget _buildFrequencyRow() {
     return Row(
       children: [
-        const Text(
-          'Frequency',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-        ),
-        const Spacer(),
-        DropdownButton<int>(
-          value: _contactFrequencyDays,
-          underline: const SizedBox(),
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.primary,
+        const Expanded(
+          child: Text(
+            'Frequency',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          onChanged: (val) => setState(() => _contactFrequencyDays = val!),
-          items: [7, 14, 30, 90]
-              .map(
-                (d) => DropdownMenuItem(value: d, child: Text('EVERY $d DAYS')),
-              )
-              .toList(),
+        ),
+        const SizedBox(width: 16),
+        SizedBox(
+          width: 148,
+          child: TextField(
+            controller: _frequencyController,
+            textAlign: TextAlign.end,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            ),
+            decoration: const InputDecoration(
+              prefixText: 'Every ',
+              suffixText: ' days',
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+            ),
+            onChanged: (value) {
+              final parsed = int.tryParse(value);
+              if (parsed != null && parsed > 0) {
+                _contactFrequencyDays = parsed;
+              }
+            },
+          ),
         ),
       ],
     );
@@ -235,6 +253,11 @@ class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
   }
 
   void _savePerson() {
+    final parsedFrequency = int.tryParse(_frequencyController.text.trim());
+    if (parsedFrequency != null && parsedFrequency > 0) {
+      _contactFrequencyDays = parsedFrequency;
+    }
+
     final person = Person(
       id:
           widget.existingPerson?.id ??
@@ -248,6 +271,11 @@ class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
       contactFrequency: Duration(days: _contactFrequencyDays),
       contactPriority: _priority,
       lastContactDate: widget.existingPerson?.lastContactDate ?? DateTime.now(),
+      phone: widget.existingPerson?.phone,
+      email: widget.existingPerson?.email,
+      organizers: widget.existingPerson?.organizers,
+      categories: widget.existingPerson?.categories,
+      obsidianPath: widget.existingPerson?.obsidianPath ?? '',
     );
 
     if (widget.existingPerson != null) {

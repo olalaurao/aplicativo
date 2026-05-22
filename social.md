@@ -114,7 +114,6 @@ class SocialPost extends ContentObject {
   // - id, title (= caption truncada ou URL se sem caption)
   // - organizers: List<OrganizerReference> → as "coleções"
   // - tags: List<String>
-  // - moc: List<String>
   // - categories: List<String>
   // - obsidianPath: "social/platform-slug.md"
   // - archived, pinned
@@ -137,7 +136,6 @@ class SocialPost extends ContentObject {
     List<String>? socialRefs,
     super.organizers,
     super.tags,
-    super.moc,
     super.categories,
     super.createdAt,
     super.updatedAt,
@@ -273,7 +271,6 @@ class SocialPost extends ContentObject {
     List<String>? socialRefs,
     List<OrganizerReference>? organizers,
     List<String>? tags,
-    List<String>? moc,
     List<String>? categories,
     bool? archived,
     bool? pinned,
@@ -297,7 +294,6 @@ class SocialPost extends ContentObject {
       socialRefs: socialRefs ?? List.from(this.socialRefs),
       organizers: organizers ?? List.from(this.organizers),
       tags: tags ?? List.from(this.tags),
-      moc: moc ?? List.from(this.moc),
       categories: categories ?? List.from(this.categories),
       archived: archived ?? this.archived,
       pinned: pinned ?? this.pinned,
@@ -1547,7 +1543,6 @@ Em `lib/ui/forms/create_task_form.dart`, na seção de notas/links (onde já exi
 
 - Label: `"Referências"`.
 - Botão `"+ Link ou post"` que abre `UniversalSearchPickerSheet` sem filtro inicial (busca em todos os tipos, incluindo `social_post`).
-- Os objetos selecionados ficam como WikiLinks na lista `task.moc` (reutilizar o campo `moc` existente — não criar campo novo em Task). Task já tem `moc: List<String>`, funciona direto.
 
 ### S7.4 — Seção "Referências" no `UniversalDetailView` para Goals
 
@@ -1628,7 +1623,6 @@ created_at: "2026-05-17T10:00:00.000Z"
 updated_at: "2026-05-17T10:00:00.000Z"
 archived: false
 pinned: false
-moc: []
 categories: []
 ---
 
@@ -1651,7 +1645,6 @@ Em `lib/services/moc_service.dart`, no método que gera index files por pasta, a
 // Ao gerar o index da pasta social/:
 const socialIndexContent = '''
 ---
-type: moc
 title: Social Archive
 ---
 
@@ -2813,9 +2806,7 @@ S5, S8 e S9 podem ser feitas em qualquer ordem após S4. S5 é a única com nova
 |---|---|---|---|
 | Goal | `social_refs` | `list of strings` (WikiLinks) | S7 |
 | Note | `social_refs` | `list of strings` (WikiLinks) | S7 |
-| Task | usa `moc` existente | `list of strings` (WikiLinks) | S7 |
 
-Task não ganha campo novo — `socialRefs` de tasks vivem no campo `moc` já existente. Isso é intencional: tasks são efêmeras e a referência informal a um post via `moc` é suficiente. Goals e Notes são permanentes e justificam campo dedicado.
 
 ### Campos que `SocialPost` acrescenta ao vault Obsidian
 

@@ -1811,7 +1811,6 @@ All files created by the app are placed in a single folder (configurable, defaul
 
 **Tasks Plugin compatibility:** The app uses Obsidian's Tasks plugin format for task checkboxes. Task items in daily notes and task definition files use the Tasks plugin's extended markdown syntax: `- [ ] Task title [due:: 2024-12-31] [priority:: high]`. This ensures that opening daily notes in Obsidian itself shows tasks in the Tasks plugin's native interface.
 
-**MOC (Map of Content) support:** Every object has a `moc` property (array of WikiLinks) in its frontmatter, pointing to the user's MOC notes. Example: a task related to English studies gets `moc: ["[[estudos-de-ingles]]"]`. This links the object into the user's knowledge graph. The MOC property is configurable per object and per category (all tasks get a default MOC, individual objects can add more). The app shows the MOC links in the object's detail view and the user can edit them.
 
 ---
 
@@ -1919,7 +1918,6 @@ The More page is a scrollable screen. It has a persistent "Mais" title with a se
 
 **Content section:** A list of all available pages with toggle + drag handle. Pages currently in the bottom bar show a filled/active toggle. Pages not in the bottom bar show an inactive toggle. Dragging reorders.
 
-**Settings section:** Below Content, standard settings rows for: Account & Sync, Notifications, Categories, MOC Links, Obsidian Integration (vault path, vault name), Appearance (light/dark/system), Scheduler (global settings), Archive (shows all archived items across all categories, searchable), Backup & Restore, About.
 
 ---
 
@@ -1931,7 +1929,6 @@ This page defines the system of automatic categorization for all object types.
 
 **Editing a category definition:**
 - Tapping a row opens the Category Definition editor.
-- Fields: Category Name (string), Property Conditions (list of property-value pairs, e.g., "categories contains [[tasks]]"), Default Tags (list of tags automatically added, e.g., "#projeto"), Default MOC Links (list of WikiLinks automatically added to the `moc` property), Default Categories (list of WikiLinks automatically added to the `categories` property of any new object in this category).
 - Changes apply to newly created objects. Existing objects are NOT retroactively modified (the user must bulk-edit if needed).
 
 **How it works in practice:**
@@ -1977,7 +1974,6 @@ In Edit Mode, a "+" button appears at the bottom of the block list and between e
 
 10. **Time blocking block** — Shows today's time blocks with tasks/pomodoros scheduled in them. Compact version of the Planner's day view.
 
-11. **Obsidian Note block** — Renders the content of any specific Obsidian note inline. Configuration: which note (selected via the link picker). The note renders as styled markdown (headings, lists, checkboxes). Useful for pinning a reference note, a daily prompt, or a MOC summary.
 
 12. **People block** — Shows people who are due for contact (based on their scheduler). Displays as a list of names + "last contact N days ago" + "contact" button.
 
@@ -2197,7 +2193,6 @@ The user can pre-schedule a Pomodoro block in the Planner:
 - `notes` — rich text body.
 - `subtasks` — array of Subtask objects. Each subtask is a full Task object (same properties as the parent) linked to the parent via the `parent_task` property. Subtasks appear as collapsible nested rows under the parent in list views.
 - `categories` — array of WikiLinks (automatically includes `[[tasks]]`).
-- `moc` — array of WikiLinks.
 - `links` — array of WikiLinks (any linked objects).
 - `organizers` — array of Organizer references.
 - `scheduler` — optional Scheduler configuration.
@@ -2238,7 +2233,6 @@ The user can pre-schedule a Pomodoro block in the Planner:
 10. **Links card:** Shows linked items as WikiLink chips. "+" opens the link picker.
 11. **Reminders card:** Shows configured reminders. "+" opens the Reminder editor (see Notifications section).
 12. **Notes card:** Rich text area. "Enter text..." placeholder.
-13. **Categories/MOC card:** Shows current categories and MOC links. Auto-populated with defaults; user can add or remove.
 14. **Color chip:** Optional color selector for visual distinction.
 15. **Salvar button:** Full-width, bottom, dark purple, rounded pill. Disabled (gray) until title is entered.
 
@@ -2270,7 +2264,6 @@ When saving a task with no date: a modal alert appears: "Esta tarefa não tem da
 - `total_pomodoro_time` — derived integer (minutes). Sum of all Pomodoro sessions linked to this project.
 - `quick_access` — array of WikiLinks to any Obsidian page or app object. Pinned references shown in the project's Quick Access section.
 - `categories` — array of WikiLinks (auto-includes `[[projects]]`).
-- `moc` — array of WikiLinks.
 - `links` — array of WikiLinks.
 - `tags` — array of tag strings (auto-includes `#projeto`).
 - `organizers` — array of Organizer references.
@@ -2570,7 +2563,6 @@ tags:                              # Standard Obsidian tags
   - projeto
   - trabalho
 
-moc:                               # WikiLinks to Maps of Content
   - "[[mapa-trabalho]]"
   - "[[mapa-desenvolvimento]]"
 

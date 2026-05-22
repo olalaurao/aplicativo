@@ -302,7 +302,6 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
       icon: existing?.icon,
       organizers: _organizers,
       categories: existing?.categories,
-      moc: existing?.moc,
       createdAt: existing?.createdAt,
       obsidianPath: existing?.obsidianPath ?? '',
     );

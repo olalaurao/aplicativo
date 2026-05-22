@@ -28,15 +28,27 @@ class RichTextEditor extends ConsumerStatefulWidget {
   ConsumerState<RichTextEditor> createState() => _RichTextEditorState();
 }
 
-class _RichTextEditorState extends ConsumerState<RichTextEditor> {
+class _RichTextEditorState extends ConsumerState<RichTextEditor>
+    with WidgetsBindingObserver {
   late QuillController _controller;
   final FocusNode _focusNode = FocusNode();
   Timer? _debounceTimer;
+  OverlayEntry? _toolbarOverlay;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _focusNode.addListener(() {
+      if (mounted) setState(() {});
+      _syncToolbarOverlay();
+    });
     _loadContent();
+  }
+
+  @override
+  void didChangeMetrics() {
+    _toolbarOverlay?.markNeedsBuild();
   }
 
   void _loadContent() {
@@ -61,7 +73,7 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
 
     _controller.addListener(() {
       final json = jsonEncode(_controller.document.toDelta().toJson());
-      
+
       _debounceTimer?.cancel();
       _debounceTimer = Timer(const Duration(milliseconds: 500), () {
         if (mounted) {
@@ -96,9 +108,47 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _removeToolbarOverlay();
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _syncToolbarOverlay() {
+    if (_focusNode.hasFocus) {
+      if (_toolbarOverlay != null) {
+        _toolbarOverlay!.markNeedsBuild();
+        return;
+      }
+
+      _toolbarOverlay = OverlayEntry(
+        builder: (overlayContext) {
+          final bottomInset = MediaQuery.of(overlayContext).viewInsets.bottom;
+          final isDark =
+              Theme.of(overlayContext).brightness == Brightness.dark;
+
+          return Positioned(
+            left: 0,
+            right: 0,
+            bottom: bottomInset,
+            child: Material(
+              color: Colors.transparent,
+              child: _buildToolbar(isDark),
+            ),
+          );
+        },
+      );
+
+      Overlay.of(context, rootOverlay: true).insert(_toolbarOverlay!);
+    } else {
+      _removeToolbarOverlay();
+    }
+  }
+
+  void _removeToolbarOverlay() {
+    _toolbarOverlay?.remove();
+    _toolbarOverlay = null;
   }
 
   Future<void> _onAddPhoto() async {
@@ -148,68 +198,72 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkSurface : AppColors.surface,
-            border: Border(
-              bottom: BorderSide(
-                color: isDark ? AppColors.darkDivider : AppColors.divider,
-              ),
-            ),
-          ),
-          child: QuillSimpleToolbar(
-            controller: _controller,
-            config: QuillSimpleToolbarConfig(
-              showFontFamily: false,
-              showFontSize: false,
-              showBoldButton: true,
-              showItalicButton: true,
-              showUnderLineButton: true,
-              showStrikeThrough: false,
-              showColorButton: true,
-              showBackgroundColorButton: false,
-              showListBullets: true,
-              showListNumbers: true,
-              showListCheck: true,
-              showCodeBlock: false,
-              showQuote: true,
-              showIndent: false,
-              showLink: true,
-              showSearchButton: false,
-              showAlignmentButtons: false,
-              showDirection: false,
-              showUndo: true,
-              showRedo: true,
-              showClearFormat: true,
-              showDividers: true,
-              showHeaderStyle: true,
-              customButtons: [
-                QuillToolbarCustomButtonOptions(
-                  icon: const Icon(Icons.add_photo_alternate_rounded, size: 20),
-                  onPressed: _onAddPhoto,
-                  tooltip: 'Anexar Foto',
-                ),
-                QuillToolbarCustomButtonOptions(
-                  icon: const Icon(Icons.alternate_email_rounded, size: 20),
-                  onPressed: _onAddMention,
-                  tooltip: 'Mencionar (@)',
-                ),
-                QuillToolbarCustomButtonOptions(
-                  icon: const Icon(Icons.note_add_outlined, size: 20),
-                  onPressed: () => _onAddWikiLink(isEmbed: true),
-                  tooltip: 'Incorporar Nota (![[ ]])',
-                ),
-              ],
-            ),
-          ),
-        ),
         if (widget.expands) Expanded(child: _buildEditor()) else _buildEditor(),
       ],
+    );
+  }
+
+  Widget _buildToolbar(bool isDark) {
+    return Container(
+      key: const ValueKey('rich-text-toolbar'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : AppColors.surface,
+        border: Border(
+          top: BorderSide(
+            color: isDark ? AppColors.darkDivider : AppColors.divider,
+          ),
+        ),
+      ),
+      child: QuillSimpleToolbar(
+        controller: _controller,
+        config: QuillSimpleToolbarConfig(
+          multiRowsDisplay: false,
+          toolbarSize: 44,
+          showFontFamily: false,
+          showFontSize: false,
+          showBoldButton: true,
+          showItalicButton: true,
+          showUnderLineButton: true,
+          showStrikeThrough: false,
+          showColorButton: true,
+          showBackgroundColorButton: false,
+          showListBullets: true,
+          showListNumbers: true,
+          showListCheck: true,
+          showCodeBlock: false,
+          showQuote: true,
+          showIndent: false,
+          showLink: true,
+          showSearchButton: false,
+          showAlignmentButtons: false,
+          showDirection: false,
+          showUndo: true,
+          showRedo: true,
+          showClearFormat: true,
+          showDividers: true,
+          showHeaderStyle: true,
+          customButtons: [
+            QuillToolbarCustomButtonOptions(
+              icon: const Icon(Icons.add_photo_alternate_rounded, size: 20),
+              onPressed: _onAddPhoto,
+              tooltip: 'Anexar Foto',
+            ),
+            QuillToolbarCustomButtonOptions(
+              icon: const Icon(Icons.alternate_email_rounded, size: 20),
+              onPressed: _onAddMention,
+              tooltip: 'Mencionar (@)',
+            ),
+            QuillToolbarCustomButtonOptions(
+              icon: const Icon(Icons.note_add_outlined, size: 20),
+              onPressed: () => _onAddWikiLink(isEmbed: true),
+              tooltip: 'Incorporar Nota (![[ ]])',
+            ),
+          ],
+        ),
+      ),
     );
   }
 

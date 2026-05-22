@@ -23,13 +23,11 @@ import '../models/snapshot_model.dart';
 import '../models/scheduler.dart';
 import '../models/day_theme_model.dart';
 import '../models/template_model.dart';
-import '../models/moc_model.dart';
 import '../models/inbox_model.dart';
 
 import '../models/sync_action.dart';
 import '../services/sync_queue_service.dart';
 import '../services/backup_service.dart';
-import '../services/moc_service.dart';
 import '../services/notification_service.dart';
 import '../models/reminder_model.dart';
 import '../models/reminder_config.dart';
@@ -1094,35 +1092,6 @@ final templatesProvider =
       return TemplatesNotifier();
     });
 
-class MocsNotifier extends Notifier<List<MocDefinition>> {
-  @override
-  List<MocDefinition> build() {
-    return ref.watch(objectsByTypeProvider('moc')).cast<MocDefinition>();
-  }
-
-  Future<void> addMoc(MocDefinition moc) async {
-    state = [...state, moc];
-    await ref.read(vaultProvider.notifier).createObject(moc);
-  }
-
-  Future<void> updateMoc(MocDefinition moc) async {
-    state = [
-      for (final m in state)
-        if (m.id == moc.id) moc else m,
-    ];
-    await ref.read(vaultProvider.notifier).updateObject(moc);
-  }
-
-  Future<void> deleteMoc(MocDefinition moc) async {
-    state = state.where((m) => m.id != moc.id).toList();
-    await ref.read(vaultProvider.notifier).deleteObject(moc);
-  }
-}
-
-final mocsProvider = NotifierProvider<MocsNotifier, List<MocDefinition>>(() {
-  return MocsNotifier();
-});
-
 final allEntriesProvider = Provider<List<JournalEntry>>((ref) {
   final asyncValue = ref.watch(allObjectsProvider);
   final data = asyncValue.valueOrNull;
@@ -1134,6 +1103,15 @@ final allEntriesProvider = Provider<List<JournalEntry>>((ref) {
 
   return [];
 });
+
+DateTime _journalEntryDateFromDaily(String dateStr, String? time) {
+  final base = DateTime.tryParse(dateStr) ?? DateTime.now();
+  final timeParts = (time ?? '').split(':');
+  final hour = timeParts.isNotEmpty ? int.tryParse(timeParts[0]) ?? 0 : 0;
+  final minute = timeParts.length > 1 ? int.tryParse(timeParts[1]) ?? 0 : 0;
+
+  return DateTime(base.year, base.month, base.day, hour, minute);
+}
 
 class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
   @override
@@ -1209,9 +1187,10 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                   final entry = JournalEntry(
                     id: data['id'],
                     body: data['body'],
-                    date:
-                        DateTime.tryParse(data['date']) ??
-                        DateTime.parse(dateStr),
+                    date: _journalEntryDateFromDaily(
+                      dateStr,
+                      data['time']?.toString(),
+                    ),
                     title: data['title']?.toString().isNotEmpty == true
                         ? data['title']
                         : data['time'],
@@ -1337,9 +1316,6 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                   stableId,
                   body: body,
                 )..obsidianPath = relativePath;
-              } else if (type == 'moc') {
-                obj = MocDefinition.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
               } else {
                 obj = Note(
                   id: stableId,
@@ -1774,28 +1750,6 @@ class VaultNotifier extends Notifier<void> {
     return object.type;
   }
 
-  String _mocNameFor(String type) {
-    switch (type) {
-      case 'tracker_definition':
-      case 'tracker_record':
-        return 'trackers';
-      case 'mood_definition':
-        return 'moods';
-      case 'combined_analysis':
-        return 'analysis';
-      case 'time_block':
-        return 'time_blocks';
-      case 'day_theme':
-        return 'day_themes';
-      case 'template':
-        return 'templates';
-      case 'moc':
-        return 'mocos';
-      default:
-        return '${type}s';
-    }
-  }
-
   String _defaultFolderForSignature(String type) {
     return switch (type) {
       'task' => 'tasks',
@@ -1810,7 +1764,6 @@ class VaultNotifier extends Notifier<void> {
       'place' => 'organizers/places',
       'label' => 'organizers/labels',
       'organizer' => 'organizers',
-      'moc' => 'mocos',
       'tracker_definition' || 'tracker_record' => 'trackers',
       'mood_definition' => 'moods',
       'combined_analysis' => 'analyses',
@@ -1974,8 +1927,6 @@ class VaultNotifier extends Notifier<void> {
         payload: object.toBaseMap(),
       ),
     );
-
-    await MocService.updateMoc(obsidianService, _mocNameFor(signatureKey));
     await _scheduleObjectReminders(object);
     await _updateWidgetsFor(object);
     _invalidateObjectProviders(object);
@@ -2075,7 +2026,6 @@ class VaultNotifier extends Notifier<void> {
     final baseTitle = object.title;
     final baseCreatedAt = object.createdAt;
     final baseOrganizers = object.organizers;
-    final baseMoc = object.moc;
 
     switch (targetType.toLowerCase()) {
       case 'task':
@@ -2087,7 +2037,6 @@ class VaultNotifier extends Notifier<void> {
           createdAt: baseCreatedAt,
           organizers: baseOrganizers,
           categories: ['[[tasks]]'],
-          moc: baseMoc,
         );
         break;
       case 'habit':
@@ -2099,7 +2048,6 @@ class VaultNotifier extends Notifier<void> {
           createdAt: baseCreatedAt,
           organizers: baseOrganizers,
           categories: ['[[habits]]'],
-          moc: baseMoc,
         );
         break;
       case 'goal':
@@ -2110,7 +2058,6 @@ class VaultNotifier extends Notifier<void> {
           createdAt: baseCreatedAt,
           organizers: baseOrganizers,
           categories: ['[[goals]]'],
-          moc: baseMoc,
         );
         break;
       case 'note':
@@ -2122,7 +2069,6 @@ class VaultNotifier extends Notifier<void> {
           createdAt: baseCreatedAt,
           organizers: baseOrganizers,
           categories: ['[[notes]]'],
-          moc: baseMoc,
         );
         break;
       case 'project':
@@ -2133,7 +2079,6 @@ class VaultNotifier extends Notifier<void> {
           createdAt: baseCreatedAt,
           organizers: baseOrganizers,
           categories: ['[[projects]]'],
-          moc: baseMoc,
         );
         break;
       case 'organizer':
@@ -2149,7 +2094,6 @@ class VaultNotifier extends Notifier<void> {
           createdAt: baseCreatedAt,
           organizers: baseOrganizers,
           categories: ['[[organizers]]'],
-          moc: baseMoc,
         );
         break;
       case 'person':
@@ -2159,7 +2103,6 @@ class VaultNotifier extends Notifier<void> {
           createdAt: baseCreatedAt,
           organizers: baseOrganizers,
           categories: ['[[people]]'],
-          moc: baseMoc,
         );
         break;
       case 'resource':
@@ -2171,7 +2114,6 @@ class VaultNotifier extends Notifier<void> {
           createdAt: baseCreatedAt,
           organizers: baseOrganizers,
           categories: ['[[resources]]'],
-          moc: baseMoc,
         );
         break;
       case 'tracker':
@@ -2183,7 +2125,6 @@ class VaultNotifier extends Notifier<void> {
           createdAt: baseCreatedAt,
           organizers: baseOrganizers,
           categories: ['[[trackers]]'],
-          moc: baseMoc,
         );
         break;
       default:
@@ -2297,7 +2238,6 @@ class VaultNotifier extends Notifier<void> {
     final folder = switch (type) {
       'task' => 'tasks',
       'habit' => 'habits',
-      'moc' => 'mocos',
       'tracker' || 'tracker_definition' => 'trackers',
 
       'goal' => 'goals',

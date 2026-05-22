@@ -32,8 +32,6 @@ import 'ui/screens/sync_conflicts_screen.dart';
 
 import 'ui/screens/organizer_detail_screen.dart';
 import 'ui/screens/universal_detail_view.dart';
-import 'models/moc_model.dart';
-import 'ui/screens/moc_detail_screen.dart';
 import 'services/widget_service.dart';
 import 'services/notification_service.dart';
 import 'services/pomodoro_bg_service.dart';
@@ -44,6 +42,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'services/sync_manager.dart';
 import 'services/permission_service.dart';
 import 'ui/widgets/notification_popup_overlay.dart';
+import 'ui/widgets/pomodoro_floating_clock.dart';
 import 'ui/forms/create_template_form.dart';
 import 'ui/forms/create_entry_form.dart';
 import 'ui/forms/create_habit_form.dart';
@@ -572,6 +571,8 @@ class MyApp extends ConsumerWidget {
           FlutterQuillLocalizations.delegate,
         ],
         supportedLocales: const [Locale('en', '')],
+        builder: (context, child) =>
+            PomodoroFloatingClock(child: child ?? const SizedBox.shrink()),
       ),
     );
   }
@@ -621,9 +622,6 @@ class _ObjectDetailResolver extends ConsumerWidget {
             .firstOrNull;
         if (object == null) {
           return const Scaffold(body: Center(child: Text('Object not found')));
-        }
-        if (object is MocDefinition) {
-          return MocDetailScreen(moc: object);
         }
         return UniversalDetailView(object: object);
       },

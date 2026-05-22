@@ -22,7 +22,6 @@ class Organizer extends ContentObject {
     this.icon,
     super.organizers,
     super.categories,
-    super.moc,
     super.createdAt,
     super.updatedAt,
     super.obsidianPath,

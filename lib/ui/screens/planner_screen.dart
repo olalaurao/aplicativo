@@ -12,6 +12,7 @@ import '../../services/undo_service.dart';
 import '../theme.dart';
 import '../../models/journal_entry.dart';
 import '../../models/tracker_model.dart';
+import '../../models/reminder_model.dart';
 import '../widgets/timeline_day_view.dart';
 import '../../services/scheduler_service.dart';
 import '../../providers/google_calendar_provider.dart';
@@ -545,6 +546,21 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     final allDayHabits = habits
         .where((h) => h.timeBlock == null || h.timeBlock!.isEmpty)
         .toList();
+    final pendingReminders =
+        ref
+            .watch(remindersProvider)
+            .where(
+              (r) =>
+                  !r.isCompleted &&
+                  (_isSameDay(r.time, _selectedDate) ||
+                      (r.scheduler != null &&
+                          SchedulerService.shouldFire(
+                            r.scheduler!,
+                            _selectedDate,
+                          ))),
+            )
+            .toList()
+          ..sort((a, b) => a.time.compareTo(b.time));
 
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -603,6 +619,15 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             ...contactReminders.map((p) => _buildContactReminderItem(p)),
             const SizedBox(height: 24),
           ],
+          if (pendingReminders.isNotEmpty) ...[
+            const Text(
+              'Lembretes pendentes',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            ...pendingReminders.map(_buildPendingReminderCard),
+            const SizedBox(height: 24),
+          ],
           if (entries.isNotEmpty || records.isNotEmpty) ...[
             const Text(
               "Day's Logs",
@@ -658,6 +683,63 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                           color: AppColors.textMuted,
                         ),
                       ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPendingReminderCard(Reminder reminder) {
+    return ObjectActionWrapper(
+      object: reminder,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => UniversalDetailView(object: reminder),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(14),
+          decoration: AppTheme.cardDecoration(context),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.notifications_active_outlined,
+                color: AppColors.warning,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      reminder.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      'Não concluído • ${DateFormat('HH:mm').format(reminder.time)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textMutedColor(context),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1415,6 +1497,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   Widget _buildWeekView(List<Task> tasks, List<Habit> habits) {
+    final reminders = ref.watch(remindersProvider);
     final startOfWeek = DateTime.now().subtract(
       Duration(days: DateTime.now().weekday - 1),
     );
@@ -1442,6 +1525,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             }
             return false;
           }).toList();
+          final dayReminders = reminders.where((r) {
+            if (r.isCompleted) return false;
+            return _isSameDay(r.time, date) ||
+                (r.scheduler != null &&
+                    SchedulerService.shouldFire(r.scheduler!, date));
+          }).toList();
 
           return Container(
             margin: const EdgeInsets.only(bottom: 16),
@@ -1453,18 +1542,22 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      index == 0
-                          ? 'Today'
-                          : DateFormat('EEEE, d MMM').format(date),
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: _isSameDay(date, DateTime.now())
-                            ? AppColors.primary
-                            : AppColors.textPrimary,
+                    Expanded(
+                      child: Text(
+                        index == 0
+                            ? 'Today'
+                            : DateFormat('EEEE, d MMM').format(date),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: _isSameDay(date, DateTime.now())
+                              ? AppColors.primary
+                              : AppColors.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (dayTasks.isNotEmpty)
+                    if (dayTasks.isNotEmpty || dayReminders.isNotEmpty)
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -1475,7 +1568,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '${dayTasks.length} itens',
+                          '${dayTasks.length + dayReminders.length} itens',
                           style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -1486,7 +1579,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                if (dayTasks.isEmpty && dayHabits.isEmpty)
+                if (dayTasks.isEmpty &&
+                    dayHabits.isEmpty &&
+                    dayReminders.isEmpty)
                   Consumer(
                     builder: (context, ref, _) {
                       final googleEvents = ref
@@ -1528,6 +1623,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 else ...[
                   ...dayTasks.map((t) => _buildCompactTaskItem(t)),
                   ...dayHabits.map((h) => _buildCompactHabitItem(h, date)),
+                  ...dayReminders.map(_buildCompactReminderItem),
                   Consumer(
                     builder: (context, ref, _) {
                       final googleEvents = ref
@@ -1642,6 +1738,21 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildCompactReminderItem(Reminder reminder) {
+    return _buildCompactItem(
+      '${DateFormat('HH:mm').format(reminder.time)}  ${reminder.title}',
+      AppColors.warning,
+      () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UniversalDetailView(object: reminder),
+          ),
+        );
+      },
     );
   }
 

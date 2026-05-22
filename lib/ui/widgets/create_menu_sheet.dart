@@ -14,7 +14,6 @@ import '../forms/create_person_form.dart';
 import '../forms/create_resource_form.dart';
 import '../forms/create_snapshot_form.dart';
 import '../forms/create_tracker_form.dart';
-import '../forms/create_moc_form.dart';
 import '../screens/pomodoro_screen.dart';
 
 class CreateMenuSheet extends StatefulWidget {
@@ -313,15 +312,6 @@ class _CreateMenuSheetState extends State<CreateMenuSheet> {
               subtitle: 'Quick alert',
               color: AppColors.warning,
               targetForm: const CreateReminderForm(),
-            ),
-            const SizedBox(width: 12),
-            _buildCreateCard(
-              context,
-              icon: Icons.layers_outlined,
-              title: 'MOC',
-              subtitle: 'MOC',
-              color: AppColors.primary,
-              targetForm: const CreateMocForm(),
             ),
           ],
         ),

@@ -96,7 +96,6 @@ class CombinedAnalysis extends ContentObject {
     this.charts = const [],
     super.organizers,
     super.categories,
-    super.moc,
     super.createdAt,
     super.updatedAt,
     super.obsidianPath,

@@ -344,30 +344,12 @@
 
 ---
 
-## Fase V2.5 — MOC: Map of Content
 
 > **Depende de:** V1 Universal Links + Backlinks funcionando.
 >
-> **Dica:** o `moc_service.dart` atual gera index automático por pasta — V2.5 substitui isso por MOC definido pelo usuário. Antes de implementar, confirme que o `backlinksProvider` existente já detecta referências `[[mocos/slug]]` corretamente; se sim, a maior parte da conectividade já funciona sem código extra.
 
-- [ ] Criar MOC salva `mocos/SLUG.md` com frontmatter correto
-  - Criar MOC com título, descrição e lista de WikiLinks. Confirmar `type: moc`, `title` e `children` no arquivo.
-- [ ] `mocsProvider` carrega todos os MOCs do vault
-  - Reiniciar o app com 2 MOCs no vault; ambos devem aparecer nos pickers.
-- [ ] Adicionar objeto a um MOC atualiza o frontmatter do objeto e o `children` do MOC
-  - Adicionar uma task ao MOC via chip; confirmar `moc: ["[[mocos/slug]]"]` na task E o slug da task em `children` do MOC.
-- [ ] MOC picker lista todos os MOCs e tem opção "Criar novo MOC"
-  - Abrir picker; listar MOCs existentes; opção de criação ao final da lista.
-- [ ] MOC detail view exibe lista de children como cards tappáveis
   - Cada child mostra ícone do tipo + título + preview de 1 linha. Tap navega para o detail do objeto.
-- [ ] MOC aninhado: child que é outro MOC mostra hierarquia com indent
-  - Criar MOC A com MOC B como child; B deve aparecer com indent na detail view de A.
-- [ ] Filtro por MOC no Journal funciona
-  - Aplicar filtro de MOC; somente entries cujo `moc` contém o slug selecionado devem aparecer.
-- [ ] Filtro por MOC no Planner colore items pelo MOC
-  - Configurar cor no MOC; items do dia vinculados a esse MOC devem ter a cor aplicada.
 - [ ] Botão "Ver Dataview" gera e copia query correta para o clipboard
-  - Colar no Obsidian; query deve listar os objetos do MOC ordenados por `file.mtime DESC`.
 
 ---
 
@@ -547,7 +529,6 @@ Fase 0 (bugs base)
   ├── Social S1+S2
   │     └── Social S3+S4
   │           └── Social S5+S6+S7+S9
-  ├── V2.5 (MOC) — depende de V1 Backlinks
   ├── V2.6 (Command Center & Inbox)
   ├── V2.7 (Templates)
   ├── V2.8 (Subtask sessions + dependencies)

@@ -28,7 +28,8 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   @override
   Widget build(BuildContext context) {
     final resources = ref.watch(resourcesProvider);
-    
+    final settings = ref.watch(settingsProvider);
+
     // Filtering
     List<Resource> filtered = _selectedType == 'All'
         ? resources
@@ -45,13 +46,16 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
           return b.rating.compareTo(a.rating);
         case 'modified':
         default:
-          final aTime = a.updatedAt ?? a.createdAt ?? DateTime(0);
-          final bTime = b.updatedAt ?? b.createdAt ?? DateTime(0);
-          return bTime.compareTo(aTime);
+          return b.updatedAt.compareTo(a.updatedAt);
       }
     });
 
-    final types = resources.map((r) => r.resourceType).toSet().toList()..sort();
+    final types =
+        settings.resourceTypeFilters
+            .where((t) => t.trim().isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -64,6 +68,11 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
             actions: [
               _buildDisplaySettingsButton(),
               _buildSortButton(),
+              IconButton(
+                icon: const Icon(Icons.tune_rounded),
+                tooltip: 'Editar filtros',
+                onPressed: () => _showFilterEditor(types),
+              ),
               IconButton(
                 icon: Icon(
                   _isGridView
@@ -167,7 +176,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
         } else {
           newFields.add(val);
         }
-        ref.read(settingsProvider.notifier).updateVisibleResourceFields(newFields);
+        ref
+            .read(settingsProvider.notifier)
+            .updateVisibleResourceFields(newFields);
       },
       itemBuilder: (ctx) => [
         CheckedPopupMenuItem(
@@ -213,7 +224,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppTheme.surfaceVariantColor(context),
+          color: selected
+              ? AppColors.primary
+              : AppTheme.surfaceVariantColor(context),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
@@ -221,11 +234,170 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : AppTheme.textSecondaryColor(context),
+            color: selected
+                ? Colors.white
+                : AppTheme.textSecondaryColor(context),
           ),
         ),
       ),
     );
+  }
+
+  void _showFilterEditor(List<String> currentTypes) {
+    final controller = TextEditingController();
+    final filters = List<String>.from(currentTypes);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          void addFilter() {
+            final value = controller.text.trim();
+            if (value.isEmpty || filters.contains(value)) return;
+            setSheetState(() {
+              filters.add(value);
+              filters.sort();
+              controller.clear();
+            });
+          }
+
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                16,
+                20,
+                16 + MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        'Filtros de recursos',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: controller,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => addFilter(),
+                          decoration: const InputDecoration(
+                            hintText: 'Novo filtro',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filled(
+                        icon: const Icon(Icons.add_rounded),
+                        onPressed: addFilter,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: filters.length,
+                      itemBuilder: (context, index) {
+                        final filter = filters[index];
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            filter,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            onPressed: () async {
+                              final updated = await _editFilterName(filter);
+                              if (updated == null || updated.isEmpty) return;
+                              setSheetState(() => filters[index] = updated);
+                            },
+                          ),
+                          leading: IconButton(
+                            icon: const Icon(Icons.delete_outline_rounded),
+                            color: AppColors.error,
+                            onPressed: () => setSheetState(() {
+                              if (_selectedType == filter)
+                                _selectedType = 'All';
+                              filters.removeAt(index);
+                            }),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        ref
+                            .read(settingsProvider.notifier)
+                            .updateResourceTypeFilters(filters);
+                        Navigator.pop(context);
+                        setState(() {});
+                      },
+                      child: const Text('Salvar filtros'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    ).whenComplete(controller.dispose);
+  }
+
+  Future<String?> _editFilterName(String current) async {
+    final controller = TextEditingController(text: current);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Editar filtro'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Nome do filtro'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
   }
 
   Widget _buildResourceCard(BuildContext context, Resource resource) {
@@ -249,7 +421,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                 child: Container(
                   width: double.infinity,
                   color: AppColors.surfaceVariant,
-                  child: resource.coverImage != null && resource.coverImage!.isNotEmpty
+                  child:
+                      resource.coverImage != null &&
+                          resource.coverImage!.isNotEmpty
                       ? Image.network(
                           resource.coverImage!,
                           fit: BoxFit.cover,
@@ -281,7 +455,10 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                     ),
                     const SizedBox(height: 4),
                     const SizedBox(height: 4),
-                    if (ref.watch(settingsProvider).visibleResourceFields.contains('author'))
+                    if (ref
+                        .watch(settingsProvider)
+                        .visibleResourceFields
+                        .contains('author'))
                       Text(
                         resource.author ?? 'Unknown',
                         style: const TextStyle(
@@ -291,13 +468,22 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    if (ref.watch(settingsProvider).visibleResourceFields.contains('author'))
+                    if (ref
+                        .watch(settingsProvider)
+                        .visibleResourceFields
+                        .contains('author'))
                       const SizedBox(height: 4),
-                    if (ref.watch(settingsProvider).visibleResourceFields.contains('rating')) ...[
+                    if (ref
+                        .watch(settingsProvider)
+                        .visibleResourceFields
+                        .contains('rating')) ...[
                       _buildRatingRow(resource),
                       const SizedBox(height: 6),
                     ],
-                    if (ref.watch(settingsProvider).visibleResourceFields.contains('type'))
+                    if (ref
+                        .watch(settingsProvider)
+                        .visibleResourceFields
+                        .contains('type'))
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 6,
@@ -346,7 +532,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.surfaceVariant,
                   borderRadius: BorderRadius.circular(8),
-                  image: resource.coverImage != null && resource.coverImage!.isNotEmpty
+                  image:
+                      resource.coverImage != null &&
+                          resource.coverImage!.isNotEmpty
                       ? DecorationImage(
                           image: NetworkImage(resource.coverImage!),
                           fit: BoxFit.cover,
@@ -354,7 +542,8 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                         )
                       : null,
                 ),
-                child: resource.coverImage == null || resource.coverImage!.isEmpty
+                child:
+                    resource.coverImage == null || resource.coverImage!.isEmpty
                     ? const Icon(
                         Icons.local_library_rounded,
                         color: AppColors.textMuted,
@@ -370,14 +559,23 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (ref.watch(settingsProvider).visibleResourceFields.contains('author'))
+                  if (ref
+                      .watch(settingsProvider)
+                      .visibleResourceFields
+                      .contains('author'))
                     Text(
                       resource.author ?? 'Unknown',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
                     ),
-                  if (ref.watch(settingsProvider).visibleResourceFields.contains('rating')) ...[
+                  if (ref
+                      .watch(settingsProvider)
+                      .visibleResourceFields
+                      .contains('rating')) ...[
                     const SizedBox(height: 2),
                     _buildRatingRow(resource),
                   ],
@@ -388,7 +586,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                 children: [
                   IconButton(
                     icon: Icon(
-                      isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                      isExpanded
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
                       size: 20,
                     ),
                     onPressed: () => setState(() {
@@ -409,9 +609,13 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                 child: Container(
                   height: 150,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.5),
+                    color: Theme.of(
+                      context,
+                    ).scaffoldBackgroundColor.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.divider.withValues(alpha: 0.5)),
+                    border: Border.all(
+                      color: AppColors.divider.withValues(alpha: 0.5),
+                    ),
                   ),
                   child: RichTextEditor(
                     content: resource.synopsis ?? '',
@@ -482,4 +686,3 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     }
   }
 }
-

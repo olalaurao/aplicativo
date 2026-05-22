@@ -1,19 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:googleapis/calendar/v3.dart' as google_calendar;
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../models/people_model.dart';
+import '../../models/shared_types.dart';
+import '../../models/task_model.dart';
+import '../../providers/google_calendar_provider.dart';
+import '../../providers/vault_provider.dart';
 import '../theme.dart';
 
-class GoogleEventDetailScreen extends StatelessWidget {
+class GoogleEventDetailScreen extends ConsumerStatefulWidget {
   final google_calendar.Event event;
 
   const GoogleEventDetailScreen({super.key, required this.event});
 
   @override
+  ConsumerState<GoogleEventDetailScreen> createState() =>
+      _GoogleEventDetailScreenState();
+}
+
+class _GoogleEventDetailScreenState
+    extends ConsumerState<GoogleEventDetailScreen> {
+  late google_calendar.Event _event;
+  final Set<String> _selectedPeopleIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _event = widget.event;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final start = event.start?.dateTime ?? event.start?.date;
-    final end = event.end?.dateTime ?? event.end?.date;
-    final isAllDay = event.start?.date != null;
+    final people = ref.watch(peopleProvider);
+    final start = _event.start?.dateTime ?? _event.start?.date;
+    final end = _event.end?.dateTime ?? _event.end?.date;
+    final isAllDay = _event.start?.date != null;
 
     final startTime = start?.toLocal();
     final endTime = end?.toLocal();
@@ -54,7 +77,7 @@ class GoogleEventDetailScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        event.summary ?? '(Untitled)',
+                        _event.summary ?? '(Untitled)',
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w800,
@@ -83,21 +106,25 @@ class GoogleEventDetailScreen extends StatelessWidget {
                   : '${DateFormat('EEEE, d MMMM').format(startTime!)}\n'
                         '${DateFormat('HH:mm').format(startTime)} - ${DateFormat('HH:mm').format(endTime!)}',
             ),
-            if (event.location != null && event.location!.isNotEmpty)
+            if (_event.location != null && _event.location!.isNotEmpty)
               _buildSection(
                 context,
                 icon: Icons.location_on_outlined,
                 title: 'Local',
-                content: event.location!,
+                content: _event.location!,
               ),
-            if (event.description != null && event.description!.isNotEmpty)
+            if (_event.description != null && _event.description!.isNotEmpty)
               _buildSection(
                 context,
                 icon: Icons.notes_rounded,
                 title: 'Description',
-                content: event.description!,
+                content: _event.description!,
                 isMarkdown: true,
               ),
+            if (people.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildPeopleSection(context, people),
+            ],
             const SizedBox(height: 40),
             SizedBox(
               width: double.infinity,
@@ -118,6 +145,159 @@ class GoogleEventDetailScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildPeopleSection(BuildContext context, List<Person> people) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'PESSOAS',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: AppColors.info,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: people.map((person) {
+            final selected = _selectedPeopleIds.contains(person.id);
+            return FilterChip(
+              selected: selected,
+              label: Text(
+                person.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              avatar: Icon(
+                Icons.person_outline_rounded,
+                size: 16,
+                color: selected ? Colors.white : AppColors.info,
+              ),
+              selectedColor: AppColors.info,
+              checkmarkColor: Colors.white,
+              onSelected: (value) {
+                setState(() {
+                  if (value) {
+                    _selectedPeopleIds.add(person.id);
+                  } else {
+                    _selectedPeopleIds.remove(person.id);
+                  }
+                });
+              },
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.group_add_outlined),
+            label: const Text('Marcar pessoas vistas e atualizar contato'),
+            onPressed: _selectedPeopleIds.isEmpty
+                ? null
+                : () => _markPeopleSeen(people),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _markPeopleSeen(List<Person> people) async {
+    final selected = people
+        .where((person) => _selectedPeopleIds.contains(person.id))
+        .toList();
+    if (selected.isEmpty) return;
+
+    final names = selected.map((person) => '[[${person.slug}]]').join(', ');
+    final marker = 'people:: $names';
+    final currentDescription = _event.description ?? '';
+    _event.description = currentDescription.contains(marker)
+        ? currentDescription
+        : [
+            if (currentDescription.trim().isNotEmpty) currentDescription.trim(),
+            marker,
+          ].join('\n');
+
+    try {
+      final service = ref.read(googleCalendarServiceProvider);
+      final updatedEvent = await service.updateEvent(_event);
+      setState(() => _event = updatedEvent);
+
+      final seenAt =
+          (_event.start?.dateTime ?? _event.start?.date)?.toLocal() ??
+          DateTime.now();
+      for (final person in selected) {
+        final updatedPerson = person.copyWith(lastContactDate: seenAt);
+        await ref.read(vaultProvider.notifier).updateObject(updatedPerson);
+        await _upsertNextContactTask(updatedPerson);
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${selected.length} pessoa(s) atualizadas.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Não foi possível atualizar o evento: $e')),
+      );
+    }
+  }
+
+  Future<void> _upsertNextContactTask(Person person) async {
+    final frequency = person.contactFrequency;
+    if (frequency == null) return;
+    final dueDate = (person.lastContactDate ?? DateTime.now()).add(frequency);
+    final title = 'Entrar em contato com ${person.title}';
+    final tasks = ref.read(tasksProvider);
+    final existing = tasks
+        .where(
+          (task) =>
+              task.title == title ||
+              task.organizers.any((org) => org.slug == person.slug),
+        )
+        .firstOrNull;
+    final organizer = OrganizerReference(
+      type: 'person',
+      slug: person.slug,
+      title: person.title,
+    );
+
+    if (existing != null) {
+      await ref
+          .read(tasksProvider.notifier)
+          .updateTask(
+            existing.copyWith(
+              endDate: dueDate,
+              stage: TaskStage.todo,
+              organizers: [
+                ...existing.organizers.where((org) => org.slug != person.slug),
+                organizer,
+              ],
+            ),
+          );
+      return;
+    }
+
+    await ref
+        .read(tasksProvider.notifier)
+        .addTask(
+          Task(
+            title: title,
+            endDate: dueDate,
+            stage: TaskStage.todo,
+            priority: person.contactPriority,
+            organizers: [organizer],
+            notes: [
+              'Criada automaticamente a partir de um evento do Google Calendar.',
+            ],
+          ),
+        );
   }
 
   Widget _buildSection(
@@ -165,7 +345,7 @@ class GoogleEventDetailScreen extends StatelessWidget {
   }
 
   Future<void> _openInGoogleCalendar(BuildContext context) async {
-    final htmlLink = event.htmlLink;
+    final htmlLink = _event.htmlLink;
     if (htmlLink != null) {
       final uri = Uri.parse(htmlLink);
       try {

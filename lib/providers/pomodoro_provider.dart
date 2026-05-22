@@ -1,9 +1,10 @@
 // lib/providers/pomodoro_provider.dart
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
+import '../models/content_object.dart';
 import '../models/pomodoro_session.dart';
 import '../models/task_model.dart';
-import '../models/organizer_model.dart';
 import '../models/shared_types.dart';
 import '../services/notification_service.dart';
 import 'vault_provider.dart';
@@ -12,8 +13,6 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import '../services/markdown_parser.dart';
 import '../services/widget_service.dart';
 import 'package:intl/intl.dart';
-import '../models/content_object.dart';
-import '../models/task_model.dart';
 import '../ui/theme.dart';
 
 class PomodoroState {
@@ -271,6 +270,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
   }
 
   void _notifyPhaseEnd() {
+    _vibrateSessionEnd();
     String title;
     String body;
 
@@ -295,6 +295,15 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       title: title,
       body: body,
     );
+  }
+
+  Future<void> _vibrateSessionEnd() async {
+    for (var i = 0; i < 3; i++) {
+      HapticFeedback.heavyImpact();
+      if (i < 2) {
+        await Future.delayed(const Duration(milliseconds: 220));
+      }
+    }
   }
 
   void stop() {
@@ -447,7 +456,15 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       scheduledTime: DateFormat('HH:mm').format(startTime),
       color: AppColors.error.toARGB32().toRadixString(16),
       pomodoroCount: count,
-      organizers: taskId != null ? [OrganizerReference(type: 'task', slug: taskId, title: taskTitle ?? 'Task')] : [],
+      organizers: taskId != null
+          ? [
+              OrganizerReference(
+                type: 'task',
+                slug: taskId,
+                title: taskTitle ?? 'Task',
+              ),
+            ]
+          : [],
     );
 
     await ref.read(tasksProvider.notifier).addTask(pomodoroBlock);
@@ -464,8 +481,11 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
 
   void _updateWeeklyWidget() {
     final now = DateTime.now();
-    final startOfWeek = DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: now.weekday - 1));
+    final startOfWeek = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: now.weekday - 1));
     final sessions = state.history
         .where((session) => !session.startTime.isBefore(startOfWeek))
         .toList();
@@ -480,11 +500,14 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
           (byTitle[session.taskTitle] ?? 0) + session.duration.inMinutes;
     }
     final totalHours = dayHours.fold<double>(0, (sum, value) => sum + value);
-    final details = (byTitle.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value)))
-        .take(4)
-        .map((entry) => '${entry.key} ${(entry.value / 60).toStringAsFixed(0)}h')
-        .join('\n');
+    final details =
+        (byTitle.entries.toList()..sort((a, b) => b.value.compareTo(a.value)))
+            .take(4)
+            .map(
+              (entry) =>
+                  '${entry.key} ${(entry.value / 60).toStringAsFixed(0)}h',
+            )
+            .join('\n');
     WidgetService.updatePomodoroWeekly(
       '${totalHours.toStringAsFixed(0)}h esta semana',
       dayHours,

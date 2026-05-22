@@ -16,7 +16,6 @@ class TemplateDefinition extends ContentObject {
     super.createdAt,
     super.updatedAt,
     super.organizers,
-    super.moc,
   });
 
   @override
@@ -31,7 +30,6 @@ class TemplateDefinition extends ContentObject {
     DateTime? createdAt,
     DateTime? updatedAt,
     List<OrganizerReference>? organizers,
-    List<String>? moc,
   }) {
     final t = TemplateDefinition(
       id: id ?? this.id,
@@ -42,7 +40,6 @@ class TemplateDefinition extends ContentObject {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       organizers: organizers ?? this.organizers,
-      moc: moc ?? this.moc,
     );
     t.obsidianPath = obsidianPath;
     t.archived = archived;
@@ -80,7 +77,6 @@ class TemplateDefinition extends ContentObject {
       frontmatterDefaults: fmDefaults,
       createdAt: map['created_at'] != null ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
       updatedAt: map['updated_at'] != null ? DateTime.tryParse(map['updated_at'].toString()) ?? DateTime.now() : DateTime.now(),
-      moc: (map['moc'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
     );
     t.loadBaseMap(map, fallbackId: id);
     return t;

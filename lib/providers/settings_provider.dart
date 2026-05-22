@@ -8,7 +8,8 @@ import '../models/shared_types.dart';
 /// This ensures SettingsNotifier has real prefs from the very first build,
 /// eliminating the async double-load that caused the vault to rebuild twice.
 final sharedPreferencesProvider = Provider<SharedPreferences>(
-  (ref) => throw UnimplementedError('Override sharedPreferencesProvider in main'),
+  (ref) =>
+      throw UnimplementedError('Override sharedPreferencesProvider in main'),
 );
 
 class AutoCategoryRule {
@@ -78,11 +79,9 @@ class AppSettings {
     this.universalWidgetType = 'daily',
     this.universalWidgetOrganizer = '',
     this.universalWidgetSize = 'medium',
-    this.universalWidgetObjectTypes = const [
-      'task',
-      'goal',
-    ],
+    this.universalWidgetObjectTypes = const ['task', 'goal'],
     this.visibleResourceFields = const ['author', 'rating', 'type'],
+    this.resourceTypeFilters = const ['General'],
     this.sleepInTomorrow = false,
     this.sleepInUntil = '10:00',
     this.sleepInDate = '',
@@ -105,6 +104,7 @@ class AppSettings {
   final String universalWidgetSize;
   final List<String> universalWidgetObjectTypes;
   final List<String> visibleResourceFields;
+  final List<String> resourceTypeFilters;
 
   final String quickAddWidgetButton1Label;
   final String quickAddWidgetButton1Target;
@@ -139,6 +139,7 @@ class AppSettings {
     String? universalWidgetSize,
     List<String>? universalWidgetObjectTypes,
     List<String>? visibleResourceFields,
+    List<String>? resourceTypeFilters,
     bool? sleepInTomorrow,
     String? sleepInUntil,
     String? sleepInDate,
@@ -178,12 +179,16 @@ class AppSettings {
       universalWidgetSize: universalWidgetSize ?? this.universalWidgetSize,
       universalWidgetObjectTypes:
           universalWidgetObjectTypes ?? this.universalWidgetObjectTypes,
-      visibleResourceFields: visibleResourceFields ?? this.visibleResourceFields,
+      visibleResourceFields:
+          visibleResourceFields ?? this.visibleResourceFields,
+      resourceTypeFilters: resourceTypeFilters ?? this.resourceTypeFilters,
       sleepInTomorrow: sleepInTomorrow ?? this.sleepInTomorrow,
       sleepInUntil: sleepInUntil ?? this.sleepInUntil,
       sleepInDate: sleepInDate ?? this.sleepInDate,
-      reviewDailyTemplateId: reviewDailyTemplateId ?? this.reviewDailyTemplateId,
-      nlpTaskParsingEnabled: nlpTaskParsingEnabled ?? this.nlpTaskParsingEnabled,
+      reviewDailyTemplateId:
+          reviewDailyTemplateId ?? this.reviewDailyTemplateId,
+      nlpTaskParsingEnabled:
+          nlpTaskParsingEnabled ?? this.nlpTaskParsingEnabled,
       quickAddWidgetButton1Label:
           quickAddWidgetButton1Label ?? this.quickAddWidgetButton1Label,
       quickAddWidgetButton1Target:
@@ -207,8 +212,7 @@ class AppSettings {
 }
 
 class SettingsNotifier extends StateNotifier<AppSettings> {
-  SettingsNotifier(SharedPreferences prefs)
-    : super(_buildFromPrefs(prefs));
+  SettingsNotifier(SharedPreferences prefs) : super(_buildFromPrefs(prefs));
 
   static AppSettings _buildFromPrefs(SharedPreferences prefs) {
     final rulesJson = prefs.getString('autoCategoryRules');
@@ -229,7 +233,9 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     Map<String, TypeSignature> sigs = _defaultSignatures();
     if (sigsJson != null) {
       final Map<String, dynamic> decoded = json.decode(sigsJson);
-      final loaded = decoded.map((k, v) => MapEntry(k, TypeSignature.fromMap(v)));
+      final loaded = decoded.map(
+        (k, v) => MapEntry(k, TypeSignature.fromMap(v)),
+      );
       sigs = _defaultSignatures()..addAll(loaded);
     }
 
@@ -257,8 +263,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       universalWidgetObjectTypes:
           prefs.getStringList('universalWidgetObjectTypes') ??
           const ['task', 'goal'],
-      visibleResourceFields: prefs.getStringList('visibleResourceFields') ??
+      visibleResourceFields:
+          prefs.getStringList('visibleResourceFields') ??
           const ['author', 'rating', 'type'],
+      resourceTypeFilters:
+          prefs.getStringList('resourceTypeFilters') ?? const ['General'],
       sleepInTomorrow: prefs.getBool('sleepInTomorrow') ?? false,
       sleepInUntil: prefs.getString('sleepInUntil') ?? '10:00',
       sleepInDate: prefs.getString('sleepInDate') ?? '',
@@ -273,8 +282,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       quickAddWidgetButton2Target:
           prefs.getString('quickAddWidgetButton2Target') ?? 'task',
       calendarWidgetType: prefs.getString('calendarWidgetType') ?? 'week',
-      calendarWidgetShowTasks:
-          prefs.getBool('calendarWidgetShowTasks') ?? true,
+      calendarWidgetShowTasks: prefs.getBool('calendarWidgetShowTasks') ?? true,
       calendarWidgetShowHabits:
           prefs.getBool('calendarWidgetShowHabits') ?? true,
       calendarWidgetShowSessions:
@@ -345,11 +353,6 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
         objectType: 'organizer',
         markerType: MarkerType.property,
         markerValue: 'type: organizer',
-      ),
-      'moc': TypeSignature(
-        objectType: 'moc',
-        markerType: MarkerType.folder,
-        markerValue: 'mocos/',
       ),
     };
   }
@@ -503,11 +506,28 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     state = state.copyWith(visibleResourceFields: fields);
   }
 
+  Future<void> updateResourceTypeFilters(List<String> filters) async {
+    final cleaned =
+        filters
+            .map((filter) => filter.trim())
+            .where((filter) => filter.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('resourceTypeFilters', cleaned);
+    state = state.copyWith(resourceTypeFilters: cleaned);
+  }
+
   Future<void> updateSleepInTomorrow(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('sleepInTomorrow', value);
     if (value) {
-      final tomorrowStr = DateTime.now().add(const Duration(days: 1)).toIso8601String().split('T').first;
+      final tomorrowStr = DateTime.now()
+          .add(const Duration(days: 1))
+          .toIso8601String()
+          .split('T')
+          .first;
       await prefs.setString('sleepInDate', tomorrowStr);
       state = state.copyWith(sleepInTomorrow: true, sleepInDate: tomorrowStr);
     } else {
@@ -541,10 +561,14 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     String? btn2Target,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    if (btn1Label != null) await prefs.setString('quickAddWidgetButton1Label', btn1Label);
-    if (btn1Target != null) await prefs.setString('quickAddWidgetButton1Target', btn1Target);
-    if (btn2Label != null) await prefs.setString('quickAddWidgetButton2Label', btn2Label);
-    if (btn2Target != null) await prefs.setString('quickAddWidgetButton2Target', btn2Target);
+    if (btn1Label != null)
+      await prefs.setString('quickAddWidgetButton1Label', btn1Label);
+    if (btn1Target != null)
+      await prefs.setString('quickAddWidgetButton1Target', btn1Target);
+    if (btn2Label != null)
+      await prefs.setString('quickAddWidgetButton2Label', btn2Label);
+    if (btn2Target != null)
+      await prefs.setString('quickAddWidgetButton2Target', btn2Target);
     state = state.copyWith(
       quickAddWidgetButton1Label: btn1Label,
       quickAddWidgetButton1Target: btn1Target,
@@ -561,9 +585,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     if (type != null) await prefs.setString('calendarWidgetType', type);
-    if (showTasks != null) await prefs.setBool('calendarWidgetShowTasks', showTasks);
-    if (showHabits != null) await prefs.setBool('calendarWidgetShowHabits', showHabits);
-    if (showSessions != null) await prefs.setBool('calendarWidgetShowSessions', showSessions);
+    if (showTasks != null)
+      await prefs.setBool('calendarWidgetShowTasks', showTasks);
+    if (showHabits != null)
+      await prefs.setBool('calendarWidgetShowHabits', showHabits);
+    if (showSessions != null)
+      await prefs.setBool('calendarWidgetShowSessions', showSessions);
     state = state.copyWith(
       calendarWidgetType: type,
       calendarWidgetShowTasks: showTasks,
@@ -577,8 +604,10 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     String? organizer,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    if (filterType != null) await prefs.setString('habitWidgetFilterType', filterType);
-    if (organizer != null) await prefs.setString('habitWidgetOrganizer', organizer);
+    if (filterType != null)
+      await prefs.setString('habitWidgetFilterType', filterType);
+    if (organizer != null)
+      await prefs.setString('habitWidgetOrganizer', organizer);
     state = state.copyWith(
       habitWidgetFilterType: filterType,
       habitWidgetOrganizer: organizer,

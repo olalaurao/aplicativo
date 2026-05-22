@@ -63,7 +63,7 @@ extension KPISourceTypeLabel on KPISourceType {
       case KPISourceType.goalProgressPercentage:
         return 'Progresso Percentual da Meta';
       case KPISourceType.customNumericInput:
-        return 'Valor Inserido Manualmente';
+        return 'Valor manual';
       case KPISourceType.moodAverage:
         return 'Average Mood in Period';
       case KPISourceType.moodTrend:

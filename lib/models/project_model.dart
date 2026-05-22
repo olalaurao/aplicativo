@@ -32,7 +32,6 @@ class Project extends Organizer {
     super.icon,
     super.organizers,
     super.categories,
-    super.moc,
     super.createdAt,
     super.updatedAt,
     super.obsidianPath,
