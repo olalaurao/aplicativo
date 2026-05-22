@@ -28,6 +28,8 @@ class SyncManager {
   final Ref _ref;
   Timer? _syncTimer;
   bool _isSyncing = false;
+  bool _preSyncBackupCreated = false;
+  bool _syncHadConflict = false;
 
   SyncManager(this._ref);
 
@@ -120,11 +122,17 @@ class SyncManager {
     }
 
     _isSyncing = true;
+    _preSyncBackupCreated = false;
+    _syncHadConflict = false;
     _ref.read(syncStatusProvider.notifier).setStatus(SyncStatus.syncing);
 
     try {
       await _performSyncWithClient(authClient).timeout(_syncTimeout);
-      _ref.read(syncStatusProvider.notifier).setStatus(SyncStatus.synced);
+      _ref
+          .read(syncStatusProvider.notifier)
+          .setStatus(
+            _syncHadConflict ? SyncStatus.conflict : SyncStatus.synced,
+          );
     } catch (e) {
       if (_isAuthError(e)) {
         try {
@@ -133,7 +141,11 @@ class SyncManager {
           );
           if (refreshedClient != null) {
             await _performSyncWithClient(refreshedClient).timeout(_syncTimeout);
-            _ref.read(syncStatusProvider.notifier).setStatus(SyncStatus.synced);
+            _ref
+                .read(syncStatusProvider.notifier)
+                .setStatus(
+                  _syncHadConflict ? SyncStatus.conflict : SyncStatus.synced,
+                );
             return;
           }
         } catch (refreshError) {
@@ -190,7 +202,46 @@ class SyncManager {
       if (content == null) return;
 
       final localHash = driveSync.calculateHash(content);
-      await driveSync.syncFile(relativePath, content, localHash);
+      final state = await queue.getFileSyncState(relativePath);
+      final baseHash = state?['baseHash'] as String?;
+      final remoteFile = (await driveSync.fetchRemoteFiles())
+          .where((file) => file.name == relativePath)
+          .firstOrNull;
+      final remoteHash = remoteFile?.appProperties?['citrine_hash'];
+      final localChanged = baseHash != null && localHash != baseHash;
+      final remoteChanged =
+          baseHash != null && remoteHash != null && remoteHash != baseHash;
+
+      if (localChanged && remoteChanged && remoteFile?.id != null) {
+        final remoteContent = await driveSync.downloadFile(remoteFile!.id!);
+        if (remoteContent != null) {
+          await _storeConflict(
+            driveSync: driveSync,
+            obsidian: obsidian,
+            relativePath: relativePath,
+            localContent: content,
+            remoteContent: remoteContent,
+          );
+        }
+        return;
+      }
+
+      await _ensurePreSyncBackup(driveSync);
+      final uploaded = await driveSync.syncFile(
+        relativePath,
+        content,
+        localHash,
+        baseHash: baseHash,
+      );
+      if (uploaded) {
+        await queue.upsertFileSyncState(
+          relativePath: relativePath,
+          localHash: localHash,
+          remoteHash: localHash,
+          baseHash: localHash,
+          remoteFileId: remoteFile?.id,
+        );
+      }
     });
 
     // 2. Pull remote changes after local queued edits are safely uploaded.
@@ -222,6 +273,7 @@ class SyncManager {
     GoogleDriveSyncService driveSync,
     ObsidianService obsidian,
   ) async {
+    final queue = _ref.read(syncQueueServiceProvider);
     final remoteFiles = await driveSync.fetchRemoteFiles();
     final localFiles = await obsidian.getAllMarkdownFiles();
 
@@ -235,21 +287,131 @@ class SyncManager {
     // 1. Upload local files that don't exist or are newer remotely
     for (final relPath in localMap.keys) {
       final localFile = localMap[relPath]!;
-      final remoteFile = remoteMap[relPath];
+      final remoteFile = remoteMap[relPath] as drive.File?;
 
       final content = await localFile.readAsString();
       final localHash = driveSync.calculateHash(content);
+      final state = await queue.getFileSyncState(relPath);
+      final baseHash = state?['baseHash'] as String?;
 
       if (remoteFile == null) {
-        // New local file
-        await driveSync.syncFile(relPath, content, localHash);
-      } else {
-        final remoteHash = remoteFile.appProperties?['citrine_hash'];
-        if (remoteHash != null && remoteHash != localHash) {
-          await driveSync.syncFile(relPath, content, localHash);
-        } else if (remoteHash == null &&
-            await _isLocalFileNewer(localFile, remoteFile)) {
-          await driveSync.syncFile(relPath, content, localHash);
+        await _ensurePreSyncBackup(driveSync);
+        final uploaded = await driveSync.syncFile(relPath, content, localHash);
+        if (uploaded) {
+          await queue.upsertFileSyncState(
+            relativePath: relPath,
+            localHash: localHash,
+            remoteHash: localHash,
+            baseHash: localHash,
+            localModifiedAt: await localFile.lastModified(),
+          );
+        }
+        continue;
+      }
+
+      final remoteHash = remoteFile.appProperties?['citrine_hash'];
+      if (remoteHash == localHash) {
+        await queue.upsertFileSyncState(
+          relativePath: relPath,
+          localHash: localHash,
+          remoteHash: localHash,
+          baseHash: localHash,
+          remoteFileId: remoteFile.id,
+          localModifiedAt: await localFile.lastModified(),
+          remoteModifiedAt: remoteFile.modifiedTime,
+        );
+        continue;
+      }
+
+      final localChanged = baseHash != null && localHash != baseHash;
+      final remoteChanged =
+          baseHash != null && remoteHash != null && remoteHash != baseHash;
+
+      if (localChanged && remoteChanged && remoteFile.id != null) {
+        final remoteContent = await driveSync.downloadFile(remoteFile.id!);
+        if (remoteContent != null) {
+          await _storeConflict(
+            driveSync: driveSync,
+            obsidian: obsidian,
+            relativePath: relPath,
+            localContent: content,
+            remoteContent: remoteContent,
+          );
+        }
+        continue;
+      }
+
+      if (remoteChanged && remoteFile.id != null) {
+        final remoteContent = await driveSync.downloadFile(remoteFile.id!);
+        if (remoteContent != null) {
+          await _ensurePreSyncBackup(driveSync);
+          await obsidian.writeFile(relPath, remoteContent);
+          final newHash = driveSync.calculateHash(remoteContent);
+          await queue.upsertFileSyncState(
+            relativePath: relPath,
+            localHash: newHash,
+            remoteHash: newHash,
+            baseHash: newHash,
+            remoteFileId: remoteFile.id,
+            remoteModifiedAt: remoteFile.modifiedTime,
+          );
+          debugPrint('Downloaded $relPath from Drive');
+        }
+        continue;
+      }
+
+      if (localChanged) {
+        await _ensurePreSyncBackup(driveSync);
+        final uploaded = await driveSync.syncFile(
+          relPath,
+          content,
+          localHash,
+          baseHash: baseHash,
+        );
+        if (uploaded) {
+          await queue.upsertFileSyncState(
+            relativePath: relPath,
+            localHash: localHash,
+            remoteHash: localHash,
+            baseHash: localHash,
+            remoteFileId: remoteFile.id,
+            localModifiedAt: await localFile.lastModified(),
+          );
+        }
+        continue;
+      }
+
+      if (remoteHash == null &&
+          await _isRemoteFileNewer(remoteFile, localFile)) {
+        if (remoteFile.id == null) continue;
+        final remoteContent = await driveSync.downloadFile(remoteFile.id!);
+        if (remoteContent != null) {
+          await _ensurePreSyncBackup(driveSync);
+          await obsidian.writeFile(relPath, remoteContent);
+          final newHash = driveSync.calculateHash(remoteContent);
+          await queue.upsertFileSyncState(
+            relativePath: relPath,
+            localHash: newHash,
+            remoteHash: newHash,
+            baseHash: newHash,
+            remoteFileId: remoteFile.id,
+            remoteModifiedAt: remoteFile.modifiedTime,
+          );
+          debugPrint('Downloaded $relPath from Drive');
+        }
+      } else if (remoteHash == null &&
+          await _isLocalFileNewer(localFile, remoteFile)) {
+        await _ensurePreSyncBackup(driveSync);
+        final uploaded = await driveSync.syncFile(relPath, content, localHash);
+        if (uploaded) {
+          await queue.upsertFileSyncState(
+            relativePath: relPath,
+            localHash: localHash,
+            remoteHash: localHash,
+            baseHash: localHash,
+            remoteFileId: remoteFile.id,
+            localModifiedAt: await localFile.lastModified(),
+          );
         }
       }
     }
@@ -261,26 +423,20 @@ class SyncManager {
       if (!relPath.endsWith('.md')) continue;
 
       final localFile = localMap[relPath];
-      final remoteHash = remoteFile.appProperties?['citrine_hash'];
-
-      bool shouldDownload = false;
       if (localFile == null) {
-        shouldDownload = true;
-      } else {
-        final content = await localFile.readAsString();
-        final localHash = driveSync.calculateHash(content);
-        if (remoteHash != null && remoteHash != localHash) {
-          shouldDownload = true;
-        } else if (remoteHash == null &&
-            await _isRemoteFileNewer(remoteFile, localFile)) {
-          shouldDownload = true;
-        }
-      }
-
-      if (shouldDownload) {
         final content = await driveSync.downloadFile(remoteFile.id!);
         if (content != null) {
+          await _ensurePreSyncBackup(driveSync);
           await obsidian.writeFile(relPath, content);
+          final hash = driveSync.calculateHash(content);
+          await queue.upsertFileSyncState(
+            relativePath: relPath,
+            localHash: hash,
+            remoteHash: hash,
+            baseHash: hash,
+            remoteFileId: remoteFile.id,
+            remoteModifiedAt: remoteFile.modifiedTime,
+          );
           debugPrint('Downloaded $relPath from Drive');
         }
       }
@@ -299,6 +455,62 @@ class SyncManager {
     if (remoteModified == null) return false;
     final localModified = await localFile.lastModified();
     return remoteModified.toUtc().isAfter(localModified.toUtc());
+  }
+
+  Future<void> _ensurePreSyncBackup(GoogleDriveSyncService driveSync) async {
+    if (_preSyncBackupCreated) return;
+    final backupService = _ref.read(backupServiceProvider);
+    final zipFile = await backupService.createBackup();
+    if (zipFile != null) {
+      await driveSync.createBackupFromFile(zipFile);
+      await backupService.cleanOldBackups(keepCount: 2);
+    }
+    await driveSync.cleanOldRemoteBackups(keepCount: 2);
+    _preSyncBackupCreated = true;
+  }
+
+  Future<void> _storeConflict({
+    required GoogleDriveSyncService driveSync,
+    required ObsidianService obsidian,
+    required String relativePath,
+    required String localContent,
+    required String remoteContent,
+  }) async {
+    await _ensurePreSyncBackup(driveSync);
+    await driveSync.saveConflictPair(
+      relativePath: relativePath,
+      localContent: localContent,
+      remoteContent: remoteContent,
+    );
+
+    final detectedAt = DateTime.now();
+    final timestamp = detectedAt.millisecondsSinceEpoch;
+    final safePath = relativePath.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    final localConflictPath = '_conflicts/${safePath}_local_$timestamp.md';
+    final remoteConflictPath = '_conflicts/${safePath}_remote_$timestamp.md';
+    await obsidian.writeFile(localConflictPath, localContent);
+    await obsidian.writeFile(remoteConflictPath, remoteContent);
+    await _ref
+        .read(syncQueueServiceProvider)
+        .upsertConflict(
+          relativePath: relativePath,
+          localPath: localConflictPath,
+          remotePath: remoteConflictPath,
+          detectedAt: detectedAt,
+        );
+
+    _syncHadConflict = true;
+    _ref
+        .read(syncConflictsProvider.notifier)
+        .addConflict(
+          SyncConflict(
+            relativePath: relativePath,
+            localPath: localConflictPath,
+            remotePath: remoteConflictPath,
+            detectedAt: detectedAt,
+          ),
+        );
+    debugPrint('Sync conflict detected for $relativePath');
   }
 
   String? _guessPathForAction(SyncAction action) {

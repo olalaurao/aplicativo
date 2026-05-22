@@ -28,6 +28,7 @@ import 'ui/screens/journal_screen.dart';
 import 'ui/screens/statistics_screen.dart';
 import 'ui/screens/inbox_screen.dart';
 import 'ui/screens/search_screen.dart';
+import 'ui/screens/sync_conflicts_screen.dart';
 
 import 'ui/screens/organizer_detail_screen.dart';
 import 'ui/screens/universal_detail_view.dart';
@@ -78,7 +79,7 @@ Future<void> homeWidgetInteractiveCallback(Uri? uri) async {
     debugPrint(
       '[WidgetCallback] type=$type objectId=$objectId date=$date slot=$slotIndex',
     );
-    
+
     if (type == 'calendar_mode') {
       final mode = uri.queryParameters['mode'];
       if (mode != null) {
@@ -526,6 +527,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/inbox',
             builder: (context, state) => const InboxScreen(),
+          ),
+          GoRoute(
+            path: '/sync-conflicts',
+            builder: (context, state) => const SyncConflictsScreen(),
           ),
           GoRoute(
             path: '/detail/:id',

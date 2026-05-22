@@ -2102,6 +2102,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _buildSyncIndicator(WidgetRef ref) {
     final status = ref.watch(syncStatusProvider);
+    final conflictCount = ref.watch(syncConflictsProvider).length;
     IconData icon;
     Color color;
     bool animate = false;
@@ -2120,6 +2121,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         icon = Icons.cloud_off_rounded;
         color = AppColors.priorityHigh;
         break;
+      case SyncStatus.conflict:
+        icon = Icons.warning_amber_rounded;
+        color = AppColors.warning;
+        break;
       case SyncStatus.offline:
         icon = Icons.cloud_off_rounded;
         color = AppColors.textMuted;
@@ -2130,10 +2135,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       icon: animate
           ? _RotatingIcon(icon: icon, color: color)
           : Icon(icon, color: color, size: 20),
-      tooltip: 'Sync: ${status.name.toUpperCase()}',
+      tooltip: status == SyncStatus.conflict
+          ? 'Sync: CONFLICT ($conflictCount)'
+          : 'Sync: ${status.name.toUpperCase()}',
       onPressed: () {
         HapticFeedback.lightImpact();
-        ref.read(syncManagerProvider).performSync();
+        if (status == SyncStatus.conflict) {
+          context.push('/sync-conflicts');
+        } else {
+          ref.read(syncManagerProvider).performSync();
+        }
       },
     );
   }

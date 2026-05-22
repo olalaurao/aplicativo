@@ -107,7 +107,7 @@ class GoogleDriveSyncService {
     return currentParentId;
   }
 
-  Future<void> syncFile(
+  Future<bool> syncFile(
     String relativePath,
     String content,
     String localHash, {
@@ -148,7 +148,7 @@ class GoogleDriveSyncService {
       // If remoteHash exists and is different from our baseHash, someone else modified it.
       if (baseHash != null && remoteHash != null && remoteHash != baseHash) {
         await _handleConflict(relativePath, content, remoteId, fileName);
-        return; // Stop sync for this file, let user resolve
+        return false; // Stop sync for this file, let user resolve
       }
 
       final updateFile = drive.File()
@@ -161,6 +161,7 @@ class GoogleDriveSyncService {
         uploadMedia: media,
         supportsAllDrives: true,
       );
+      return true;
     } else {
       // Create new file
       final newFile = drive.File()
@@ -173,6 +174,7 @@ class GoogleDriveSyncService {
         uploadMedia: media,
         supportsAllDrives: true,
       );
+      return true;
     }
   }
 
@@ -275,6 +277,23 @@ class GoogleDriveSyncService {
     debugPrint('Conflict detected and saved to _conflicts for $relativePath');
   }
 
+  Future<void> saveConflictPair({
+    required String relativePath,
+    required String localContent,
+    required String remoteContent,
+  }) async {
+    if (_driveApi == null || _vaultFolderId == null) {
+      throw Exception('Drive API not initialized');
+    }
+    final fileName = relativePath.split('/').last;
+    await _saveConflictFiles(
+      relativePath,
+      localContent,
+      remoteContent,
+      fileName,
+    );
+  }
+
   Future<void> deleteFile(String relativePath, String fileId) async {
     if (_driveApi == null) return;
 
@@ -333,6 +352,7 @@ class GoogleDriveSyncService {
       uploadMedia: media,
       supportsAllDrives: true,
     );
+    await cleanOldRemoteBackups(keepCount: 2);
   }
 
   Future<void> createBackupFromFile(File zipFile) async {
@@ -351,6 +371,32 @@ class GoogleDriveSyncService {
       uploadMedia: media,
       supportsAllDrives: true,
     );
+    await cleanOldRemoteBackups(keepCount: 2);
+  }
+
+  Future<void> cleanOldRemoteBackups({int keepCount = 2}) async {
+    if (_driveApi == null || _vaultFolderId == null) return;
+
+    final backupsFolderId = await _getOrCreateFolder('_backups');
+    final fileList = await _driveApi!.files.list(
+      q: "'${_queryStringLiteral(backupsFolderId)}' in parents and trashed=false",
+      spaces: 'drive',
+      includeItemsFromAllDrives: true,
+      supportsAllDrives: true,
+      orderBy: 'modifiedTime desc',
+      $fields: 'files(id, name, modifiedTime)',
+    );
+
+    final backups = (fileList.files ?? <drive.File>[])
+        .where((file) => (file.name ?? '').endsWith('.zip'))
+        .toList();
+    if (backups.length <= keepCount) return;
+
+    for (final backup in backups.skip(keepCount)) {
+      final id = backup.id;
+      if (id == null) continue;
+      await _driveApi!.files.delete(id, supportsAllDrives: true);
+    }
   }
 
   Future<List<drive.File>> fetchRemoteFiles() async {
