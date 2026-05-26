@@ -170,6 +170,9 @@ class KPIEngine {
         moods: moods,
         notes: notes,
       );
+      if (kpi.currentValue >= kpi.targetValue) {
+        kpi.completed = true;
+      }
       if (kpi.currentValue < kpi.targetValue) {
         allMet = false;
       }
@@ -179,6 +182,6 @@ class KPIEngine {
 
   /// Checks if a single KPI has met its target
   static bool isKPIComplete(KPI kpi) {
-    return kpi.currentValue >= kpi.targetValue;
+    return kpi.completed || kpi.currentValue >= kpi.targetValue;
   }
 }

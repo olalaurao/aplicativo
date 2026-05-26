@@ -15,7 +15,14 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
     if (jsonStr != null) {
       try {
         final List<dynamic> decoded = jsonDecode(jsonStr);
-        return decoded.map((item) => NavigationItem.fromMap(item)).toList();
+        final savedItems = decoded
+            .map((item) => NavigationItem.fromMap(item))
+            .toList();
+        final migratedItems = _withMissingDefaultItems(savedItems);
+        if (migratedItems.length != savedItems.length) {
+          await _saveItems(prefs, migratedItems);
+        }
+        return migratedItems;
       } catch (e) {
         return _defaultItems;
       }
@@ -24,11 +31,7 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
   }
 
   static final List<NavigationItem> _defaultItems = [
-    NavigationItem(
-      section: NavSection.home,
-      label: 'Home',
-      route: '/',
-    ),
+    NavigationItem(section: NavSection.home, label: 'Home', route: '/'),
     NavigationItem(
       section: NavSection.timeline,
       label: 'Journal',
@@ -56,11 +59,7 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
       route: '/pomodoro',
       inBottomBar: false,
     ),
-    NavigationItem(
-      section: NavSection.more,
-      label: 'More',
-      route: '/more',
-    ),
+    NavigationItem(section: NavSection.more, label: 'More', route: '/more'),
     NavigationItem(
       section: NavSection.statistics,
       label: 'Estatísticas',
@@ -83,6 +82,12 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
       section: NavSection.resources,
       label: 'Resources',
       route: '/resources',
+      inBottomBar: false,
+    ),
+    NavigationItem(
+      section: NavSection.social,
+      label: 'Social',
+      route: '/social',
       inBottomBar: false,
     ),
     NavigationItem(
@@ -132,10 +137,30 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
     final data = state.valueOrNull ?? [];
+    await _saveItems(prefs, data);
+  }
+
+  static Future<void> _saveItems(
+    SharedPreferences prefs,
+    List<NavigationItem> data,
+  ) async {
     await prefs.setString(
       _prefKey,
       jsonEncode(data.map((e) => e.toMap()).toList()),
     );
+  }
+
+  static List<NavigationItem> _withMissingDefaultItems(
+    List<NavigationItem> savedItems,
+  ) {
+    final existingSections = savedItems
+        .where((item) => !item.isCustom)
+        .map((item) => item.section)
+        .toSet();
+    final missingDefaults = _defaultItems.where(
+      (item) => !existingSections.contains(item.section),
+    );
+    return [...savedItems, ...missingDefaults];
   }
 
   Future<void> toggleInBottomBar(dynamic idOrSection) async {

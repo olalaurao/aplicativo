@@ -1,4 +1,6 @@
 // lib/models/content_object.dart
+import 'dart:convert';
+
 import 'package:uuid/uuid.dart';
 import 'shared_types.dart';
 import 'reminder_config.dart';
@@ -153,6 +155,102 @@ String generateMarkdown(Map<String, dynamic> frontmatter, String body) {
   buffer.writeln();
   buffer.writeln(body);
   return buffer.toString();
+}
+
+String normalizeRichTextBodyForMarkdown(String body) {
+  final ops = _tryParseDeltaOps(body);
+  if (ops == null) return body;
+  return _deltaOpsToMarkdown(ops);
+}
+
+List<Map<String, dynamic>>? _tryParseDeltaOps(String body) {
+  final trimmed = body.trim();
+  if (trimmed.isEmpty) return null;
+  if (!trimmed.startsWith('[') && !trimmed.startsWith('{')) return null;
+  if (!trimmed.contains('"insert"') && !trimmed.contains("'insert'")) {
+    return null;
+  }
+
+  try {
+    final decoded = jsonDecode(trimmed);
+    final rawOps = decoded is Map ? decoded['ops'] : decoded;
+    if (rawOps is! List) return null;
+    return rawOps
+        .whereType<Map>()
+        .map((op) => Map<String, dynamic>.from(op))
+        .toList();
+  } catch (_) {
+    return null;
+  }
+}
+
+String _deltaOpsToMarkdown(List<Map<String, dynamic>> ops) {
+  final lines = <String>[];
+  final current = StringBuffer();
+  var orderedIndex = 1;
+
+  String formatInline(String text, Map<String, dynamic> attributes) {
+    var result = text;
+    if (attributes['code'] == true) result = '`$result`';
+    if (attributes['bold'] == true) result = '**$result**';
+    if (attributes['italic'] == true) result = '*$result*';
+    if (attributes['link'] != null) {
+      result = '[$result](${attributes['link']})';
+    }
+    return result;
+  }
+
+  void flush(Map<String, dynamic> attributes) {
+    final text = current.toString();
+    current.clear();
+
+    final listType = attributes['list']?.toString();
+    if (listType == 'bullet') {
+      lines.add('- $text');
+    } else if (listType == 'ordered') {
+      lines.add('${orderedIndex++}. $text');
+    } else if (listType == 'checked' || listType == 'unchecked') {
+      lines.add('- [${listType == 'checked' ? 'x' : ' '}] $text');
+    } else if (attributes['blockquote'] == true) {
+      lines.add('> $text');
+    } else if (attributes['header'] != null) {
+      final level = int.tryParse(attributes['header'].toString()) ?? 1;
+      lines.add('${'#' * level.clamp(1, 6)} $text');
+    } else {
+      orderedIndex = 1;
+      lines.add(text);
+    }
+  }
+
+  for (final op in ops) {
+    final insert = op['insert'];
+    final attributes = op['attributes'] is Map
+        ? Map<String, dynamic>.from(op['attributes'] as Map)
+        : <String, dynamic>{};
+
+    if (insert is Map) {
+      final image = insert['image']?.toString();
+      if (image != null && image.isNotEmpty) {
+        if (current.isNotEmpty) flush(const {});
+        lines.add('![[$image]]');
+      }
+      continue;
+    }
+
+    if (insert is! String) continue;
+    final parts = insert.split('\n');
+    for (var i = 0; i < parts.length; i++) {
+      if (parts[i].isNotEmpty) {
+        current.write(formatInline(parts[i], attributes));
+      }
+      if (i < parts.length - 1) {
+        flush(attributes);
+      }
+    }
+  }
+
+  if (current.isNotEmpty) flush(const {});
+  return lines.join('\n').trim();
 }
 
 class NewPagePlaceholder extends ContentObject {

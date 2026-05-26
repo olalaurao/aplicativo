@@ -17,6 +17,7 @@ import '../models/tracker_model.dart';
 import '../models/mood_model.dart';
 import '../models/analysis_model.dart';
 import '../models/resource_model.dart';
+import '../models/social_post.dart';
 import '../models/people_model.dart';
 import '../models/project_model.dart';
 import '../models/snapshot_model.dart';
@@ -34,6 +35,7 @@ import '../models/reminder_config.dart';
 import '../services/automation_service.dart';
 import '../models/shared_types.dart' as shared_types;
 import '../services/widget_service.dart';
+import '../services/dataview_generator.dart';
 import 'settings_provider.dart';
 import '../services/google_drive_sync_service.dart';
 
@@ -180,18 +182,6 @@ class TasksNotifier extends Notifier<List<Task>> {
   Future<void> addTask(Task task) async {
     state = [...state, task];
     await ref.read(vaultProvider.notifier).createObject(task);
-
-    // Schedule notification if needed
-    if (task.reminderDate != null &&
-        task.reminderDate!.isAfter(DateTime.now())) {
-      await NotificationService().scheduleNotification(
-        id: task.id.hashCode,
-        title: 'Lembrete: ${task.title}',
-        body: 'Your task is scheduled for now.',
-        scheduledDate: task.reminderDate!,
-        payload: task.id,
-      );
-    }
   }
 
   Future<void> updateTask(Task task) async {
@@ -720,6 +710,40 @@ final resourcesProvider = NotifierProvider<ResourcesNotifier, List<Resource>>(
   () => ResourcesNotifier(),
 );
 
+class SocialPostsNotifier extends Notifier<List<SocialPost>> {
+  @override
+  List<SocialPost> build() {
+    return ref.watch(objectsByTypeProvider('social_post')).cast<SocialPost>();
+  }
+
+  Future<void> addPost(SocialPost post) async {
+    state = [...state, post];
+    await ref.read(vaultProvider.notifier).createObject(post);
+  }
+
+  Future<void> updatePost(SocialPost post) async {
+    state = [
+      for (final item in state)
+        if (item.id == post.id) post else item,
+    ];
+    await ref.read(vaultProvider.notifier).updateObject(post);
+  }
+
+  Future<void> deletePost(SocialPost post) async {
+    state = state.where((item) => item.id != post.id).toList();
+    await ref.read(vaultProvider.notifier).deleteObject(post);
+  }
+
+  Future<void> toggleWatched(SocialPost post) async {
+    await updatePost(post.copyWith(watched: !post.watched));
+  }
+}
+
+final socialPostsProvider =
+    NotifierProvider<SocialPostsNotifier, List<SocialPost>>(
+      () => SocialPostsNotifier(),
+    );
+
 class GoalsNotifier extends Notifier<List<Goal>> {
   @override
   List<Goal> build() {
@@ -950,8 +974,6 @@ final combinedAnalysisProvider =
       return CombinedAnalysisNotifier();
     });
 
-final analysesProvider = combinedAnalysisProvider;
-
 class TimeBlocksNotifier extends Notifier<List<TimeBlock>> {
   @override
   List<TimeBlock> build() {
@@ -1033,9 +1055,9 @@ class TemplatesNotifier extends Notifier<List<TemplateDefinition>> {
     final defaultTemplates = [
       TemplateDefinition.create(
         title: 'Reunião 1:1',
-        templateType: 'note',
+        templateType: 'entry',
         body:
-            '# Pauta\n- [ ] O que correu bem\n- [ ] Desafios e bloqueios\n- [ ] Próximos passos\n\n# Notas da Reunião\n\n# Ações\n',
+            '# Reunião 1:1\n\n## Assunto\n\n## Decisões\n- \n\n## Próximos passos\n- [ ] \n',
       ),
       TemplateDefinition.create(
         title: 'Weekly Review',
@@ -1051,15 +1073,15 @@ class TemplatesNotifier extends Notifier<List<TemplateDefinition>> {
       ),
       TemplateDefinition.create(
         title: 'Sprint Planning',
-        templateType: 'note',
+        templateType: 'entry',
         body:
-            '# Planejamento da Sprint\n\n## Objetivos da Sprint\n- [ ] \n\n## Backlog Priorizado\n- [ ] \n\n## Riscos e Impedimentos\n',
+            '# Sprint Planning\n\n## Goals\n- [ ] \n\n## Tasks\n- [ ] \n\n## Capacidade\n\n## Riscos e Impedimentos\n',
       ),
       TemplateDefinition.create(
         title: 'Projeto novo',
-        templateType: 'note',
+        templateType: 'goal',
         body:
-            '# Escopo do Projeto\n\n## Visão Geral\n\n## Objetivos e Entregáveis\n- [ ] \n\n## Recursos Necessários\n\n## Cronograma Estimado\n- Fase 1: \n- Fase 2: \n',
+            '# Projeto novo\n\n## Objetivo\n\n## KPIs\n- \n\n## Timeline\n- Fase 1: \n- Fase 2: \n\n## Riscos\n- \n',
       ),
     ];
 
@@ -1280,6 +1302,9 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
               } else if (type == 'resource') {
                 obj = Resource.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
+              } else if (type == 'social_post') {
+                obj = SocialPost.fromMarkdown(frontmatter, body)
+                  ..obsidianPath = relativePath;
               } else if (type == 'goal') {
                 obj = Goal.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
@@ -1425,11 +1450,18 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
         deduplicated[obj.id] = obj;
       }
     }
-    return deduplicated.values.toList();
+    final objects = deduplicated.values.toList()
+      ..sort((a, b) {
+        final updated = b.updatedAt.compareTo(a.updatedAt);
+        if (updated != 0) return updated;
+        return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+      });
+    return objects;
   }
 
   Future<void> updateObject(ContentObject object) async {
     final service = ref.read(obsidianServiceProvider);
+    object.updatedAt = DateTime.now();
     await service.writeFile(object.obsidianPath, object.toMarkdown());
     ref.invalidateSelf();
   }
@@ -1757,6 +1789,7 @@ class VaultNotifier extends Notifier<void> {
       'goal' => 'goals',
       'note' => 'notes',
       'resource' => 'resources',
+      'social_post' => 'social',
       'person' => 'organizers/people',
       'project' => 'organizers/projects',
       'area' => 'organizers/areas',
@@ -1889,6 +1922,13 @@ class VaultNotifier extends Notifier<void> {
     }
   }
 
+  Future<void> rescheduleAllObjectReminders() async {
+    final allObjects = await ref.read(allObjectsProvider.future);
+    for (final object in allObjects) {
+      await _scheduleObjectReminders(object);
+    }
+  }
+
   Future<String> _writeObject(
     ContentObject object, {
     required SyncOperation operation,
@@ -1918,7 +1958,30 @@ class VaultNotifier extends Notifier<void> {
 
     object.obsidianPath = relativePath;
 
-    await obsidianService.writeFile(relativePath, prepared['markdown']!);
+    var markdown = prepared['markdown']!;
+    if (object is TrackerDefinition) {
+      final dataviewBlock = DataviewGenerator.generateTrackerDataviewBlock(
+        object,
+      );
+      final chartBlock = DataviewGenerator.generateChartBlock(object);
+      markdown = [
+        markdown.trimRight(),
+        '## Obsidian Views',
+        dataviewBlock,
+        if (chartBlock.isNotEmpty) chartBlock,
+      ].join('\n\n');
+    } else if (object is CombinedAnalysis) {
+      final trackerBlock = DataviewGenerator.generateTrackerPluginBlock(object);
+      if (trackerBlock.isNotEmpty) {
+        markdown = [
+          markdown.trimRight(),
+          '## Obsidian Tracker',
+          trackerBlock,
+        ].join('\n\n');
+      }
+    }
+
+    await obsidianService.writeFile(relativePath, markdown);
     await syncQueue.enqueueAction(
       SyncAction(
         objectType: signatureKey,
@@ -2290,6 +2353,10 @@ class VaultNotifier extends Notifier<void> {
         await createQuickTaskFromNaturalLanguage(payload);
         continue;
       }
+      if (actionId == 'quick_habit_text') {
+        await createQuickHabit(payload);
+        continue;
+      }
       if (actionId == 'toggle_habit') {
         final habit = ref
             .read(habitsProvider)
@@ -2348,6 +2415,36 @@ class VaultNotifier extends Notifier<void> {
                 : null,
             scheduler: parsed.scheduler,
             notes: parsed.notes.isEmpty ? const [] : [parsed.notes],
+          ),
+        );
+    await NotificationService().showQuickCaptureNotification();
+  }
+
+  Future<void> createQuickHabit(String text) async {
+    final title = text.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (title.isEmpty) return;
+
+    await ref
+        .read(habitsProvider.notifier)
+        .addHabit(
+          Habit(
+            title: title,
+            color: '#F97316',
+            icon: 'check_circle',
+            dailyGoal: 1,
+            slots: [HabitSlot(label: 'Padrão')],
+            schedulers: [
+              Scheduler(
+                startDate: DateTime.now(),
+                rules: [
+                  SchedulerRule(
+                    repeatType: RepeatType.numberOfDays,
+                    interval: 1,
+                  ),
+                ],
+              ),
+            ],
+            habitStartDate: DateTime.now(),
           ),
         );
     await NotificationService().showQuickCaptureNotification();
@@ -2660,11 +2757,10 @@ class InboxNotifier extends AsyncNotifier<List<InboxItem>> {
               .replaceFirst(RegExp(r'^/'), '');
           item.obsidianPath = rel;
 
-          // Auto-archive items older than 30 days
+          // Auto-archive items older than 30 days through VaultNotifier so
+          // deletion, sync queue, reminders and widget updates stay consistent.
           if (now.difference(item.createdAt).inDays > 30) {
-            final fileName = rel.split('/').last;
-            await obsidian.writeFile('_deleted/$fileName', content);
-            await obsidian.deleteFile(rel);
+            await ref.read(vaultProvider.notifier).deleteObject(item);
             autoArchivedTitles.add(item.title);
             continue;
           }

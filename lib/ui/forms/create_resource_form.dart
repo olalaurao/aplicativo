@@ -450,6 +450,14 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
   }
 
   void _saveResource() {
+    final coverUrl = _coverUrlController.text.trim();
+    if (coverUrl.isNotEmpty && !_isValidCoverUrl(coverUrl)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('URL da capa inválida')),
+      );
+      return;
+    }
+
     final resource = Resource(
       id:
           widget.existingResource?.id ??
@@ -466,9 +474,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
       pages: int.tryParse(_pagesController.text.trim()),
       category: _categoryController.text.trim(),
       readDate: _readDate,
-      coverImage: _coverUrlController.text.trim().isEmpty
-          ? null
-          : _coverUrlController.text.trim(),
+      coverImage: coverUrl.isEmpty ? null : coverUrl,
       obsidianPath: widget.existingResource?.obsidianPath ?? '',
       organizers: _organizers,
       categories: widget.existingResource?.categories,
@@ -488,5 +494,13 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
         ),
       ),
     );
+  }
+
+  bool _isValidCoverUrl(String value) {
+    final uri = Uri.tryParse(value);
+    return uri != null &&
+        uri.isAbsolute &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
   }
 }

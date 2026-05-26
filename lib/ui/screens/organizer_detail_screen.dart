@@ -4,9 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../models/organizer_model.dart';
 import '../../models/content_object.dart';
+import '../../models/social_post.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import '../widgets/object_action_wrapper.dart';
+import '../widgets/social_post_grid_card.dart';
+import 'social_post_detail.dart';
 import 'universal_detail_view.dart';
 
 class OrganizerDetailScreen extends ConsumerStatefulWidget {
@@ -17,6 +20,44 @@ class OrganizerDetailScreen extends ConsumerStatefulWidget {
   @override
   ConsumerState<OrganizerDetailScreen> createState() =>
       _OrganizerDetailScreenState();
+}
+
+class _SocialPostMiniCard extends StatelessWidget {
+  final SocialPost post;
+
+  const _SocialPostMiniCard({required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => SocialPostDetail(post: post)),
+      ),
+      child: SizedBox(
+        width: 80,
+        height: 120,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              SocialPostThumbnail(post: post, borderRadius: BorderRadius.zero),
+              Positioned(
+                left: 6,
+                right: 6,
+                bottom: 6,
+                child: SocialPlatformBadge(
+                  platform: post.platform,
+                  fontSize: 8,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
@@ -119,17 +160,24 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
                     const SizedBox(height: 12),
                     Consumer(
                       builder: (context, ref, _) {
-                        final parent = ref.watch(organizersProvider).where((o) => o.id == widget.organizer.parentId).firstOrNull;
+                        final parent = ref
+                            .watch(organizersProvider)
+                            .where((o) => o.id == widget.organizer.parentId)
+                            .firstOrNull;
                         if (parent == null) return const SizedBox.shrink();
                         return InkWell(
                           onTap: () => Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => OrganizerDetailScreen(organizer: parent),
+                              builder: (_) =>
+                                  OrganizerDetailScreen(organizer: parent),
                             ),
                           ),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.surfaceVariant,
                               borderRadius: BorderRadius.circular(10),
@@ -137,11 +185,18 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.arrow_upward_rounded, size: 14, color: AppColors.textSecondary),
+                                const Icon(
+                                  Icons.arrow_upward_rounded,
+                                  size: 14,
+                                  color: AppColors.textSecondary,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Parent: ${parent.title}',
-                                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
                               ],
                             ),
@@ -297,7 +352,11 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
   ) {
     return itemsAsync.when(
       data: (items) {
-        if (items.isEmpty) {
+        final socialPosts = _postsForOrganizer();
+        final visibleItems = items
+            .where((item) => item is! SocialPost && item.type != 'social_post')
+            .toList();
+        if (visibleItems.isEmpty && socialPosts.isEmpty) {
           return _buildEmptyState(
             'No items',
             'Items associated with this organizer will appear here',
@@ -305,78 +364,86 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         }
 
         final grouped = <String, List<ContentObject>>{};
-        for (final item in items) {
+        for (final item in visibleItems) {
           grouped.putIfAbsent(_getObjectCategory(item), () => []).add(item);
         }
 
         return ListView(
           padding: const EdgeInsets.all(20),
-          children: grouped.entries.map((entry) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8, top: 8),
-                  child: Text(
-                    _objectTypeLabel(entry.key),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
+          children: [
+            if (socialPosts.isNotEmpty) ...[
+              _buildSocialPostsSection(socialPosts),
+              const SizedBox(height: 18),
+            ],
+            ...grouped.entries.map((entry) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8, top: 8),
+                    child: Text(
+                      _objectTypeLabel(entry.key),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
-                ),
-                ...entry.value.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: ObjectActionWrapper(
-                      object: item,
-                      child: InkWell(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => UniversalDetailView(object: item),
+                  ...entry.value.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: ObjectActionWrapper(
+                        object: item,
+                        child: InkWell(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => UniversalDetailView(object: item),
+                            ),
                           ),
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          decoration: AppTheme.cardDecorationFlat(context),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _objectTypeIcon(_getObjectCategory(item)),
-                                size: 18,
-                                color: _objectTypeColor(_getObjectCategory(item)),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  item.title,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration: AppTheme.cardDecorationFlat(context),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _objectTypeIcon(_getObjectCategory(item)),
+                                  size: 18,
+                                  color: _objectTypeColor(
+                                    _getObjectCategory(item),
                                   ),
                                 ),
-                              ),
-                              const Icon(
-                                Icons.chevron_right_rounded,
-                                size: 18,
-                                color: AppColors.textMuted,
-                              ),
-                            ],
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    item.title,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 18,
+                                  color: AppColors.textMuted,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            );
-          }).toList(),
+                ],
+              );
+            }),
+          ],
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -386,7 +453,9 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
 
   Widget _buildChildrenList(BuildContext context) {
     final allOrganizers = ref.watch(organizersProvider);
-    final children = allOrganizers.where((o) => o.parentId == widget.organizer.id).toList();
+    final children = allOrganizers
+        .where((o) => o.parentId == widget.organizer.id)
+        .toList();
 
     if (children.isEmpty) {
       return _buildEmptyState(
@@ -400,7 +469,9 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
       itemCount: children.length,
       itemBuilder: (context, index) {
         final item = children[index];
-        final itemColor = item.color != null ? _parseColor(item.color!) : AppColors.primary;
+        final itemColor = item.color != null
+            ? _parseColor(item.color!)
+            : AppColors.primary;
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
@@ -424,22 +495,76 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
                       color: itemColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(_typeIcon(item.organizerType), size: 16, color: itemColor),
+                    child: Icon(
+                      _typeIcon(item.organizerType),
+                      size: 16,
+                      color: itemColor,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       item.title,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: AppColors.textMuted,
+                  ),
                 ],
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  List<SocialPost> _postsForOrganizer() {
+    final posts = ref.watch(socialPostsProvider);
+    return posts
+        .where(
+          (post) => post.organizers.any(
+            (organizer) => organizer.matches(
+              widget.organizer.id,
+              widget.organizer.slug,
+              widget.organizer.title,
+            ),
+          ),
+        )
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  Widget _buildSocialPostsSection(List<SocialPost> posts) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'POSTS SOCIAIS',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 120,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: posts.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (context, index) =>
+                _SocialPostMiniCard(post: posts[index]),
+          ),
+        ),
+      ],
     );
   }
 
@@ -576,7 +701,9 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
       case 'place':
         return 'Lugares';
       default:
-        return type.isEmpty ? '' : type.substring(0, 1).toUpperCase() + type.substring(1);
+        return type.isEmpty
+            ? ''
+            : type.substring(0, 1).toUpperCase() + type.substring(1);
     }
   }
 

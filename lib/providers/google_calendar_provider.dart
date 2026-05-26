@@ -5,6 +5,7 @@ import 'package:googleapis/calendar/v3.dart' as calendar;
 import '../services/google_calendar_service.dart';
 import '../services/google_auth_service.dart' as auth;
 import '../services/sync_manager.dart';
+import 'settings_provider.dart';
 import 'sync_provider.dart';
 
 final googleAuthServiceProvider =
@@ -50,6 +51,70 @@ final googleCalendarServiceProvider = Provider<GoogleCalendarService>((ref) {
   return GoogleCalendarService();
 });
 
+final googleCalendarListProvider = FutureProvider<List<calendar.CalendarListEntry>>((
+  ref,
+) async {
+  final calendarService = ref.watch(googleCalendarServiceProvider);
+  ref.watch(googleAuthServiceProvider);
+  final clientReady = await ref
+      .watch(auth.googleAuthServiceProvider)
+      .ensureClient();
+  if (clientReady == null) {
+    throw Exception('Google client not authenticated');
+  }
+
+  calendarService.init(clientReady);
+  return calendarService.fetchCalendars();
+});
+
+class GoogleCalendarVisibilityNotifier extends AsyncNotifier<Set<String>?> {
+  static const _prefsKey = 'googleCalendarEnabledIds';
+
+  @override
+  Future<Set<String>?> build() async {
+    final prefs = ref.watch(sharedPreferencesProvider);
+    if (!prefs.containsKey(_prefsKey)) return null;
+    return (prefs.getStringList(_prefsKey) ?? const <String>[]).toSet();
+  }
+
+  Future<void> setEnabledCalendarIds(Set<String> ids) async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs.setStringList(_prefsKey, ids.toList()..sort());
+    state = AsyncData(ids);
+    ref.invalidate(googleCalendarEventsProvider);
+    ref.invalidate(googleCalendarRangeEventsProvider);
+  }
+
+  Future<void> toggleCalendar(
+    String calendarId, {
+    required Set<String> defaultEnabledIds,
+  }) async {
+    final current = state.valueOrNull ?? defaultEnabledIds;
+    final updated = Set<String>.from(current);
+    if (!updated.add(calendarId)) {
+      updated.remove(calendarId);
+    }
+    await setEnabledCalendarIds(updated);
+  }
+}
+
+final googleCalendarVisibilityProvider =
+    AsyncNotifierProvider<GoogleCalendarVisibilityNotifier, Set<String>?>(
+      () => GoogleCalendarVisibilityNotifier(),
+    );
+
+List<String> _visibleCalendarIds(
+  List<calendar.CalendarListEntry> calendars,
+  Set<String>? configuredIds,
+) {
+  if (configuredIds != null) return configuredIds.toList()..sort();
+  return calendars
+      .where((entry) => entry.selected != false)
+      .map((entry) => entry.id)
+      .whereType<String>()
+      .toList();
+}
+
 final googleCalendarEventsProvider =
     FutureProvider.family<List<calendar.Event>, DateTime>((ref, date) async {
       final calendarService = ref.watch(googleCalendarServiceProvider);
@@ -62,6 +127,11 @@ final googleCalendarEventsProvider =
       }
 
       calendarService.init(clientReady);
+      final calendars = await ref.watch(googleCalendarListProvider.future);
+      final configuredIds = await ref.watch(
+        googleCalendarVisibilityProvider.future,
+      );
+      final visibleIds = _visibleCalendarIds(calendars, configuredIds);
 
       final startOfDay = DateTime(date.year, date.month, date.day);
       final endOfDay = startOfDay.add(const Duration(days: 1));
@@ -69,6 +139,7 @@ final googleCalendarEventsProvider =
       return await calendarService.fetchEvents(
         start: startOfDay,
         end: endOfDay,
+        calendarIds: visibleIds.isEmpty ? ['primary'] : visibleIds,
       );
     });
 
@@ -111,6 +182,11 @@ final googleCalendarRangeEventsProvider =
       }
 
       calendarService.init(clientReady);
+      final calendars = await ref.watch(googleCalendarListProvider.future);
+      final configuredIds = await ref.watch(
+        googleCalendarVisibilityProvider.future,
+      );
+      final visibleIds = _visibleCalendarIds(calendars, configuredIds);
 
       final start = DateTime(
         params.startDate.year,
@@ -119,5 +195,9 @@ final googleCalendarRangeEventsProvider =
       );
       final end = start.add(Duration(days: params.days));
 
-      return await calendarService.fetchEvents(start: start, end: end);
+      return await calendarService.fetchEvents(
+        start: start,
+        end: end,
+        calendarIds: visibleIds.isEmpty ? ['primary'] : visibleIds,
+      );
     });

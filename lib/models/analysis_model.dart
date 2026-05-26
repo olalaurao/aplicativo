@@ -87,12 +87,14 @@ class AnalysisChart {
 
 class CombinedAnalysis extends ContentObject {
   String? description;
+  List<MetricSource> dataSources;
   List<AnalysisChart> charts;
 
   CombinedAnalysis({
     super.id,
     required super.title,
     this.description,
+    this.dataSources = const [],
     this.charts = const [],
     super.organizers,
     super.categories,
@@ -108,6 +110,7 @@ class CombinedAnalysis extends ContentObject {
   String toMarkdown() {
     final frontmatter = toBaseMap();
     if (description != null) frontmatter['description'] = description;
+    frontmatter['data_sources'] = dataSources.map((s) => s.toMap()).toList();
     frontmatter['charts'] = charts.map((c) => c.toMap()).toList();
     
     final buffer = StringBuffer();
@@ -138,10 +141,19 @@ class CombinedAnalysis extends ContentObject {
     );
     analysis.loadBaseMap(frontmatter);
     analysis.description = frontmatter['description'] as String?;
+    if (frontmatter['data_sources'] != null &&
+        frontmatter['data_sources'] is List) {
+      analysis.dataSources = (frontmatter['data_sources'] as List).map((s) {
+        return MetricSource.fromMap(Map<String, dynamic>.from(s as Map));
+      }).toList();
+    }
     if (frontmatter['charts'] != null && frontmatter['charts'] is List) {
       analysis.charts = (frontmatter['charts'] as List).map((c) {
         return AnalysisChart.fromMap(Map<String, dynamic>.from(c as Map));
       }).toList();
+    }
+    if (analysis.dataSources.isEmpty) {
+      analysis.dataSources = analysis.charts.expand((c) => c.sources).toList();
     }
     return analysis;
   }

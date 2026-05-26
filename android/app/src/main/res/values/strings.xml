@@ -2,6 +2,9 @@
 <resources>
     <string name="app_name">Citrine</string>
     <string name="widget_calendar_description">Citrine calendario</string>
+    <string name="widget_tasks_description">Citrine tarefas</string>
     <string name="widget_filter_description">Citrine filtro</string>
     <string name="widget_pomodoro_description">Citrine pomodoro</string>
+    <string name="widget_quick_add_description">Citrine adicionar rapido</string>
+    <string name="widget_note_description">Citrine nota</string>
 </resources>

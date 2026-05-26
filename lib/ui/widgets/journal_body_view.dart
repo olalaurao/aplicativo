@@ -1,9 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/markdown_parser.dart';
+import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import 'markdown_body_view.dart';
 
-class JournalBodyView extends StatelessWidget {
+class JournalBodyView extends ConsumerWidget {
   final String body;
   final int? maxLines;
   final TextStyle? style;
@@ -16,7 +20,7 @@ class JournalBodyView extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ops = MarkdownParser.tryParseDeltaOps(body);
     final defaultStyle = TextStyle(
       fontSize: 14,
@@ -28,6 +32,13 @@ class JournalBodyView extends StatelessWidget {
     final effectiveStyle = defaultStyle.merge(style);
 
     if (ops == null) {
+      if (_hasObsidianEmbeds(body)) {
+        return _EmbeddedMarkdownPreview(
+          content: body,
+          maxLines: maxLines,
+          style: effectiveStyle,
+        );
+      }
       if (maxLines != null) {
         return Text(
           MarkdownParser.getPlainTextFromBody(body),
@@ -39,6 +50,14 @@ class JournalBodyView extends StatelessWidget {
       return MarkdownBodyView(content: body, shrinkWrap: true);
     }
 
+    if (_needsMarkdownLayout(ops)) {
+      return _EmbeddedMarkdownPreview(
+        content: _deltaToMarkdown(ops),
+        maxLines: maxLines,
+        style: effectiveStyle,
+      );
+    }
+
     final spans = <InlineSpan>[];
     for (final op in ops) {
       final insert = op['insert'];
@@ -47,24 +66,16 @@ class JournalBodyView extends StatelessWidget {
           : <String, dynamic>{};
 
       if (insert is String) {
-        spans.add(
-          TextSpan(text: insert, style: _styleFor(effectiveStyle, attributes)),
-        );
-      } else if (insert is Map) {
-        final mediaInfo = _getMediaInfo(insert);
-        spans.add(
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              child: _MediaPill(
-                label: mediaInfo.label,
-                icon: mediaInfo.icon,
-                color: mediaInfo.color,
-              ),
-            ),
+        spans.addAll(
+          _spansForText(
+            context,
+            ref,
+            insert,
+            _styleFor(effectiveStyle, attributes),
           ),
         );
+      } else if (insert is Map) {
+        spans.add(_mediaSpan(context, ref, insert));
       }
     }
 
@@ -80,6 +91,149 @@ class JournalBodyView extends StatelessWidget {
         overflow: maxLines == null ? TextOverflow.clip : TextOverflow.ellipsis,
         text: TextSpan(style: effectiveStyle, children: spans),
         textAlign: _getAlignment(ops),
+      ),
+    );
+  }
+
+  bool _needsMarkdownLayout(List<Map<String, dynamic>> ops) {
+    return ops.any((op) {
+      final insert = op['insert'];
+      final attributes = op['attributes'] is Map
+          ? Map<String, dynamic>.from(op['attributes'] as Map)
+          : const <String, dynamic>{};
+      return insert is Map ||
+          (insert is String && _hasObsidianEmbeds(insert)) ||
+          attributes['list'] != null ||
+          attributes['blockquote'] == true ||
+          attributes['header'] != null;
+    });
+  }
+
+  String _deltaToMarkdown(List<Map<String, dynamic>> ops) {
+    final lines = <String>[];
+    final line = StringBuffer();
+    var orderedIndex = 1;
+
+    void flushLine(Map<String, dynamic> attributes) {
+      final text = line.toString();
+      line.clear();
+      final listType = attributes['list']?.toString();
+      if (listType == 'bullet') {
+        lines.add('- $text');
+      } else if (listType == 'ordered') {
+        lines.add('${orderedIndex++}. $text');
+      } else if (listType == 'checked' || listType == 'unchecked') {
+        lines.add('- [${listType == 'checked' ? 'x' : ' '}] $text');
+      } else if (attributes['blockquote'] == true) {
+        lines.add('> $text');
+      } else if (attributes['header'] != null) {
+        final level = attributes['header'].toString() == '1' ? '#' : '##';
+        lines.add('$level $text');
+      } else {
+        orderedIndex = 1;
+        lines.add(text);
+      }
+    }
+
+    for (final op in ops) {
+      final insert = op['insert'];
+      final attributes = op['attributes'] is Map
+          ? Map<String, dynamic>.from(op['attributes'] as Map)
+          : <String, dynamic>{};
+
+      if (insert is Map) {
+        final image = insert['image']?.toString();
+        if (image != null && image.isNotEmpty) {
+          if (line.isNotEmpty) flushLine(const {});
+          lines.add('![[$image]]');
+        }
+        continue;
+      }
+
+      if (insert is! String) continue;
+      final parts = insert.split('\n');
+      for (var i = 0; i < parts.length; i++) {
+        var text = parts[i];
+        if (text.isNotEmpty) {
+          if (attributes['bold'] == true) text = '**$text**';
+          if (attributes['italic'] == true) text = '*$text*';
+          line.write(text);
+        }
+        if (i < parts.length - 1) {
+          flushLine(attributes);
+        }
+      }
+    }
+
+    if (line.isNotEmpty) flushLine(const {});
+    return lines.join('\n');
+  }
+
+  bool _hasObsidianEmbeds(String text) =>
+      RegExp(r'!\[\[([^\]]+)\]\]').hasMatch(text);
+
+  List<InlineSpan> _spansForText(
+    BuildContext context,
+    WidgetRef ref,
+    String text,
+    TextStyle style,
+  ) {
+    final spans = <InlineSpan>[];
+    final embedRegex = RegExp(r'!\[\[([^\]]+)\]\]');
+    var cursor = 0;
+
+    for (final match in embedRegex.allMatches(text)) {
+      if (match.start > cursor) {
+        spans.add(
+          TextSpan(text: text.substring(cursor, match.start), style: style),
+        );
+      }
+      final path = match.group(1)!.trim();
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: _EmbeddedMedia(path: path),
+          ),
+        ),
+      );
+      cursor = match.end;
+    }
+
+    if (cursor < text.length) {
+      spans.add(TextSpan(text: text.substring(cursor), style: style));
+    }
+
+    return spans;
+  }
+
+  InlineSpan _mediaSpan(
+    BuildContext context,
+    WidgetRef ref,
+    Map<dynamic, dynamic> insert,
+  ) {
+    final image = insert['image']?.toString();
+    if (image != null && image.isNotEmpty) {
+      return WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: _EmbeddedMedia(path: image),
+        ),
+      );
+    }
+
+    final mediaInfo = _getMediaInfo(insert);
+    return WidgetSpan(
+      alignment: PlaceholderAlignment.middle,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: _MediaPill(
+          label: mediaInfo.label,
+          icon: mediaInfo.icon,
+          color: mediaInfo.color,
+        ),
       ),
     );
   }
@@ -143,19 +297,117 @@ class JournalBodyView extends StatelessWidget {
     }
     if (insert['video'] != null) {
       return _MediaInfo(
-        'Video',
+        'Vídeo',
         Icons.play_circle_fill_rounded,
         AppColors.error,
       );
     }
     if (insert['formula'] != null) {
       return _MediaInfo(
-        'Formula',
+        'Fórmula',
         Icons.functions_rounded,
         AppColors.habitPurple,
       );
     }
-    return _MediaInfo('Media', Icons.attachment_rounded, AppColors.primary);
+    return _MediaInfo('Mídia', Icons.attachment_rounded, AppColors.primary);
+  }
+}
+
+class _EmbeddedMarkdownPreview extends ConsumerWidget {
+  final String content;
+  final int? maxLines;
+  final TextStyle style;
+
+  const _EmbeddedMarkdownPreview({
+    required this.content,
+    required this.maxLines,
+    required this.style,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lines = content.split('\n');
+    final visibleLines = maxLines == null
+        ? lines
+        : lines.take(maxLines!).toList();
+    final children = <Widget>[];
+    final embedRegex = RegExp(r'!\[\[([^\]]+)\]\]');
+
+    for (final line in visibleLines) {
+      final matches = embedRegex.allMatches(line).toList();
+      if (matches.isEmpty) {
+        if (line.trim().isEmpty) continue;
+        children.add(MarkdownBodyView(content: line, shrinkWrap: true));
+        continue;
+      }
+
+      var textOnly = line;
+      for (final match in matches) {
+        final path = match.group(1)!.trim();
+        children.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: _EmbeddedMedia(path: path),
+          ),
+        );
+      }
+      textOnly = textOnly.replaceAll(embedRegex, '').trim();
+      if (textOnly.isNotEmpty) {
+        children.add(MarkdownBodyView(content: textOnly, shrinkWrap: true));
+      }
+    }
+
+    if (children.isEmpty) {
+      return MarkdownBodyView(content: content, shrinkWrap: true);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
+  }
+}
+
+class _EmbeddedMedia extends ConsumerWidget {
+  final String path;
+
+  const _EmbeddedMedia({required this.path});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final normalized = path.replaceAll('\\', '/');
+    final ext = normalized.split('.').last.toLowerCase();
+    final isImage = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}.contains(ext);
+    if (!isImage) {
+      return const _MediaPill(
+        label: 'Anexo',
+        icon: Icons.attachment_rounded,
+        color: AppColors.primary,
+      );
+    }
+
+    final obsidian = ref.watch(obsidianServiceProvider);
+    final file =
+        normalized.startsWith('/') ||
+            RegExp(r'^[A-Za-z]:/').hasMatch(normalized)
+        ? File(normalized)
+        : File('${obsidian.vaultDir?.path ?? ''}/$normalized');
+
+    if (!file.existsSync()) {
+      return const _MediaPill(
+        label: 'Imagem',
+        icon: Icons.broken_image_rounded,
+        color: AppColors.warning,
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 180, minWidth: 96),
+        child: Image.file(file, fit: BoxFit.cover),
+      ),
+    );
   }
 }
 

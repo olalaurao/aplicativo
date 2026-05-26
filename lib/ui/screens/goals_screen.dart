@@ -126,11 +126,15 @@ class _GoalCard extends ConsumerWidget {
 
   const _GoalCard({required this.goal, this.isCompleted = false});
 
+  Color _goalColor(String? rawColor) {
+    if (rawColor == null || rawColor.trim().isEmpty) return AppColors.primary;
+    final normalized = rawColor.trim().replaceFirst('#', '0xFF');
+    return Color(int.tryParse(normalized) ?? AppColors.primary.toARGB32());
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final color = goal.color != null
-        ? Color(int.parse(goal.color!.replaceAll('#', '0xFF')))
-        : AppColors.primary;
+    final color = _goalColor(goal.color);
 
     return ObjectActionWrapper(
       object: goal,
@@ -243,7 +247,7 @@ class _GoalCard extends ConsumerWidget {
       );
     }
 
-    final hasDeadline = goal.deadline != null;
+    final deadline = goal.deadline;
     final progress = _calculateLiveProgress(ref);
 
     return Column(
@@ -276,7 +280,7 @@ class _GoalCard extends ConsumerWidget {
             ),
           ],
         ),
-        if (hasDeadline) ...[
+        if (deadline != null) ...[
           const SizedBox(height: 8),
           Row(
             children: [
@@ -287,13 +291,13 @@ class _GoalCard extends ConsumerWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                'Deadline: ${DateFormat('d MMM yyyy').format(goal.deadline!)}',
+                'Deadline: ${DateFormat('d MMM yyyy').format(deadline)}',
                 style: const TextStyle(
                   fontSize: 11,
                   color: AppColors.textMuted,
                 ),
               ),
-              if (goal.deadline!.isBefore(DateTime.now())) ...[
+              if (deadline.isBefore(DateTime.now())) ...[
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(

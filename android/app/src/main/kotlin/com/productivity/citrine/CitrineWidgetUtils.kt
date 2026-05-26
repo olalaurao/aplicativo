@@ -49,17 +49,9 @@ object CitrineWidgetUtils {
         )
     }
 
-    /** Abre o DayPopupActivity com a data selecionada */
+    /** Abre o Planner no dia selecionado via deep link */
     fun dayPopupIntent(context: Context, date: String): PendingIntent {
-        val intent = Intent(context, DayPopupActivity::class.java)
-        intent.putExtra("date", date)
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return PendingIntent.getActivity(
-            context,
-            date.hashCode(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
+        return openUriIntent(context, "citrine:///planner/day/$date")
     }
 
     /**

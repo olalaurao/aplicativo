@@ -25,7 +25,7 @@ class CombinedAnalysisScreen extends ConsumerStatefulWidget {
 
 class _CombinedAnalysisScreenState
     extends ConsumerState<CombinedAnalysisScreen> {
-  final DateTime _currentMonth = DateTime.now();
+  DateTime _currentMonth = DateTime.now();
   CombinedAnalysis? _currentAnalysis;
   bool _loadedSavedAnalysis = false;
   final List<MetricSource> _activeSources = [];
@@ -42,7 +42,7 @@ class _CombinedAnalysisScreenState
           _currentAnalysis = saved;
           _activeSources
             ..clear()
-            ..addAll(saved.charts.expand((chart) => chart.sources));
+            ..addAll(_sourcesForAnalysis(saved));
           _loadedSavedAnalysis = true;
         });
       });
@@ -165,7 +165,9 @@ class _CombinedAnalysisScreenState
                                 ),
                               )
                             : CitrineChart(
-                                type: ChartType.line,
+                                type:
+                                    _currentAnalysis?.charts.firstOrNull?.type ??
+                                    ChartType.line,
                                 title: 'Tendência (Últimos 14 dias)',
                                 data: chartSeries.first,
                                 multiData: chartSeries,
@@ -183,6 +185,39 @@ class _CombinedAnalysisScreenState
                           fontWeight: FontWeight.w700,
                           color: AppTheme.textPrimaryColor(context),
                         ),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            tooltip: 'Mês anterior',
+                            onPressed: () => setState(() {
+                              _currentMonth = DateTime(
+                                _currentMonth.year,
+                                _currentMonth.month - 1,
+                              );
+                            }),
+                            icon: const Icon(Icons.chevron_left_rounded),
+                          ),
+                          Text(
+                            DateFormat('MMMM yyyy', 'pt_BR')
+                                .format(_currentMonth),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Próximo mês',
+                            onPressed: () => setState(() {
+                              _currentMonth = DateTime(
+                                _currentMonth.year,
+                                _currentMonth.month + 1,
+                              );
+                            }),
+                            icon: const Icon(Icons.chevron_right_rounded),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       AnalysisCalendar(
@@ -314,9 +349,7 @@ class _CombinedAnalysisScreenState
                             _currentAnalysis = val;
                             _activeSources
                               ..clear()
-                              ..addAll(
-                                val.charts.expand((chart) => chart.sources),
-                              );
+                              ..addAll(_sourcesForAnalysis(val));
                           });
                         }
                       },
@@ -473,7 +506,7 @@ class _CombinedAnalysisScreenState
             _currentAnalysis = savedAnalysis;
             _activeSources
               ..clear()
-              ..addAll(savedAnalysis.charts.expand((chart) => chart.sources));
+              ..addAll(_sourcesForAnalysis(savedAnalysis));
           });
         },
       ),
@@ -499,6 +532,12 @@ class _CombinedAnalysisScreenState
       side: BorderSide.none,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     );
+  }
+
+  List<MetricSource> _sourcesForAnalysis(CombinedAnalysis analysis) {
+    return analysis.dataSources.isNotEmpty
+        ? analysis.dataSources
+        : analysis.charts.expand((chart) => chart.sources).toList();
   }
 
   String _generateInsightText(List<List<ChartDataPoint>> series) {
@@ -766,6 +805,7 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
   final List<MetricSource> _tempSources = [];
+  late ChartType _selectedChartType;
 
   final List<Color> _colorPresets = [
     AppColors.primary,
@@ -786,8 +826,16 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
     _descriptionController = TextEditingController(
       text: widget.analysis?.description ?? '',
     );
-    if (widget.analysis != null && widget.analysis!.charts.isNotEmpty) {
-      _tempSources.addAll(widget.analysis!.charts.first.sources);
+    _selectedChartType =
+        widget.analysis?.charts.firstOrNull?.type ?? ChartType.line;
+    if (widget.analysis != null &&
+        (widget.analysis!.dataSources.isNotEmpty ||
+            widget.analysis!.charts.isNotEmpty)) {
+      _tempSources.addAll(
+        widget.analysis!.dataSources.isNotEmpty
+            ? widget.analysis!.dataSources
+            : widget.analysis!.charts.expand((chart) => chart.sources),
+      );
     } else {
       // Default initial source
       _tempSources.add(
@@ -888,6 +936,35 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                         hintText:
                             'Ex: Entenda como sessões de Pomodoro impactam seu humor',
                       ),
+                    ),
+                    const SizedBox(height: 24),
+                    DropdownButtonFormField<ChartType>(
+                      initialValue: _selectedChartType,
+                      decoration: const InputDecoration(
+                        labelText: 'Tipo de gráfico',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: ChartType.line,
+                          child: Text('Linha multi-série'),
+                        ),
+                        DropdownMenuItem(
+                          value: ChartType.bar,
+                          child: Text('Barras'),
+                        ),
+                        DropdownMenuItem(
+                          value: ChartType.pie,
+                          child: Text('Pizza/donut'),
+                        ),
+                        DropdownMenuItem(
+                          value: ChartType.heatmap,
+                          child: Text('Calendar heatmap'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() => _selectedChartType = value);
+                      },
                     ),
                     const SizedBox(height: 24),
 
@@ -1441,10 +1518,11 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
       createdAt: widget.analysis?.createdAt,
       updatedAt: DateTime.now(),
       obsidianPath: widget.analysis?.obsidianPath ?? '',
+      dataSources: List.from(_tempSources),
       charts: [
         AnalysisChart(
           title: 'Gráfico Comparativo',
-          type: ChartType.line,
+          type: _selectedChartType,
           sources: List.from(_tempSources),
         ),
       ],

@@ -23,21 +23,19 @@ class MarkdownBodyView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final allObjects = ref.watch(allObjectsProvider).maybeWhen(
-          data: (data) => data,
-          orElse: () => [],
-        );
+    final allObjects = ref
+        .watch(allObjectsProvider)
+        .maybeWhen(data: (data) => data, orElse: () => []);
 
     // Pre-process content to handle [[WikiLinks]] for Markdown
     // We convert [[Title]] to [Title](citrine://object/Title)
     // We must encode the URL part so flutter_markdown parses it correctly
-    var processedContent = content.replaceAllMapped(
-      RegExp(r'\[\[(.*?)\]\]'),
-      (match) {
-        final title = match.group(1) ?? '';
-        return '[$title](citrine://object/${Uri.encodeComponent(title)})';
-      },
-    );
+    var processedContent = content.replaceAllMapped(RegExp(r'\[\[(.*?)\]\]'), (
+      match,
+    ) {
+      final title = match.group(1) ?? '';
+      return '[$title](citrine://object/${Uri.encodeComponent(title)})';
+    });
 
     // Also fix any existing [title](citrine://object/title with spaces)
     processedContent = processedContent.replaceAllMapped(
@@ -58,10 +56,21 @@ class MarkdownBodyView extends ConsumerWidget {
       onTapLink: (text, href, title) async {
         if (href != null) {
           if (href.startsWith('citrine://object/')) {
-            final objectTitle = Uri.decodeComponent(href.replaceFirst('citrine://object/', ''));
-            final matchingObject = allObjects
-                .where((o) => o.title.toLowerCase() == objectTitle.toLowerCase())
-                .firstOrNull;
+            final objectTitle = Uri.decodeComponent(
+              href.replaceFirst('citrine://object/', ''),
+            );
+            final lookup = objectTitle
+                .split('/')
+                .last
+                .replaceAll('.md', '')
+                .trim()
+                .toLowerCase();
+            final matchingObject = allObjects.where((o) {
+              final title = o.title.trim().toLowerCase();
+              final slug = o.slug.trim().toLowerCase();
+              final fileName = o.obsidianFileName.trim().toLowerCase();
+              return title == lookup || slug == lookup || fileName == lookup;
+            }).firstOrNull;
 
             if (matchingObject != null) {
               Navigator.push(
@@ -115,9 +124,7 @@ class MarkdownBodyView extends ConsumerWidget {
           fontStyle: FontStyle.italic,
         ),
         blockquoteDecoration: const BoxDecoration(
-          border: Border(
-            left: BorderSide(color: AppColors.primary, width: 4),
-          ),
+          border: Border(left: BorderSide(color: AppColors.primary, width: 4)),
         ),
         listBullet: const TextStyle(color: AppColors.primary),
       ),

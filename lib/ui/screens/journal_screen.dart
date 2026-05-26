@@ -173,6 +173,21 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
     final reminders = ref.watch(remindersProvider);
     final moods = ref.watch(moodsProvider);
 
+    // Check if there's already an entry for the FAB target date.
+    final today = DateTime.now();
+    final isSelectedDateToday = _isSameDay(_selectedDate, today);
+    final hasItemsToday = entries.any(
+      (e) => _isSameDay(_journalEntryDisplayDate(e), _selectedDate),
+    );
+    final selectedDateEntry =
+        entries
+            .where(
+              (e) => _isSameDay(_journalEntryDisplayDate(e), _selectedDate),
+            )
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
+    final isFirstEntryToday = isSelectedDateToday && !hasItemsToday;
+
     // Grouping by date
     final Map<String, List<dynamic>> groupedItems = {};
 
@@ -283,6 +298,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
+        key: const PageStorageKey('journal-scroll'),
         slivers: [
           SliverAppBar(
             title: const Text('Journal'),
@@ -378,17 +394,42 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
+          final entryToEdit = selectedDateEntry.isNotEmpty
+              ? selectedDateEntry.first
+              : null;
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => CreateEntryForm(initialDate: _selectedDate),
+              builder: (_) => CreateEntryForm(
+                initialDate: _selectedDate,
+                existingEntry: entryToEdit,
+              ),
             ),
           );
         },
         backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+        icon: Icon(
+          isFirstEntryToday
+              ? Icons.wb_sunny_rounded
+              : hasItemsToday
+              ? Icons.edit_note_rounded
+              : Icons.add_rounded,
+          color: Colors.white,
+          size: 20,
+        ),
+        label: Text(
+          isFirstEntryToday
+              ? 'Começar o dia'
+              : hasItemsToday
+              ? 'Editar entrada'
+              : 'Nova entrada',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }

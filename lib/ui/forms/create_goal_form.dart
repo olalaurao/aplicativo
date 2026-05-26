@@ -5,9 +5,11 @@ import 'package:intl/intl.dart';
 import '../../models/goal_model.dart';
 import '../../models/kpi_model.dart';
 import '../../models/shared_types.dart' hide KPI;
+import '../../models/social_post.dart';
 import '../../providers/vault_provider.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/organizer_selector_field.dart';
+import '../widgets/universal_search_picker.dart';
 import '../theme.dart';
 
 class CreateGoalForm extends ConsumerStatefulWidget {
@@ -42,6 +44,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
   GoalStatus _state = GoalStatus.active;
   List<KPI> _kpis = [];
   List<OrganizerReference> _organizers = [];
+  List<String> _socialRefs = [];
 
   @override
   void initState() {
@@ -64,6 +67,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
       _state = goal.state;
       _kpis = List.from(goal.kpis);
       _organizers = List.from(goal.organizers);
+      _socialRefs = List.from(goal.socialRefs);
     }
   }
 
@@ -389,6 +393,10 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                   const SizedBox(height: 12),
 
+                  _buildSocialRefsSection(),
+
+                  const SizedBox(height: 12),
+
                   // ─── Organizers ───
                   Container(
                     decoration: AppTheme.cardDecoration(context),
@@ -522,6 +530,79 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
     if (date != null) setState(() => _deadline = date);
   }
 
+  Widget _buildSocialRefsSection() {
+    final posts = ref.watch(socialPostsProvider);
+    final selectedPosts = posts
+        .where((post) => _socialRefs.contains('[[social/${post.socialSlug}]]'))
+        .toList();
+
+    return Container(
+      decoration: AppTheme.cardDecoration(context),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Inspirado por',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (selectedPosts.isNotEmpty)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final post in selectedPosts)
+                  InputChip(
+                    label: Text(
+                      post.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onDeleted: () => setState(
+                      () => _socialRefs.remove('[[social/${post.socialSlug}]]'),
+                    ),
+                  ),
+              ],
+            ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.add_link_rounded),
+            label: const Text('Adicionar post de referência'),
+            onPressed: _pickSocialReference,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _pickSocialReference() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => UniversalSearchPickerSheet(
+        title: 'Escolher post social',
+        initialFilter: 'social_post',
+        onSelected: (object) {
+          if (object is SocialPost) {
+            final socialRef = '[[social/${object.socialSlug}]]';
+            setState(() {
+              if (!_socialRefs.contains(socialRef)) {
+                _socialRefs.add(socialRef);
+              }
+            });
+          }
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
   void _saveGoal() {
     final goal = Goal(
       id:
@@ -537,6 +618,8 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
       color: _selectedColor,
       kpis: _kpis,
       organizers: _organizers,
+      socialRefs: _socialRefs,
+      obsidianPath: widget.existingGoal?.obsidianPath ?? '',
     );
 
     if (widget.existingGoal != null) {

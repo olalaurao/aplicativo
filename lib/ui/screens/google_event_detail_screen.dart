@@ -4,11 +4,15 @@ import 'package:googleapis/calendar/v3.dart' as google_calendar;
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/people_model.dart';
+import '../../models/content_object.dart';
+import '../../models/goal_model.dart';
+import '../../models/project_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/task_model.dart';
 import '../../providers/google_calendar_provider.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
+import '../widgets/universal_search_picker.dart';
 
 class GoogleEventDetailScreen extends ConsumerStatefulWidget {
   final google_calendar.Event event;
@@ -125,6 +129,15 @@ class _GoogleEventDetailScreenState
               const SizedBox(height: 8),
               _buildPeopleSection(context, people),
             ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.link_rounded),
+                label: const Text('Associar a...'),
+                onPressed: () => _showLinkObjectPicker(context),
+              ),
+            ),
             const SizedBox(height: 40),
             SizedBox(
               width: double.infinity,
@@ -144,6 +157,70 @@ class _GoogleEventDetailScreenState
           ],
         ),
       ),
+    );
+  }
+
+  void _showLinkObjectPicker(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => UniversalSearchPickerSheet(
+        title: 'Associar evento a...',
+        initialFilter: 'all',
+        showClear: false,
+        onSelected: (object) async {
+          Navigator.pop(context);
+          await _linkEventToObject(object);
+        },
+      ),
+    );
+  }
+
+  Future<void> _linkEventToObject(ContentObject object) async {
+    if (object is! Task && object is! Goal && object is! Project) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Selecione uma tarefa, objetivo ou projeto.'),
+        ),
+      );
+      return;
+    }
+
+    final start = (_event.start?.dateTime ?? _event.start?.date)?.toLocal();
+    final eventDate = start?.toIso8601String();
+    final title = _event.summary ?? 'Evento Google';
+
+    if (object is Task) {
+      await ref
+          .read(vaultProvider.notifier)
+          .updateObject(
+            object.copyWith(
+              linkedGoogleEventId: _event.id,
+              linkedGoogleEventTitle: title,
+              linkedGoogleEventDate: eventDate,
+              linkedGoogleEventUrl: _event.htmlLink,
+            ),
+          );
+    } else if (object is Goal) {
+      object
+        ..linkedGoogleEventId = _event.id
+        ..linkedGoogleEventTitle = title
+        ..linkedGoogleEventDate = eventDate
+        ..linkedGoogleEventUrl = _event.htmlLink;
+      await ref.read(vaultProvider.notifier).updateObject(object);
+    } else if (object is Project) {
+      object
+        ..linkedGoogleEventId = _event.id
+        ..linkedGoogleEventTitle = title
+        ..linkedGoogleEventDate = eventDate
+        ..linkedGoogleEventUrl = _event.htmlLink;
+      await ref.read(vaultProvider.notifier).updateObject(object);
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Evento associado a "${object.title}".')),
     );
   }
 

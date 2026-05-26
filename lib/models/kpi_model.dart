@@ -95,6 +95,7 @@ class KPI {
   DateTime? startDate;
   DateTime? endDate;
   KPIDisplayType displayType;
+  bool completed;
 
   KPI({
     required this.id,
@@ -107,6 +108,7 @@ class KPI {
     this.startDate,
     this.endDate,
     this.displayType = KPIDisplayType.number,
+    this.completed = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -121,15 +123,22 @@ class KPI {
       'start_date': startDate?.toIso8601String(),
       'end_date': endDate?.toIso8601String(),
       'display_type': displayType.name,
+      'completed': completed,
     };
   }
 
   factory KPI.fromMap(Map<String, dynamic> map) {
+    final rawSourceType = map['source_type']?.toString() ?? '';
+    final normalizedSourceType = rawSourceType.replaceAllMapped(
+      RegExp(r'_([a-z])'),
+      (match) => match.group(1)!.toUpperCase(),
+    );
     return KPI(
       id: map['id'] as String,
       title: map['title'] as String,
       sourceType: KPISourceType.values.firstWhere(
-        (e) => e.name == map['source_type'],
+        (e) => e.name == normalizedSourceType,
+        orElse: () => KPISourceType.customNumericInput,
       ),
       sourceId: map['source_id'] as String?,
       fieldId: map['field_id'] as String?,
@@ -143,6 +152,7 @@ class KPI {
         (e) => e.name == map['display_type'],
         orElse: () => KPIDisplayType.number,
       ),
+      completed: map['completed'] as bool? ?? false,
     );
   }
 }

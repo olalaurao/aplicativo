@@ -289,7 +289,7 @@ class NotificationService with WidgetsBindingObserver {
 
     // Alarms Channel
     const alarmChannel = AndroidNotificationChannel(
-      'alarm_channel_v3',
+      'alarm_channel_v4',
       'Alarms',
       description: 'High priority intrusive alarms',
       importance: Importance.max,
@@ -301,7 +301,7 @@ class NotificationService with WidgetsBindingObserver {
 
     // Popups Channel
     const popupChannel = AndroidNotificationChannel(
-      'popup_channel_v3',
+      'popup_channel_v4',
       'Popups',
       description: 'Important visual popups',
       importance: Importance.max,
@@ -412,7 +412,9 @@ class NotificationService with WidgetsBindingObserver {
       }
     }
 
-    if (actionId == 'quick_entry' || actionId == 'quick_task') {
+    if (actionId == 'quick_entry' ||
+        actionId == 'quick_task' ||
+        actionId == 'quick_habit') {
       try {
         await _instance.showQuickCaptureNotification();
       } catch (e) {
@@ -487,8 +489,8 @@ class NotificationService with WidgetsBindingObserver {
 
     final androidDetails = AndroidNotificationDetails(
       isAlarm
-          ? 'alarm_channel_v3'
-          : (isPopup ? 'popup_channel_v3' : 'reminder_channel_v2'),
+          ? 'alarm_channel_v4'
+          : (isPopup ? 'popup_channel_v4' : 'reminder_channel_v2'),
       isAlarm ? 'Alarms' : (isPopup ? 'Popups' : 'Reminders'),
       channelDescription: isAlarm
           ? 'High priority intrusive alarms'
@@ -500,8 +502,11 @@ class NotificationService with WidgetsBindingObserver {
           ? AndroidNotificationCategory.alarm
           : AndroidNotificationCategory.reminder,
       // Use user-configurable sound and vibration settings
-      playSound: config.playSound,
-      enableVibration: config.vibrate,
+      playSound: isAlarm ? true : config.playSound,
+      enableVibration: isAlarm || config.vibrate,
+      vibrationPattern: (isAlarm || config.vibrate)
+          ? Int64List.fromList(const <int>[0, 700, 350, 700])
+          : null,
       audioAttributesUsage: isAlarm || isPopup
           ? AudioAttributesUsage.alarm
           : AudioAttributesUsage.notification,
@@ -509,12 +514,13 @@ class NotificationService with WidgetsBindingObserver {
       visibility: NotificationVisibility.public,
       ongoing: isAlarm,
       autoCancel: !isAlarm,
+      timeoutAfter: isPopup ? 30000 : null,
       additionalFlags: isAlarm ? Int32List.fromList(<int>[4]) : null,
       channelShowBadge: true,
       actions: [
-        const AndroidNotificationAction('done', 'Done'),
-        const AndroidNotificationAction('snooze', 'Snooze'),
-        const AndroidNotificationAction('dismiss', 'Dismiss'),
+        const AndroidNotificationAction('done', 'Concluído'),
+        const AndroidNotificationAction('snooze', 'Adiar'),
+        const AndroidNotificationAction('dismiss', 'Dispensar'),
       ],
     );
 
@@ -741,15 +747,23 @@ class NotificationService with WidgetsBindingObserver {
       actions: [
         AndroidNotificationAction(
           'quick_entry',
-          'Journal entry',
+          'Entrada',
+          showsUserInterface: true,
           inputs: [AndroidNotificationActionInput(label: 'Write entry')],
         ),
         AndroidNotificationAction(
           'quick_task',
-          'Task',
+          'Tarefa',
+          showsUserInterface: true,
           inputs: [
             AndroidNotificationActionInput(label: 'Ex: Buy milk tomorrow 10am'),
           ],
+        ),
+        AndroidNotificationAction(
+          'quick_habit',
+          'Hábito',
+          showsUserInterface: true,
+          inputs: [AndroidNotificationActionInput(label: 'Nome do hábito')],
         ),
       ],
     );
@@ -763,69 +777,94 @@ class NotificationService with WidgetsBindingObserver {
   }
 
   Future<void> scheduleWeeklyReviewNotifications() async {
-    final now = DateTime.now();
-    // Schedule for Friday at 18:00
-    DateTime nextFriday = now.add(
-      Duration(days: (DateTime.friday - now.weekday + 7) % 7),
-    );
-    nextFriday = DateTime(
-      nextFriday.year,
-      nextFriday.month,
-      nextFriday.day,
-      18,
-      0,
-    );
-    if (nextFriday.isBefore(now)) {
-      nextFriday = nextFriday.add(const Duration(days: 7));
-    }
-
-    // Schedule for Sunday at 18:00
-    DateTime nextSunday = now.add(
-      Duration(days: (DateTime.sunday - now.weekday + 7) % 7),
-    );
-    nextSunday = DateTime(
-      nextSunday.year,
-      nextSunday.month,
-      nextSunday.day,
-      18,
-      0,
-    );
-    if (nextSunday.isBefore(now)) {
-      nextSunday = nextSunday.add(const Duration(days: 7));
-    }
-
-    // Friday review reminder id: 999991
-    await scheduleReminder(
+    await _scheduleWeeklyReviewNotification(
       id: 999991,
-      title: 'Weekly Review',
-      config: ReminderConfig(
-        id: 'weekly_review_friday',
-        triggerTime: nextFriday,
-        type: NotificationType.push,
-        notificationBody:
-            'Sua review da semana está pronta! Que tal dar uma olhada e planejar os próximos passos?',
-      ),
-      payload: 'action=weekly_review',
+      weekday: DateTime.friday,
+    );
+    await _scheduleWeeklyReviewNotification(
+      id: 999992,
+      weekday: DateTime.sunday,
+    );
+  }
+
+  Future<void> _scheduleWeeklyReviewNotification({
+    required int id,
+    required int weekday,
+  }) async {
+    const title = 'Weekly Review';
+    const body =
+        'Sua review da semana está pronta! Que tal dar uma olhada e planejar os próximos passos?';
+    final fireTime = _nextWeekdayAt(weekday, hour: 20);
+    final payload = _buildEnrichedPayload(
+      originalPayload: 'action=weekly_review',
+      title: title,
+      body: body,
+      notifType: 'push',
+      id: id,
     );
 
-    // Sunday review reminder id: 999992
-    await scheduleReminder(
-      id: 999992,
-      title: 'Weekly Review',
-      config: ReminderConfig(
-        id: 'weekly_review_sunday',
-        triggerTime: nextSunday,
-        type: NotificationType.push,
-        notificationBody:
-            'Sua review da semana está pronta! Que tal dar uma olhada e planejar os próximos passos?',
-      ),
-      payload: 'action=weekly_review',
+    const androidDetails = AndroidNotificationDetails(
+      'reminder_channel_v2',
+      'Reminders',
+      channelDescription: 'General task reminders',
+      importance: Importance.max,
+      priority: Priority.max,
+      category: AndroidNotificationCategory.reminder,
+      visibility: NotificationVisibility.public,
+      channelShowBadge: true,
+      actions: [
+        AndroidNotificationAction('done', 'Concluído'),
+        AndroidNotificationAction('snooze', 'Adiar'),
+        AndroidNotificationAction('dismiss', 'Dispensar'),
+      ],
     );
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      categoryIdentifier: 'reminder_category',
+    );
+
+    await _notifications.zonedSchedule(
+      id,
+      title,
+      body,
+      tz.TZDateTime.from(fireTime, tz.local),
+      const NotificationDetails(android: androidDetails, iOS: iosDetails),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      payload: payload,
+    );
+  }
+
+  DateTime _nextWeekdayAt(int weekday, {required int hour}) {
+    final now = DateTime.now();
+    var date = now.add(Duration(days: (weekday - now.weekday + 7) % 7));
+    date = DateTime(date.year, date.month, date.day, hour);
+    if (!date.isAfter(now)) {
+      date = date.add(const Duration(days: 7));
+    }
+    return date;
   }
 
   Future<void> cancelNotification(int id) async {
     _cancelForegroundTimer(id);
     await _notifications.cancel(id);
+  }
+
+  Future<void> clearNotificationCache() async {
+    for (final timer in _foregroundTimers.values) {
+      timer.cancel();
+    }
+    _foregroundTimers.clear();
+    _foregroundEntries.clear();
+
+    await _notifications.cancelAll();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('notification_actions');
   }
 
   @override
@@ -838,18 +877,25 @@ class NotificationService with WidgetsBindingObserver {
   Future<void> _checkPendingPayloadFromNative() async {
     try {
       const channel = MethodChannel('com.productivity.citrine/settings');
-      final payload = await channel.invokeMethod<String>('getAndClearPendingPayload');
+      final payload = await channel.invokeMethod<String>(
+        'getAndClearPendingPayload',
+      );
       if (payload != null && payload.isNotEmpty) {
-        debugPrint('NotificationService: found pending payload from native: $payload');
+        debugPrint(
+          'NotificationService: found pending payload from native: $payload',
+        );
         final response = NotificationResponse(
-          notificationResponseType: NotificationResponseType.selectedNotification,
+          notificationResponseType:
+              NotificationResponseType.selectedNotification,
           payload: payload,
           id: _extractNotificationId(payload),
         );
         _handleNotificationResponse(response);
       }
     } catch (e) {
-      debugPrint('NotificationService: failed to check pending native payload: $e');
+      debugPrint(
+        'NotificationService: failed to check pending native payload: $e',
+      );
     }
   }
 

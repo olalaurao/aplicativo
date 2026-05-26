@@ -21,6 +21,7 @@ enum NavSection {
   shortcut, // Added for custom shortcuts
   statistics,
   inbox,
+  social,
 }
 
 class NavigationItem {
@@ -59,7 +60,9 @@ class NavigationItem {
   static IconData _getShortcutIcon(String? type, {required bool active}) {
     switch (type) {
       case 'task':
-        return active ? Icons.check_circle_rounded : Icons.check_circle_outline_rounded;
+        return active
+            ? Icons.check_circle_rounded
+            : Icons.check_circle_outline_rounded;
       case 'goal':
         return active ? Icons.flag_rounded : Icons.flag_outlined;
       case 'habit':
@@ -72,8 +75,12 @@ class NavigationItem {
         return active ? Icons.assignment_rounded : Icons.assignment_outlined;
       case 'person':
         return active ? Icons.person_rounded : Icons.person_outline_rounded;
+      case 'social_post':
+        return active ? Icons.bookmarks_rounded : Icons.bookmarks_outlined;
       case 'activity':
-        return active ? Icons.local_activity_rounded : Icons.local_activity_outlined;
+        return active
+            ? Icons.local_activity_rounded
+            : Icons.local_activity_outlined;
       default:
         return active ? Icons.link_rounded : Icons.link_outlined;
     }
@@ -84,9 +91,13 @@ class NavigationItem {
       case NavSection.home:
         return active ? Icons.home_rounded : Icons.home_outlined;
       case NavSection.timeline:
-        return active ? Icons.auto_awesome_motion_rounded : Icons.auto_awesome_motion_outlined;
+        return active
+            ? Icons.auto_awesome_motion_rounded
+            : Icons.auto_awesome_motion_outlined;
       case NavSection.planner:
-        return active ? Icons.calendar_today_rounded : Icons.calendar_today_outlined;
+        return active
+            ? Icons.calendar_today_rounded
+            : Icons.calendar_today_outlined;
       case NavSection.organize:
         return active ? Icons.grid_view_rounded : Icons.grid_view_outlined;
       case NavSection.trackers:
@@ -108,7 +119,9 @@ class NavigationItem {
       case NavSection.map:
         return active ? Icons.map_rounded : Icons.map_outlined;
       case NavSection.reminders:
-        return active ? Icons.notifications_active_rounded : Icons.notifications_none_rounded;
+        return active
+            ? Icons.notifications_active_rounded
+            : Icons.notifications_none_rounded;
       case NavSection.deletedFiles:
         return active ? Icons.delete_rounded : Icons.delete_outline_rounded;
       case NavSection.more:
@@ -119,6 +132,8 @@ class NavigationItem {
         return active ? Icons.bar_chart_rounded : Icons.bar_chart_outlined;
       case NavSection.inbox:
         return active ? Icons.inbox_rounded : Icons.inbox_outlined;
+      case NavSection.social:
+        return active ? Icons.bookmarks_rounded : Icons.bookmarks_outlined;
     }
   }
 

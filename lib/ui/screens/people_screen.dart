@@ -27,6 +27,7 @@ class PeopleScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
+        key: const PageStorageKey('people-scroll'),
         slivers: [
           SliverAppBar(
             title: const Text('People & Contacts'),
@@ -77,7 +78,30 @@ class PeopleScreen extends ConsumerWidget {
         ? DateTime.now().difference(person.lastContactDate!).inDays
         : null;
 
-    final isOverdue = person.isDueForContact;
+    final frequencyDays = person.contactFrequency?.inDays;
+    
+    double urgencyRatio = 0.0;
+    if (frequencyDays != null && frequencyDays > 0) {
+      urgencyRatio = (daysSince ?? (frequencyDays + 1)) / frequencyDays;
+    } else if (daysSince != null) {
+      urgencyRatio = daysSince > 30 ? 1.2 : 0.4;
+    } else {
+      urgencyRatio = 1.2; // Never contacted, default to overdue/high urgency
+    }
+
+    Color urgencyColor;
+    String urgencyLabel;
+
+    if (urgencyRatio > 1.0) {
+      urgencyColor = AppColors.error;
+      urgencyLabel = daysSince != null ? 'Atrasado ($daysSince dias)' : 'Nunca contatado';
+    } else if (urgencyRatio > 0.7) {
+      urgencyColor = AppColors.warning;
+      urgencyLabel = daysSince != null ? 'Próximo ($daysSince dias)' : 'Próximo';
+    } else {
+      urgencyColor = AppColors.habitGreen;
+      urgencyLabel = daysSince != null ? 'OK ($daysSince dias)' : 'OK';
+    }
 
     return ObjectActionWrapper(
       object: person,
@@ -110,23 +134,26 @@ class PeopleScreen extends ConsumerWidget {
                           )
                         : null,
                   ),
-                  if (isOverdue)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: AppColors.error,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.priority_high_rounded,
-                          size: 12,
-                          color: Colors.white,
-                        ),
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: urgencyColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        urgencyRatio > 1.0
+                            ? Icons.priority_high_rounded
+                            : (urgencyRatio > 0.7
+                                ? Icons.warning_amber_rounded
+                                : Icons.check_rounded),
+                        size: 10,
+                        color: Colors.white,
                       ),
                     ),
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
@@ -141,13 +168,11 @@ class PeopleScreen extends ConsumerWidget {
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
-                isOverdue
-                    ? 'Overdue'
-                    : (daysSince != null ? '$daysSince days ago' : 'Never'),
+                urgencyLabel,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: isOverdue ? AppColors.error : AppColors.textMuted,
+                  color: urgencyColor,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -155,7 +180,7 @@ class PeopleScreen extends ConsumerWidget {
               const SizedBox(height: 4),
               if (person.contactFrequency != null)
                 Text(
-                  'Every ${person.contactFrequency!.inDays} days',
+                  'A cada ${person.contactFrequency!.inDays} dias',
                   style: TextStyle(
                     fontSize: 10,
                     color: AppTheme.textMutedColor(context),

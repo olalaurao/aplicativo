@@ -123,6 +123,7 @@ class _UniversalSearchPickerSheetState
                 _filterChip('area', 'Áreas'),
                 _filterChip('note', 'Notas'),
                 _filterChip('resource', 'Recursos'),
+                _filterChip('social_post', 'Posts'),
                 _filterChip('person', 'Pessoas'),
               ],
             ),
@@ -332,6 +333,10 @@ class _UniversalSearchPickerSheetState
           icon = Icons.menu_book_outlined;
           color = AppColors.primary;
           break;
+        case 'social_post':
+          icon = Icons.bookmarks_outlined;
+          color = AppColors.primary;
+          break;
         case 'person':
           icon = Icons.person_outline_rounded;
           color = AppColors.primary;
@@ -372,6 +377,8 @@ class _UniversalSearchPickerSheetState
         return 'Nota';
       case 'resource':
         return 'Recurso';
+      case 'social_post':
+        return 'Post social';
       case 'person':
         return 'Pessoa';
       default:

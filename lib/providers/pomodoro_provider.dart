@@ -4,7 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import '../models/content_object.dart';
 import '../models/pomodoro_session.dart';
+import '../models/sync_action.dart';
 import '../models/task_model.dart';
+import '../models/goal_model.dart';
+import '../models/project_model.dart';
+import '../models/kpi_model.dart';
 import '../models/shared_types.dart';
 import '../services/notification_service.dart';
 import 'vault_provider.dart';
@@ -185,8 +189,9 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
         }
       } else if (data is Map<String, dynamic>) {
         final action = data['action'];
-        if (action == 'pause') stop();
+        if (action == 'pause') pause();
         if (action == 'resume') start();
+        if (action == 'skip') skip();
         if (action == 'stop') {
           stop();
           reset();
@@ -313,6 +318,13 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     _persistState();
   }
 
+  void pause() {
+    _timer?.cancel();
+    state = state.copyWith(isRunning: false);
+    PomodoroBackgroundService.pause(state.remainingSeconds);
+    _persistState();
+  }
+
   void stopSession({bool saveIncomplete = false}) {
     _timer?.cancel();
     if (saveIncomplete) {
@@ -352,6 +364,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       // From break or custom, always go back to work (default 25)
       setDuration(25, PomodoroType.work);
     }
+    PomodoroBackgroundService.start(state.remainingSeconds);
   }
 
   Future<void> _completeSession({bool forceSave = false}) async {
@@ -388,6 +401,17 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
         timerSessions: target.timerSessions + session.duration.inMinutes,
       );
       await ref.read(tasksProvider.notifier).updateTask(updatedTask);
+    } else if (target is Goal) {
+      for (final kpi in target.kpis) {
+        if (kpi.sourceType == KPISourceType.timeSpentInCategory ||
+            kpi.sourceType == KPISourceType.plannerTaskDuration) {
+          kpi.currentValue += session.duration.inMinutes;
+        }
+      }
+      await ref.read(vaultProvider.notifier).updateObject(target);
+    } else if (target is Project) {
+      target.totalPomodoroTime += session.duration.inMinutes;
+      await ref.read(vaultProvider.notifier).updateObject(target);
     }
 
     // Keep KPI calculations up-to-date for goals/projects linked to planner objects.
@@ -397,42 +421,34 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
   Future<void> _saveToDailyNote(PomodoroSession session) async {
     final obsidianService = ref.read(obsidianServiceProvider);
     final dateStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final path = 'daily/$dateStr.md';
-    final dayThemes = ref.read(dayThemesProvider);
-
-    String content =
-        await obsidianService.readFile(path) ??
-        getDailyNoteTemplate(dateStr, dayThemes);
-
-    final frontmatter = MarkdownParser.parseFrontmatter(content);
-    final body = MarkdownParser.extractBody(content);
-
-    final entries = MarkdownParser.parseJournalEntries(body, dateStr);
-    final tasks = MarkdownParser.parseTasksFromDailyNote(body);
-    final habits = MarkdownParser.parseHabitCompletions(frontmatter);
-    final trackers = MarkdownParser.parseTrackerRecords(frontmatter);
-    final pomodoros = MarkdownParser.parsePomodoros(body);
 
     final timeStr = DateFormat('HH:mm').format(session.startTime);
-    pomodoros.add({
-      'time': timeStr,
-      'title': state.currentItemTitle ?? 'Session de Focus',
-      'duration': session.duration.inMinutes,
-      'type': session.pomodoroType.name,
-      if (state.currentItemId != null) 'linked': state.currentItemId,
-      'blocks': state.completedSessions + 1,
-    });
+    final title = state.currentItemTitle ?? 'Sessão livre';
+    final minutes = session.duration.inMinutes;
+    final block = [
+      '### $timeStr — $title',
+      if (state.currentItemId != null) '- Linked: [[${state.currentItemId}]]',
+      '- Blocos: ${state.completedSessions + 1} completos',
+      '- Tempo: ${minutes}min trabalhados',
+      '- Pausas: ${session.pomodoroType == PomodoroType.work ? 0 : minutes}min',
+    ].join('\n');
 
-    final newBody = MarkdownParser.generateDailyNoteBody(
-      entries: entries,
-      tasks: tasks,
-      habits: habits,
-      trackers: trackers,
-      pomodoros: pomodoros,
+    await obsidianService.appendToDailyNote(
+      session.startTime,
+      '## Pomodoros',
+      block,
     );
-
-    final finalMarkdown = generateMarkdown(frontmatter, newBody);
-    await obsidianService.writeFile(path, finalMarkdown);
+    await ref.read(syncQueueServiceProvider).enqueueAction(
+      SyncAction(
+        objectType: 'daily_note',
+        objectId: dateStr,
+        operation: SyncOperation.update,
+        payload: {'date': dateStr, 'section': 'Pomodoros'},
+      ),
+    );
+    ref.invalidate(dailyNoteDataProvider(dateStr));
+    ref.invalidate(allObjectsProvider);
+    ref.invalidate(allEntriesProvider);
   }
 
   Future<void> scheduleSessions({

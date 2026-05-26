@@ -56,10 +56,26 @@ class AutomationService {
 
   static Future<void> checkPersonContacts(Ref ref, List<Person> people) async {
     final tasks = ref.read(tasksProvider);
+    final entries = ref.read(allEntriesProvider);
     final now = DateTime.now();
 
     for (final person in people) {
-      if (person.isDueForContact) {
+      final latestContact = _latestContactFromBacklinks(
+        person,
+        entries,
+        tasks,
+      );
+      final effectivePerson = latestContact != null &&
+              (person.lastContactDate == null ||
+                  latestContact.isAfter(person.lastContactDate!))
+          ? person.copyWith(lastContactDate: latestContact)
+          : person;
+      if (effectivePerson.id == person.id &&
+          effectivePerson.lastContactDate != person.lastContactDate) {
+        await ref.read(peopleProvider.notifier).updatePerson(effectivePerson);
+      }
+
+      if (effectivePerson.isDueForContact) {
         final taskTitle = 'Contatar ${person.title}';
 
         // Check if task already exists
@@ -78,6 +94,7 @@ class AutomationService {
               startDate: now,
               priority: person.contactPriority,
               stage: TaskStage.todo,
+              endDate: now,
               organizers: [
                 OrganizerReference(type: 'person', slug: person.slug, title: person.title),
               ],
@@ -86,6 +103,35 @@ class AutomationService {
         }
       }
     }
+  }
+
+  static DateTime? _latestContactFromBacklinks(
+    Person person,
+    List<JournalEntry> entries,
+    List<Task> tasks,
+  ) {
+    final wiki = '[[${person.slug}]]';
+    DateTime? latest;
+
+    void include(DateTime date) {
+      if (latest == null || date.isAfter(latest!)) latest = date;
+    }
+
+    for (final entry in entries) {
+      final mentionsPerson = entry.body.contains(wiki) ||
+          entry.organizers.any((org) => org.slug == person.slug);
+      if (mentionsPerson) include(entry.date);
+    }
+
+    for (final task in tasks) {
+      final mentionsPerson = task.notes.any((note) => note.contains(wiki)) ||
+          task.organizers.any((org) => org.slug == person.slug);
+      if (mentionsPerson && task.stage == TaskStage.finalized) {
+        include(task.updatedAt);
+      }
+    }
+
+    return latest;
   }
 
   static Future<void> updateAllKPIs(Ref ref) async {
@@ -111,6 +157,15 @@ class AutomationService {
           kpi.currentValue = newValue;
           goalChanged = true;
         }
+        if (!kpi.completed && newValue >= kpi.targetValue) {
+          kpi.completed = true;
+          goalChanged = true;
+          await NotificationService().showImmediateNotification(
+            id: kpi.id.hashCode.abs() % 1000000,
+            title: 'KPI atingido',
+            body: '${kpi.title}: ${newValue.toStringAsFixed(0)} / ${kpi.targetValue.toStringAsFixed(0)}',
+          );
+        }
       }
       if (goalChanged) {
         await ref.read(goalsProvider.notifier).updateGoal(goal);
@@ -124,7 +179,7 @@ class AutomationService {
 
     // If all KPIs are met, mark as completed
     if (goal.kpis.isNotEmpty &&
-        goal.kpis.every((k) => k.currentValue >= k.targetValue)) {
+        goal.kpis.every((k) => k.completed || k.currentValue >= k.targetValue)) {
       goal.state = GoalStatus.completed;
       await ref.read(goalsProvider.notifier).updateGoal(goal);
 

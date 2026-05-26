@@ -48,25 +48,57 @@ class OrganizerReference {
   bool matches(String orgId, String orgSlug, String orgTitle) {
     if (slug == orgSlug) return true;
     if (slug == orgId) return true;
-    final normalizedRef = slug.replaceAll('_', '-').replaceAll('/', '-').toLowerCase();
-    final normalizedSlug = orgSlug.replaceAll('_', '-').replaceAll('/', '-').toLowerCase();
-    final normalizedId = orgId.replaceAll('_', '-').replaceAll('/', '-').toLowerCase();
-    if (normalizedRef == normalizedSlug || normalizedRef == normalizedId) return true;
+    final normalizedRef = slug
+        .replaceAll('_', '-')
+        .replaceAll('/', '-')
+        .toLowerCase();
+    final normalizedSlug = orgSlug
+        .replaceAll('_', '-')
+        .replaceAll('/', '-')
+        .toLowerCase();
+    final normalizedId = orgId
+        .replaceAll('_', '-')
+        .replaceAll('/', '-')
+        .toLowerCase();
+    if (normalizedRef == normalizedSlug || normalizedRef == normalizedId) {
+      return true;
+    }
     if (title.toLowerCase() == orgTitle.toLowerCase()) return true;
     return false;
   }
 
-  factory OrganizerReference.fromWikiLink(String wikiLink, {String defaultType = 'label'}) {
+  factory OrganizerReference.fromWikiLink(
+    String wikiLink, {
+    String defaultType = 'label',
+  }) {
     final raw = wikiLink.replaceAll('[', '').replaceAll(']', '').trim();
     final parts = raw.split('/');
     if (parts.length >= 2) {
       final type = parts.first.toLowerCase();
-      final slug = parts.sublist(1).join('/').toLowerCase().replaceAll(' ', '-');
-      final title = slug.replaceAll('-', ' ').split(' ').map((word) => word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : '').join(' ');
+      final slug = parts
+          .sublist(1)
+          .join('/')
+          .toLowerCase()
+          .replaceAll(' ', '-');
+      final title = slug
+          .replaceAll('-', ' ')
+          .split(' ')
+          .map(
+            (word) => word.isNotEmpty
+                ? word[0].toUpperCase() + word.substring(1)
+                : '',
+          )
+          .join(' ');
       return OrganizerReference(type: type, slug: slug, title: title);
     }
     final slug = raw.toLowerCase().replaceAll(' ', '-');
-    final title = raw.split(' ').map((word) => word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : '').join(' ');
+    final title = raw
+        .split(' ')
+        .map(
+          (word) =>
+              word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : '',
+        )
+        .join(' ');
     return OrganizerReference(type: defaultType, slug: slug, title: title);
   }
 
@@ -80,13 +112,14 @@ class OrganizerReference {
     if (color != null) 'color': color,
   };
 
-  factory OrganizerReference.fromMap(Map<String, dynamic> map) => OrganizerReference(
-    type: map['type'] ?? 'label',
-    slug: map['slug'] ?? '',
-    title: map['title'] ?? '',
-    icon: map['icon'],
-    color: map['color'],
-  );
+  factory OrganizerReference.fromMap(Map<String, dynamic> map) =>
+      OrganizerReference(
+        type: map['type'] ?? 'label',
+        slug: map['slug'] ?? '',
+        title: map['title'] ?? '',
+        icon: map['icon'],
+        color: map['color'],
+      );
 
   @override
   bool operator ==(Object other) =>
@@ -144,13 +177,17 @@ class SubtaskSession {
   Map<String, dynamic> toMap() => {
     'id': id,
     'name': name,
-    'subtaskIds': subtaskIds,
+    'subtask_ids': subtaskIds,
   };
 
   factory SubtaskSession.fromMap(Map<String, dynamic> map) => SubtaskSession(
     id: map['id']?.toString() ?? '',
     name: map['name']?.toString() ?? '',
-    subtaskIds: (map['subtaskIds'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+    subtaskIds:
+        ((map['subtask_ids'] ?? map['subtaskIds']) as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [],
   );
 }
 

@@ -28,7 +28,9 @@ class SearchAction {
 }
 
 class SearchScreen extends ConsumerStatefulWidget {
-  const SearchScreen({super.key});
+  final String? initialType;
+
+  const SearchScreen({super.key, this.initialType});
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -55,7 +57,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     'project': 'Projects',
     'person': 'People',
     'resource': 'Media',
+    'social_post': 'Posts sociais',
   };
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedType = widget.initialType;
+  }
+
   List<SearchAction> _getAllActions() {
     return [
       SearchAction(

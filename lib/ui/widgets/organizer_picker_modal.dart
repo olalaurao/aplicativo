@@ -50,6 +50,8 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
         return Icons.bar_chart_rounded;
       case 'resource':
         return Icons.menu_book_rounded;
+      case 'social_post':
+        return Icons.bookmarks_rounded;
       case 'note':
         return Icons.description_rounded;
       default:
@@ -85,6 +87,8 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
         return 'Nota';
       case 'resource':
         return 'Recurso';
+      case 'social_post':
+        return 'Post social';
       case 'person':
         return 'Pessoa';
       default:
@@ -412,6 +416,11 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
                         setModalState(() => selectedFilter = val);
                       }),
                       buildFilterChip('resource', 'Recursos', selectedFilter, (
+                        val,
+                      ) {
+                        setModalState(() => selectedFilter = val);
+                      }),
+                      buildFilterChip('social_post', 'Posts', selectedFilter, (
                         val,
                       ) {
                         setModalState(() => selectedFilter = val);

@@ -8,9 +8,13 @@ import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 
 class WidgetService {
+  static const _androidPackage = 'com.productivity.citrine';
   static const _calendarProvider = 'CitrineCalendarWidgetReceiver';
+  static const _tasksProvider = 'CitrineTasksWidgetReceiver';
   static const _filterProvider = 'CitrineFilterWidgetProvider';
   static const _pomodoroProvider = 'CitrinePomodoroWidgetProvider';
+  static const _quickAddProvider = 'CitrineQuickAddWidgetProvider';
+  static const _noteProvider = 'CitrineNoteWidgetProvider';
 
   static Future<void> init() async {
     await refreshAllWidgets();
@@ -34,7 +38,7 @@ class WidgetService {
   }
 
   static Future<void> updateHabits(List<dynamic> habits) async {
-    await refreshAllWidgets();
+    await _updateTaskProviders();
   }
 
   static Future<void> updateCalendar({
@@ -55,20 +59,52 @@ class WidgetService {
     required String title,
     required String content,
     required String slug,
-  }) async {}
+  }) async {
+    await _saveJson('citrine_note_$widgetId', {
+      'title': title,
+      'content': content,
+      'slug': slug,
+      'linkUri': 'citrine:///detail/$slug',
+    });
+    await _saveJson('citrine_note', {
+      'title': title,
+      'content': content,
+      'slug': slug,
+      'linkUri': 'citrine:///detail/$slug',
+    });
+    await _update(_noteProvider);
+  }
 
   static Future<void> updateQuickAddLabels({
     String journalLabel = 'Journal',
     String taskLabel = 'Task',
     String firstTarget = 'entry',
     String secondTarget = 'task',
-  }) async {}
+  }) async {
+    await _saveJson('citrine_quick_add', {
+      'buttons': [
+        {
+          'label': journalLabel,
+          'target': firstTarget,
+          'uri': 'citrine:///create/$firstTarget',
+        },
+        {
+          'label': taskLabel,
+          'target': secondTarget,
+          'uri': 'citrine:///create/$secondTarget',
+        },
+      ],
+    });
+    await _update(_quickAddProvider);
+  }
 
   static Future<void> refreshAllWidgets() async {
     await Future.wait([
       _updateCalendarProviders(),
-      _update(_filterProvider),
+      _updateTaskProviders(),
       _update(_pomodoroProvider),
+      _update(_quickAddProvider),
+      _update(_noteProvider),
     ]);
   }
 
@@ -84,7 +120,18 @@ class WidgetService {
     String size = 'medium',
     Map<String, String>? data,
     int? widgetId,
-  }) async {}
+  }) async {
+    final payload = <String, dynamic>{
+      'title': title,
+      'size': size,
+      'data': data ?? <String, String>{},
+    };
+    if (widgetId != null) {
+      payload['widgetId'] = widgetId;
+    }
+    await _saveJson('citrine_widget_$type', payload);
+    await refreshUniversalWidgets();
+  }
 
   static Future<List<int>> universalWidgetIds() async => [];
 
@@ -95,7 +142,17 @@ class WidgetService {
     required String size,
     required String organizer,
     required List<String> objectTypes,
-  }) async {}
+  }) async {
+    await _saveJson('citrine_widget_config_$widgetId', {
+      'widgetId': widgetId,
+      'type': type,
+      'title': title,
+      'size': size,
+      'organizer': organizer,
+      'objectTypes': objectTypes,
+    });
+    await refreshUniversalWidgets();
+  }
 
   static Future<void> refreshUniversalWidgets() async => refreshAllWidgets();
 
@@ -134,7 +191,7 @@ class WidgetService {
   }) async {}
 
   static Future<void> updateNextTask(dynamic task) async {
-    await refreshAllWidgets();
+    await _updateTaskProviders();
   }
 
   static Future<void> updatePomodoro(
@@ -194,9 +251,19 @@ class WidgetService {
     await _update(_calendarProvider);
   }
 
+  static Future<void> _updateTaskProviders() async {
+    await Future.wait([
+      _update(_tasksProvider),
+      _update(_filterProvider),
+    ]);
+  }
+
   static Future<void> _update(String provider) async {
     try {
-      await HomeWidget.updateWidget(androidName: provider);
+      await HomeWidget.updateWidget(
+        androidName: provider,
+        qualifiedAndroidName: '$_androidPackage.$provider',
+      );
     } catch (e) {
       debugPrint('[WidgetService] update $provider failed: $e');
     }

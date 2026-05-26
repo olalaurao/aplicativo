@@ -10,6 +10,7 @@ class Note extends ContentObject {
   final String body; // Raw markdown or JSON for outline/collection
   String? parentNoteId;
   String? color;
+  List<String> socialRefs;
 
   Note({
     super.id,
@@ -18,6 +19,7 @@ class Note extends ContentObject {
     required this.body,
     this.parentNoteId,
     this.color,
+    List<String>? socialRefs,
     super.organizers,
     super.categories,
     super.tags,
@@ -28,7 +30,7 @@ class Note extends ContentObject {
     super.pinned,
     super.order,
     super.obsidianPath,
-  });
+  }) : socialRefs = socialRefs ?? [];
 
   @override
   String get type => 'note';
@@ -41,8 +43,12 @@ class Note extends ContentObject {
     frontmatter['note_subtype'] = subtype.name;
     if (parentNoteId != null) frontmatter['parent_note_id'] = parentNoteId;
     if (color != null) frontmatter['color'] = color;
+    if (socialRefs.isNotEmpty) frontmatter['social_refs'] = socialRefs;
 
-    return generateMarkdown(frontmatter, body);
+    final markdownBody = subtype == NoteSubtype.text
+        ? normalizeRichTextBodyForMarkdown(body)
+        : body;
+    return generateMarkdown(frontmatter, markdownBody);
   }
 
   factory Note.fromMarkdown(Map<String, dynamic> frontmatter, String body) {
@@ -60,6 +66,11 @@ class Note extends ContentObject {
     note.loadBaseMap(frontmatter);
     note.parentNoteId = frontmatter['parent_note_id'] as String?;
     note.color = frontmatter['color'] as String?;
+    if (frontmatter['social_refs'] is List) {
+      note.socialRefs = (frontmatter['social_refs'] as List)
+          .map((e) => e.toString())
+          .toList();
+    }
     return note;
   }
 
@@ -69,6 +80,7 @@ class Note extends ContentObject {
     String? body,
     String? parentNoteId,
     String? color,
+    List<String>? socialRefs,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     List<String>? tags,
@@ -87,6 +99,7 @@ class Note extends ContentObject {
       body: body ?? this.body,
       parentNoteId: parentNoteId ?? this.parentNoteId,
       color: color ?? this.color,
+      socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       tags: tags ?? this.tags,

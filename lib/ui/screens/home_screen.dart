@@ -12,6 +12,7 @@ import '../../models/task_model.dart';
 import '../../models/goal_model.dart';
 import '../../models/journal_entry.dart';
 import '../../models/content_object.dart';
+import '../../models/note_model.dart';
 import '../../models/dashboard_block.dart';
 import '../../models/organizer_model.dart';
 import '../theme.dart';
@@ -20,7 +21,7 @@ import '../widgets/object_action_wrapper.dart';
 import '../widgets/timeline_card.dart';
 import 'universal_detail_view.dart';
 import '../widgets/citrine_chart.dart';
-import '../widgets/wiki_text_view.dart';
+import '../widgets/journal_body_view.dart';
 import '../widgets/habit_detail_sheet.dart';
 import '../widgets/calendar_widget.dart';
 import '../../models/mood_model.dart';
@@ -47,11 +48,13 @@ import '../../services/sync_manager.dart';
 import '../../providers/google_calendar_provider.dart';
 import '../../services/notification_service.dart';
 import '../../services/pomodoro_bg_service.dart';
+import '../../services/scheduler_service.dart';
 import '../forms/create_entry_form.dart';
 import '../forms/create_task_form.dart';
 import '../forms/create_habit_form.dart';
 import '../widgets/pomodoro_week_overview.dart';
 import '../widgets/organizer_tasks_widget.dart';
+import '../widgets/universal_search_picker.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -331,10 +334,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         );
       },
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () => _buildDashboardSkeleton(),
       error: (e, s) =>
           Scaffold(body: Center(child: Text('Error loading dashboard: $e'))),
+    );
+  }
+
+  Widget _buildDashboardSkeleton() {
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text('Dashboard'),
+        centerTitle: true,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.transparent,
+      ),
+      body: ListView.separated(
+        key: const PageStorageKey('dashboard-loading-skeleton'),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        itemCount: 4,
+        separatorBuilder: (_, _) => const SizedBox(height: 16),
+        itemBuilder: (context, index) {
+          final heights = [132.0, 92.0, 156.0, 112.0];
+          return Container(
+            height: heights[index],
+            decoration: AppTheme.cardDecoration(context),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _skeletonLine(width: 140, height: 14),
+                const SizedBox(height: 16),
+                _skeletonLine(width: double.infinity, height: 12),
+                const SizedBox(height: 10),
+                _skeletonLine(width: 220, height: 12),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _skeletonLine({required double width, required double height}) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceVariantColor(context),
+        borderRadius: BorderRadius.circular(6),
+      ),
     );
   }
 
@@ -703,7 +753,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       case BlockType.calendar:
         return const CalendarWidget();
       case BlockType.notes:
-        return _buildNotesBlock();
+        return _buildNotesBlock(block);
       case BlockType.timer:
         return _buildTimerBlock();
       case BlockType.trackerField:
@@ -1242,20 +1292,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildHabitsBlock() {
-    final habits = ref.watch(habitsProvider);
+    final today = DateTime.now();
+    final habits = ref
+        .watch(habitsProvider)
+        .where(
+          (habit) =>
+              habit.status == HabitStatus.active &&
+              (habit.scheduler == null ||
+                  SchedulerService.shouldFire(habit.scheduler!, today)),
+        )
+        .toList();
     if (habits.isEmpty) {
       return _buildCard(
-        title: 'Habits',
+        title: 'Hábitos de hoje',
         icon: Icons.loop_rounded,
         child: const Text(
-          'No habits registered',
+          'Nenhum hábito para hoje',
           style: TextStyle(color: AppColors.textMuted, fontSize: 13),
         ),
       );
     }
 
     return _buildCard(
-      title: "Today's Habits",
+      title: 'Hábitos de hoje',
       icon: Icons.loop_rounded,
       onAdd: () => showCreateMenu(context),
       child: SingleChildScrollView(
@@ -1681,15 +1740,59 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return mood?.title ?? moodSlug;
   }
 
-  Widget _buildNotesBlock() {
+  Widget _buildNotesBlock(DashboardBlock block) {
     final notes = ref.watch(notesProvider);
+    final noteSlug = block.metadata['noteSlug']?.toString();
+    final pinnedNote = noteSlug == null
+        ? null
+        : notes
+              .where(
+                (note) =>
+                    note.slug == noteSlug ||
+                    note.id == noteSlug ||
+                    note.obsidianFileName == noteSlug,
+              )
+              .firstOrNull;
     if (notes.isEmpty) {
       return _buildCard(
         title: 'Notes',
         icon: Icons.sticky_note_2_rounded,
+        onConfigure: () => _showPinnedNotePicker(block),
         child: const Text(
           'None note encontrada',
           style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+        ),
+      );
+    }
+
+    if (pinnedNote != null) {
+      return _buildCard(
+        title: pinnedNote.title,
+        icon: Icons.sticky_note_2_rounded,
+        onConfigure: () => _showPinnedNotePicker(block),
+        child: ObjectActionWrapper(
+          object: pinnedNote,
+          child: InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UniversalDetailView(object: pinnedNote),
+              ),
+            ),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: JournalBodyView(
+                body: pinnedNote.body,
+                maxLines: 10,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textSecondaryColor(context),
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ),
         ),
       );
     }
@@ -1698,6 +1801,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       title: 'Recent Notes',
       icon: Icons.sticky_note_2_rounded,
       onAdd: () => showCreateMenu(context),
+      onConfigure: () => _showPinnedNotePicker(block),
       child: SizedBox(
         height: 120,
         child: ListView.separated(
@@ -1739,10 +1843,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       ),
                       const SizedBox(height: 6),
                       Expanded(
-                        child: WikiTextView(
-                          text: _compactNotePreview(note.body),
+                        child: JournalBodyView(
+                          body: note.body,
                           maxLines: 4,
-                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 11,
                             color: AppTheme.textSecondaryColor(context),
@@ -1757,6 +1860,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             );
           },
         ),
+      ),
+    );
+  }
+
+  void _showPinnedNotePicker(DashboardBlock block) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => UniversalSearchPickerSheet(
+        title: 'Fixar nota',
+        initialFilter: 'note',
+        onSelected: (object) {
+          Navigator.pop(context);
+          if (object is! Note) return;
+          ref
+              .read(dashboardProvider.notifier)
+              .updateBlock(
+                block.copyWith(
+                  title: object.title,
+                  metadata: {
+                    ...block.metadata,
+                    'noteSlug': object.slug,
+                  },
+                ),
+              );
+        },
+        onClear: () {
+          Navigator.pop(context);
+          final metadata = Map<String, dynamic>.from(block.metadata)
+            ..remove('noteSlug');
+          ref
+              .read(dashboardProvider.notifier)
+              .updateBlock(block.copyWith(title: 'Notes', metadata: metadata));
+        },
       ),
     );
   }
@@ -1823,13 +1961,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ],
       ),
     );
-  }
-
-  String _compactNotePreview(String body) {
-    return body
-        .replaceAll(RegExp(r'!\[\[[^\]]+\]\]'), '[anexo]')
-        .replaceAll(RegExp(r'[#*_`>-]'), '')
-        .trim();
   }
 
   Widget _buildTrackerFieldBlock() {

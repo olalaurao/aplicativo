@@ -23,6 +23,12 @@ subprojects {
     val newSubprojectBuildDir = newBuildDir.resolve(project.name)
     project.layout.buildDirectory.set(newSubprojectBuildDir)
     project.evaluationDependsOn(":app")
+
+    if (name == "receive_sharing_intent") {
+        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+            kotlinOptions.jvmTarget = "1.8"
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {

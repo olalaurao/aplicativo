@@ -1,10 +1,13 @@
 // lib/main.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'dart:io';
 import 'package:home_widget/home_widget.dart';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ui/shell/app_shell.dart';
 import 'ui/theme.dart';
@@ -27,6 +30,7 @@ import 'ui/screens/deleted_files_screen.dart';
 import 'ui/screens/journal_screen.dart';
 import 'ui/screens/statistics_screen.dart';
 import 'ui/screens/inbox_screen.dart';
+import 'ui/screens/social_screen.dart';
 import 'ui/screens/search_screen.dart';
 import 'ui/screens/sync_conflicts_screen.dart';
 
@@ -40,6 +44,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'services/sync_manager.dart';
+import 'services/oembed_service.dart';
 import 'services/permission_service.dart';
 import 'ui/widgets/notification_popup_overlay.dart';
 import 'ui/widgets/pomodoro_floating_clock.dart';
@@ -48,12 +53,12 @@ import 'ui/forms/create_entry_form.dart';
 import 'ui/forms/create_habit_form.dart';
 import 'ui/forms/create_note_form.dart';
 import 'ui/forms/create_task_form.dart';
+import 'ui/forms/create_social_post_form.dart';
 import 'models/template_model.dart';
 import 'models/task_model.dart';
 import 'models/habit_model.dart';
 
 import 'package:quick_actions/quick_actions.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/settings_provider.dart';
 import 'providers/widget_sync_provider.dart';
 
@@ -181,6 +186,92 @@ class BootstrapApp extends StatefulWidget {
 
 class _BootstrapAppState extends State<BootstrapApp> {
   late final Future<void> _initFuture = _initApp(widget.container);
+  late final AppLifecycleListener _lifecycleListener;
+  StreamSubscription<List<SharedMediaFile>>? _shareIntentSub;
+  Timer? _midnightTimer;
+  DateTime _lastCheckedDate = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycleListener = AppLifecycleListener(
+      onResume: () {
+        debugPrint('[AppLifecycle] Resumed - refreshing widgets and syncing');
+        unawaited(forceWidgetSync(widget.container));
+        widget.container.read(syncManagerProvider).performSync();
+      },
+    );
+    _initShareIntentHandling();
+
+    _midnightTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      final now = DateTime.now();
+      final currentDate = DateTime(now.year, now.month, now.day);
+      final lastDate = DateTime(
+        _lastCheckedDate.year,
+        _lastCheckedDate.month,
+        _lastCheckedDate.day,
+      );
+      if (currentDate != lastDate) {
+        debugPrint(
+          '[MidnightTimer] Day changed from $lastDate to $currentDate. '
+          'Invalidating vault and syncing widgets.',
+        );
+        _lastCheckedDate = now;
+        widget.container.invalidate(vaultProvider);
+        unawaited(forceWidgetSync(widget.container));
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _lifecycleListener.dispose();
+    _shareIntentSub?.cancel();
+    _midnightTimer?.cancel();
+    super.dispose();
+  }
+
+  void _initShareIntentHandling() {
+    _shareIntentSub = ReceiveSharingIntent.instance.getMediaStream().listen(
+      _handleSharedMedia,
+      onError: (error) => debugPrint('Share intent stream failed: $error'),
+    );
+    unawaited(
+      ReceiveSharingIntent.instance
+          .getInitialMedia()
+          .then(_handleSharedMedia)
+          .catchError(
+            (error) => debugPrint('Initial share intent failed: $error'),
+          ),
+    );
+  }
+
+  Future<void> _handleSharedMedia(List<SharedMediaFile> files) async {
+    final url = _extractSharedUrl(files);
+    if (url == null) return;
+    await ReceiveSharingIntent.instance.reset();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navigator = _rootNavigatorKey.currentState;
+      if (navigator == null) return;
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => CreateSocialPostForm(initialUrl: url),
+        ),
+      );
+    });
+  }
+
+  String? _extractSharedUrl(List<SharedMediaFile> files) {
+    for (final file in files) {
+      final candidates = [file.path, file.message].whereType<String>();
+      for (final candidate in candidates) {
+        final match = RegExp(r'https?://\S+').firstMatch(candidate);
+        final url = match?.group(0)?.trim();
+        if (url != null && OEmbedService.isSupportedUrl(url)) return url;
+      }
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -292,6 +383,21 @@ Future<void> _initApp(ProviderContainer container) async {
     final notificationService = NotificationService();
     notificationService.setProviderContainer(container);
     notificationService.setNavigatorKey(_rootNavigatorKey);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      const purgeKey = 'notification_cache_purged_late_duplicates_20260525';
+      if (prefs.getBool(purgeKey) != true) {
+        await notificationService.clearNotificationCache();
+        await prefs.setBool(purgeKey, true);
+        await container
+            .read(vaultProvider.notifier)
+            .rescheduleAllObjectReminders();
+        debugPrint('Notification cache purge completed.');
+      }
+    } catch (e) {
+      debugPrint('Startup init failed: notification_cache_purge: $e');
+    }
 
     // Request permissions after app is visible (avoids blocking splash)
     await PermissionService.requestAllPermissions();
@@ -526,6 +632,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/inbox',
             builder: (context, state) => const InboxScreen(),
+          ),
+          GoRoute(
+            path: '/social',
+            builder: (context, state) => const SocialScreen(),
           ),
           GoRoute(
             path: '/sync-conflicts',

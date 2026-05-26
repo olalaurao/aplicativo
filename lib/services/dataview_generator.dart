@@ -3,6 +3,8 @@
 // These are written to index.md files in each vault folder during sync.
 
 import 'package:flutter/foundation.dart';
+import '../models/analysis_model.dart';
+import '../models/tracker_model.dart';
 import 'obsidian_service.dart';
 
 class DataviewGenerator {
@@ -20,10 +22,82 @@ class DataviewGenerator {
       _writeMoodIndex(),
       _writeGoalsIndex(),
       _writeNotesIndex(),
+      _writeSocialIndex(),
     ]);
   }
 
   /// Generates a tracker chart block for Obsidian Charts plugin.
+  static String generateTrackerDataviewBlock(TrackerDefinition tracker) {
+    final fields = tracker.sections
+        .expand((section) => section.inputFields)
+        .map((field) => '${tracker.slug}.${field.id} AS "${field.title}"')
+        .join(', ');
+    final tableFields = fields.isEmpty ? 'file.link AS "Registro"' : fields;
+
+    return '''```dataview
+TABLE $tableFields
+FROM "daily"
+WHERE ${tracker.slug}
+SORT file.name DESC
+```''';
+  }
+
+  static String generateChartBlock(TrackerDefinition tracker) {
+    final numericFields = tracker.sections
+        .expand((section) => section.inputFields)
+        .where(
+          (field) =>
+              field.type == InputFieldType.quantity ||
+              field.type == InputFieldType.range ||
+              field.type == InputFieldType.duration ||
+              field.type == InputFieldType.mood ||
+              field.type == InputFieldType.checkbox,
+        )
+        .toList();
+    if (numericFields.isEmpty) return '';
+
+    final series = numericFields
+        .map(
+          (field) => '''  - title: "${field.title}"
+    data: []''',
+        )
+        .join('\n');
+
+    return '''```chart
+type: line
+labels: []
+series:
+$series
+width: 80%
+beginAtZero: false
+```''';
+  }
+
+  static String generateTrackerPluginBlock(CombinedAnalysis analysis) {
+    final sources = analysis.dataSources.isNotEmpty
+        ? analysis.dataSources
+        : analysis.charts.expand((chart) => chart.sources).toList();
+    if (sources.isEmpty) return '';
+
+    final blocks = sources
+        .map((source) {
+          final target = source.fieldId == null || source.fieldId!.isEmpty
+              ? source.id
+              : '${source.id}.${source.fieldId}';
+          return '''```tracker
+searchType: frontmatter
+searchTarget: $target
+folder: daily
+line:
+  title: "${source.label}"
+  yAxisLabel: "${source.label}"
+```''';
+        })
+        .join('\n\n');
+
+    return blocks;
+  }
+
   static String trackerChartBlock({
     required String trackerSlug,
     required String fieldSlug,
@@ -53,8 +127,12 @@ beginAtZero: false
   }) {
     final today = DateTime.now();
     final lastMonth = DateTime(today.year, today.month - 1, today.day);
-    final start = startDate ?? '${lastMonth.year}-${lastMonth.month.toString().padLeft(2, '0')}-${lastMonth.day.toString().padLeft(2, '0')}';
-    final end = endDate ?? '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final start =
+        startDate ??
+        '${lastMonth.year}-${lastMonth.month.toString().padLeft(2, '0')}-${lastMonth.day.toString().padLeft(2, '0')}';
+    final end =
+        endDate ??
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
     return '''```tracker
 searchType: frontmatter
@@ -191,6 +269,62 @@ SORT file.mtime DESC
 ```
 ''';
     await _safeWrite('notes/index.md', content);
+  }
+
+  Future<void> _writeSocialIndex() async {
+    const content = '''---
+type: index
+title: Social Posts Index
+---
+
+# Social
+
+## Todos os posts
+
+```dataview
+TABLE platform AS "Plataforma", author_handle AS "Autor", posted_at AS "Data", watched AS "Visto"
+FROM "social"
+WHERE type = "social_post"
+SORT created_at DESC
+```
+
+## Não vistos
+
+```dataview
+TABLE platform AS "Plataforma", author_handle AS "Autor", file.link AS "Post"
+FROM "social"
+WHERE type = "social_post" AND watched = false
+SORT created_at DESC
+```
+
+## TikTok
+
+```dataview
+TABLE author_handle AS "Autor", posted_at AS "Data", watched AS "Visto"
+FROM "social"
+WHERE type = "social_post" AND platform = "tiktok"
+SORT posted_at DESC
+```
+
+## Instagram
+
+```dataview
+TABLE author_handle AS "Autor", posted_at AS "Data", watched AS "Visto"
+FROM "social"
+WHERE type = "social_post" AND platform = "instagram"
+SORT posted_at DESC
+```
+
+## Substack
+
+```dataview
+TABLE author_name AS "Autor", posted_at AS "Data", watched AS "Lido"
+FROM "social"
+WHERE type = "social_post" AND platform = "substack"
+SORT posted_at DESC
+```
+''';
+    await _safeWrite('social/index.md', content);
   }
 
   Future<void> _safeWrite(String path, String content) async {

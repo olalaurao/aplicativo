@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../models/social_post.dart';
 import '../../models/task_model.dart';
 import '../../models/reminder_config.dart';
 import '../../models/shared_types.dart';
@@ -50,6 +51,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
   int? _pomodoroCount;
   String? _timeBlock;
   List<String> _dependsOn = [];
+  List<String> _socialRefs = [];
   Scheduler? _scheduler;
   int? _estimatedMinutes;
 
@@ -99,6 +101,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       _pomodoroCount = task.pomodoroCount;
       _timeBlock = task.timeBlock;
       _dependsOn = List.from(task.dependsOn);
+      _socialRefs = List.from(task.socialRefs);
       _estimatedMinutes = task.estimatedMinutes;
     } else {
       _timeBlock = widget.initialTimeBlock;
@@ -513,6 +516,10 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                       onChanged: (val) => setState(() => _organizers = val),
                     ),
                   ),
+
+                  const SizedBox(height: 12),
+
+                  _buildSocialRefsCard(),
 
                   const SizedBox(height: 12),
 
@@ -1020,6 +1027,81 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     );
   }
 
+  Widget _buildSocialRefsCard() {
+    final posts = ref.watch(socialPostsProvider);
+    final selectedPosts = posts
+        .where((post) => _socialRefs.contains('[[social/${post.socialSlug}]]'))
+        .toList();
+
+    return Container(
+      decoration: AppTheme.cardDecoration(context),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Referências',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.add_link_rounded),
+                color: AppColors.primary,
+                onPressed: _pickSocialReference,
+              ),
+            ],
+          ),
+          if (selectedPosts.isEmpty)
+            const Text(
+              'Nenhum post social vinculado',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final post in selectedPosts)
+                  InputChip(
+                    label: Text(
+                      post.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onDeleted: () => setState(
+                      () => _socialRefs.remove('[[social/${post.socialSlug}]]'),
+                    ),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _pickSocialReference() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => UniversalSearchPickerSheet(
+        title: 'Adicionar referência',
+        initialFilter: 'social_post',
+        onSelected: (obj) {
+          if (obj is SocialPost) {
+            final ref = '[[social/${obj.socialSlug}]]';
+            setState(() {
+              if (!_socialRefs.contains(ref)) _socialRefs.add(ref);
+            });
+          }
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
   void _pickTime() async {
     final time = await showTimePicker(
       context: context,
@@ -1511,6 +1593,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       pomodoroCount: _pomodoroCount,
       timeBlock: _timeBlock,
       dependsOn: _dependsOn,
+      socialRefs: _socialRefs,
       estimatedMinutes: _estimatedMinutes,
     );
 

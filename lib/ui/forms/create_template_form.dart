@@ -312,6 +312,7 @@ class _CreateTemplateFormState extends ConsumerState<CreateTemplateForm> {
                       DropdownMenuItem(value: 'note', child: Text('Nota')),
                       DropdownMenuItem(value: 'task', child: Text('Tarefa')),
                       DropdownMenuItem(value: 'entry', child: Text('Journal Entry')),
+                      DropdownMenuItem(value: 'goal', child: Text('Objetivo')),
                     ],
                     onChanged: (val) {
                       if (val != null) {
@@ -321,6 +322,10 @@ class _CreateTemplateFormState extends ConsumerState<CreateTemplateForm> {
                           if (_selectedType == 'task') {
                             _frontmatterDefaults.remove('pinned');
                           } else if (_selectedType == 'note') {
+                            _frontmatterDefaults.remove('priority');
+                            _frontmatterDefaults.remove('duration');
+                          } else if (_selectedType == 'goal') {
+                            _frontmatterDefaults.remove('pinned');
                             _frontmatterDefaults.remove('priority');
                             _frontmatterDefaults.remove('duration');
                           } else {

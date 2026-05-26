@@ -29,9 +29,14 @@ class Task extends ContentObject {
   int duration; // minutes
   String? scheduledTime; // HH:MM
   String? exportedCalendarId;
+  String? linkedGoogleEventId;
+  String? linkedGoogleEventTitle;
+  String? linkedGoogleEventDate;
+  String? linkedGoogleEventUrl;
   int? pomodoroCount;
   String? timeBlock;
   List<String> dependsOn;
+  List<String> socialRefs;
   int? estimatedMinutes;
 
   Task({
@@ -65,9 +70,14 @@ class Task extends ContentObject {
     super.obsidianPath,
     super.reminders,
     this.exportedCalendarId,
+    this.linkedGoogleEventId,
+    this.linkedGoogleEventTitle,
+    this.linkedGoogleEventDate,
+    this.linkedGoogleEventUrl,
     this.pomodoroCount,
     this.timeBlock,
     this.dependsOn = const [],
+    this.socialRefs = const [],
     this.estimatedMinutes,
     DateTime? reminderDate,
   }) {
@@ -101,7 +111,7 @@ class Task extends ContentObject {
 
   bool get isCompleted => stage == TaskStage.finalized;
 
-  int get actualMinutes => (pomodoroCount ?? 0) * 25;
+  int get actualMinutes => timerSessions;
 
   bool isBlocked(List<ContentObject> allObjects) {
     if (dependsOn.isEmpty) return false;
@@ -181,11 +191,26 @@ class Task extends ContentObject {
     frontmatter['until_done'] = untilDone;
     frontmatter['all_day'] = allDay;
     frontmatter['duration'] = duration;
+    if (timerSessions > 0) {
+      frontmatter['timer_sessions'] = timerSessions;
+    }
     if (scheduledTime != null) frontmatter['scheduled_time'] = scheduledTime;
     frontmatter['archived'] = archived;
     frontmatter['pinned'] = pinned;
     if (exportedCalendarId != null) {
       frontmatter['calendar_id'] = exportedCalendarId;
+    }
+    if (linkedGoogleEventId != null) {
+      frontmatter['linked_google_event_id'] = linkedGoogleEventId;
+    }
+    if (linkedGoogleEventTitle != null) {
+      frontmatter['linked_google_event_title'] = linkedGoogleEventTitle;
+    }
+    if (linkedGoogleEventDate != null) {
+      frontmatter['linked_google_event_date'] = linkedGoogleEventDate;
+    }
+    if (linkedGoogleEventUrl != null) {
+      frontmatter['linked_google_event_url'] = linkedGoogleEventUrl;
     }
     if (pomodoroCount != null) {
       frontmatter['pomodoro_count'] = pomodoroCount;
@@ -195,6 +220,9 @@ class Task extends ContentObject {
     }
     if (dependsOn.isNotEmpty) {
       frontmatter['depends_on'] = dependsOn;
+    }
+    if (socialRefs.isNotEmpty) {
+      frontmatter['social_refs'] = socialRefs;
     }
     if (estimatedMinutes != null) {
       frontmatter['estimated_minutes'] = estimatedMinutes;
@@ -245,7 +273,7 @@ class Task extends ContentObject {
     sessions = derivedSessions;
 
     if (sessions.isNotEmpty) {
-      frontmatter['sessions'] = sessions.map((s) => s.toMap()).toList();
+      frontmatter['subtask_sessions'] = sessions.map((s) => s.toMap()).toList();
     }
 
     final buffer = StringBuffer();
@@ -310,6 +338,10 @@ class Task extends ContentObject {
     task.scheduledTime = frontmatter['scheduled_time'] is List
         ? (frontmatter['scheduled_time'] as List).join(', ')
         : frontmatter['scheduled_time']?.toString();
+    final timer = frontmatter['timer_sessions'];
+    task.timerSessions = timer is num
+        ? timer.toInt()
+        : int.tryParse(timer?.toString() ?? '') ?? 0;
     task.archived = frontmatter['archived'] as bool? ?? false;
     task.pinned = frontmatter['pinned'] as bool? ?? false;
     if (frontmatter['reminder_date'] != null) {
@@ -320,6 +352,19 @@ class Task extends ContentObject {
     task.exportedCalendarId = frontmatter['calendar_id'] is List
         ? (frontmatter['calendar_id'] as List).join(', ')
         : frontmatter['calendar_id']?.toString();
+    task.linkedGoogleEventId = frontmatter['linked_google_event_id'] is List
+        ? (frontmatter['linked_google_event_id'] as List).join(', ')
+        : frontmatter['linked_google_event_id']?.toString();
+    task.linkedGoogleEventTitle =
+        frontmatter['linked_google_event_title'] is List
+        ? (frontmatter['linked_google_event_title'] as List).join(', ')
+        : frontmatter['linked_google_event_title']?.toString();
+    task.linkedGoogleEventDate = frontmatter['linked_google_event_date'] is List
+        ? (frontmatter['linked_google_event_date'] as List).join(', ')
+        : frontmatter['linked_google_event_date']?.toString();
+    task.linkedGoogleEventUrl = frontmatter['linked_google_event_url'] is List
+        ? (frontmatter['linked_google_event_url'] as List).join(', ')
+        : frontmatter['linked_google_event_url']?.toString();
     task.reflection = frontmatter['reflection'] is List
         ? (frontmatter['reflection'] as List).join(', ')
         : frontmatter['reflection']?.toString();
@@ -334,6 +379,12 @@ class Task extends ContentObject {
     if (frontmatter['depends_on'] != null &&
         frontmatter['depends_on'] is List) {
       task.dependsOn = (frontmatter['depends_on'] as List)
+          .map((e) => e.toString())
+          .toList();
+    }
+    if (frontmatter['social_refs'] != null &&
+        frontmatter['social_refs'] is List) {
+      task.socialRefs = (frontmatter['social_refs'] as List)
           .map((e) => e.toString())
           .toList();
     }
@@ -354,9 +405,11 @@ class Task extends ContentObject {
     }
 
     final List<SubtaskSession> fmSessions = [];
-    if (frontmatter['sessions'] != null && frontmatter['sessions'] is List) {
+    final rawSessions =
+        frontmatter['subtask_sessions'] ?? frontmatter['sessions'];
+    if (rawSessions is List) {
       fmSessions.addAll(
-        (frontmatter['sessions'] as List).map(
+        rawSessions.map(
           (e) => SubtaskSession.fromMap(Map<String, dynamic>.from(e as Map)),
         ),
       );
@@ -452,9 +505,14 @@ class Task extends ContentObject {
     bool? pinned,
     List<ReminderConfig>? reminders,
     String? exportedCalendarId,
+    String? linkedGoogleEventId,
+    String? linkedGoogleEventTitle,
+    String? linkedGoogleEventDate,
+    String? linkedGoogleEventUrl,
     int? pomodoroCount,
     String? timeBlock,
     List<String>? dependsOn,
+    List<String>? socialRefs,
     int? estimatedMinutes,
     List<OrganizerReference>? organizers,
     List<String>? categories,
@@ -486,9 +544,16 @@ class Task extends ContentObject {
       pinned: pinned ?? this.pinned,
       reminders: reminders ?? this.reminders,
       exportedCalendarId: exportedCalendarId ?? this.exportedCalendarId,
+      linkedGoogleEventId: linkedGoogleEventId ?? this.linkedGoogleEventId,
+      linkedGoogleEventTitle:
+          linkedGoogleEventTitle ?? this.linkedGoogleEventTitle,
+      linkedGoogleEventDate:
+          linkedGoogleEventDate ?? this.linkedGoogleEventDate,
+      linkedGoogleEventUrl: linkedGoogleEventUrl ?? this.linkedGoogleEventUrl,
       pomodoroCount: pomodoroCount ?? this.pomodoroCount,
       timeBlock: timeBlock ?? this.timeBlock,
       dependsOn: dependsOn ?? this.dependsOn,
+      socialRefs: socialRefs ?? this.socialRefs,
       estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,

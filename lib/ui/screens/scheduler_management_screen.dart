@@ -6,8 +6,10 @@ import '../../models/task_model.dart';
 import '../../models/habit_model.dart';
 import '../../models/goal_model.dart';
 import '../../models/scheduler.dart';
+import '../../services/scheduler_service.dart';
 import '../theme.dart';
 import '../forms/scheduler_picker.dart';
+import '../widgets/universal_search_picker.dart';
 
 class SchedulerManagementScreen extends ConsumerWidget {
   const SchedulerManagementScreen({super.key});
@@ -33,6 +35,10 @@ class SchedulerManagementScreen extends ConsumerWidget {
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _addScheduler(context, ref),
+        child: const Icon(Icons.add_rounded),
+      ),
       body: scheduledObjects.isEmpty
           ? const Center(
               child: Text(
@@ -50,6 +56,10 @@ class SchedulerManagementScreen extends ConsumerWidget {
                 final scheduler = type == 'goal'
                     ? (obj as Goal).schedulers.first
                     : (obj is Task ? obj.scheduler : (obj as Habit).scheduler);
+                final next = SchedulerService.nextOccurrence(
+                  scheduler!,
+                  after: DateTime.now().subtract(const Duration(days: 1)),
+                );
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -71,7 +81,11 @@ class SchedulerManagementScreen extends ConsumerWidget {
                       ),
                     ),
                     subtitle: Text(
-                      _getSchedulerSummary(scheduler!),
+                      [
+                        _getSchedulerSummary(scheduler),
+                        if (next != null)
+                          'Próxima: ${next.day.toString().padLeft(2, '0')}/${next.month.toString().padLeft(2, '0')}/${next.year}',
+                      ].join(' · '),
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textMuted,
@@ -89,6 +103,41 @@ class SchedulerManagementScreen extends ConsumerWidget {
                 );
               },
             ),
+    );
+  }
+
+  Future<void> _addScheduler(BuildContext context, WidgetRef ref) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => UniversalSearchPickerSheet(
+        title: 'Adicionar scheduler',
+        initialFilter: 'all',
+        showClear: false,
+        onSelected: (object) async {
+          Navigator.pop(context);
+          if (object is! Task && object is! Habit && object is! Goal) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Escolha uma tarefa, hábito ou objetivo.'),
+              ),
+            );
+            return;
+          }
+          final current = object is Goal
+              ? (object.schedulers.isNotEmpty ? object.schedulers.first : null)
+              : (object is Task ? object.scheduler : (object as Habit).scheduler);
+          final scheduler = await Navigator.push<Scheduler>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SchedulerPicker(initialScheduler: current),
+            ),
+          );
+          if (scheduler == null) return;
+          await _saveScheduler(ref, object, scheduler);
+        },
+      ),
     );
   }
 
@@ -149,17 +198,24 @@ class SchedulerManagementScreen extends ConsumerWidget {
     );
 
     if (result != null) {
-      // Logic to update the object's scheduler in the vault
-      if (obj is Task) {
-        obj.scheduler = result;
-        ref.read(tasksProvider.notifier).updateTask(obj);
-      } else if (obj is Habit) {
-        obj.scheduler = result;
-        ref.read(habitsProvider.notifier).updateHabit(obj);
-      } else if (obj is Goal) {
-        obj.schedulers = [result];
-        ref.read(goalsProvider.notifier).updateGoal(obj);
-      }
+      await _saveScheduler(ref, obj, result);
+    }
+  }
+
+  Future<void> _saveScheduler(
+    WidgetRef ref,
+    dynamic obj,
+    Scheduler scheduler,
+  ) async {
+    if (obj is Task) {
+      obj.scheduler = scheduler;
+      await ref.read(tasksProvider.notifier).updateTask(obj);
+    } else if (obj is Habit) {
+      obj.scheduler = scheduler;
+      await ref.read(habitsProvider.notifier).updateHabit(obj);
+    } else if (obj is Goal) {
+      obj.schedulers = [scheduler];
+      await ref.read(goalsProvider.notifier).updateGoal(obj);
     }
   }
 }

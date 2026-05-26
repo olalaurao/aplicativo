@@ -39,6 +39,9 @@ class PomodoroTaskHandler extends TaskHandler {
       FlutterForegroundTask.sendDataToMain({
         'action': _isRunning ? 'resume' : 'pause',
       });
+      _updateNotification();
+    } else if (id == 'skipButton') {
+      FlutterForegroundTask.sendDataToMain({'action': 'skip'});
     } else if (id == 'stopButton') {
       FlutterForegroundTask.sendDataToMain({'action': 'stop'});
     }
@@ -73,7 +76,7 @@ class PomodoroTaskHandler extends TaskHandler {
       final timeStr =
           '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
       FlutterForegroundTask.updateService(
-        notificationTitle: 'Pomodoro Active',
+        notificationTitle: 'Pomodoro em andamento',
         notificationText: 'Tempo restante: $timeStr',
         notificationButtons: PomodoroBackgroundService._notificationButtons,
       );
@@ -81,19 +84,22 @@ class PomodoroTaskHandler extends TaskHandler {
     }
 
     FlutterForegroundTask.updateService(
-      notificationTitle: done ? 'Pomodoro Completed!' : 'Pomodoro Paused',
+      notificationTitle: done ? 'Pomodoro concluído!' : 'Pomodoro pausado',
       notificationText: done
-          ? 'Time to switch phases.'
-          : 'Resume whenever you want.',
-      notificationButtons: const [],
+          ? 'Hora de trocar de fase.'
+          : 'Retome quando estiver pronto.',
+      notificationButtons: done
+          ? const []
+          : PomodoroBackgroundService._notificationButtons,
     );
   }
 }
 
 class PomodoroBackgroundService {
   static const _notificationButtons = [
-    NotificationButton(id: 'pauseButton', text: 'Pause/Resume'),
-    NotificationButton(id: 'stopButton', text: 'Stop'),
+    NotificationButton(id: 'pauseButton', text: 'Pausar/Retomar'),
+    NotificationButton(id: 'skipButton', text: 'Pular fase'),
+    NotificationButton(id: 'stopButton', text: 'Parar'),
   ];
 
   static void init() {

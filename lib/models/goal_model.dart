@@ -20,6 +20,11 @@ class Goal extends ContentObject {
   List<Scheduler> schedulers;
   String? color;
   String? icon;
+  String? linkedGoogleEventId;
+  String? linkedGoogleEventTitle;
+  String? linkedGoogleEventDate;
+  String? linkedGoogleEventUrl;
+  List<String> socialRefs;
 
   Goal({
     super.id,
@@ -35,12 +40,18 @@ class Goal extends ContentObject {
     this.schedulers = const [],
     this.color,
     this.icon,
+    this.linkedGoogleEventId,
+    this.linkedGoogleEventTitle,
+    this.linkedGoogleEventDate,
+    this.linkedGoogleEventUrl,
+    List<String>? socialRefs,
     super.organizers,
     super.categories,
     super.createdAt,
     super.updatedAt,
     super.obsidianPath,
-  }) : super();
+  }) : socialRefs = socialRefs ?? [],
+       super();
 
   @override
   String get type => 'goal';
@@ -60,6 +71,21 @@ class Goal extends ContentObject {
         .toList();
     frontmatter['color'] = color;
     frontmatter['icon'] = icon;
+    if (linkedGoogleEventId != null) {
+      frontmatter['linked_google_event_id'] = linkedGoogleEventId;
+    }
+    if (linkedGoogleEventTitle != null) {
+      frontmatter['linked_google_event_title'] = linkedGoogleEventTitle;
+    }
+    if (linkedGoogleEventDate != null) {
+      frontmatter['linked_google_event_date'] = linkedGoogleEventDate;
+    }
+    if (linkedGoogleEventUrl != null) {
+      frontmatter['linked_google_event_url'] = linkedGoogleEventUrl;
+    }
+    if (socialRefs.isNotEmpty) {
+      frontmatter['social_refs'] = socialRefs;
+    }
 
     return generateMarkdown(frontmatter, description ?? '');
   }
@@ -96,8 +122,79 @@ class Goal extends ContentObject {
 
     goal.color = frontmatter['color'] as String?;
     goal.icon = frontmatter['icon'] as String?;
+    goal.linkedGoogleEventId = frontmatter['linked_google_event_id']
+        ?.toString();
+    goal.linkedGoogleEventTitle = frontmatter['linked_google_event_title']
+        ?.toString();
+    goal.linkedGoogleEventDate = frontmatter['linked_google_event_date']
+        ?.toString();
+    goal.linkedGoogleEventUrl = frontmatter['linked_google_event_url']
+        ?.toString();
+    if (frontmatter['social_refs'] is List) {
+      goal.socialRefs = (frontmatter['social_refs'] as List)
+          .map((e) => e.toString())
+          .toList();
+    }
 
     return goal;
+  }
+
+  Goal copyWith({
+    String? title,
+    String? description,
+    GoalType? goalType,
+    GoalStatus? state,
+    String? repeatInterval,
+    DateTime? startDate,
+    DateTime? deadline,
+    List<KPI>? kpis,
+    List<Subtask>? subtasks,
+    List<Scheduler>? schedulers,
+    String? color,
+    String? icon,
+    String? linkedGoogleEventId,
+    String? linkedGoogleEventTitle,
+    String? linkedGoogleEventDate,
+    String? linkedGoogleEventUrl,
+    List<String>? socialRefs,
+    List<OrganizerReference>? organizers,
+    List<String>? categories,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? obsidianPath,
+  }) {
+    return Goal(
+        id: id,
+        title: title ?? this.title,
+        description: description ?? this.description,
+        goalType: goalType ?? this.goalType,
+        state: state ?? this.state,
+        repeatInterval: repeatInterval ?? this.repeatInterval,
+        startDate: startDate ?? this.startDate,
+        deadline: deadline ?? this.deadline,
+        kpis: kpis ?? this.kpis,
+        subtasks: subtasks ?? this.subtasks,
+        schedulers: schedulers ?? this.schedulers,
+        color: color ?? this.color,
+        icon: icon ?? this.icon,
+        linkedGoogleEventId: linkedGoogleEventId ?? this.linkedGoogleEventId,
+        linkedGoogleEventTitle:
+            linkedGoogleEventTitle ?? this.linkedGoogleEventTitle,
+        linkedGoogleEventDate:
+            linkedGoogleEventDate ?? this.linkedGoogleEventDate,
+        linkedGoogleEventUrl: linkedGoogleEventUrl ?? this.linkedGoogleEventUrl,
+        socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
+        organizers: organizers ?? this.organizers,
+        categories: categories ?? this.categories,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? DateTime.now(),
+        obsidianPath: obsidianPath ?? this.obsidianPath,
+      )
+      ..archived = archived
+      ..pinned = pinned
+      ..tags = List<String>.from(tags)
+      ..reminders = List.from(reminders)
+      ..order = order;
   }
 
   double get progress {

@@ -36,6 +36,7 @@ import '../widgets/rich_text_editor.dart';
 import '../widgets/outline_editor.dart';
 import '../widgets/collection_view.dart';
 import '../widgets/object_action_wrapper.dart';
+import '../widgets/social_post_grid_card.dart';
 import '../../models/note_model.dart';
 import '../../models/template_model.dart';
 import '../widgets/wiki_text_view.dart';
@@ -54,6 +55,7 @@ import '../forms/create_tracker_form.dart';
 import '../forms/create_organizer_form.dart';
 import '../../services/google_auth_service.dart' as auth;
 import '../../providers/google_calendar_provider.dart';
+import 'social_post_detail.dart';
 
 class UniversalDetailView extends ConsumerStatefulWidget {
   final ContentObject object;
@@ -363,6 +365,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 ),
               ),
             ),
+
+          if (_socialRefsFor(object).isNotEmpty)
+            SliverToBoxAdapter(child: _buildSocialRefsSection(ref)),
 
           // ─── Type-Specific Content ───
           ..._buildTypeSpecificContent(context, ref),
@@ -824,6 +829,91 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
+  List<String> _socialRefsFor(ContentObject object) {
+    if (object is Goal) return object.socialRefs;
+    if (object is Task) return object.socialRefs;
+    if (object is Note) return object.socialRefs;
+    return const [];
+  }
+
+  Widget _buildSocialRefsSection(WidgetRef ref) {
+    final refs = _socialRefsFor(object);
+    final posts = ref
+        .watch(socialPostsProvider)
+        .where((post) => refs.contains('[[social/${post.socialSlug}]]'))
+        .toList();
+    if (posts.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.bookmarks_outlined,
+                size: 18,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Posts de referência',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(width: 8),
+              _badge(posts.length.toString()),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 128,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: posts.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final post = posts[index];
+                return GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SocialPostDetail(post: post),
+                    ),
+                  ),
+                  child: SizedBox(
+                    width: 86,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          SocialPostThumbnail(
+                            post: post,
+                            borderRadius: BorderRadius.zero,
+                          ),
+                          Positioned(
+                            left: 6,
+                            right: 6,
+                            bottom: 6,
+                            child: SocialPlatformBadge(
+                              platform: post.platform,
+                              fontSize: 8,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<Widget> _buildTypeSpecificProperties(
     BuildContext context,
     WidgetRef ref,
@@ -831,6 +921,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     if (object is Task) {
       final task = object as Task;
       return [
+        ..._buildLinkedGoogleEventRows(context, task),
         _divider(),
         _buildPropertyRow(
           context,
@@ -867,6 +958,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     if (object is Project) {
       final project = object as Project;
       return [
+        ..._buildLinkedGoogleEventRows(context, project),
         _divider(),
         _buildPropertyRow(
           context,
@@ -1001,6 +1093,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       final progress = total > 0 ? (completed / total) : 0.0;
 
       return [
+        ..._buildLinkedGoogleEventRows(context, goal),
         _divider(),
         _buildPropertyRow(
           context,
@@ -1036,6 +1129,55 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
 
     return [];
+  }
+
+  List<Widget> _buildLinkedGoogleEventRows(
+    BuildContext context,
+    Object source,
+  ) {
+    String? id;
+    String? title;
+    String? date;
+    String? url;
+
+    if (source is Task) {
+      id = source.linkedGoogleEventId;
+      title = source.linkedGoogleEventTitle;
+      date = source.linkedGoogleEventDate;
+      url = source.linkedGoogleEventUrl;
+    } else if (source is Goal) {
+      id = source.linkedGoogleEventId;
+      title = source.linkedGoogleEventTitle;
+      date = source.linkedGoogleEventDate;
+      url = source.linkedGoogleEventUrl;
+    } else if (source is Project) {
+      id = source.linkedGoogleEventId;
+      title = source.linkedGoogleEventTitle;
+      date = source.linkedGoogleEventDate;
+      url = source.linkedGoogleEventUrl;
+    }
+
+    if (id == null || id.isEmpty) return [];
+    final parsedDate = date == null ? null : DateTime.tryParse(date);
+    final dateLabel = parsedDate == null
+        ? null
+        : DateFormat('d MMM yyyy HH:mm').format(parsedDate.toLocal());
+    final label = [title ?? 'Evento Google', ?dateLabel].join(' · ');
+
+    return [
+      _divider(),
+      _buildPropertyRow(
+        context,
+        'Evento Google',
+        label,
+        onTap: url == null || url.isEmpty
+            ? null
+            : () => launchUrl(
+                Uri.parse(url!),
+                mode: LaunchMode.externalApplication,
+              ),
+      ),
+    ];
   }
 
   List<Widget> _buildTypeSpecificContent(BuildContext context, WidgetRef ref) {
@@ -1084,6 +1226,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 ],
                 // ── V2.8.3 Time Estimates vs Actuals ──
                 if (task.estimatedMinutes != null ||
+                    task.actualMinutes > 0 ||
                     (task.pomodoroCount != null &&
                         task.pomodoroCount! > 0)) ...[
                   const SizedBox(height: 24),
@@ -3157,6 +3300,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
 
     final progress = (currentValue / kpi.targetValue).clamp(0.0, 1.0);
+    final isComplete = kpi.completed || currentValue >= kpi.targetValue;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -3176,14 +3320,34 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   ),
                 ),
               ),
-              Text(
-                '${currentValue.toInt()} / ${kpi.targetValue.toInt()}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
+              if (isComplete)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    '✓ Atingido',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.success,
+                    ),
+                  ),
+                )
+              else
+                Text(
+                  '${currentValue.toInt()} / ${kpi.targetValue.toInt()}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -3201,8 +3365,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             child: LinearProgressIndicator(
               value: progress,
               backgroundColor: AppColors.surfaceVariant,
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                AppColors.primary,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isComplete ? AppColors.success : AppColors.primary,
               ),
               minHeight: 8,
             ),

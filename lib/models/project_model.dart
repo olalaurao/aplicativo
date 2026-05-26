@@ -13,6 +13,10 @@ class Project extends Organizer {
   List<String> taskLinks; // List of Task slugs/IDs
   List<String> quickAccessLinks; // List of WikiLinks
   int totalPomodoroTime; // Minutes
+  String? linkedGoogleEventId;
+  String? linkedGoogleEventTitle;
+  String? linkedGoogleEventDate;
+  String? linkedGoogleEventUrl;
 
   Project({
     super.id,
@@ -25,6 +29,10 @@ class Project extends Organizer {
     List<String>? taskLinks,
     List<String>? quickAccessLinks,
     this.totalPomodoroTime = 0,
+    this.linkedGoogleEventId,
+    this.linkedGoogleEventTitle,
+    this.linkedGoogleEventDate,
+    this.linkedGoogleEventUrl,
     super.parentId,
     super.startDate,
     super.endDate,
@@ -55,6 +63,18 @@ class Project extends Organizer {
     frontmatter['tasks'] = taskLinks;
     frontmatter['quick_access'] = quickAccessLinks;
     frontmatter['total_pomodoro_time'] = totalPomodoroTime;
+    if (linkedGoogleEventId != null) {
+      frontmatter['linked_google_event_id'] = linkedGoogleEventId;
+    }
+    if (linkedGoogleEventTitle != null) {
+      frontmatter['linked_google_event_title'] = linkedGoogleEventTitle;
+    }
+    if (linkedGoogleEventDate != null) {
+      frontmatter['linked_google_event_date'] = linkedGoogleEventDate;
+    }
+    if (linkedGoogleEventUrl != null) {
+      frontmatter['linked_google_event_url'] = linkedGoogleEventUrl;
+    }
 
     // Add organizer-specific fields
     if (startDate != null) {
@@ -105,6 +125,14 @@ class Project extends Organizer {
     }
     project.color = frontmatter['color'] is List ? (frontmatter['color'] as List).join(', ') : frontmatter['color']?.toString();
     project.icon = frontmatter['icon'] is List ? (frontmatter['icon'] as List).join(', ') : frontmatter['icon']?.toString();
+    project.linkedGoogleEventId =
+        frontmatter['linked_google_event_id']?.toString();
+    project.linkedGoogleEventTitle =
+        frontmatter['linked_google_event_title']?.toString();
+    project.linkedGoogleEventDate =
+        frontmatter['linked_google_event_date']?.toString();
+    project.linkedGoogleEventUrl =
+        frontmatter['linked_google_event_url']?.toString();
 
     return project;
   }

@@ -3,6 +3,8 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import 'package:watcher/watcher.dart';
+import '../models/content_object.dart';
+import 'markdown_parser.dart';
 
 class ObsidianService {
   Directory? vaultDir;
@@ -51,6 +53,7 @@ class ObsidianService {
       'organizers/places',
       'organizers/labels',
       'resources',
+      'social',
       'sessions',
       '_attachments',
       '_deleted',
@@ -115,6 +118,58 @@ class ObsidianService {
     await file.writeAsString(content, encoding: utf8);
   }
 
+  Future<void> appendToDailyNote(
+    DateTime date,
+    String sectionHeading,
+    String contentToAppend,
+  ) async {
+    final dateStr = date.toIso8601String().split('T').first;
+    final path = 'daily/$dateStr.md';
+    final existing =
+        await readFile(path) ??
+        '---\ndate: $dateStr\ntags:\n  - daily\n---\n\n# $dateStr\n';
+    final frontmatter = MarkdownParser.parseFrontmatter(existing);
+    final body = MarkdownParser.extractBody(existing);
+    final newBody = _appendToSection(body, sectionHeading, contentToAppend);
+    await writeFile(path, generateMarkdown(frontmatter, newBody));
+  }
+
+  String _appendToSection(
+    String body,
+    String sectionHeading,
+    String contentToAppend,
+  ) {
+    final normalizedHeading = sectionHeading.trim();
+    final addition = contentToAppend.trim();
+    if (addition.isEmpty) return body;
+
+    final lines = body.split('\n');
+    final sectionIndex = lines.indexWhere(
+      (line) => line.trim() == normalizedHeading,
+    );
+    if (sectionIndex == -1) {
+      return [
+        body.trimRight(),
+        '',
+        normalizedHeading,
+        '',
+        addition,
+        '',
+      ].join('\n');
+    }
+
+    var insertAt = lines.length;
+    for (var i = sectionIndex + 1; i < lines.length; i++) {
+      final trimmed = lines[i].trimLeft();
+      if (trimmed.startsWith('## ') && !trimmed.startsWith('### ')) {
+        insertAt = i;
+        break;
+      }
+    }
+    lines.insertAll(insertAt, ['', addition]);
+    return lines.join('\n').trimRight();
+  }
+
   Future<List<File>> getFilesInFolder(String folderName) async {
     if (vaultDir == null) return [];
     final dir = Directory('${vaultDir!.path}/$folderName');
@@ -135,6 +190,12 @@ class ObsidianService {
 
   Stream<WatchEvent>? watchVault() {
     if (vaultDir == null) return null;
+    if (Platform.isIOS) {
+      return PollingDirectoryWatcher(
+        vaultDir!.path,
+        pollingDelay: const Duration(minutes: 1),
+      ).events;
+    }
     return DirectoryWatcher(vaultDir!.path).events;
   }
 

@@ -3,7 +3,7 @@ import 'content_object.dart';
 import 'shared_types.dart';
 
 class TemplateDefinition extends ContentObject {
-  final String templateType; // 'entry', 'task', 'note', 'habit', 'tracker'
+  final String templateType; // 'entry', 'task', 'note', 'habit', 'tracker', 'goal'
   final String body;
   final Map<String, dynamic> frontmatterDefaults;
 

@@ -60,6 +60,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
+        key: const PageStorageKey('resources-scroll'),
         slivers: [
           SliverAppBar(
             title: const Text('Media & Resources'),

@@ -20,7 +20,7 @@ class AnalysisCalendar extends StatelessWidget {
     final firstDay = DateTime(month.year, month.month, 1);
     final lastDay = DateTime(month.year, month.month + 1, 0);
     final daysInMonth = lastDay.day;
-    final firstWeekday = firstDay.weekday % 7; // 0 for Sunday
+    final firstWeekday = (firstDay.weekday - 1) % 7; // 0 for Monday
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

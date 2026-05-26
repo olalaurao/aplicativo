@@ -6,6 +6,7 @@ import '../forms/create_entry_form.dart';
 import '../forms/create_habit_form.dart';
 import '../forms/create_goal_form.dart';
 import '../forms/create_note_form.dart';
+import '../forms/create_social_post_form.dart';
 
 import '../forms/create_scan_document_form.dart';
 import '../forms/create_reminder_form.dart';
@@ -220,6 +221,19 @@ class _CreateMenuSheetState extends State<CreateMenuSheet> {
             const SizedBox(width: 12),
             _buildCreateCard(
               context,
+              icon: Icons.play_circle_outline_rounded,
+              title: 'Post social',
+              subtitle: 'Salvar link de uma rede',
+              color: AppColors.info,
+              targetForm: const CreateSocialPostForm(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _buildCreateCard(
+              context,
               icon: Icons.document_scanner_outlined,
               title: 'Escanear',
               subtitle: 'Scan a physical document',
@@ -228,6 +242,7 @@ class _CreateMenuSheetState extends State<CreateMenuSheet> {
                 initialTitle: widget.initialTitle,
               ),
             ),
+            const Spacer(),
           ],
         ),
       ],

@@ -193,7 +193,21 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
                           }),
                         ),
 
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 24),
+
+                        // Presets Row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _presetButton(context, ref, '25/5 min', 25, PomodoroType.work),
+                            const SizedBox(width: 8),
+                            _presetButton(context, ref, '50/10 min', 50, PomodoroType.work),
+                            const SizedBox(width: 8),
+                            _presetButton(context, ref, '90/20 min', 90, PomodoroType.work),
+                          ],
+                        ),
+
+                        const SizedBox(height: 32),
 
                         // Main Action
                         Row(
@@ -806,6 +820,49 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _presetButton(
+    BuildContext context,
+    WidgetRef ref,
+    String label,
+    int minutes,
+    PomodoroType type,
+  ) {
+    final state = ref.watch(pomodoroProvider);
+    final isSelected = state.totalSeconds == minutes * 60 && state.currentType == type;
+
+    return OutlinedButton(
+      onPressed: state.isRunning
+          ? null
+          : () {
+              ref.read(pomodoroProvider.notifier).setDuration(minutes, type);
+              HapticFeedback.lightImpact();
+            },
+      style: OutlinedButton.styleFrom(
+        foregroundColor: isSelected ? Colors.white : AppColors.error,
+        backgroundColor: isSelected
+            ? AppColors.error
+            : AppColors.surfaceVariant.withValues(alpha: 0.3),
+        side: BorderSide(
+          color: isSelected ? AppColors.error : AppColors.divider.withValues(alpha: 0.1),
+          width: 1.5,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

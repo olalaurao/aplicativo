@@ -11,7 +11,6 @@ import 'obsidian_service.dart';
 import 'dataview_generator.dart';
 import 'notification_service.dart';
 import '../models/content_object.dart';
-import '../models/task_model.dart';
 import '../models/sync_action.dart';
 import '../providers/sync_provider.dart';
 import '../providers/vault_provider.dart';
@@ -536,8 +535,6 @@ class SyncManager {
     return object?.obsidianPath;
   }
 
-  static final Set<int> _notifiedMissedReminders = {};
-
   Future<void> _refreshNotificationsFromLocalVault() async {
     _ref.invalidate(allObjectsProvider);
     final allObjects = await _ref.read(allObjectsProvider.future);
@@ -556,30 +553,6 @@ class SyncManager {
             title: object.title,
             triggerTime: triggerTime,
             config: reminder,
-            payload: object.id,
-          );
-        }
-        // Trigger immediately if missed recently (within last 60 mins)
-        else if (triggerTime.isBefore(now) &&
-            triggerTime.isAfter(now.subtract(const Duration(minutes: 60)))) {
-          if (_notifiedMissedReminders.contains(notificationId)) continue;
-
-          // Check if object is already completed
-          bool alreadyDone = false;
-          if (object is Task && object.stage == TaskStage.finalized) {
-            alreadyDone = true;
-          }
-          // Habit completion check would require reading the daily note specifically,
-          // but for now this covers Tasks which are the most common reminders.
-
-          if (alreadyDone) continue;
-
-          _notifiedMissedReminders.add(notificationId);
-          await NotificationService().showImmediateNotification(
-            id: notificationId,
-            title: 'Lembrete Atrasado: ${object.title}',
-            body:
-                'This should have happened at ${triggerTime.hour}:${triggerTime.minute.toString().padLeft(2, '0')}',
             payload: object.id,
           );
         }

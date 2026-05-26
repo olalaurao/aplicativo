@@ -42,7 +42,7 @@ class JournalEntry extends ContentObject {
     if (location != null) frontmatter['location'] = location;
     if (photos.isNotEmpty) frontmatter['photos'] = photos;
 
-    return generateMarkdown(frontmatter, body);
+    return generateMarkdown(frontmatter, normalizeRichTextBodyForMarkdown(body));
   }
 
   factory JournalEntry.fromMarkdown(

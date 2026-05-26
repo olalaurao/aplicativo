@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme.dart';
@@ -10,6 +12,8 @@ import 'mood_settings_screen.dart';
 import 'scheduler_management_screen.dart';
 import 'notification_settings_screen.dart';
 import 'day_theme_screen.dart';
+import 'import_vault_screen.dart';
+import 'social_bulk_import_screen.dart';
 
 import 'package:file_picker/file_picker.dart';
 import '../../services/google_drive_sync_service.dart';
@@ -19,7 +23,6 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'category_management_screen.dart';
 import 'type_signatures_screen.dart';
 import '../../models/template_model.dart';
-import 'dart:io';
 import '../../services/permission_service.dart';
 import '../../services/dataview_generator.dart';
 
@@ -100,6 +103,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           String? result = await FilePicker.platform
                               .getDirectoryPath();
                           if (result != null) {
+                            final validationError = await _validateVaultPath(
+                              result,
+                            );
+                            if (validationError != null) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(validationError)),
+                              );
+                              return;
+                            }
                             await notifier.updateVaultPath(result);
                             await ref
                                 .read(obsidianServiceProvider)
@@ -136,7 +149,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ),
                         subtitle: const Text(
-                          'Copia arquivos .md de um diretório externo para o vault interno.',
+                          'Seleciona uma pasta existente e indexa os arquivos compatíveis.',
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: const Icon(
@@ -144,28 +157,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           size: 20,
                           color: AppColors.primary,
                         ),
-                        onTap: () async {
-                          String? result = await FilePicker.platform
-                              .getDirectoryPath();
-                          if (!context.mounted) return;
-                          if (result != null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Importando vault...'),
-                              ),
-                            );
-                            await ref
-                                .read(vaultProvider.notifier)
-                                .importExistingVault(result);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Vault importado com sucesso!'),
-                                ),
-                              );
-                            }
-                          }
-                        },
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ImportVaultScreen(),
+                          ),
+                        ),
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      ListTile(
+                        title: const Text(
+                          'Importar lista de URLs',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Importa posts sociais a partir de uma lista de links.',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        trailing: const Icon(
+                          Icons.playlist_add_rounded,
+                          size: 20,
+                          color: AppColors.primary,
+                        ),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SocialBulkImportScreen(),
+                          ),
+                        ),
                       ),
                       const Divider(height: 1, indent: 16),
                       _switchTileSimple('Sync Hidden Files', false, (v) {}),
@@ -753,7 +775,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () => _importObsidianVault(context, notifier),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ImportVaultScreen(),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -891,56 +918,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text('Erro ao regenerar: $e')));
     }
-  }
-
-  Future<void> _importObsidianVault(
-    BuildContext context,
-    SettingsNotifier notifier,
-  ) async {
-    final result = await FilePicker.platform.getDirectoryPath(
-      dialogTitle: 'Selecionar pasta do vault Obsidian',
-    );
-    if (result == null || !context.mounted) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Importar vault Obsidian?'),
-        content: Text(
-          'O app vai apontar para:\n$result\n\n'
-          'Arquivos com frontmatter estruturado serão indexados. '
-          'Arquivos simples serão importados como Text Notes.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Importar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !context.mounted) return;
-
-    // Update the vault path to the imported vault
-    await notifier.updateVaultPath(result);
-    await ref
-        .read(obsidianServiceProvider)
-        .initVault(ref.read(settingsProvider).vaultName, customPath: result);
-    // Reload all objects from new vault
-    ref.invalidate(allObjectsProvider);
-
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Vault importado! Recarregando dados...'),
-        duration: Duration(seconds: 3),
-      ),
-    );
   }
 
   Widget _buildBottomBarEditor() {
@@ -1671,41 +1648,163 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final authNotifier = ref.read(
       calendar_auth.googleAuthServiceProvider.notifier,
     );
+    final calendarsAsync = ref.watch(calendar_auth.googleCalendarListProvider);
+    final visibilityAsync = ref.watch(
+      calendar_auth.googleCalendarVisibilityProvider,
+    );
 
     return Container(
       decoration: AppTheme.cardDecoration(context),
-      child: ListTile(
-        leading: const Icon(
-          Icons.calendar_month_rounded,
-          color: AppColors.primary,
-        ),
-        title: const Text(
-          'Google Calendar',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-        ),
-        subtitle: Text(
-          googleUser != null
-              ? 'Connected as ${googleUser.email}'
-              : 'Not connected',
-          style: const TextStyle(fontSize: 12),
-        ),
-        trailing: googleUser != null
-            ? TextButton(
-                onPressed: () => authNotifier.signOut(),
-                child: const Text(
-                  'DISCONNECT',
-                  style: TextStyle(fontSize: 11, color: AppColors.error),
-                ),
-              )
-            : TextButton(
-                onPressed: () => authNotifier.signIn(),
-                child: const Text(
-                  'CONNECT',
-                  style: TextStyle(fontSize: 11, color: AppColors.primary),
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(
+              Icons.calendar_month_rounded,
+              color: AppColors.primary,
+            ),
+            title: const Text(
+              'Google Calendar',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+            subtitle: Text(
+              googleUser != null
+                  ? 'Conectado como ${googleUser.email}'
+                  : 'Não conectado',
+              style: const TextStyle(fontSize: 12),
+            ),
+            trailing: googleUser != null
+                ? TextButton(
+                    onPressed: () => authNotifier.signOut(),
+                    child: const Text(
+                      'DESCONECTAR',
+                      style: TextStyle(fontSize: 11, color: AppColors.error),
+                    ),
+                  )
+                : TextButton(
+                    onPressed: () => authNotifier.signIn(),
+                    child: const Text(
+                      'CONECTAR',
+                      style: TextStyle(fontSize: 11, color: AppColors.primary),
+                    ),
+                  ),
+          ),
+          if (googleUser != null)
+            calendarsAsync.when(
+              data: (calendars) {
+                final defaultEnabled = calendars
+                    .where((entry) => entry.selected != false)
+                    .map((entry) => entry.id)
+                    .whereType<String>()
+                    .toSet();
+                final configured = visibilityAsync.valueOrNull;
+                final enabled = configured ?? defaultEnabled;
+
+                if (calendars.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Nenhum calendário encontrado.',
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Column(
+                    children: calendars.map((calendar) {
+                      final id = calendar.id;
+                      if (id == null) return const SizedBox.shrink();
+                      final title = calendar.summary ?? id;
+                      return SwitchListTile.adaptive(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: enabled.contains(id),
+                        activeThumbColor: AppColors.primary,
+                        title: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        subtitle: Text(
+                          calendar.primary == true
+                              ? 'Calendário principal'
+                              : id,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        onChanged: (_) => ref
+                            .read(
+                              calendar_auth
+                                  .googleCalendarVisibilityProvider
+                                  .notifier,
+                            )
+                            .toggleCalendar(
+                              id,
+                              defaultEnabledIds: defaultEnabled,
+                            ),
+                      );
+                    }).toList(),
+                  ),
+                );
+              },
+              loading: () => const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
                 ),
               ),
+              error: (error, _) => Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Não foi possível carregar calendários: $error',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.error,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
+  }
+
+  Future<String?> _validateVaultPath(String path) async {
+    try {
+      final dir = Directory(path);
+      if (!await dir.exists()) {
+        return 'A pasta selecionada não existe.';
+      }
+      final probe = File(
+        '${dir.path}${Platform.pathSeparator}.citrine_write_test',
+      );
+      await probe.writeAsString('ok');
+      if (await probe.exists()) {
+        await probe.delete();
+      }
+      return null;
+    } catch (e) {
+      return 'Sem permissão de escrita nesta pasta: $e';
+    }
   }
 }
 
