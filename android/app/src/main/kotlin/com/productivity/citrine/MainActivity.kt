@@ -16,6 +16,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.productivity.citrine/settings"
     private var pendingPayload: String? = null
+    private var pendingSharedText: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,6 +39,10 @@ class MainActivity : FlutterActivity() {
     private fun handleIntent(intent: Intent?) {
         if (intent != null && intent.hasExtra("payload")) {
             pendingPayload = intent.getStringExtra("payload")
+        }
+        if (intent?.action == Intent.ACTION_SEND && intent.type?.startsWith("text/") == true) {
+            pendingSharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
+                ?: intent.getStringExtra(Intent.EXTRA_SUBJECT)
         }
     }
 
@@ -168,6 +173,11 @@ class MainActivity : FlutterActivity() {
                     val payload = pendingPayload
                     pendingPayload = null
                     result.success(payload)
+                }
+                "getAndClearSharedText" -> {
+                    val sharedText = pendingSharedText
+                    pendingSharedText = null
+                    result.success(sharedText)
                 }
                 "bringAppToForeground" -> {
                     try {

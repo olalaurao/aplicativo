@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:home_widget/home_widget.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 
 import 'ui/shell/app_shell.dart';
 import 'ui/theme.dart';
@@ -44,7 +45,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'services/sync_manager.dart';
-import 'services/oembed_service.dart';
 import 'services/permission_service.dart';
 import 'ui/widgets/notification_popup_overlay.dart';
 import 'ui/widgets/pomodoro_floating_clock.dart';
@@ -190,6 +190,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
   StreamSubscription<List<SharedMediaFile>>? _shareIntentSub;
   Timer? _midnightTimer;
   DateTime _lastCheckedDate = DateTime.now();
+  String? _pendingSharedUrl;
 
   @override
   void initState() {
@@ -199,6 +200,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
         debugPrint('[AppLifecycle] Resumed - refreshing widgets and syncing');
         unawaited(forceWidgetSync(widget.container));
         widget.container.read(syncManagerProvider).performSync();
+        unawaited(_checkPendingSharedTextFromNative());
       },
     );
     _initShareIntentHandling();
@@ -244,33 +246,74 @@ class _BootstrapAppState extends State<BootstrapApp> {
             (error) => debugPrint('Initial share intent failed: $error'),
           ),
     );
+    unawaited(_checkPendingSharedTextFromNative());
   }
 
   Future<void> _handleSharedMedia(List<SharedMediaFile> files) async {
     final url = _extractSharedUrl(files);
-    if (url == null) return;
+    if (url == null) {
+      debugPrint('Share intent ignored: no http(s) URL found.');
+      return;
+    }
     await ReceiveSharingIntent.instance.reset();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final navigator = _rootNavigatorKey.currentState;
-      if (navigator == null) return;
-      navigator.push(
-        MaterialPageRoute(
-          builder: (_) => CreateSocialPostForm(initialUrl: url),
-        ),
-      );
-    });
+    _openSharedSocialUrl(url);
   }
 
   String? _extractSharedUrl(List<SharedMediaFile> files) {
     for (final file in files) {
       final candidates = [file.path, file.message].whereType<String>();
       for (final candidate in candidates) {
-        final match = RegExp(r'https?://\S+').firstMatch(candidate);
-        final url = match?.group(0)?.trim();
-        if (url != null && OEmbedService.isSupportedUrl(url)) return url;
+        final url = _extractUrlFromText(candidate);
+        if (url != null) return url;
       }
     }
     return null;
+  }
+
+  Future<void> _checkPendingSharedTextFromNative() async {
+    if (!Platform.isAndroid) return;
+    try {
+      const channel = MethodChannel('com.productivity.citrine/settings');
+      final text = await channel.invokeMethod<String>('getAndClearSharedText');
+      final url = _extractUrlFromText(text);
+      if (url != null) {
+        _openSharedSocialUrl(url);
+      }
+    } catch (error) {
+      debugPrint('Native share intent check failed: $error');
+    }
+  }
+
+  String? _extractUrlFromText(String? text) {
+    if (text == null) return null;
+    final match = RegExp(r'https?://[^\s<>"\]]+').firstMatch(text);
+    return match?.group(0)?.trim().replaceFirst(RegExp(r'[),.;]+$'), '');
+  }
+
+  void _openSharedSocialUrl(String url) {
+    _pendingSharedUrl = url;
+    _tryOpenPendingSharedUrl();
+  }
+
+  void _tryOpenPendingSharedUrl([int attempt = 0]) {
+    final url = _pendingSharedUrl;
+    if (url == null) return;
+
+    final navigator = _rootNavigatorKey.currentState;
+    if (navigator == null) {
+      if (attempt < 20) {
+        Future.delayed(
+          const Duration(milliseconds: 250),
+          () => _tryOpenPendingSharedUrl(attempt + 1),
+        );
+      }
+      return;
+    }
+
+    _pendingSharedUrl = null;
+    navigator.push(
+      MaterialPageRoute(builder: (_) => CreateSocialPostForm(initialUrl: url)),
+    );
   }
 
   @override
