@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../models/habit_model.dart';
@@ -356,9 +357,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         itemCount: 4,
         separatorBuilder: (_, _) => const SizedBox(height: 16),
         itemBuilder: (context, index) {
-          final heights = [132.0, 92.0, 156.0, 112.0];
+          final heights = [132.0, 116.0, 156.0, 116.0];
           return Container(
-            height: heights[index],
+            constraints: BoxConstraints(minHeight: heights[index]),
             decoration: AppTheme.cardDecoration(context),
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -1880,10 +1881,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               .updateBlock(
                 block.copyWith(
                   title: object.title,
-                  metadata: {
-                    ...block.metadata,
-                    'noteSlug': object.slug,
-                  },
+                  metadata: {...block.metadata, 'noteSlug': object.slug},
                 ),
               );
         },
@@ -2303,9 +2301,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           context.push('/sync-conflicts');
         } else {
           ref.read(syncManagerProvider).performSync();
+          _triggerFolderSync();
         }
       },
     );
+  }
+
+  Future<void> _triggerFolderSync() async {
+    if (!Platform.isAndroid) return;
+    final syncUri = Uri.parse('foldersync://sync');
+    try {
+      if (await canLaunchUrl(syncUri)) {
+        await launchUrl(syncUri, mode: LaunchMode.externalApplication);
+        return;
+      }
+      const channel = MethodChannel('com.productivity.citrine/settings');
+      await channel.invokeMethod('sendBroadcast', {
+        'action': 'com.tacit.foldersync.intent.action.SYNC_ALL',
+      });
+    } catch (e) {
+      debugPrint('FolderSync trigger failed: $e');
+      final marketUri = Uri.parse(
+        'market://details?id=dk.tacit.android.foldersync.lite',
+      );
+      if (await canLaunchUrl(marketUri)) {
+        await launchUrl(marketUri, mode: LaunchMode.externalApplication);
+      }
+    }
   }
 
   Widget _buildJournalQuickAddBlock() {

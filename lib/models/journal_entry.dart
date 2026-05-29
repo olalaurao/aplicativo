@@ -2,6 +2,7 @@
 import 'content_object.dart';
 import 'shared_types.dart';
 import 'reminder_config.dart';
+import 'package:flutter/foundation.dart';
 
 class JournalEntry extends ContentObject {
   String body;
@@ -42,19 +43,25 @@ class JournalEntry extends ContentObject {
     if (location != null) frontmatter['location'] = location;
     if (photos.isNotEmpty) frontmatter['photos'] = photos;
 
-    return generateMarkdown(frontmatter, normalizeRichTextBodyForMarkdown(body));
+    return generateMarkdown(
+      frontmatter,
+      normalizeRichTextBodyForMarkdown(body),
+    );
   }
 
   factory JournalEntry.fromMarkdown(
     Map<String, dynamic> frontmatter,
     String body,
   ) {
+    final rawDate = frontmatter['date']?.toString();
+    final parsedDate = rawDate == null ? null : DateTime.tryParse(rawDate);
+    if (rawDate != null && parsedDate == null) {
+      debugPrint('Invalid journal entry date in frontmatter: $rawDate');
+    }
     final entry = JournalEntry(
       title: frontmatter['title'] as String?,
       body: body,
-      date: frontmatter['date'] != null
-          ? DateTime.tryParse(frontmatter['date'].toString()) ?? DateTime.now()
-          : DateTime.now(),
+      date: parsedDate ?? DateTime.fromMillisecondsSinceEpoch(0),
     );
     entry.loadBaseMap(frontmatter);
 

@@ -1607,7 +1607,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     }
 
     await _createPromotedSubtasks(task);
-    if (mounted) Navigator.pop(context);
+    if (mounted) Navigator.pop(context, true);
   }
 
   void _deleteTask() {

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/markdown_parser.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
+import '../screens/universal_detail_view.dart';
 import 'markdown_body_view.dart';
 
 class JournalBodyView extends ConsumerWidget {
@@ -179,25 +180,46 @@ class JournalBodyView extends ConsumerWidget {
     TextStyle style,
   ) {
     final spans = <InlineSpan>[];
-    final embedRegex = RegExp(r'!\[\[([^\]]+)\]\]');
+    final tokenRegex = RegExp(r'!\[\[([^\]]+)\]\]|\[\[([^\]]+)\]\]');
     var cursor = 0;
 
-    for (final match in embedRegex.allMatches(text)) {
+    for (final match in tokenRegex.allMatches(text)) {
       if (match.start > cursor) {
         spans.add(
           TextSpan(text: text.substring(cursor, match.start), style: style),
         );
       }
-      final path = match.group(1)!.trim();
-      spans.add(
-        WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-            child: _EmbeddedMedia(path: path),
+      final embedPath = match.group(1);
+      final linkText = match.group(2);
+      if (embedPath != null) {
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: _EmbeddedMedia(path: embedPath.trim()),
+            ),
           ),
-        ),
-      );
+        );
+      } else if (linkText != null) {
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: GestureDetector(
+              onTap: () => _openWikiLink(context, ref, linkText),
+              child: Text(
+                linkText,
+                style: style.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ),
+        );
+      }
       cursor = match.end;
     }
 
@@ -206,6 +228,33 @@ class JournalBodyView extends ConsumerWidget {
     }
 
     return spans;
+  }
+
+  void _openWikiLink(BuildContext context, WidgetRef ref, String linkText) {
+    final lookup = linkText
+        .split('#')
+        .first
+        .split('/')
+        .last
+        .replaceAll('.md', '')
+        .trim()
+        .toLowerCase();
+    final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+    final target = allObjects.where((o) {
+      final title = o.title.trim().toLowerCase();
+      final slug = o.slug.trim().toLowerCase();
+      final fileName = o.obsidianFileName.trim().toLowerCase();
+      final aliases = o.aliases.map((a) => a.trim().toLowerCase());
+      return title == lookup ||
+          slug == lookup ||
+          fileName == lookup ||
+          aliases.contains(lookup);
+    }).firstOrNull;
+    if (target == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => UniversalDetailView(object: target)),
+    );
   }
 
   InlineSpan _mediaSpan(

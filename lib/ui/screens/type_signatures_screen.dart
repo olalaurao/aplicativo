@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/settings_provider.dart';
+import '../../providers/vault_provider.dart';
 import '../../models/shared_types.dart';
 import '../theme.dart';
 
@@ -58,7 +61,7 @@ class TypeSignaturesScreen extends ConsumerWidget {
                   size: 20,
                   color: AppColors.primary,
                 ),
-                onPressed: () => _showEditDialog(context, notifier, sig),
+                onPressed: () => _showEditDialog(context, ref, notifier, sig),
               ),
             ),
           );
@@ -113,6 +116,7 @@ class TypeSignaturesScreen extends ConsumerWidget {
 
   void _showEditDialog(
     BuildContext context,
+    WidgetRef ref,
     SettingsNotifier notifier,
     TypeSignature sig,
   ) {
@@ -164,16 +168,30 @@ class TypeSignaturesScreen extends ConsumerWidget {
               child: const Text('CANCELAR'),
             ),
             TextButton(
-              onPressed: () {
-                notifier.updateTypeSignature(
-                  sig.objectType,
-                  TypeSignature(
-                    objectType: sig.objectType,
-                    markerType: selectedMarker,
-                    markerValue: valueController.text,
-                  ),
+              onPressed: () async {
+                final newValue = valueController.text.trim();
+                final updatedSignature = TypeSignature(
+                  objectType: sig.objectType,
+                  markerType: selectedMarker,
+                  markerValue: newValue,
                 );
-                Navigator.pop(context);
+                if (selectedMarker == MarkerType.folder &&
+                    newValue.isNotEmpty &&
+                    newValue != sig.markerValue) {
+                  final confirmed = await _confirmAndMoveFolder(
+                    context,
+                    ref,
+                    sig,
+                    newValue,
+                  );
+                  if (!confirmed) return;
+                }
+                await notifier.updateTypeSignature(
+                  sig.objectType,
+                  updatedSignature,
+                );
+                ref.invalidate(allObjectsProvider);
+                if (context.mounted) Navigator.pop(context);
               },
               child: const Text('SALVAR'),
             ),
@@ -182,4 +200,62 @@ class TypeSignaturesScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Future<bool> _confirmAndMoveFolder(
+    BuildContext context,
+    WidgetRef ref,
+    TypeSignature oldSignature,
+    String newFolder,
+  ) async {
+    final obsidian = ref.read(obsidianServiceProvider);
+    final normalizedNewFolder = _normalizeFolder(newFolder);
+    final normalizedOldFolder = _normalizeFolder(oldSignature.markerValue);
+    final fullNewFolder = Directory(
+      '${obsidian.vaultPath}/$normalizedNewFolder',
+    );
+    final exists = fullNewFolder.existsSync();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(exists ? 'Mover arquivos?' : 'Criar pasta e mover?'),
+        content: Text(
+          exists
+              ? 'Mover os arquivos de "$normalizedOldFolder" para "$normalizedNewFolder"?'
+              : 'A pasta "$normalizedNewFolder" não existe. Criar e mover os arquivos existentes para ela?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('CANCELAR'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('CONFIRMAR'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return false;
+
+    if (!exists) await fullNewFolder.create(recursive: true);
+    if (normalizedOldFolder.isEmpty ||
+        normalizedOldFolder == normalizedNewFolder) {
+      return true;
+    }
+
+    final files = await obsidian.getFilesInFolder(normalizedOldFolder);
+    for (final file in files) {
+      if (!file.path.endsWith('.md')) continue;
+      final relativePath = obsidian.getRelativePath(file.path);
+      final fileName = relativePath.split('/').last;
+      final content = await file.readAsString();
+      await obsidian.writeFile('$normalizedNewFolder/$fileName', content);
+      await obsidian.deleteFile(relativePath);
+    }
+    return true;
+  }
+
+  String _normalizeFolder(String value) =>
+      value.trim().replaceAll('\\', '/').replaceAll(RegExp(r'^/+|/+$'), '');
 }

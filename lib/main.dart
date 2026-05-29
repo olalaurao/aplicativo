@@ -67,7 +67,7 @@ Future<void> homeWidgetInteractiveCallback(Uri? uri) async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('pt_BR');
   debugPrint('[WidgetCallback] received: $uri');
-  if (uri == null || uri.host != 'widget-toggle') return;
+  if (uri == null) return;
 
   final prefs = await SharedPreferences.getInstance();
   final container = ProviderContainer(
@@ -75,71 +75,77 @@ Future<void> homeWidgetInteractiveCallback(Uri? uri) async {
   );
 
   try {
-    final type = uri.queryParameters['type'];
-    final objectId = uri.queryParameters['id'];
-    final date =
-        DateTime.tryParse(uri.queryParameters['date'] ?? '') ?? DateTime.now();
-    final slotIndex = int.tryParse(uri.queryParameters['slot'] ?? '');
-    debugPrint(
-      '[WidgetCallback] type=$type objectId=$objectId date=$date slot=$slotIndex',
-    );
-
-    if (type == 'calendar_mode') {
-      final mode = uri.queryParameters['mode'];
-      if (mode != null) {
-        await container
-            .read(settingsProvider.notifier)
-            .updateWidgetCalendarSettings(type: mode);
-        await prefs.setInt('calendarWidgetOffset', 0); // reset offset
-        await forceWidgetSync(container);
-        debugPrint('[WidgetCallback] calendar mode updated: $mode');
-      }
-      return;
-    }
-
-    if (type == 'calendar_offset') {
-      final offsetStr = uri.queryParameters['offset'];
-      if (offsetStr != null) {
-        final offset = int.tryParse(offsetStr) ?? 0;
-        final currentOffset = prefs.getInt('calendarWidgetOffset') ?? 0;
-        await prefs.setInt('calendarWidgetOffset', currentOffset + offset);
-        await forceWidgetSync(container);
-        debugPrint(
-          '[WidgetCallback] calendar offset updated: ${currentOffset + offset}',
-        );
-      }
-      return;
-    }
-
-    if (objectId == null || objectId.isEmpty) return;
-
-    final objects = await container.read(allObjectsProvider.future);
-    final object = objects
-        .where((candidate) => candidate.id == objectId)
-        .firstOrNull;
-    if (type == 'task' && object is Task) {
-      await container
-          .read(tasksProvider.notifier)
-          .updateTask(
-            object.copyWith(
-              stage: object.isCompleted ? TaskStage.todo : TaskStage.finalized,
-            ),
-          );
-      await forceWidgetSync(container);
-      debugPrint('[WidgetCallback] task toggled: $objectId');
-    } else if (type == 'habit' && object is Habit) {
-      await container
-          .read(habitsProvider.notifier)
-          .toggleHabit(object, date, slotIndex: slotIndex);
-      await forceWidgetSync(container);
-      debugPrint('[WidgetCallback] habit toggled: $objectId');
-    }
-    await WidgetService.refreshAllWidgets();
+    await _handleWidgetToggleUri(uri, container);
   } catch (e) {
     debugPrint('homeWidgetInteractiveCallback failed: $e');
   } finally {
     container.dispose();
   }
+}
+
+Future<void> _handleWidgetToggleUri(
+  Uri uri,
+  ProviderContainer container,
+) async {
+  if (uri.host != 'widget-toggle') return;
+  final prefs = container.read(sharedPreferencesProvider);
+  final type = uri.queryParameters['type'];
+  final objectId = uri.queryParameters['id'];
+  final date =
+      DateTime.tryParse(uri.queryParameters['date'] ?? '') ?? DateTime.now();
+  final slotIndex = int.tryParse(uri.queryParameters['slot'] ?? '');
+  debugPrint(
+    '[WidgetCallback] type=$type objectId=$objectId date=$date slot=$slotIndex',
+  );
+
+  if (type == 'calendar_mode') {
+    final mode = uri.queryParameters['mode'];
+    if (mode == 'day' || mode == 'week' || mode == 'month') {
+      await container
+          .read(settingsProvider.notifier)
+          .updateWidgetCalendarSettings(type: mode);
+      await prefs.setInt('calendarWidgetOffset', 0);
+      await forceWidgetSync(container);
+      debugPrint('[WidgetCallback] calendar mode updated: $mode');
+    }
+    return;
+  }
+
+  if (type == 'calendar_offset') {
+    final offset = int.tryParse(uri.queryParameters['offset'] ?? '') ?? 0;
+    final currentOffset = prefs.getInt('calendarWidgetOffset') ?? 0;
+    await prefs.setInt('calendarWidgetOffset', currentOffset + offset);
+    await forceWidgetSync(container);
+    debugPrint(
+      '[WidgetCallback] calendar offset updated: ${currentOffset + offset}',
+    );
+    return;
+  }
+
+  if (objectId == null || objectId.isEmpty) return;
+
+  final objects = await container.read(allObjectsProvider.future);
+  final object = objects
+      .where((candidate) => candidate.id == objectId)
+      .firstOrNull;
+  if (type == 'task' && object is Task) {
+    await container
+        .read(tasksProvider.notifier)
+        .updateTask(
+          object.copyWith(
+            stage: object.isCompleted ? TaskStage.todo : TaskStage.finalized,
+          ),
+        );
+    await forceWidgetSync(container);
+    debugPrint('[WidgetCallback] task toggled: $objectId');
+  } else if (type == 'habit' && object is Habit) {
+    await container
+        .read(habitsProvider.notifier)
+        .toggleHabit(object, date, slotIndex: slotIndex);
+    await forceWidgetSync(container);
+    debugPrint('[WidgetCallback] habit toggled: $objectId');
+  }
+  await WidgetService.refreshAllWidgets();
 }
 
 void main() async {
@@ -201,9 +207,11 @@ class _BootstrapAppState extends State<BootstrapApp> {
         unawaited(forceWidgetSync(widget.container));
         widget.container.read(syncManagerProvider).performSync();
         unawaited(_checkPendingSharedTextFromNative());
+        unawaited(_checkPendingWidgetUriFromNative());
       },
     );
     _initShareIntentHandling();
+    unawaited(_checkPendingWidgetUriFromNative());
 
     _midnightTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
       final now = DateTime.now();
@@ -281,6 +289,22 @@ class _BootstrapAppState extends State<BootstrapApp> {
       }
     } catch (error) {
       debugPrint('Native share intent check failed: $error');
+    }
+  }
+
+  Future<void> _checkPendingWidgetUriFromNative() async {
+    if (!Platform.isAndroid) return;
+    try {
+      const channel = MethodChannel('com.productivity.citrine/settings');
+      final rawUri = await channel.invokeMethod<String>(
+        'getAndClearPendingWidgetUri',
+      );
+      if (rawUri == null || rawUri.isEmpty) return;
+      final uri = Uri.tryParse(rawUri);
+      if (uri == null) return;
+      await _handleWidgetToggleUri(uri, widget.container);
+    } catch (error) {
+      debugPrint('Native widget uri check failed: $error');
     }
   }
 

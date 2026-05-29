@@ -1661,6 +1661,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   ),
                 ),
                 const SizedBox(height: 24),
+                _personGoogleEventBanner(context, ref, person),
+                const SizedBox(height: 24),
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: AppTheme.cardDecoration(context),
@@ -3145,20 +3147,33 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               HapticFeedback.heavyImpact();
               final oldObject = object;
               final originalPath = object.obsidianPath;
-              ref.read(vaultProvider.notifier).deleteObject(object);
+              if (object is JournalEntry) {
+                ref
+                    .read(todayJournalProvider.notifier)
+                    .deleteEntry(object as JournalEntry);
+              } else {
+                ref.read(vaultProvider.notifier).deleteObject(object);
+              }
 
               Navigator.pop(ctx);
               Navigator.pop(context);
 
-              UndoService.showUndoSnackbar(
-                context: context,
-                message: '"${oldObject.title}" moved to trash',
-                onUndo: () {
-                  ref
-                      .read(vaultProvider.notifier)
-                      .restoreObject(oldObject, originalPath);
-                },
-              );
+              if (!context.mounted) return;
+              if (oldObject is JournalEntry) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Entrada removida do diário.')),
+                );
+              } else {
+                UndoService.showUndoSnackbar(
+                  context: context,
+                  message: '"${oldObject.title}" moved to trash',
+                  onUndo: () {
+                    ref
+                        .read(vaultProvider.notifier)
+                        .restoreObject(oldObject, originalPath);
+                  },
+                );
+              }
             },
             child: const Text(
               'DELETE',
@@ -3173,16 +3188,24 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   Future<void> _openInObsidian(BuildContext context, WidgetRef ref) async {
     final vaultName = ref.read(settingsProvider).vaultName;
     final path = object.obsidianPath;
+    if (path.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('File path not set for this object')),
+      );
+      return;
+    }
 
     final encodedVault = Uri.encodeComponent(vaultName);
-    final encodedFile = Uri.encodeComponent(path);
+    final cleanPath = path.endsWith('.md')
+        ? path.substring(0, path.length - 3)
+        : path;
+    final encodedFile = Uri.encodeComponent(cleanPath);
     final uri = Uri.parse(
       'obsidian://open?vault=$encodedVault&file=$encodedFile',
     );
+    debugPrint('Opening Obsidian: $uri');
 
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -3283,7 +3306,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   }
 
   Widget _buildKPICard(BuildContext context, WidgetRef ref, KPI kpi) {
-    // In a real app, we'd fetch actual values from KPIEngine
     final habits = ref.watch(habitsProvider);
     final trackerRecords = ref.watch(trackingRecordsProvider);
     final entries = ref.watch(allEntriesProvider);
@@ -3299,7 +3321,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       notes: notes,
     );
 
-    final progress = (currentValue / kpi.targetValue).clamp(0.0, 1.0);
+    final progress = kpi.targetValue <= 0
+        ? 0.0
+        : (currentValue / kpi.targetValue).clamp(0.0, 1.0);
     final isComplete = kpi.completed || currentValue >= kpi.targetValue;
 
     return Container(
@@ -3744,6 +3768,79 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       case ResourceStatus.dropped:
         return AppColors.error;
     }
+  }
+
+  Widget _personGoogleEventBanner(
+    BuildContext context,
+    WidgetRef ref,
+    Person person,
+  ) {
+    final email = person.email?.trim().toLowerCase();
+    final frequencyDays = person.contactFrequency?.inDays;
+    final daysSince = person.lastContactDate == null
+        ? null
+        : DateTime.now().difference(person.lastContactDate!).inDays;
+    if (email == null || email.isEmpty) return const SizedBox.shrink();
+
+    final eventsAsync = ref.watch(
+      googleCalendarRangeEventsProvider(
+        GoogleCalendarParams(startDate: DateTime.now(), days: 30),
+      ),
+    );
+
+    return eventsAsync.maybeWhen(
+      data: (events) {
+        dynamic nextEvent;
+        for (final event in events) {
+          final start = event.start?.dateTime ?? event.start?.date;
+          if (start == null || start.isBefore(DateTime.now())) continue;
+          final attendees = event.attendees ?? const [];
+          final hasPerson = attendees.any(
+            (attendee) => attendee.email?.trim().toLowerCase() == email,
+          );
+          if (hasPerson) {
+            nextEvent = event;
+            break;
+          }
+        }
+        if (nextEvent == null) return const SizedBox.shrink();
+
+        final start = nextEvent.start?.dateTime ?? nextEvent.start?.date;
+        final isTomorrow =
+            start != null &&
+            _isSameDay(
+              start.toLocal(),
+              DateTime.now().add(const Duration(days: 1)),
+            );
+        final overBy = daysSince != null && frequencyDays != null
+            ? daysSince - frequencyDays
+            : null;
+        final prefix = overBy != null && overBy > 0
+            ? 'Você está há $overBy dias a mais sem falar do que gostaria.'
+            : 'Próximo contato programado.';
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.info.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.info.withValues(alpha: 0.24)),
+          ),
+          child: Text(
+            '$prefix ${isTomorrow ? 'Amanhã' : 'Em breve'} tem evento: ${nextEvent.summary ?? 'Sem título'}.',
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.info,
+            ),
+          ),
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
   }
 
   Widget _contactActionButton(

@@ -13,7 +13,6 @@ import '../widgets/metadata_strip.dart';
 import '../widgets/organizer_picker_modal.dart';
 import 'package:go_router/go_router.dart';
 
-
 enum NoteType { text, outline, collection }
 
 class CreateNoteForm extends ConsumerStatefulWidget {
@@ -90,7 +89,10 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
             centerTitle: true,
             actions: [
               IconButton(
-                icon: const Icon(Icons.copy_all_rounded, color: AppColors.primary),
+                icon: const Icon(
+                  Icons.copy_all_rounded,
+                  color: AppColors.primary,
+                ),
                 tooltip: 'Usar Template',
                 onPressed: _showTemplatePicker,
               ),
@@ -305,7 +307,8 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
       ref.read(notesProvider.notifier).addNote(note);
     }
 
-    Navigator.pop(context);
+    Navigator.pop(context, true);
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -382,7 +385,10 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
   }
 
   void _showTemplatePicker() async {
-    final templates = ref.read(templatesProvider).where((t) => t.templateType == 'note').toList();
+    final templates = ref
+        .read(templatesProvider)
+        .where((t) => t.templateType == 'note')
+        .toList();
 
     showModalBottomSheet(
       context: context,
@@ -405,7 +411,10 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
                 TextButton.icon(
                   onPressed: () {
                     Navigator.pop(context);
-                    context.push('/create/template', extra: {'initialType': 'note'});
+                    context.push(
+                      '/create/template',
+                      extra: {'initialType': 'note'},
+                    );
                   },
                   icon: const Icon(Icons.add_rounded),
                   label: const Text('Novo'),
@@ -414,16 +423,33 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
             ),
             const SizedBox(height: 16),
             if (templates.isEmpty)
-              const Text('Nenhum template encontrado.', style: TextStyle(color: AppColors.textMuted)),
+              const Text(
+                'Nenhum template encontrado.',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
             ...templates.map(
               (t) => ListTile(
                 title: Text(t.title),
                 onTap: () {
                   String body = t.body;
-                  body = body.replaceAll('{{date}}', DateFormat('dd/MM/yyyy').format(_createdAt));
-                  body = body.replaceAll('{{time}}', DateFormat('HH:mm').format(_createdAt));
-                  body = body.replaceAll('{{weekday}}', DateFormat('EEEE').format(_createdAt));
-                  body = body.replaceAll('{{title}}', _titleController.text.isNotEmpty ? _titleController.text : 'Nova Nota');
+                  body = body.replaceAll(
+                    '{{date}}',
+                    DateFormat('dd/MM/yyyy').format(_createdAt),
+                  );
+                  body = body.replaceAll(
+                    '{{time}}',
+                    DateFormat('HH:mm').format(_createdAt),
+                  );
+                  body = body.replaceAll(
+                    '{{weekday}}',
+                    DateFormat('EEEE').format(_createdAt),
+                  );
+                  body = body.replaceAll(
+                    '{{title}}',
+                    _titleController.text.isNotEmpty
+                        ? _titleController.text
+                        : 'Nova Nota',
+                  );
 
                   setState(() {
                     if (_richContent.isEmpty) {
@@ -435,7 +461,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
                     if (t.frontmatterDefaults.containsKey('pinned')) {
                       _pinned = t.frontmatterDefaults['pinned'] == true;
                     }
-                                    });
+                  });
                   Navigator.pop(context);
                 },
               ),
@@ -446,4 +472,3 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
     );
   }
 }
-

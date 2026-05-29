@@ -69,7 +69,11 @@ class MarkdownBodyView extends ConsumerWidget {
               final title = o.title.trim().toLowerCase();
               final slug = o.slug.trim().toLowerCase();
               final fileName = o.obsidianFileName.trim().toLowerCase();
-              return title == lookup || slug == lookup || fileName == lookup;
+              final aliases = o.aliases.map((a) => a.trim().toLowerCase());
+              return title == lookup ||
+                  slug == lookup ||
+                  fileName == lookup ||
+                  aliases.contains(lookup);
             }).firstOrNull;
 
             if (matchingObject != null) {

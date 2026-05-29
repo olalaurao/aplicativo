@@ -170,7 +170,10 @@ class ObsidianService {
     return lines.join('\n').trimRight();
   }
 
-  Future<List<File>> getFilesInFolder(String folderName) async {
+  Future<List<File>> getFilesInFolder(
+    String folderName, {
+    bool includeDeleted = false,
+  }) async {
     if (vaultDir == null) return [];
     final dir = Directory('${vaultDir!.path}/$folderName');
     if (!await dir.exists()) return [];
@@ -179,7 +182,8 @@ class ObsidianService {
     await for (final entity in dir.list(recursive: true, followLinks: false)) {
       if (entity is File) {
         final path = entity.path.replaceAll('\\', '/');
-        if (path.contains('/_attachments/') || path.contains('/_deleted/')) {
+        if (path.contains('/_attachments/') ||
+            (!includeDeleted && path.contains('/_deleted/'))) {
           continue;
         }
         files.add(entity);

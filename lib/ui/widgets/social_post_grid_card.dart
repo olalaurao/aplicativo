@@ -214,6 +214,7 @@ Color socialPlatformColor(SocialPlatform platform) {
     SocialPlatform.tiktok => AppColors.textPrimary,
     SocialPlatform.instagram => AppColors.habitPink,
     SocialPlatform.substack => AppColors.warning,
+    SocialPlatform.linkedin => AppColors.info,
     SocialPlatform.pinterest => AppColors.error,
     SocialPlatform.youtube => AppColors.error,
     SocialPlatform.twitter => AppColors.info,
@@ -225,6 +226,7 @@ IconData socialPlatformIcon(SocialPlatform platform) {
   return switch (platform) {
     SocialPlatform.youtube => Icons.play_circle_outline_rounded,
     SocialPlatform.substack => Icons.article_outlined,
+    SocialPlatform.linkedin => Icons.business_center_outlined,
     SocialPlatform.pinterest => Icons.push_pin_outlined,
     SocialPlatform.instagram => Icons.camera_alt_outlined,
     SocialPlatform.tiktok => Icons.music_note_rounded,
@@ -238,6 +240,7 @@ String platformLabel(SocialPlatform platform) {
     SocialPlatform.tiktok => 'TikTok',
     SocialPlatform.instagram => 'Instagram',
     SocialPlatform.substack => 'Substack',
+    SocialPlatform.linkedin => 'LinkedIn',
     SocialPlatform.pinterest => 'Pinterest',
     SocialPlatform.youtube => 'YouTube',
     SocialPlatform.twitter => 'Twitter',

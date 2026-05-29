@@ -38,8 +38,25 @@ class WikiTextView extends ConsumerWidget {
       }
 
       final linkText = match.group(1) ?? '';
+      final lookup = linkText
+          .split('#')
+          .first
+          .split('/')
+          .last
+          .replaceAll('.md', '')
+          .trim()
+          .toLowerCase();
       final matchingObject = allObjects
-          .where((o) => o.title.toLowerCase() == linkText.toLowerCase())
+          .where((o) {
+            final title = o.title.trim().toLowerCase();
+            final slug = o.slug.trim().toLowerCase();
+            final fileName = o.obsidianFileName.trim().toLowerCase();
+            final aliases = o.aliases.map((a) => a.trim().toLowerCase());
+            return title == lookup ||
+                slug == lookup ||
+                fileName == lookup ||
+                aliases.contains(lookup);
+          })
           .firstOrNull;
 
       if (matchingObject != null) {

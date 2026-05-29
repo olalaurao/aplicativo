@@ -1,6 +1,7 @@
 // lib/models/tracker_model.dart
 import 'content_object.dart';
 import 'shared_types.dart';
+import 'package:flutter/foundation.dart';
 
 enum InputFieldType {
   text,
@@ -54,18 +55,21 @@ class InputField {
   }
 
   factory InputField.fromMap(Map<String, dynamic> map) {
+    final rawOptions = map['options'];
     return InputField(
-      id: map['id'] as String? ?? '',
-      title: map['title'] as String? ?? '',
+      id: map['id']?.toString() ?? map['slug']?.toString() ?? '',
+      title: map['title']?.toString() ?? map['name']?.toString() ?? '',
       type: InputFieldType.values.firstWhere(
-        (e) => e.name == map['type'],
+        (e) => e.name == map['type']?.toString(),
         orElse: () => InputFieldType.text,
       ),
       defaultValue: map['default_value'],
-      unit: map['unit'] as String?,
+      unit: map['unit']?.toString(),
       min: (map['min'] as num?)?.toDouble(),
       max: (map['max'] as num?)?.toDouble(),
-      options: List<String>.from(map['options'] as List? ?? []),
+      options: rawOptions is List
+          ? rawOptions.map((option) => option.toString()).toList()
+          : const [],
       organizers: (map['organizers'] as List? ?? [])
           .map((e) => OrganizerReference.fromWikiLink(e.toString()))
           .toList(),
@@ -88,10 +92,13 @@ class TrackerSection {
   }
 
   factory TrackerSection.fromMap(Map<String, dynamic> map) {
+    final rawFields =
+        map['input_fields'] ?? map['inputFields'] ?? map['fields'] ?? [];
     return TrackerSection(
-      title: map['title'] as String? ?? '',
-      inputFields: (map['input_fields'] as List? ?? [])
-          .map((e) => InputField.fromMap(Map<String, dynamic>.from(e as Map)))
+      title: map['title']?.toString() ?? map['name']?.toString() ?? '',
+      inputFields: (rawFields is List ? rawFields : const [])
+          .whereType<Map>()
+          .map((e) => InputField.fromMap(Map<String, dynamic>.from(e)))
           .toList(),
     );
   }
@@ -168,10 +175,65 @@ class TrackerDefinition extends ContentObject {
     tracker.color = frontmatter['color'] as String? ?? '#6B5EA8';
     tracker.icon = frontmatter['icon'] as String?;
     tracker.description = frontmatter['description'] as String?;
-    tracker.sections = (frontmatter['sections'] as List? ?? [])
-        .map((e) => TrackerSection.fromMap(Map<String, dynamic>.from(e as Map)))
-        .toList();
+    tracker.sections = _parseSections(frontmatter['sections'], body);
+    debugPrint('Tracker sections: ${tracker.sections.length}');
     return tracker;
+  }
+
+  static List<TrackerSection> _parseSections(dynamic rawSections, String body) {
+    if (rawSections is List) {
+      return rawSections
+          .whereType<Map>()
+          .map((e) => TrackerSection.fromMap(Map<String, dynamic>.from(e)))
+          .toList();
+    }
+    if (rawSections is Map) {
+      return rawSections.entries.map((entry) {
+        final value = entry.value;
+        if (value is Map) {
+          final section = Map<String, dynamic>.from(value);
+          section.putIfAbsent('title', () => entry.key.toString());
+          return TrackerSection.fromMap(section);
+        }
+        if (value is List) {
+          return TrackerSection(
+            title: entry.key.toString(),
+            inputFields: value.whereType<Map>().map((field) {
+              return InputField.fromMap(Map<String, dynamic>.from(field));
+            }).toList(),
+          );
+        }
+        return TrackerSection(title: entry.key.toString());
+      }).toList();
+    }
+
+    final sections = <TrackerSection>[];
+    TrackerSection? current;
+    for (final line in body.split('\n')) {
+      final sectionMatch = RegExp(r'^##\s+(.+)$').firstMatch(line.trim());
+      if (sectionMatch != null) {
+        current = TrackerSection(title: sectionMatch.group(1)!.trim());
+        sections.add(current);
+        continue;
+      }
+      final fieldMatch = RegExp(r'^###\s+(.+)$').firstMatch(line.trim());
+      if (fieldMatch != null) {
+        current ??= TrackerSection(title: 'Default Section');
+        if (!sections.contains(current)) sections.add(current);
+        final title = fieldMatch.group(1)!.trim();
+        current.inputFields.add(
+          InputField(
+            id: title
+                .toLowerCase()
+                .replaceAll(RegExp(r'\s+'), '_')
+                .replaceAll(RegExp(r'[^a-z0-9_]'), ''),
+            title: title,
+            type: InputFieldType.text,
+          ),
+        );
+      }
+    }
+    return sections;
   }
 }
 

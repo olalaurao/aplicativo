@@ -76,8 +76,8 @@ class WidgetService {
   }
 
   static Future<void> updateQuickAddLabels({
-    String journalLabel = 'Journal',
-    String taskLabel = 'Task',
+    String journalLabel = 'Diário',
+    String taskLabel = 'Tarefa',
     String firstTarget = 'entry',
     String secondTarget = 'task',
   }) async {
@@ -112,7 +112,14 @@ class WidgetService {
     required String title,
     required String time,
     required String date,
-  }) async {}
+  }) async {
+    await _saveJson('citrine_lock_next_session', {
+      'title': title,
+      'time': time,
+      'date': date,
+    });
+    await _updateCalendarProviders();
+  }
 
   static Future<void> updateUniversalWidget({
     required String type,
@@ -133,7 +140,37 @@ class WidgetService {
     await refreshUniversalWidgets();
   }
 
-  static Future<List<int>> universalWidgetIds() async => [];
+  static Future<List<int>> universalWidgetIds() async {
+    try {
+      final installed = await HomeWidget.getInstalledWidgets();
+      final ids =
+          installed
+              .where((widget) {
+                final className = widget.androidClassName ?? '';
+                return className.contains('Citrine');
+              })
+              .map((widget) => widget.androidWidgetId)
+              .whereType<int>()
+              .toSet()
+              .toList()
+            ..sort();
+      return ids;
+    } catch (e, st) {
+      debugPrint('[WidgetService] universalWidgetIds failed: $e\n$st');
+      final stored = await HomeWidget.getWidgetData<String>(
+        'citrine_universal_widget_ids',
+        defaultValue: '[]',
+      );
+      final decoded = jsonDecode(stored ?? '[]');
+      if (decoded is List) {
+        return decoded
+            .map((item) => item is int ? item : int.tryParse(item.toString()))
+            .whereType<int>()
+            .toList();
+      }
+      return [];
+    }
+  }
 
   static Future<void> saveUniversalWidgetConfig({
     required int widgetId,
@@ -143,6 +180,12 @@ class WidgetService {
     required String organizer,
     required List<String> objectTypes,
   }) async {
+    final existingIds = await universalWidgetIds();
+    final ids = {...existingIds, widgetId}.toList()..sort();
+    await HomeWidget.saveWidgetData<String>(
+      'citrine_universal_widget_ids',
+      jsonEncode(ids),
+    );
     await _saveJson('citrine_widget_config_$widgetId', {
       'widgetId': widgetId,
       'type': type,
@@ -181,14 +224,34 @@ class WidgetService {
     required int completedCount,
     required int totalCount,
     int? widgetId,
-  }) async {}
+  }) async {
+    final payload = {
+      'type': 'organizer_detailed',
+      'slug': slug,
+      'title': title,
+      'tasks': tasks,
+      'completedCount': completedCount,
+      'totalCount': totalCount,
+    };
+    await _saveUniversalPayload(payload, widgetId: widgetId);
+  }
 
   static Future<void> updatePomodoroSummary({
     required String total,
     required String details,
     required List<bool> barActive,
     int? widgetId,
-  }) async {}
+  }) async {
+    final payload = {
+      'type': 'pomodoro_summary',
+      'total': total,
+      'details': details,
+      'barActive': barActive,
+    };
+    await _saveJson('citrine_pomodoro_summary', payload);
+    await _saveUniversalPayload(payload, widgetId: widgetId);
+    await _update(_pomodoroProvider);
+  }
 
   static Future<void> updateNextTask(dynamic task) async {
     await _updateTaskProviders();
@@ -211,7 +274,14 @@ class WidgetService {
     String title,
     String content,
     String footer,
-  ) async {}
+  ) async {
+    await _saveJson('citrine_planner', {
+      'title': title,
+      'content': content,
+      'footer': footer,
+    });
+    await _updateCalendarProviders();
+  }
 
   static Future<void> updateOrganizerSummary({
     required String title,
@@ -220,7 +290,19 @@ class WidgetService {
     required String focus,
     required String stats,
     String slug = '',
-  }) async {}
+  }) async {
+    final payload = {
+      'type': 'organizer_summary',
+      'title': title,
+      'tasks': tasks,
+      'events': events,
+      'focus': focus,
+      'stats': stats,
+      'slug': slug,
+    };
+    await _saveJson('citrine_organizer_summary', payload);
+    await _saveUniversalPayload(payload);
+  }
 
   static Future<void> updatePomodoroWeekly(
     String total,
@@ -241,7 +323,28 @@ class WidgetService {
     required Map<int, String> weeklyDays,
     required String monthTitle,
     required List<String> monthFocus,
-  }) async {}
+  }) async {
+    final payload = {
+      'type': 'planner_detailed',
+      'dailyItems': dailyItems,
+      'weeklyDays': weeklyDays.map((key, value) => MapEntry('$key', value)),
+      'monthTitle': monthTitle,
+      'monthFocus': monthFocus,
+    };
+    await _saveJson('citrine_planner_detailed', payload);
+    await _saveUniversalPayload(payload);
+  }
+
+  static Future<void> _saveUniversalPayload(
+    Map<String, dynamic> payload, {
+    int? widgetId,
+  }) async {
+    await _saveJson('citrine_universal_widget', payload);
+    if (widgetId != null) {
+      await _saveJson('citrine_universal_widget_$widgetId', payload);
+    }
+    await refreshUniversalWidgets();
+  }
 
   static Future<void> _saveJson(String key, Map<String, dynamic> value) {
     return HomeWidget.saveWidgetData<String>(key, jsonEncode(value));
@@ -252,10 +355,7 @@ class WidgetService {
   }
 
   static Future<void> _updateTaskProviders() async {
-    await Future.wait([
-      _update(_tasksProvider),
-      _update(_filterProvider),
-    ]);
+    await Future.wait([_update(_tasksProvider), _update(_filterProvider)]);
   }
 
   static Future<void> _update(String provider) async {

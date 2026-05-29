@@ -329,6 +329,10 @@ class MarkdownParser {
     String dateStr,
   ) {
     if (body.isEmpty) return [];
+    final parsedDay = DateTime.tryParse(dateStr);
+    if (parsedDay == null) {
+      debugPrint('Invalid daily note date for journal parsing: $dateStr');
+    }
 
     final entries = <Map<String, dynamic>>[];
     final journalSections = body.split(
@@ -389,6 +393,16 @@ class MarkdownParser {
 
         final hashtags = extractTags(entryBody);
 
+        final entryDate = parsedDay == null
+            ? dateStr
+            : DateTime(
+                parsedDay.year,
+                parsedDay.month,
+                parsedDay.day,
+                int.tryParse(time.split(':').first) ?? 0,
+                int.tryParse(time.split(':').last) ?? 0,
+              ).toIso8601String();
+
         entries.add({
           'time': time,
           'title': title,
@@ -396,7 +410,7 @@ class MarkdownParser {
           'mood': moodSlug,
           'organizers': orgsList,
           'hashtags': hashtags,
-          'date': '$dateStr $time',
+          'date': entryDate,
         });
       }
     }

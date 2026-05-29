@@ -9,6 +9,8 @@ import '../../models/goal_model.dart';
 import '../../models/organizer_model.dart';
 import '../../models/dashboard_block.dart';
 import '../../providers/dashboard_provider.dart';
+import '../../providers/widget_sync_provider.dart';
+import '../../services/widget_service.dart';
 import '../theme.dart';
 
 class WidgetConfigSheet extends ConsumerStatefulWidget {
@@ -149,18 +151,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () {
-              // Trigger sync visual feedback
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Configurações dos Widgets sincronizadas com sucesso!',
-                  ),
-                  backgroundColor: AppColors.primary,
-                ),
-              );
-              Navigator.pop(context);
-            },
+            onPressed: () => _saveAndSyncWidgets(dashboardBlocks),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               minimumSize: const Size(double.infinity, 50),
@@ -181,6 +172,54 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
         ],
       ),
     );
+  }
+
+  Future<void> _saveAndSyncWidgets(List<DashboardBlock> dashboardBlocks) async {
+    try {
+      final container = ProviderScope.containerOf(context, listen: false);
+      final block = dashboardBlocks
+          .where((item) => item.id == 'home-area')
+          .firstOrNull;
+      final metadata = block?.metadata ?? const <String, dynamic>{};
+      final rawTypes = metadata['filterObjectTypes'] ?? metadata['objectTypes'];
+      final objectTypes = rawTypes is List
+          ? rawTypes.map((item) => item.toString()).toSet().toList()
+          : const ['task', 'habit'];
+      final organizer = metadata['organizerSlug']?.toString() ?? '';
+      await ref
+          .read(settingsProvider.notifier)
+          .updateUniversalWidgetSettings(
+            type: 'filter',
+            organizer: organizer,
+            objectTypes: objectTypes,
+          );
+      final widgetIds = await WidgetService.universalWidgetIds();
+      for (final widgetId in widgetIds) {
+        await WidgetService.saveUniversalWidgetConfig(
+          widgetId: widgetId,
+          type: 'filter',
+          title: 'Filtro',
+          size: 'medium',
+          organizer: organizer,
+          objectTypes: objectTypes,
+        );
+      }
+      await forceWidgetSync(container);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Configurações dos widgets sincronizadas.'),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      debugPrint('Falha ao sincronizar widgets: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao sincronizar widgets: $e')),
+      );
+    }
   }
 
   Widget _buildWidgetHeader({
@@ -414,6 +453,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
             ),
             initialValue: settings.calendarWidgetType,
             items: const [
+              DropdownMenuItem(value: 'day', child: Text('Dia')),
               DropdownMenuItem(value: 'week', child: Text('Semana')),
               DropdownMenuItem(value: 'month', child: Text('Mês')),
             ],
@@ -616,10 +656,8 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
   }
 
   Widget _buildFilterConfig(List<DashboardBlock> blocks) {
+    final settings = ref.watch(settingsProvider);
     final block = blocks.where((b) => b.id == 'home-area').firstOrNull;
-    if (block == null) {
-      return const SizedBox.shrink();
-    }
 
     final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
     final organizers = [
@@ -627,12 +665,17 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
       ...allObjects.whereType<Goal>().cast<ContentObject>(),
     ]..sort((a, b) => a.title.compareTo(b.title));
 
-    final metadata = block.metadata;
+    final metadata = block?.metadata ?? const <String, dynamic>{};
     var organizerSlug =
+        (settings.universalWidgetOrganizer.isNotEmpty
+            ? settings.universalWidgetOrganizer
+            : null) ??
         metadata['organizerSlug'] as String? ??
         (organizers.isNotEmpty ? organizers.first.slug : null);
 
-    final rawTypes = metadata['filterObjectTypes'] ?? metadata['objectTypes'];
+    final rawTypes = settings.universalWidgetObjectTypes.isNotEmpty
+        ? settings.universalWidgetObjectTypes
+        : metadata['filterObjectTypes'] ?? metadata['objectTypes'];
     final selectedObjectTypes = rawTypes is List
         ? rawTypes.map((item) => item.toString()).toSet()
         : {'task', 'habit'};
@@ -641,9 +684,9 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
       'task': 'Tarefas',
       'habit': 'Hábitos',
       'pomodoro': 'Pomodoros',
-      'goal': 'Goals',
+      'goal': 'Objetivos',
       'note': 'Notas',
-      'journal_entry': 'Journal',
+      'journal_entry': 'Diário',
       'resource': 'Recursos',
       'person': 'Pessoas',
     };
@@ -676,7 +719,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
               return DropdownMenuItem(
                 value: o.slug,
                 child: Text(
-                  o is Goal ? 'Goal · ${o.title}' : o.title,
+                  o is Goal ? 'Objetivo · ${o.title}' : o.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -685,12 +728,20 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
             onChanged: (val) {
               if (val != null) {
                 final updatedMetadata = Map<String, dynamic>.from(
-                  block.metadata,
+                  block?.metadata ?? const <String, dynamic>{},
                 );
                 updatedMetadata['organizerSlug'] = val;
                 ref
-                    .read(dashboardProvider.notifier)
-                    .updateBlock(block.copyWith(metadata: updatedMetadata));
+                    .read(settingsProvider.notifier)
+                    .updateUniversalWidgetSettings(
+                      type: 'filter',
+                      organizer: val,
+                    );
+                if (block != null) {
+                  ref
+                      .read(dashboardProvider.notifier)
+                      .updateBlock(block.copyWith(metadata: updatedMetadata));
+                }
               }
             },
           ),
@@ -712,13 +763,21 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                   final next = Set<String>.from(selectedObjectTypes);
                   value ? next.add(entry.key) : next.remove(entry.key);
                   final updatedMetadata = Map<String, dynamic>.from(
-                    block.metadata,
+                    block?.metadata ?? const <String, dynamic>{},
                   );
                   updatedMetadata['filterObjectTypes'] = next.toList();
                   updatedMetadata['objectTypes'] = next.toList();
                   ref
-                      .read(dashboardProvider.notifier)
-                      .updateBlock(block.copyWith(metadata: updatedMetadata));
+                      .read(settingsProvider.notifier)
+                      .updateUniversalWidgetSettings(
+                        type: 'filter',
+                        objectTypes: next.toList(),
+                      );
+                  if (block != null) {
+                    ref
+                        .read(dashboardProvider.notifier)
+                        .updateBlock(block.copyWith(metadata: updatedMetadata));
+                  }
                 },
                 selectedColor: AppColors.primary.withValues(alpha: 0.16),
                 checkmarkColor: AppColors.primary,

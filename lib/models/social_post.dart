@@ -7,6 +7,7 @@ enum SocialPlatform {
   tiktok,
   instagram,
   substack,
+  linkedin,
   pinterest,
   youtube,
   twitter,
@@ -24,6 +25,8 @@ class SocialPost extends ContentObject {
   String? authorName;
   String? thumbnailUrl;
   String? embedUrl;
+  List<String> mediaUrls;
+  int primaryMediaIndex;
   DateTime? postedAt;
   String? personalNote;
   bool watched;
@@ -40,6 +43,8 @@ class SocialPost extends ContentObject {
     this.authorName,
     this.thumbnailUrl,
     this.embedUrl,
+    List<String>? mediaUrls,
+    this.primaryMediaIndex = 0,
     this.postedAt,
     this.personalNote,
     this.watched = false,
@@ -54,7 +59,8 @@ class SocialPost extends ContentObject {
     super.pinned,
     super.order,
     super.reminders,
-  }) : socialRefs = socialRefs ?? [];
+  }) : mediaUrls = mediaUrls ?? [],
+       socialRefs = socialRefs ?? [];
 
   @override
   String get type => 'social_post';
@@ -91,6 +97,8 @@ class SocialPost extends ContentObject {
     if (_hasText(authorName)) frontmatter['author_name'] = authorName;
     if (_hasText(thumbnailUrl)) frontmatter['thumbnail'] = thumbnailUrl;
     if (_hasText(embedUrl)) frontmatter['embed_url'] = embedUrl;
+    if (mediaUrls.isNotEmpty) frontmatter['media_urls'] = mediaUrls;
+    frontmatter['primary_media_index'] = primaryMediaIndex;
     if (postedAt != null) {
       frontmatter['posted_at'] = postedAt!.toIso8601String();
     }
@@ -146,6 +154,11 @@ class SocialPost extends ContentObject {
       frontmatter['thumbnail'] ?? frontmatter['thumbnail_url'],
     );
     post.embedUrl = _stringValue(frontmatter['embed_url']);
+    post.mediaUrls = _stringList(frontmatter['media_urls']);
+    post.primaryMediaIndex = int.tryParse(
+          frontmatter['primary_media_index']?.toString() ?? '',
+        ) ??
+        0;
     post.watched = _boolValue(frontmatter['watched']);
     post.postedAt = DateTime.tryParse(
       _stringValue(frontmatter['posted_at']) ?? '',
@@ -165,6 +178,8 @@ class SocialPost extends ContentObject {
     String? authorName,
     String? thumbnailUrl,
     String? embedUrl,
+    List<String>? mediaUrls,
+    int? primaryMediaIndex,
     DateTime? postedAt,
     String? personalNote,
     bool? watched,
@@ -191,6 +206,8 @@ class SocialPost extends ContentObject {
       authorName: authorName ?? this.authorName,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       embedUrl: embedUrl ?? this.embedUrl,
+      mediaUrls: mediaUrls ?? List<String>.from(this.mediaUrls),
+      primaryMediaIndex: primaryMediaIndex ?? this.primaryMediaIndex,
       postedAt: postedAt ?? this.postedAt,
       personalNote: personalNote ?? this.personalNote,
       watched: watched ?? this.watched,

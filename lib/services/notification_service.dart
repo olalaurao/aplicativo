@@ -512,9 +512,9 @@ class NotificationService with WidgetsBindingObserver {
           : AudioAttributesUsage.notification,
       color: config.popupColor ?? AppColors.primary,
       visibility: NotificationVisibility.public,
-      ongoing: isAlarm,
-      autoCancel: !isAlarm,
-      timeoutAfter: isPopup ? 30000 : null,
+      ongoing: isAlarm || isPopup,
+      autoCancel: !(isAlarm || isPopup),
+      timeoutAfter: null,
       additionalFlags: isAlarm ? Int32List.fromList(<int>[4]) : null,
       channelShowBadge: true,
       actions: [

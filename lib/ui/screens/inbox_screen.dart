@@ -159,8 +159,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           // List
           Expanded(
             child: inboxAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Erro: $e')),
               data: (items) {
                 if (items.isEmpty) {
@@ -188,9 +187,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                       onTriage: () => _showTriageSheet(ctx, item),
                       onDelete: () async {
                         HapticFeedback.mediumImpact();
-                        await ref
-                            .read(inboxProvider.notifier)
-                            .deleteItem(item);
+                        await ref.read(inboxProvider.notifier).deleteItem(item);
                         if (ctx.mounted) {
                           ScaffoldMessenger.of(ctx).showSnackBar(
                             SnackBar(
@@ -429,15 +426,17 @@ class _TriageSheet extends ConsumerWidget {
             label: 'Virou uma task',
             subtitle: 'Criar tarefa com este título',
             onTap: () async {
-              await ref.read(inboxProvider.notifier).triageItem(item);
               if (context.mounted) {
                 Navigator.pop(context);
-                Navigator.push(
+                final saved = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
                     builder: (_) => CreateTaskForm(initialTitle: item.title),
                   ),
                 );
+                if (saved == true) {
+                  await ref.read(inboxProvider.notifier).triageItem(item);
+                }
               }
             },
           ),
@@ -448,15 +447,17 @@ class _TriageSheet extends ConsumerWidget {
             label: 'Era uma ideia (nota)',
             subtitle: 'Criar nota com este conteúdo',
             onTap: () async {
-              await ref.read(inboxProvider.notifier).triageItem(item);
               if (context.mounted) {
                 Navigator.pop(context);
-                Navigator.push(
+                final saved = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
                     builder: (_) => CreateNoteForm(initialTitle: item.title),
                   ),
                 );
+                if (saved == true) {
+                  await ref.read(inboxProvider.notifier).triageItem(item);
+                }
               }
             },
           ),
@@ -467,15 +468,17 @@ class _TriageSheet extends ConsumerWidget {
             label: 'É uma entrada do journal',
             subtitle: 'Adicionar ao diário de hoje',
             onTap: () async {
-              await ref.read(inboxProvider.notifier).triageItem(item);
               if (context.mounted) {
                 Navigator.pop(context);
-                Navigator.push(
+                final saved = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
                     builder: (_) => CreateEntryForm(initialBody: item.title),
                   ),
                 );
+                if (saved == true) {
+                  await ref.read(inboxProvider.notifier).triageItem(item);
+                }
               }
             },
           ),

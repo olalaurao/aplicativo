@@ -339,9 +339,13 @@ Future<void> _openInObsidian(
   }
 
   final settings = ref.read(settingsProvider);
+  final cleanPath = path.endsWith('.md')
+      ? path.substring(0, path.length - 3)
+      : path;
   final uri = Uri.parse(
-    'obsidian://open?vault=${Uri.encodeComponent(settings.vaultName)}&file=${Uri.encodeComponent(path)}',
+    'obsidian://open?vault=${Uri.encodeComponent(settings.vaultName)}&file=${Uri.encodeComponent(cleanPath)}',
   );
+  debugPrint('Opening Obsidian: $uri');
 
   if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
     if (context.mounted) {

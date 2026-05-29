@@ -123,6 +123,25 @@ final objectsByTypeProvider = Provider.family<List<ContentObject>, String>((
   return grouped[type] ?? [];
 });
 
+Future<void> _cancelHabitSlotReminderNotification(
+  Habit habit,
+  int slotIndex,
+) async {
+  final enabledSlotIndexes = habit.slots
+      .asMap()
+      .entries
+      .where(
+        (entry) =>
+            entry.value.reminderEnabled && entry.value.reminderTime != null,
+      )
+      .map((entry) => entry.key)
+      .toList();
+  final reminderIndex = enabledSlotIndexes.indexOf(slotIndex);
+  if (reminderIndex == -1) return;
+  final baseId = habit.id.hashCode.abs() % 1000000;
+  await NotificationService().cancelNotification(baseId + reminderIndex);
+}
+
 // Map to store raw daily note data for O(1) lookup
 final _dailyNoteDataMapProvider =
     StateProvider<Map<String, Map<String, dynamic>>>((ref) => {});
@@ -251,8 +270,12 @@ class HabitsNotifier extends Notifier<List<Habit>> {
         while (slots.length <= slotIndex) {
           slots.add(false);
         }
-        slots[slotIndex] = !_isTruthyCompletion(slots[slotIndex]);
+        final nextValue = !_isTruthyCompletion(slots[slotIndex]);
+        slots[slotIndex] = nextValue;
         habitsMap[habit.slug] = slots;
+        if (nextValue == true) {
+          await _cancelHabitSlotReminderNotification(habit, slotIndex);
+        }
       } else {
         if (currentVal is bool) {
           habitsMap[habit.slug] = !currentVal;
@@ -1135,6 +1158,41 @@ DateTime _journalEntryDateFromDaily(String dateStr, String? time) {
   return DateTime(base.year, base.month, base.day, hour, minute);
 }
 
+bool _isDailyNote(
+  String relativePath,
+  Map<String, dynamic> frontmatter,
+  AppSettings settings,
+) {
+  final normalizedPath = relativePath.replaceAll('\\', '/');
+  final fileName = normalizedPath.split('/').last;
+  final folder = settings.dailyNoteFolder
+      .trim()
+      .replaceAll('\\', '/')
+      .replaceAll(RegExp(r'^/+|/+$'), '');
+
+  switch (settings.dailyNoteIdentifier) {
+    case 'folder':
+      return folder.isNotEmpty &&
+          (normalizedPath == '$folder/$fileName' ||
+              normalizedPath.startsWith('$folder/'));
+    case 'frontmatter_type':
+      return frontmatter['type']?.toString() == 'daily_note';
+    case 'filename_format':
+    default:
+      final pattern = settings.dailyNoteDateFormat == 'yy-MM-dd'
+          ? RegExp(r'^\d{2}-\d{2}-\d{2}\.md$')
+          : RegExp(r'^\d{4}-\d{2}-\d{2}\.md$');
+      return pattern.hasMatch(fileName);
+  }
+}
+
+String _normalizeDailyDate(String raw) {
+  if (RegExp(r'^\d{2}-\d{2}-\d{2}$').hasMatch(raw)) {
+    return '20$raw';
+  }
+  return raw;
+}
+
 class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
   @override
   Future<List<ContentObject>> build() async {
@@ -1169,7 +1227,7 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
             final frontmatter = MarkdownParser.parseFrontmatter(content);
             final body = MarkdownParser.extractBody(content);
 
-            final isDaily = relativePath.split('/').contains('daily');
+            final isDaily = _isDailyNote(relativePath, frontmatter, settings);
             String? type = frontmatter['type'];
 
             final entries = typeSignatures.entries.toList();
@@ -1195,10 +1253,10 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
 
             if (isDaily || type == 'daily_note') {
               final dateMatch = RegExp(
-                r'(\d{4}-\d{2}-\d{2})',
+                r'(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{2})',
               ).firstMatch(relativePath);
               if (dateMatch != null) {
-                final dateStr = dateMatch.group(1)!;
+                final dateStr = _normalizeDailyDate(dateMatch.group(1)!);
                 final entriesData = MarkdownParser.parseJournalEntries(
                   body,
                   dateStr,
@@ -1511,6 +1569,108 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     return [];
   }
 
+  String _entryTime(DateTime date) {
+    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  bool _isImplicitTimeTitle(String title, String time) {
+    final trimmed = title.trim();
+    return trimmed.isEmpty || trimmed == time;
+  }
+
+  String _storedTitleForEntry(JournalEntry entry) {
+    final time = _entryTime(entry.date);
+    final title = entry.title.trim();
+    return _isImplicitTimeTitle(title, time) ? '' : title;
+  }
+
+  Map<String, dynamic> _dailyMapForEntry(JournalEntry entry, String dateStr) {
+    final time = _entryTime(entry.date);
+    return {
+      'time': time,
+      'title': _storedTitleForEntry(entry),
+      'body': entry.body,
+      'mood': entry.moodSlug,
+      'organizers': entry.organizers,
+      'date': DateTime(
+        entry.date.year,
+        entry.date.month,
+        entry.date.day,
+        entry.date.hour,
+        entry.date.minute,
+      ).toIso8601String(),
+    };
+  }
+
+  int _findEntryIndex(
+    List<Map<String, dynamic>> entries,
+    JournalEntry sourceEntry,
+  ) {
+    final originalTime = _entryTime(sourceEntry.date);
+    final originalTitle = sourceEntry.title.trim();
+
+    return entries.indexWhere((candidate) {
+      if (candidate['time'] != originalTime) return false;
+      final candidateTitle = (candidate['title'] as String? ?? '').trim();
+      if (_isImplicitTimeTitle(originalTitle, originalTime)) {
+        return candidateTitle.isEmpty || candidateTitle == originalTime;
+      }
+      return candidateTitle == originalTitle;
+    });
+  }
+
+  void _updateEntryCache({
+    required String dateStr,
+    required String relativePath,
+    required List<Map<String, dynamic>> entries,
+    required Map<String, dynamic> frontmatter,
+    required Map<String, dynamic> habits,
+    required Map<String, dynamic> trackers,
+  }) {
+    final journalEntries = entries.map((data) {
+      final title = data['title']?.toString().trim() ?? '';
+      final time = data['time']?.toString();
+      final entry = JournalEntry(
+        body: data['body']?.toString() ?? '',
+        date: _journalEntryDateFromDaily(dateStr, time),
+        title: title.isNotEmpty ? title : time,
+        moodSlug: data['mood']?.toString(),
+        obsidianPath: relativePath,
+      );
+      final organizers = data['organizers'];
+      if (organizers is List) {
+        entry.organizers = organizers
+            .map<shared_types.OrganizerReference>(
+              (organizer) => organizer is shared_types.OrganizerReference
+                  ? organizer
+                  : shared_types.OrganizerReference.fromWikiLink(
+                      organizer.toString(),
+                    ),
+            )
+            .toList();
+      }
+      return entry;
+    }).toList();
+
+    final notifier = ref.read(_dailyNoteDataMapProvider.notifier);
+    final current = notifier.state;
+    notifier.state = {
+      ...current,
+      dateStr: {
+        'entries': journalEntries,
+        'habitCompletions': habits,
+        'habits': habits,
+        'trackerRecords': trackers,
+        'frontmatter': frontmatter,
+      },
+    };
+
+    final todayStr = DateTime.now().toIso8601String().split('T').first;
+    if (dateStr == todayStr) {
+      state = journalEntries;
+    }
+  }
+
   Future<void> addEntry(JournalEntry entry) async {
     final normalizedDate = DateTime(
       entry.date.year,
@@ -1547,16 +1707,7 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     final pomodoros = MarkdownParser.parsePomodoros(body);
 
     // Add new entry
-    final time =
-        '${entry.date.hour.toString().padLeft(2, '0')}:${entry.date.minute.toString().padLeft(2, '0')}';
-    entries.add({
-      'time': time,
-      'title': entry.title,
-      'body': entry.body,
-      'mood': entry.moodSlug,
-      'organizers': entry.organizers,
-      'date': '$dateStr $time',
-    });
+    entries.add(_dailyMapForEntry(entry, dateStr));
 
     // Sort by time
     entries.sort((a, b) => a['time'].compareTo(b['time']));
@@ -1578,6 +1729,14 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
 
     // 2. Write to local disk
     await obsidianService.writeFile(relativePath, newContent);
+    _updateEntryCache(
+      dateStr: dateStr,
+      relativePath: relativePath,
+      entries: entries,
+      frontmatter: frontmatter,
+      habits: habits,
+      trackers: trackers,
+    );
 
     // 3. Queue for Sync
     await syncQueue.enqueueAction(
@@ -1641,28 +1800,16 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     final trackers = MarkdownParser.parseTrackerRecords(frontmatter);
     final pomodoros = MarkdownParser.parsePomodoros(body);
 
-    final originalTime =
-        '${sourceEntry.date.hour.toString().padLeft(2, '0')}:${sourceEntry.date.minute.toString().padLeft(2, '0')}';
-    final originalTitle = sourceEntry.title.trim();
-    final replacementTime =
-        '${entry.date.hour.toString().padLeft(2, '0')}:${entry.date.minute.toString().padLeft(2, '0')}';
-    final replacement = {
-      'time': replacementTime,
-      'title': entry.title.trim(),
-      'body': entry.body,
-      'mood': entry.moodSlug,
-      'organizers': entry.organizers,
-      'date': '$dateStr $replacementTime',
-    };
+    entry.obsidianPath = relativePath;
+    final replacement = _dailyMapForEntry(entry, dateStr);
 
-    final index = entries.indexWhere((candidate) {
-      final sameTime = candidate['time'] == originalTime;
-      final title = (candidate['title'] as String? ?? '').trim();
-      return sameTime && (originalTitle.isEmpty || title == originalTitle);
-    });
+    final index = _findEntryIndex(entries, sourceEntry);
     if (index >= 0) {
       entries[index] = replacement;
     } else {
+      debugPrint(
+        'Journal update could not match entry in $relativePath; appending replacement.',
+      );
       entries.add(replacement);
     }
 
@@ -1680,6 +1827,14 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     );
     final newContent = generateMarkdown(frontmatter, newBody);
     await obsidianService.writeFile(relativePath, newContent);
+    _updateEntryCache(
+      dateStr: dateStr,
+      relativePath: relativePath,
+      entries: entries,
+      frontmatter: frontmatter,
+      habits: habits,
+      trackers: trackers,
+    );
     await syncQueue.enqueueAction(
       SyncAction(
         objectType: 'daily_note',
@@ -1720,18 +1875,12 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     final trackers = MarkdownParser.parseTrackerRecords(frontmatter);
     final pomodoros = MarkdownParser.parsePomodoros(body);
 
-    final originalTime =
-        '${entry.date.hour.toString().padLeft(2, '0')}:${entry.date.minute.toString().padLeft(2, '0')}';
-    final originalTitle = entry.title.trim();
-
-    final index = entries.indexWhere((candidate) {
-      final sameTime = candidate['time'] == originalTime;
-      final title = (candidate['title'] as String? ?? '').trim();
-      return sameTime && (originalTitle.isEmpty || title == originalTitle);
-    });
+    final index = _findEntryIndex(entries, entry);
 
     if (index >= 0) {
       entries.removeAt(index);
+    } else {
+      debugPrint('Journal delete could not match entry in $relativePath.');
     }
 
     final newBody = MarkdownParser.generateDailyNoteBody(
@@ -1743,6 +1892,14 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     );
     final newContent = generateMarkdown(frontmatter, newBody);
     await obsidianService.writeFile(relativePath, newContent);
+    _updateEntryCache(
+      dateStr: dateStr,
+      relativePath: relativePath,
+      entries: entries,
+      frontmatter: frontmatter,
+      habits: habits,
+      trackers: trackers,
+    );
     await syncQueue.enqueueAction(
       SyncAction(
         objectType: 'daily_note',
@@ -1805,6 +1962,7 @@ class VaultNotifier extends Notifier<void> {
       'day_theme' => 'day_themes',
       'template' => 'templates',
       'reminder' => 'reminders',
+      'inbox' => 'inbox',
       _ => 'app',
     };
   }
@@ -1829,6 +1987,15 @@ class VaultNotifier extends Notifier<void> {
       final config = object.reminders[index];
       final triggerTime = config.calculateTriggerTime(baseTime);
       if (triggerTime.isAfter(DateTime.now())) {
+        final habitSlotIndex = object is Habit
+            ? _slotIndexFromReminderConfig(config)
+            : null;
+        if (object is Habit &&
+            habitSlotIndex != null &&
+            _isHabitSlotCompletedOn(object, triggerTime, habitSlotIndex)) {
+          continue;
+        }
+
         // Sleep In Tomorrow logic for Habits
         if (object is Habit &&
             settings.sleepInTomorrow &&
@@ -1859,10 +2026,31 @@ class VaultNotifier extends Notifier<void> {
           id: reminderId,
           title: object.title,
           config: config,
-          payload: object.id,
+          payload: object is Habit && habitSlotIndex != null
+              ? 'citrine://notification?oid=${Uri.encodeComponent(object.id)}&type=habit&slot=$habitSlotIndex'
+              : object.id,
         );
       }
     }
+  }
+
+  int? _slotIndexFromReminderConfig(ReminderConfig config) {
+    final match = RegExp(r'_slot_(\d+)$').firstMatch(config.id);
+    if (match == null) return null;
+    return int.tryParse(match.group(1)!);
+  }
+
+  bool _isHabitSlotCompletedOn(Habit habit, DateTime date, int slotIndex) {
+    final dateStr = date.toIso8601String().split('T').first;
+    final record = habit.completionHistory
+        .where(
+          (entry) => entry.date.toIso8601String().split('T').first == dateStr,
+        )
+        .firstOrNull;
+    final slots = record?.slotCompletions;
+    return slots != null &&
+        slotIndex < slots.length &&
+        slots[slotIndex] == true;
   }
 
   Future<void> rescheduleAllHabits() async {
@@ -2048,6 +2236,7 @@ class VaultNotifier extends Notifier<void> {
 
     // 1. Move old file to _deleted/ and delete original
     if (object.obsidianPath.isNotEmpty) {
+      debugPrint('Deleting: ${object.obsidianPath}');
       final fileName = object.obsidianPath.split('/').last;
       final deletedPath = '_deleted/$fileName';
 
@@ -2204,14 +2393,19 @@ class VaultNotifier extends Notifier<void> {
 
   Future<void> _purgeOldDeletedFiles() async {
     final obsidianService = ref.read(obsidianServiceProvider);
-    final files = await obsidianService.getFilesInFolder('_deleted');
+    final files = await obsidianService.getFilesInFolder(
+      '_deleted',
+      includeDeleted: true,
+    );
     final now = DateTime.now();
 
     for (final file in files) {
       final stat = await file.stat();
       final diff = now.difference(stat.modified);
       if (diff.inDays > 30) {
-        await obsidianService.deleteFile(file.path);
+        await obsidianService.deleteFile(
+          obsidianService.getRelativePath(file.path),
+        );
       }
     }
   }
@@ -2235,6 +2429,7 @@ class VaultNotifier extends Notifier<void> {
     final syncQueue = ref.read(syncQueueServiceProvider);
 
     if (object.obsidianPath.isNotEmpty) {
+      debugPrint('Deleting: ${object.obsidianPath}');
       final fileName = object.obsidianPath.split('/').last;
       final deletedPath = '_deleted/$fileName';
 
@@ -2780,28 +2975,18 @@ class InboxNotifier extends AsyncNotifier<List<InboxItem>> {
   }
 
   Future<void> addItem(String text) async {
-    final obsidian = ref.read(obsidianServiceProvider);
     final now = DateTime.now();
     final slug =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}'
         '-${now.hour.toString().padLeft(2, '0')}-${now.minute.toString().padLeft(2, '0')}';
     final item = InboxItem(title: text.trim(), content: '', createdAt: now);
     item.obsidianPath = 'inbox/$slug.md';
-    await obsidian.writeFile(item.obsidianPath, item.toMarkdown());
+    await ref.read(vaultProvider.notifier).createObject(item);
     ref.invalidateSelf();
   }
 
   Future<void> deleteItem(InboxItem item) async {
-    final obsidian = ref.read(obsidianServiceProvider);
-    // Move to _deleted
-    if (item.obsidianPath.isNotEmpty) {
-      final fileName = item.obsidianPath.split('/').last;
-      final content = await obsidian.readFile(item.obsidianPath);
-      if (content != null) {
-        await obsidian.writeFile('_deleted/$fileName', content);
-      }
-      await obsidian.deleteFile(item.obsidianPath);
-    }
+    await ref.read(vaultProvider.notifier).deleteObject(item);
     ref.invalidateSelf();
   }
 

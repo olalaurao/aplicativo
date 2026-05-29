@@ -16,7 +16,12 @@ class CreateHabitForm extends ConsumerStatefulWidget {
   final String? initialTitle;
   final Habit? existingHabit;
   final String? initialTimeBlock;
-  const CreateHabitForm({super.key, this.initialTitle, this.existingHabit, this.initialTimeBlock});
+  const CreateHabitForm({
+    super.key,
+    this.initialTitle,
+    this.existingHabit,
+    this.initialTimeBlock,
+  });
 
   @override
   ConsumerState<CreateHabitForm> createState() => _CreateHabitFormState();
@@ -95,7 +100,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
 
   @override
   Widget build(BuildContext context) {
-    final hasTitle = _titleController.text.trim().isNotEmpty;
+    final canSave = _canSave;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -133,7 +138,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                 ),
               IconButton(
                 icon: const Icon(Icons.check_rounded, color: AppColors.primary),
-                onPressed: _saveHabit,
+                onPressed: canSave ? _saveHabit : null,
               ),
               const SizedBox(width: 8),
             ],
@@ -404,7 +409,8 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                         const Divider(height: 24),
                         TimeBlockPicker(
                           selectedBlockId: _timeBlock,
-                          onBlockSelected: (val) => setState(() => _timeBlock = val),
+                          onBlockSelected: (val) =>
+                              setState(() => _timeBlock = val),
                         ),
                       ],
                     ),
@@ -552,7 +558,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
           child: SizedBox(
             height: 52,
             child: FilledButton(
-              onPressed: hasTitle ? _saveHabit : null,
+              onPressed: canSave ? _saveHabit : null,
               style: FilledButton.styleFrom(
                 backgroundColor: _parseColor(_selectedColor),
                 disabledBackgroundColor: AppColors.textMuted.withValues(
@@ -572,6 +578,9 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
       ),
     );
   }
+
+  bool get _canSave =>
+      _titleController.text.trim().isNotEmpty && _schedulers.isNotEmpty;
 
   Widget _propertyRow(
     String label,

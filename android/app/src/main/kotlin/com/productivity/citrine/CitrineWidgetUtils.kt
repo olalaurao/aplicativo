@@ -37,6 +37,19 @@ object CitrineWidgetUtils {
 
     fun array(obj: JSONObject, key: String): JSONArray = obj.optJSONArray(key) ?: JSONArray()
 
+    fun displayText(item: JSONObject, vararg keys: String, fallback: String = "Sem título"): String {
+        for (key in keys) {
+            val value = item.optString(key, "").trim()
+            if (value.isNotBlank() && !looksLikeTechnicalId(value)) return value
+        }
+        return fallback
+    }
+
+    private fun looksLikeTechnicalId(value: String): Boolean {
+        return Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$").matches(value) ||
+            Regex("^\\d{10,}$").matches(value)
+    }
+
     /** Abre uma URI deep-link no MainActivity (citrine:///planner, citrine:///detail/xxx, etc.) */
     fun openUriIntent(context: Context, uri: String): PendingIntent {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uri), context, MainActivity::class.java)
@@ -137,15 +150,14 @@ object CitrineWidgetUtils {
             views.setTextViewText(timeId, item.optString("time", ""))
             views.setTextColor(timeId, mutedColor(context))
         }
-        views.setTextViewText(titleId, item.optString("title", ""))
-        views.setTextViewText(subtitleId, item.optString("subtitle", ""))
+        views.setTextViewText(titleId, displayText(item, "title", "label"))
+        views.setTextViewText(subtitleId, displayText(item, "subtitle", fallback = ""))
         views.setTextColor(titleId, textColor(context))
         views.setTextColor(subtitleId, mutedColor(context))
 
         // Deep link para o detalhe do item ao clicar no row
         val linkUri = item.optString("linkUri", "").ifBlank {
-            val id = item.optString("id", "")
-            if (id.isNotBlank()) "citrine:///detail/$id" else "citrine:///planner"
+            "citrine:///planner"
         }
         views.setOnClickPendingIntent(rowId, itemIntent(context, linkUri))
     }
@@ -184,8 +196,8 @@ object CitrineWidgetUtils {
         }
         views.setTextViewText(timeId, item.optString("time", ""))
         views.setTextColor(timeId, accent)
-        views.setTextViewText(titleId, item.optString("title", ""))
-        views.setTextViewText(subtitleId, item.optString("subtitle", ""))
+        views.setTextViewText(titleId, displayText(item, "title", "label"))
+        views.setTextViewText(subtitleId, displayText(item, "subtitle", fallback = ""))
         views.setTextColor(titleId, textColor(context))
         views.setTextColor(subtitleId, mutedColor(context))
     }

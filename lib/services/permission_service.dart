@@ -36,10 +36,21 @@ class PermissionService {
 
   /// Check if exact alarm permission is granted using the flutter_local_notifications plugin.
   static Future<bool> canScheduleExactAlarms() async {
+    if (Platform.isAndroid) {
+      try {
+        final nativeAllowed = await _channel.invokeMethod<bool>(
+          'checkScheduleExactAlarm',
+        );
+        if (nativeAllowed != null) return nativeAllowed;
+      } catch (_) {}
+    }
+
     try {
       final plugin = FlutterLocalNotificationsPlugin();
-      final android = plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
+      final android = plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       if (android == null) return true;
       return await android.canScheduleExactNotifications() ?? true;
     } catch (_) {
@@ -55,8 +66,10 @@ class PermissionService {
       }
 
       // 2. Exact alarms (Android 12+)
-      // Use the flutter_local_notifications plugin check first — it's more
-      // reliable than the permission_handler package for this specific API.
+      // Use the native AlarmManager check first. Declaring USE_EXACT_ALARM
+      // bypasses this dialog on some Android versions, so the manifest only
+      // declares SCHEDULE_EXACT_ALARM and we explicitly send the user to the
+      // special access page when denied.
       final canScheduleExact = await canScheduleExactAlarms();
       if (!canScheduleExact) {
         // Open the system settings page for exact alarms via platform channel
@@ -81,7 +94,11 @@ class PermissionService {
 
       // Ignore Battery Optimizations - Direct Redirection to Settings!
       try {
-        final batteryIgnored = await _channel.invokeMethod<bool>('checkBatteryOptimizationIgnored') ?? false;
+        final batteryIgnored =
+            await _channel.invokeMethod<bool>(
+              'checkBatteryOptimizationIgnored',
+            ) ??
+            false;
         if (!batteryIgnored) {
           await requestBatteryOptimizationBypass();
         }
@@ -93,9 +110,11 @@ class PermissionService {
 
       // System Alert Window (aparecer sobre outros apps, pro Pomodoro/alarmes trancados)
       try {
-        final alertWindowGranted = await _channel.invokeMethod<bool>('checkSystemAlertWindow') ?? false;
+        final alertWindowGranted =
+            await _channel.invokeMethod<bool>('checkSystemAlertWindow') ??
+            false;
         if (!alertWindowGranted) {
-            await _channel.invokeMethod('requestSystemAlertWindow');
+          await _channel.invokeMethod('requestSystemAlertWindow');
         }
       } catch (_) {
         if (await Permission.systemAlertWindow.isDenied) {
@@ -108,7 +127,9 @@ class PermissionService {
   /// Show a dialog explaining why exact alarm permission is needed, then
   /// redirect to the system settings page. Call from a settings screen or
   /// when scheduling the first alarm-type notification.
-  static Future<void> showExactAlarmPermissionDialog(BuildContext context) async {
+  static Future<void> showExactAlarmPermissionDialog(
+    BuildContext context,
+  ) async {
     if (!Platform.isAndroid) return;
     final canSchedule = await canScheduleExactAlarms();
     if (canSchedule) return;

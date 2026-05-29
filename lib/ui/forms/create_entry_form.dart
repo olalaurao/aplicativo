@@ -82,7 +82,17 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
       _location = entry.location;
       _organizers = List.of(entry.organizers);
     } else {
-      _entryDate = widget.initialDate ?? DateTime.now();
+      final now = DateTime.now();
+      final initialDate = widget.initialDate;
+      _entryDate = initialDate == null
+          ? now
+          : DateTime(
+              initialDate.year,
+              initialDate.month,
+              initialDate.day,
+              now.hour,
+              now.minute,
+            );
       if (widget.initialBody != null) {
         _content = widget.initialBody!;
       } else {
@@ -886,6 +896,6 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
       return;
     }
     if (!mounted) return;
-    Navigator.pop(context);
+    Navigator.pop(context, true);
   }
 }

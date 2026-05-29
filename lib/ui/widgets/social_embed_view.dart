@@ -31,6 +31,7 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
       SocialPlatform.youtube => 220,
       SocialPlatform.pinterest => 400,
       SocialPlatform.twitter => 280,
+      SocialPlatform.linkedin => 260,
       SocialPlatform.substack => MediaQuery.of(context).size.height * 0.7,
       SocialPlatform.other => 400,
     };

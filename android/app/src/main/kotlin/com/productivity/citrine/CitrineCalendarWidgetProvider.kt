@@ -51,14 +51,14 @@ open class CitrineCalendarWidgetProvider : AppWidgetProvider() {
         // Arrows navigation
         views.setOnClickPendingIntent(
             R.id.nav_prev,
-            CitrineWidgetUtils.backgroundIntent(
+            CitrineWidgetUtils.openUriIntent(
                 context,
                 "citrine://widget-toggle?type=calendar_offset&offset=-1",
             )
         )
         views.setOnClickPendingIntent(
             R.id.nav_next,
-            CitrineWidgetUtils.backgroundIntent(
+            CitrineWidgetUtils.openUriIntent(
                 context,
                 "citrine://widget-toggle?type=calendar_offset&offset=1",
             )
@@ -75,21 +75,21 @@ open class CitrineCalendarWidgetProvider : AppWidgetProvider() {
 
         views.setOnClickPendingIntent(
             R.id.toggle_day,
-            CitrineWidgetUtils.backgroundIntent(
+            CitrineWidgetUtils.openUriIntent(
                 context,
                 "citrine://widget-toggle?type=calendar_mode&mode=day",
             )
         )
         views.setOnClickPendingIntent(
             R.id.toggle_week,
-            CitrineWidgetUtils.backgroundIntent(
+            CitrineWidgetUtils.openUriIntent(
                 context,
                 "citrine://widget-toggle?type=calendar_mode&mode=week",
             )
         )
         views.setOnClickPendingIntent(
             R.id.toggle_month,
-            CitrineWidgetUtils.backgroundIntent(
+            CitrineWidgetUtils.openUriIntent(
                 context,
                 "citrine://widget-toggle?type=calendar_mode&mode=month",
             )

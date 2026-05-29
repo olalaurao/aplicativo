@@ -1,9 +1,11 @@
 import 'package:citrine/models/habit_model.dart';
 import 'package:citrine/models/analysis_model.dart';
+import 'package:citrine/models/journal_entry.dart';
 
 import 'package:citrine/models/goal_model.dart';
 import 'package:citrine/models/mood_model.dart';
 import 'package:citrine/models/note_model.dart';
+import 'package:citrine/models/organizer_model.dart';
 import 'package:citrine/models/people_model.dart';
 import 'package:citrine/models/project_model.dart';
 import 'package:citrine/models/reminder_model.dart';
@@ -13,11 +15,19 @@ import 'package:citrine/models/snapshot_model.dart';
 import 'package:citrine/models/task_model.dart';
 import 'package:citrine/models/tracker_model.dart';
 import 'package:citrine/models/kpi_model.dart' as kpi_model;
+import 'package:citrine/models/dashboard_block.dart';
+import 'package:citrine/providers/settings_provider.dart';
+import 'package:citrine/providers/widget_sync_provider.dart';
 import 'package:citrine/services/markdown_parser.dart';
 import 'package:citrine/services/kpi_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 void main() {
+  setUpAll(() async {
+    await initializeDateFormatting('pt_BR');
+  });
+
   group('markdown round-trip', () {
     test('task preserves base fields and subtasks', () {
       final task = Task(
@@ -47,7 +57,11 @@ void main() {
     });
 
     test('organizer references preserve type in wikilinks', () {
-      final reference = OrganizerReference(type: 'project', slug: 'launch', title: 'Launch');
+      final reference = OrganizerReference(
+        type: 'project',
+        slug: 'launch',
+        title: 'Launch',
+      );
       final parsed = OrganizerReference.fromWikiLink(reference.toWikiLink());
 
       expect(reference.toWikiLink(), '[[project/launch]]');
@@ -89,6 +103,54 @@ void main() {
         expect(body, contains('[[hydrate]]'));
         expect(body, contains('hours: 7.5'));
         expect(pomodoros.single['title'], 'Focus');
+      },
+    );
+
+    test('daily journal heading keeps fixed file date and heading time', () {
+      const body = '''
+## Journal Entries
+
+### 08:30
+Entrada antiga.
+mood:: [[good]]
+organizers:: [[health]]
+
+---
+''';
+
+      final entries = MarkdownParser.parseJournalEntries(body, '2026-05-20');
+
+      expect(entries, hasLength(1));
+      expect(
+        DateTime.parse(entries.single['date'] as String),
+        DateTime(2026, 5, 20, 8, 30),
+      );
+      expect(entries.single['time'], '08:30');
+      expect(entries.single['body'], 'Entrada antiga.');
+    });
+
+    test(
+      'editing journal body preserves original date when date is reused',
+      () {
+        const body = '''
+## Journal Entries
+
+### 08:30 - Morning
+Texto original.
+
+---
+''';
+
+        final entries = MarkdownParser.parseJournalEntries(body, '2026-05-20');
+        final originalDate = DateTime.parse(entries.single['date'] as String);
+        final edited = JournalEntry(
+          id: 'entry-1',
+          title: 'Morning',
+          body: 'Texto editado.',
+          date: originalDate,
+        ).copyWith(body: 'Texto editado.');
+
+        expect(edited.date, DateTime(2026, 5, 20, 8, 30));
       },
     );
 
@@ -343,6 +405,130 @@ void main() {
       );
 
       expect(value, 3);
+    });
+
+    test('widget snapshots keep internal ids out of display fields', () {
+      const uuid = '123e4567-e89b-12d3-a456-426614174000';
+      final organizer = Organizer(
+        id: 'area-health',
+        title: 'Saúde',
+        organizerType: OrganizerType.area,
+      );
+      final habit = Habit(
+        id: uuid,
+        title: 'Beber água',
+        color: '#4D9DE0',
+        organizers: [
+          OrganizerReference(
+            type: 'area',
+            slug: organizer.slug,
+            title: organizer.title,
+          ),
+        ],
+      );
+      final block = DashboardBlock(
+        id: 'home-area',
+        type: BlockType.organizerSummary,
+        title: 'Filtro',
+        order: 0,
+        metadata: {
+          'organizerSlug': organizer.slug,
+          'filterObjectTypes': ['habit'],
+        },
+      );
+
+      final filter = buildFilterSnapshotForTest([organizer, habit], [block]);
+      final rows = filter['items'] as List;
+      final row = rows.single as Map<String, dynamic>;
+
+      expect(row['id'], uuid);
+      expect(row['title'], 'Beber água');
+      expect(row['subtitle'], 'Saúde');
+      expect(row['title'], isNot(contains(uuid)));
+      expect(row['subtitle'], isNot(contains(uuid)));
+      expect(filter['organizer'], isNot(contains(uuid)));
+    });
+
+    test('calendar widget day snapshot displays habit title, not id', () {
+      const uuid = '123e4567-e89b-12d3-a456-426614174000';
+      final habit = Habit(id: uuid, title: 'Beber água', color: '#4D9DE0');
+      final snapshot = buildCalendarSnapshotForTest(
+        [habit],
+        AppSettings(vaultName: 'Test', calendarWidgetType: 'day'),
+        const [],
+        0,
+      );
+      final items = snapshot['items'] as List;
+      final row = items.single as Map<String, dynamic>;
+
+      expect(row['id'], uuid);
+      expect(row['title'], 'Beber água');
+      expect(row['title'], isNot(contains(uuid)));
+    });
+
+    test(
+      'widget snapshots replace technical title fallback with human text',
+      () {
+        const uuid = '123e4567-e89b-12d3-a456-426614174000';
+        final habit = Habit(id: uuid, title: uuid, color: '#4D9DE0');
+        final snapshot = buildCalendarSnapshotForTest(
+          [habit],
+          AppSettings(vaultName: 'Test', calendarWidgetType: 'day'),
+          const [],
+          0,
+        );
+        final row = (snapshot['items'] as List).single as Map<String, dynamic>;
+
+        expect(row['id'], uuid);
+        expect(row['title'], 'Sem título');
+        expect(row['title'], isNot(contains(uuid)));
+      },
+    );
+
+    test('filter widget snapshot uses saved widget settings', () {
+      final organizer = Organizer(
+        id: 'area-work',
+        title: 'Trabalho',
+        organizerType: OrganizerType.area,
+      );
+      final habit = Habit(
+        id: 'habit-water',
+        title: 'Beber água',
+        color: '#4D9DE0',
+        organizers: [
+          OrganizerReference(
+            type: 'area',
+            slug: organizer.slug,
+            title: organizer.title,
+          ),
+        ],
+      );
+      final task = Task(
+        id: 'task-report',
+        title: 'Relatório',
+        organizers: [
+          OrganizerReference(
+            type: 'area',
+            slug: organizer.slug,
+            title: organizer.title,
+          ),
+        ],
+      );
+
+      final filter = buildFilterSnapshotForTest(
+        [organizer, habit, task],
+        const [],
+        AppSettings(
+          vaultName: 'Test',
+          universalWidgetOrganizer: organizer.slug,
+          universalWidgetObjectTypes: const ['habit'],
+        ),
+      );
+      final rows = filter['items'] as List;
+
+      expect(filter['organizer'], 'Trabalho');
+      expect(rows, hasLength(1));
+      expect((rows.single as Map<String, dynamic>)['title'], 'Beber água');
     });
   });
 }

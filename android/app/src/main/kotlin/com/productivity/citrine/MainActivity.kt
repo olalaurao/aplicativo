@@ -1,5 +1,6 @@
 package com.productivity.citrine
 
+import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -17,6 +18,7 @@ class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.productivity.citrine/settings"
     private var pendingPayload: String? = null
     private var pendingSharedText: String? = null
+    private var pendingWidgetUri: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,6 +39,10 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
+        val data = intent?.data
+        if (data?.host == "widget-toggle") {
+            pendingWidgetUri = data.toString()
+        }
         if (intent != null && intent.hasExtra("payload")) {
             pendingPayload = intent.getStringExtra("payload")
         }
@@ -109,6 +115,18 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                 }
+                "checkScheduleExactAlarm" -> {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                            result.success(alarmManager.canScheduleExactAlarms())
+                        } else {
+                            result.success(true)
+                        }
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
                 "requestFullScreenIntent" -> {
                     try {
                         if (Build.VERSION.SDK_INT >= 34) { // Android 14 (UPSIDE_DOWN_CAKE)
@@ -179,12 +197,30 @@ class MainActivity : FlutterActivity() {
                     pendingSharedText = null
                     result.success(sharedText)
                 }
+                "getAndClearPendingWidgetUri" -> {
+                    val uri = pendingWidgetUri
+                    pendingWidgetUri = null
+                    result.success(uri)
+                }
                 "bringAppToForeground" -> {
                     try {
                         val intent = Intent(this@MainActivity, MainActivity::class.java)
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                         startActivity(intent)
                         result.success(true)
+                    } catch (e: Exception) {
+                        result.error("ERROR", e.message, null)
+                    }
+                }
+                "sendBroadcast" -> {
+                    try {
+                        val action = call.argument<String>("action")
+                        if (action.isNullOrBlank()) {
+                            result.error("ERROR", "Missing broadcast action", null)
+                        } else {
+                            sendBroadcast(Intent(action))
+                            result.success(true)
+                        }
                     } catch (e: Exception) {
                         result.error("ERROR", e.message, null)
                     }

@@ -58,6 +58,9 @@ class AppSettings {
   final String sleepInDate;
   final String reviewDailyTemplateId;
   final bool nlpTaskParsingEnabled;
+  final String dailyNoteIdentifier;
+  final String dailyNoteDateFormat;
+  final String dailyNoteFolder;
 
   AppSettings({
     required this.vaultName,
@@ -87,9 +90,12 @@ class AppSettings {
     this.sleepInDate = '',
     this.reviewDailyTemplateId = '',
     this.nlpTaskParsingEnabled = true,
-    this.quickAddWidgetButton1Label = 'Journal',
+    this.dailyNoteIdentifier = 'filename_format',
+    this.dailyNoteDateFormat = 'yyyy-MM-dd',
+    this.dailyNoteFolder = 'daily',
+    this.quickAddWidgetButton1Label = 'Diário',
     this.quickAddWidgetButton1Target = 'journal',
-    this.quickAddWidgetButton2Label = 'Task',
+    this.quickAddWidgetButton2Label = 'Tarefa',
     this.quickAddWidgetButton2Target = 'task',
     this.calendarWidgetType = 'week',
     this.calendarWidgetShowTasks = true,
@@ -145,6 +151,9 @@ class AppSettings {
     String? sleepInDate,
     String? reviewDailyTemplateId,
     bool? nlpTaskParsingEnabled,
+    String? dailyNoteIdentifier,
+    String? dailyNoteDateFormat,
+    String? dailyNoteFolder,
     String? quickAddWidgetButton1Label,
     String? quickAddWidgetButton1Target,
     String? quickAddWidgetButton2Label,
@@ -189,6 +198,9 @@ class AppSettings {
           reviewDailyTemplateId ?? this.reviewDailyTemplateId,
       nlpTaskParsingEnabled:
           nlpTaskParsingEnabled ?? this.nlpTaskParsingEnabled,
+      dailyNoteIdentifier: dailyNoteIdentifier ?? this.dailyNoteIdentifier,
+      dailyNoteDateFormat: dailyNoteDateFormat ?? this.dailyNoteDateFormat,
+      dailyNoteFolder: dailyNoteFolder ?? this.dailyNoteFolder,
       quickAddWidgetButton1Label:
           quickAddWidgetButton1Label ?? this.quickAddWidgetButton1Label,
       quickAddWidgetButton1Target:
@@ -273,12 +285,17 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       sleepInDate: prefs.getString('sleepInDate') ?? '',
       reviewDailyTemplateId: prefs.getString('reviewDailyTemplateId') ?? '',
       nlpTaskParsingEnabled: prefs.getBool('nlpTaskParsingEnabled') ?? true,
+      dailyNoteIdentifier:
+          prefs.getString('dailyNoteIdentifier') ?? 'filename_format',
+      dailyNoteDateFormat:
+          prefs.getString('dailyNoteDateFormat') ?? 'yyyy-MM-dd',
+      dailyNoteFolder: prefs.getString('dailyNoteFolder') ?? 'daily',
       quickAddWidgetButton1Label:
-          prefs.getString('quickAddWidgetButton1Label') ?? 'Journal',
+          prefs.getString('quickAddWidgetButton1Label') ?? 'Diário',
       quickAddWidgetButton1Target:
           prefs.getString('quickAddWidgetButton1Target') ?? 'journal',
       quickAddWidgetButton2Label:
-          prefs.getString('quickAddWidgetButton2Label') ?? 'Task',
+          prefs.getString('quickAddWidgetButton2Label') ?? 'Tarefa',
       quickAddWidgetButton2Target:
           prefs.getString('quickAddWidgetButton2Target') ?? 'task',
       calendarWidgetType: prefs.getString('calendarWidgetType') ?? 'week',
@@ -627,6 +644,28 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('nlpTaskParsingEnabled', value);
     state = state.copyWith(nlpTaskParsingEnabled: value);
+  }
+
+  Future<void> updateDailyNoteSettings({
+    String? identifier,
+    String? dateFormat,
+    String? folder,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (identifier != null) {
+      await prefs.setString('dailyNoteIdentifier', identifier);
+    }
+    if (dateFormat != null) {
+      await prefs.setString('dailyNoteDateFormat', dateFormat);
+    }
+    if (folder != null) {
+      await prefs.setString('dailyNoteFolder', folder);
+    }
+    state = state.copyWith(
+      dailyNoteIdentifier: identifier,
+      dailyNoteDateFormat: dateFormat,
+      dailyNoteFolder: folder,
+    );
   }
 }
 

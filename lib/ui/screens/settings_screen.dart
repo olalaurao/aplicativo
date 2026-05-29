@@ -760,6 +760,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       const Divider(height: 1, indent: 16),
                       ListTile(
                         leading: const Icon(
+                          Icons.today_rounded,
+                          color: AppColors.primary,
+                        ),
+                        title: const Text(
+                          'Formato da daily note',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${_dailyIdentifierLabel(settings.dailyNoteIdentifier)} · ${settings.dailyNoteFolder}/${_dailyPreview(settings.dailyNoteDateFormat)}',
+                          style: const TextStyle(fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () =>
+                            _showDailyNoteDialog(context, settings, notifier),
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      ListTile(
+                        leading: const Icon(
                           Icons.folder_zip_outlined,
                           color: AppColors.info,
                         ),
@@ -1212,6 +1235,118 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         );
       },
+    );
+  }
+
+  String _dailyIdentifierLabel(String value) {
+    return switch (value) {
+      'folder' => 'Pasta',
+      'frontmatter_type' => 'Frontmatter type',
+      _ => 'Nome do arquivo',
+    };
+  }
+
+  String _dailyPreview(String format) {
+    return format == 'yy-MM-dd' ? '26-05-27.md' : '2026-05-27.md';
+  }
+
+  void _showDailyNoteDialog(
+    BuildContext context,
+    AppSettings settings,
+    SettingsNotifier notifier,
+  ) {
+    var identifier = settings.dailyNoteIdentifier;
+    var dateFormat = settings.dailyNoteDateFormat;
+    final folderController = TextEditingController(
+      text: settings.dailyNoteFolder,
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Formato da daily note'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: identifier,
+                decoration: const InputDecoration(labelText: 'Identificação'),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'filename_format',
+                    child: Text('Nome do arquivo'),
+                  ),
+                  DropdownMenuItem(value: 'folder', child: Text('Pasta')),
+                  DropdownMenuItem(
+                    value: 'frontmatter_type',
+                    child: Text('Frontmatter type: daily_note'),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setDialogState(() => identifier = value);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: dateFormat,
+                decoration: const InputDecoration(labelText: 'Formato da data'),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'yyyy-MM-dd',
+                    child: Text('YYYY-MM-DD'),
+                  ),
+                  DropdownMenuItem(value: 'yy-MM-dd', child: Text('YY-MM-DD')),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setDialogState(() => dateFormat = value);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: folderController,
+                decoration: const InputDecoration(labelText: 'Pasta'),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Preview: ${folderController.text.trim().isEmpty ? 'daily' : folderController.text.trim()}/${_dailyPreview(dateFormat)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textMutedColor(context),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('CANCELAR'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await notifier.updateDailyNoteSettings(
+                  identifier: identifier,
+                  dateFormat: dateFormat,
+                  folder: folderController.text.trim().isEmpty
+                      ? 'daily'
+                      : folderController.text.trim(),
+                );
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              child: const Text('SALVAR'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

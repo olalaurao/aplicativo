@@ -12,6 +12,7 @@ class OEmbedService {
     if (lower.contains('tiktok.com')) return SocialPlatform.tiktok;
     if (lower.contains('instagram.com')) return SocialPlatform.instagram;
     if (lower.contains('substack.com')) return SocialPlatform.substack;
+    if (lower.contains('linkedin.com')) return SocialPlatform.linkedin;
     if (lower.contains('pinterest.com') || lower.contains('pin.it')) {
       return SocialPlatform.pinterest;
     }
@@ -39,6 +40,7 @@ class OEmbedService {
             ? SocialMediaType.video
             : SocialMediaType.image,
       SocialPlatform.substack => SocialMediaType.article,
+      SocialPlatform.linkedin => SocialMediaType.other,
       SocialPlatform.pinterest => SocialMediaType.image,
       SocialPlatform.twitter || SocialPlatform.other => SocialMediaType.other,
     };
@@ -58,6 +60,8 @@ class OEmbedService {
             : 'https://www.instagram.com/p/$shortcode/embed/';
       case SocialPlatform.substack:
         return originalUrl;
+      case SocialPlatform.linkedin:
+        return null;
       case SocialPlatform.pinterest:
         final id = RegExp(r'/pin/(\d+)').firstMatch(originalUrl)?.group(1);
         return id == null
@@ -101,6 +105,7 @@ class OEmbedService {
         ),
         SocialPlatform.instagram ||
         SocialPlatform.substack ||
+        SocialPlatform.linkedin ||
         SocialPlatform.twitter ||
         SocialPlatform.other => _fetchOpenGraph(normalizedUrl),
       };

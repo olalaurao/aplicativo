@@ -27,6 +27,9 @@ class SearchService {
 
       bool allTokensMatch = tokens.every((token) {
         if (obj.title.toLowerCase().contains(token)) return true;
+        if (obj.aliases.any((alias) => alias.toLowerCase().contains(token))) {
+          return true;
+        }
         if (obj.type.toLowerCase().contains(token)) return true;
         if (obj.categories.any((c) => c.toLowerCase().contains(token))) {
           return true;

@@ -6,6 +6,7 @@ import '../forms/create_entry_form.dart';
 import '../forms/create_habit_form.dart';
 import '../forms/create_goal_form.dart';
 import '../forms/create_note_form.dart';
+import '../forms/create_event_form.dart';
 import '../forms/create_social_post_form.dart';
 
 import '../forms/create_scan_document_form.dart';
@@ -327,6 +328,15 @@ class _CreateMenuSheetState extends State<CreateMenuSheet> {
               subtitle: 'Quick alert',
               color: AppColors.warning,
               targetForm: const CreateReminderForm(),
+            ),
+            const SizedBox(width: 12),
+            _buildCreateCard(
+              context,
+              icon: Icons.event_rounded,
+              title: 'Evento',
+              subtitle: 'Criar no Google Calendar',
+              color: AppColors.info,
+              targetForm: CreateEventForm(initialTitle: widget.initialTitle),
             ),
           ],
         ),

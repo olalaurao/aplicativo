@@ -107,7 +107,7 @@ Future<void> forceWidgetSync(ProviderContainer container) async {
     final googleDays = isMonthWidget
         ? DateTime(today.year, today.month + 1, 0).day
         : 35;
-        
+
     List<calendar.Event> googleEvents = [];
     try {
       googleEvents = await container.read(
@@ -142,8 +142,13 @@ Future<void> _updateAllWidgets(
   int offset,
 ) async {
   try {
-    final calendar = _buildCalendarSnapshot(allObjects, settings, googleEvents, offset);
-    final filter = _buildFilterSnapshot(allObjects, dashboardBlocks);
+    final calendar = _buildCalendarSnapshot(
+      allObjects,
+      settings,
+      googleEvents,
+      offset,
+    );
+    final filter = _buildFilterSnapshot(allObjects, dashboardBlocks, settings);
     final pomodoro = _buildPomodoroSnapshot(pomodoroHistory);
     await WidgetService.updateDashboardWidgets(
       calendar: calendar,
@@ -153,6 +158,25 @@ Future<void> _updateAllWidgets(
   } catch (e, st) {
     debugPrint('[WidgetSync] failed: $e\n$st');
   }
+}
+
+@visibleForTesting
+Map<String, dynamic> buildCalendarSnapshotForTest(
+  List<ContentObject> objects,
+  AppSettings settings,
+  List<calendar.Event> googleEvents,
+  int offset,
+) {
+  return _buildCalendarSnapshot(objects, settings, googleEvents, offset);
+}
+
+@visibleForTesting
+Map<String, dynamic> buildFilterSnapshotForTest(
+  List<ContentObject> allObjects,
+  List<DashboardBlock> dashboardBlocks, [
+  AppSettings? settings,
+]) {
+  return _buildFilterSnapshot(allObjects, dashboardBlocks, settings);
 }
 
 Map<String, dynamic> _buildCalendarSnapshot(
@@ -173,7 +197,14 @@ Map<String, dynamic> _buildCalendarSnapshot(
   if (mode == 'day') {
     // offset shifts by days
     final focusDay = today.add(Duration(days: offset));
-    final items = _dayItems(focusDay, tasks, habits, reminders, googleEvents, settings);
+    final items = _dayItems(
+      focusDay,
+      tasks,
+      habits,
+      reminders,
+      googleEvents,
+      settings,
+    );
 
     return {
       'title': 'Calendário',
@@ -184,7 +215,7 @@ Map<String, dynamic> _buildCalendarSnapshot(
       'selectedSubtitle': DateFormat('EEEE', 'pt_BR').format(focusDay),
       'subtitle': '${items.length} ${items.length == 1 ? 'tarefa' : 'tarefas'}',
       'items': items.take(_maxWidgetDayItems).toList(),
-      'days': <Map<String, dynamic>>[],  // strip hidden in day mode
+      'days': <Map<String, dynamic>>[], // strip hidden in day mode
     };
   } else if (mode == 'week') {
     // offset shifts by weeks
@@ -194,7 +225,14 @@ Map<String, dynamic> _buildCalendarSnapshot(
     // Build day strip
     final days = List.generate(7, (i) {
       final date = focusMonday.add(Duration(days: i));
-      final dayItems = _dayItems(date, tasks, habits, reminders, googleEvents, settings);
+      final dayItems = _dayItems(
+        date,
+        tasks,
+        habits,
+        reminders,
+        googleEvents,
+        settings,
+      );
       return {
         'dayHeader': dayHeaders[i],
         'dayNum': '${date.day}',
@@ -207,12 +245,20 @@ Map<String, dynamic> _buildCalendarSnapshot(
     });
 
     // Items for today (or first day of focused week if today is outside)
-    final selectedDate = _isSameDay(focusMonday, today) ||
+    final selectedDate =
+        _isSameDay(focusMonday, today) ||
             (today.isAfter(focusMonday) &&
                 today.isBefore(focusMonday.add(const Duration(days: 7))))
         ? today
         : focusMonday;
-    final selectedItems = _dayItems(selectedDate, tasks, habits, reminders, googleEvents, settings);
+    final selectedItems = _dayItems(
+      selectedDate,
+      tasks,
+      habits,
+      reminders,
+      googleEvents,
+      settings,
+    );
 
     final endOfWeek = focusMonday.add(const Duration(days: 6));
     final startMonth = _shortMonth(focusMonday);
@@ -226,7 +272,8 @@ Map<String, dynamic> _buildCalendarSnapshot(
       'mode': 'week',
       'selectedTitle': rangeStr,
       'selectedSubtitle': '',
-      'subtitle': 'Hoje · ${selectedItems.length} ${selectedItems.length == 1 ? 'tarefa' : 'tarefas'}',
+      'subtitle':
+          'Hoje · ${selectedItems.length} ${selectedItems.length == 1 ? 'tarefa' : 'tarefas'}',
       'items': selectedItems.take(_maxWidgetDayItems).toList(),
       'days': days,
     };
@@ -240,7 +287,8 @@ Map<String, dynamic> _buildCalendarSnapshot(
     final gridStart = focusMonth.subtract(Duration(days: firstWeekday));
     final monthGrid = List.generate(42, (i) {
       final date = gridStart.add(Duration(days: i));
-      final isCurrentMonth = date.month == focusMonth.month && date.year == focusMonth.year;
+      final isCurrentMonth =
+          date.month == focusMonth.month && date.year == focusMonth.year;
       final dayItems = isCurrentMonth
           ? _dayItems(date, tasks, habits, reminders, googleEvents, settings)
           : <Map<String, dynamic>>[];
@@ -349,7 +397,7 @@ List<Map<String, dynamic>> _dayItems(
       items.add({
         'type': 'task',
         'id': task.id,
-        'title': task.title,
+        'title': _displayTitle(task),
         'time': task.scheduledTime ?? (task.allDay ? 'Dia inteiro' : '00:00'),
         'subtitle': _organizerLabel(task),
         'sort': _sortTime(task.scheduledTime),
@@ -396,7 +444,7 @@ List<Map<String, dynamic>> _dayItems(
         items.add({
           'type': 'habit',
           'id': habit.id,
-          'title': habit.title,
+          'title': _displayTitle(habit),
           'time': '00:00',
           'subtitle': _organizerLabel(habit),
           'sort': 0,
@@ -414,7 +462,7 @@ List<Map<String, dynamic>> _dayItems(
           items.add({
             'type': 'habit',
             'id': habit.id,
-            'title': habit.title,
+            'title': _displayTitle(habit),
             'time': time,
             'subtitle': _organizerLabel(habit),
             'sort': _sortTime(time),
@@ -448,7 +496,7 @@ List<Map<String, dynamic>> _dayItems(
       items.add({
         'type': 'google_calendar',
         'id': event.id ?? event.summary ?? '',
-        'title': event.summary ?? '(Untitled)',
+        'title': event.summary ?? '(Sem título)',
         'time': timeStr,
         'subtitle': 'Google Calendar',
         'sort': event.start?.dateTime != null
@@ -470,12 +518,16 @@ List<Map<String, dynamic>> _dayItems(
 Map<String, dynamic> _buildFilterSnapshot(
   List<ContentObject> allObjects,
   List<DashboardBlock> dashboardBlocks,
+  AppSettings? settings,
 ) {
   final block = dashboardBlocks
       .where((item) => item.id == 'home-area')
       .firstOrNull;
   final metadata = block?.metadata ?? {};
-  final rawTypes = metadata['filterObjectTypes'] ?? metadata['objectTypes'];
+  final rawTypes =
+      settings?.universalWidgetObjectTypes ??
+      metadata['filterObjectTypes'] ??
+      metadata['objectTypes'];
   final selectedTypes = rawTypes is List
       ? rawTypes.map((item) => item.toString()).toSet()
       : {'task', 'habit'};
@@ -483,7 +535,11 @@ Map<String, dynamic> _buildFilterSnapshot(
     ...allObjects.whereType<Organizer>().cast<ContentObject>(),
     ...allObjects.whereType<Goal>().cast<ContentObject>(),
   ]..sort((a, b) => a.title.compareTo(b.title));
-  final organizerSlug = metadata['organizerSlug'] as String?;
+  final configuredOrganizer = settings?.universalWidgetOrganizer;
+  final organizerSlug =
+      configuredOrganizer != null && configuredOrganizer.isNotEmpty
+      ? configuredOrganizer
+      : metadata['organizerSlug'] as String?;
   final organizer = organizerSlug == null
       ? (organizers.isNotEmpty ? organizers.first : null)
       : organizers.where((item) => item.slug == organizerSlug).firstOrNull;
@@ -519,8 +575,8 @@ Map<String, dynamic> _buildFilterSnapshot(
   final chips =
       <Map<String, dynamic>>[
             {'label': 'Tarefas', 'count': refs.whereType<Task>().length},
-            {'label': 'Habitos', 'count': refs.whereType<Habit>().length},
-            {'label': 'Goals', 'count': refs.whereType<Goal>().length},
+            {'label': 'Hábitos', 'count': refs.whereType<Habit>().length},
+            {'label': 'Objetivos', 'count': refs.whereType<Goal>().length},
             {'label': 'Notas', 'count': refs.whereType<Note>().length},
             {'label': 'Recursos', 'count': refs.whereType<Resource>().length},
           ]
@@ -548,8 +604,8 @@ Map<String, dynamic> _buildFilterSnapshot(
           : null;
       final row = {
         'id': item.id,
-        'title': item.title,
-        'type': item.type,
+        'title': _displayTitle(item),
+        'type': _displayType(item),
         'subtitle': item.organizers.isEmpty
             ? item.displayType
             : _organizerLabel(item),
@@ -585,22 +641,60 @@ Map<String, dynamic> _buildPomodoroSnapshot(List<PomodoroSession> history) {
         .where((session) => _isSameDay(session.startTime, day))
         .fold<int>(0, (sum, session) => sum + session.duration.inMinutes);
     return {
-      'label': DateFormat('E', 'en_US').format(day),
+      'label': DateFormat('E', 'pt_BR').format(day),
       'hours': minutes / 60,
     };
   });
   return {
     'title': 'Pomodoro',
     'total': '${(totalMinutes / 60).toStringAsFixed(0)}h',
-    'details': 'this week',
+    'details': 'esta semana',
     'average':
-        '~${(totalMinutes / 60 / now.weekday).toStringAsFixed(0)}h per day',
+        '~${(totalMinutes / 60 / now.weekday).toStringAsFixed(0)}h por dia',
     'bars': bars,
   };
 }
 
 String _organizerLabel(ContentObject object) {
-  return object.organizers.isEmpty ? 'Sem area' : object.organizers.first.title;
+  return object.organizers.isEmpty ? 'Sem área' : object.organizers.first.title;
+}
+
+String _displayType(ContentObject item) {
+  return switch (item.type) {
+    'task' => 'Tarefa',
+    'habit' => 'Hábito',
+    'goal' => 'Objetivo',
+    'note' => 'Nota',
+    'journal_entry' => 'Diário',
+    'resource' => 'Recurso',
+    'person' => 'Pessoa',
+    _ => item.displayType,
+  };
+}
+
+String _displayTitle(ContentObject item) {
+  final title = item.title.trim();
+  if (title.isNotEmpty && title != item.id && !_looksLikeTechnicalId(title)) {
+    return title;
+  }
+  final fileName = item.obsidianFileName.trim();
+  if (fileName.isNotEmpty &&
+      fileName != item.id &&
+      !_looksLikeTechnicalId(fileName)) {
+    return fileName;
+  }
+  if (item.aliases.isNotEmpty && item.aliases.first.trim().isNotEmpty) {
+    return item.aliases.first.trim();
+  }
+  return 'Sem título';
+}
+
+bool _looksLikeTechnicalId(String value) {
+  final trimmed = value.trim();
+  return RegExp(
+        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+      ).hasMatch(trimmed) ||
+      RegExp(r'^\d{10,}$').hasMatch(trimmed);
 }
 
 String _dateKey(DateTime date) {

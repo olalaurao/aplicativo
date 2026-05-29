@@ -58,7 +58,7 @@ class _CreateTrackerFormState extends ConsumerState<CreateTrackerForm> {
 
   @override
   Widget build(BuildContext context) {
-    final hasTitle = _titleController.text.trim().isNotEmpty;
+    final canSave = _canSave;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -201,7 +201,7 @@ class _CreateTrackerFormState extends ConsumerState<CreateTrackerForm> {
           child: SizedBox(
             height: 52,
             child: FilledButton(
-              onPressed: hasTitle ? _saveTracker : null,
+              onPressed: canSave ? _saveTracker : null,
               style: AppTheme.primaryButtonStyle,
               child: Text(
                 widget.tracker == null ? 'Create Tracker' : 'Save Changes',
@@ -211,6 +211,15 @@ class _CreateTrackerFormState extends ConsumerState<CreateTrackerForm> {
         ),
       ),
     );
+  }
+
+  bool get _canSave {
+    final hasTitle = _titleController.text.trim().isNotEmpty;
+    final hasField = _sections.any(
+      (section) =>
+          section.inputFields.any((field) => field.title.trim().isNotEmpty),
+    );
+    return hasTitle && hasField;
   }
 
   Widget _buildSectionEditor(int sIndex, TrackerSection section) {

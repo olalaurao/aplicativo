@@ -639,3 +639,127 @@ Toda mutação (create/update/delete) enfileira uma `SyncAction`. A fila é proc
 
 > **Última atualização**: 2026-05-15
 > **Gerado a partir de**: Consolidação da arquitetura centrada em tarefas (Task-centric)
+
+
+## REGRA FUNDAMENTAL: ANÁLISE PROATIVA, NÃO REATIVA
+
+O agente **não deve esperar o usuário reportar um bug para identificá-lo**. Ao ler qualquer arquivo Dart do projeto, o agente deve procurar ativamente por erros, independentemente do que foi perguntado.
+
+---
+
+## PADRÕES DE ERRO QUE DEVEM SEMPRE ACENDER ALERTA
+
+### 1. Stub não implementado
+```
+método() async {}          // corpo vazio
+método() { return null; }  // retorno sem lógica
+throw UnimplementedError() // nunca implementado
+```
+🚨 Alerta: identificar quem chama esse método e qual feature depende dele.
+
+### 2. Provider/lista sempre vazia
+```dart
+static Future<List<int>> widgetIds() async => [];  // sempre vazio
+final state = AsyncData([]);                        // nunca preenchido
+```
+🚨 Alerta: quem consome esse provider recebe sempre vazio — feature silenciosamente quebrada.
+
+### 3. Campo escrito com uma chave, lido com outra
+```dart
+map['due_date'] = value;   // escrita
+final x = map['dueDate'];  // leitura — sempre null
+```
+🚨 Alerta: dado salvo mas nunca recuperado — bug silencioso, sem crash.
+
+### 4. Type mismatch em parsing
+```dart
+// Arquivo escreve:
+frontmatter['type'] = 'task';
+// Parser lê:
+case 'Task': // capitalização diferente — nunca faz match
+```
+🚨 Alerta: objeto nunca parseado — desaparece silenciosamente do vault.
+
+### 5. Canal/ID não-determinístico
+```dart
+id: DateTime.now().millisecondsSinceEpoch % 100000  // ID diferente a cada chamada
+```
+🚨 Alerta: mesmo objeto gera IDs diferentes em sessões distintas — duplicatas garantidas.
+
+### 6. Acesso sem null-check ou bounds-check
+```dart
+list[0]                    // crash se lista vazia
+map['campo']!              // crash se campo ausente
+DateTime.parse(str)        // crash se str malformada
+object as ConcreteType     // crash se tipo errado
+```
+🚨 Alerta: crash em runtime com dados reais do vault (usuário pode ter editado no Obsidian).
+
+### 7. Rota referenciada mas não registrada
+```dart
+context.push('/create/event')  // no form
+// GoRouter não tem '/create/event' registrado
+```
+🚨 Alerta: navegação falha silenciosamente (GoRouter retorna erro no console, UI não responde).
+
+### 8. Import de arquivo inexistente
+```dart
+import 'package:citrine/models/event_model.dart';
+// event_model.dart não existe na lista de arquivos
+```
+🚨 Alerta: compile error — app não builda.
+
+### 9. Método chamado em objeto potencialmente null
+```dart
+_navigatorKey?.currentState?.push(...)  // ok — safe call
+_navigatorKey!.currentState.push(...)   // crash se null
+_container!.read(provider)              // crash se container não inicializado
+```
+🚨 Alerta: verificar se o campo é garantidamente não-null no momento da chamada.
+
+### 10. Canal de notificação desatualizado
+```dart
+AndroidNotificationDetails(channelId: 'alarm_channel_v4')
+// mas o canal criado é 'alarm_channel_v5'
+```
+🚨 Alerta: notificação vai para canal inexistente — não dispara, sem crash, bug silencioso total.
+
+---
+
+## FORMATO DE REPORTE OBRIGATÓRIO
+
+Quando encontrar qualquer um dos padrões acima, reportar **imediatamente** neste formato, mesmo que o usuário não tenha perguntado sobre aquele trecho:
+
+```
+🚨 [ARQUIVO:LINHA] TIPO_DO_ERRO
+   Chama:   o que o código está tentando fazer
+   Destino: o que existe de fato (ou o que está faltando)
+   Impacto: crash / dado perdido / sempre null / duplicata / feature inativa
+   Fix:     correção direta (1-3 linhas de código)
+```
+
+Exemplo real encontrado neste projeto:
+```
+🚨 [widget_service.dart:~89] STUB NÃO IMPLEMENTADO
+   Chama:   updatePlanner(title, content, footer) — chamado pelo dashboard ao atualizar
+   Destino: corpo do método é {} — não faz nada
+   Impacto: widget de planner no dashboard nunca atualiza
+   Fix:     await _saveJson('citrine_planner', {'title': title, 'content': content,
+            'footer': footer}); await _update(_plannerProvider);
+```
+
+---
+
+## O QUE NÃO É ACEITÁVEL
+
+| Comportamento proibido | Comportamento correto |
+|------------------------|----------------------|
+| "O código existe então provavelmente funciona" | Verificar se o código tem implementação real |
+| Marcar ✅ sem testar ou ver o corpo do método | Só marcar ✅ se implementação real + sem os padrões de erro acima |
+| Ignorar método vazio porque está fora do escopo da pergunta | Reportar o stub com o formato de alerta |
+| Assumir que dados do vault estão sempre bem formatados | Verificar null-safety e tryParse em todos os acessos |
+| Esperar o usuário testar no device para descobrir bugs visíveis no código | Identificar o bug pelo código antes do teste |
+
+---
+
+*Esta regra se aplica a toda análise, independentemente do que foi perguntado. Se o agente está lendo um arquivo para qualquer motivo e encontra um desses padrões, ele alerta.*

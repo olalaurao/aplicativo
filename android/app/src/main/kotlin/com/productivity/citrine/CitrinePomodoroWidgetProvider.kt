@@ -30,8 +30,8 @@ open class CitrinePomodoroWidgetProvider : AppWidgetProvider() {
 
         views.setInt(R.id.pomodoro_root, "setBackgroundColor", CitrineWidgetUtils.bgColor(context))
         views.setTextViewText(R.id.pomodoro_total, data.optString("total", "0h"))
-        views.setTextViewText(R.id.pomodoro_details, data.optString("details", "this week"))
-        views.setTextViewText(R.id.pomodoro_average, data.optString("average", "~0h per day"))
+        views.setTextViewText(R.id.pomodoro_details, data.optString("details", "esta semana"))
+        views.setTextViewText(R.id.pomodoro_average, data.optString("average", "~0h por dia"))
         views.setTextColor(R.id.pomodoro_total, CitrineWidgetUtils.accent)
         views.setTextColor(R.id.pomodoro_details, CitrineWidgetUtils.mutedColor(context))
         views.setTextColor(R.id.pomodoro_average, CitrineWidgetUtils.mutedColor(context))
