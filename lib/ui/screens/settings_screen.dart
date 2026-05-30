@@ -783,6 +783,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       const Divider(height: 1, indent: 16),
                       ListTile(
                         leading: const Icon(
+                          Icons.folder_copy_outlined,
+                          color: AppColors.primary,
+                        ),
+                        title: const Text(
+                          'Pastas por tipo',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Define onde novos objetos serão salvos no vault',
+                          style: TextStyle(fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () =>
+                            _showFolderPathsDialog(context, settings, notifier),
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      ListTile(
+                        leading: const Icon(
                           Icons.folder_zip_outlined,
                           color: AppColors.info,
                         ),
@@ -1348,6 +1371,80 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  void _showFolderPathsDialog(
+    BuildContext context,
+    AppSettings settings,
+    SettingsNotifier notifier,
+  ) {
+    const defaults = <String, String>{
+      'task': 'tasks',
+      'habit': 'habits',
+      'goal': 'goals',
+      'note': 'notes',
+      'resource': 'resources',
+      'event': 'events',
+      'social_post': 'social',
+      'person': 'organizers/people',
+      'project': 'organizers/projects',
+      'area': 'organizers/areas',
+      'activity': 'organizers/activities',
+      'tracker_definition': 'trackers',
+      'mood_definition': 'moods',
+      'combined_analysis': 'analyses',
+    };
+    final controllers = {
+      for (final entry in defaults.entries)
+        entry.key: TextEditingController(
+          text: settings.folderPaths[entry.key] ?? entry.value,
+        ),
+    };
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Pastas por tipo'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final entry in defaults.entries)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: TextField(
+                    controller: controllers[entry.key],
+                    decoration: InputDecoration(
+                      labelText: entry.key,
+                      hintText: entry.value,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CANCELAR'),
+          ),
+          TextButton(
+            onPressed: () async {
+              for (final entry in controllers.entries) {
+                await notifier.updateFolderPath(entry.key, entry.value.text);
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('SALVAR'),
+          ),
+        ],
+      ),
+    ).whenComplete(() {
+      for (final controller in controllers.values) {
+        controller.dispose();
+      }
+    });
   }
 
   void _showVaultDialog(BuildContext context, SettingsNotifier notifier) {

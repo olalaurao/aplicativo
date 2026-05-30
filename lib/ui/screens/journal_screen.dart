@@ -1123,6 +1123,21 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
     final dailyDate = DateTime.tryParse(match.group(1)!);
     if (dailyDate == null) return entry.date;
 
+    final explicitTime = entry.timeOfDay;
+    if (explicitTime != null && explicitTime.contains(':')) {
+      final parts = explicitTime.split(':');
+      return DateTime(
+        dailyDate.year,
+        dailyDate.month,
+        dailyDate.day,
+        int.tryParse(parts[0]) ?? entry.date.hour,
+        parts.length > 1 ? int.tryParse(parts[1]) ?? entry.date.minute : 0,
+        entry.date.second,
+        entry.date.millisecond,
+        entry.date.microsecond,
+      );
+    }
+
     return DateTime(
       dailyDate.year,
       dailyDate.month,

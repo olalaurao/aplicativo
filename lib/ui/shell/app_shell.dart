@@ -28,6 +28,7 @@ class AppShell extends ConsumerStatefulWidget {
 class _AppShellState extends ConsumerState<AppShell> {
   Widget? _lastListChild;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  DateTime? _lastCommandCenterOverscrollAt;
 
   @override
   Widget build(BuildContext context) {
@@ -124,7 +125,10 @@ class _AppShellState extends ConsumerState<AppShell> {
                                     children: [
                                       Expanded(
                                         flex: 4,
-                                        child: leftPane,
+                                        child: _withCommandCenterOverscroll(
+                                          context,
+                                          leftPane,
+                                        ),
                                       ),
                                       VerticalDivider(
                                         width: 1,
@@ -136,11 +140,17 @@ class _AppShellState extends ConsumerState<AppShell> {
                                       ),
                                       Expanded(
                                         flex: 5,
-                                        child: widget.child,
+                                        child: _withCommandCenterOverscroll(
+                                          context,
+                                          widget.child,
+                                        ),
                                       ),
                                     ],
                                   )
-                                : widget.child,
+                                : _withCommandCenterOverscroll(
+                                    context,
+                                    widget.child,
+                                  ),
                           ),
                         ),
                       ],
@@ -152,7 +162,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                 return Scaffold(
                   key: _scaffoldKey,
                   drawer: _buildHistoryDrawer(context, ref),
-                  body: widget.child,
+                  body: _withCommandCenterOverscroll(context, widget.child),
                   floatingActionButton: GestureDetector(
                     onLongPress: () => _openCommandCenter(context),
                     child: FloatingActionButton(
@@ -248,6 +258,25 @@ class _AppShellState extends ConsumerState<AppShell> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _withCommandCenterOverscroll(BuildContext context, Widget child) {
+    return NotificationListener<OverscrollNotification>(
+      onNotification: (notification) {
+        if (notification.metrics.pixels <=
+                notification.metrics.minScrollExtent + 2 &&
+            notification.overscroll < -18) {
+          final now = DateTime.now();
+          final last = _lastCommandCenterOverscrollAt;
+          if (last == null || now.difference(last).inSeconds > 1) {
+            _lastCommandCenterOverscrollAt = now;
+            _openCommandCenter(context);
+          }
+        }
+        return false;
+      },
+      child: child,
     );
   }
 

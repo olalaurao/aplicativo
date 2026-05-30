@@ -34,6 +34,7 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor>
   final FocusNode _focusNode = FocusNode();
   Timer? _debounceTimer;
   OverlayEntry? _toolbarOverlay;
+  bool _wikiPickerOpen = false;
 
   @override
   void initState() {
@@ -91,14 +92,11 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor>
             selection.baseOffset,
           );
           if (lastTwoChars == '[[') {
-            // Delete the '[[' as the picker will insert them wrapped around the title
-            _controller.replaceText(
-              selection.baseOffset - 2,
-              2,
-              '',
-              const TextSelection.collapsed(offset: 0),
+            _onAddWikiLink(
+              isEmbed: false,
+              replaceStart: selection.baseOffset - 2,
+              replaceLength: 2,
             );
-            _onAddWikiLink(isEmbed: false);
           }
         }
       }
@@ -125,8 +123,7 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor>
       _toolbarOverlay = OverlayEntry(
         builder: (overlayContext) {
           final bottomInset = MediaQuery.of(overlayContext).viewInsets.bottom;
-          final isDark =
-              Theme.of(overlayContext).brightness == Brightness.dark;
+          final isDark = Theme.of(overlayContext).brightness == Brightness.dark;
 
           return Positioned(
             left: 0,
@@ -168,26 +165,35 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor>
     }
   }
 
-  void _onAddWikiLink({bool isEmbed = false}) {
+  void _onAddWikiLink({
+    bool isEmbed = false,
+    int? replaceStart,
+    int? replaceLength,
+  }) {
+    if (_wikiPickerOpen) return;
+    _wikiPickerOpen = true;
+    final selection = _controller.selection;
+    final start = replaceStart ?? selection.baseOffset;
+    final length =
+        replaceLength ?? (selection.extentOffset - selection.baseOffset);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => WikiLinkPicker(
         onSelected: (obj) {
-          final index = _controller.selection.baseOffset;
-          final length = _controller.selection.extentOffset - index;
           final prefix = isEmbed ? '!' : '';
+          final insert = '$prefix[[${obj.title}]]';
           _controller.replaceText(
-            index,
+            start.clamp(0, _controller.document.length),
             length,
-            '$prefix[[${obj.title}]]',
-            null,
+            insert,
+            TextSelection.collapsed(offset: start + insert.length),
           );
           Navigator.pop(context);
         },
       ),
-    );
+    ).whenComplete(() => _wikiPickerOpen = false);
   }
 
   void _onAddMention() {

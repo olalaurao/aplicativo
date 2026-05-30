@@ -42,6 +42,7 @@ class ObsidianService {
       'habits',
       'trackers',
       'tasks',
+      'events',
       'notes',
       'moods',
       'projects',

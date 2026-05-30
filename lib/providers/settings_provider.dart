@@ -61,6 +61,8 @@ class AppSettings {
   final String dailyNoteIdentifier;
   final String dailyNoteDateFormat;
   final String dailyNoteFolder;
+  final String socialViewMode;
+  final Map<String, String> folderPaths;
 
   AppSettings({
     required this.vaultName,
@@ -93,6 +95,8 @@ class AppSettings {
     this.dailyNoteIdentifier = 'filename_format',
     this.dailyNoteDateFormat = 'yyyy-MM-dd',
     this.dailyNoteFolder = 'daily',
+    this.socialViewMode = 'grid',
+    this.folderPaths = const {},
     this.quickAddWidgetButton1Label = 'Diário',
     this.quickAddWidgetButton1Target = 'journal',
     this.quickAddWidgetButton2Label = 'Tarefa',
@@ -154,6 +158,8 @@ class AppSettings {
     String? dailyNoteIdentifier,
     String? dailyNoteDateFormat,
     String? dailyNoteFolder,
+    String? socialViewMode,
+    Map<String, String>? folderPaths,
     String? quickAddWidgetButton1Label,
     String? quickAddWidgetButton1Target,
     String? quickAddWidgetButton2Label,
@@ -201,6 +207,8 @@ class AppSettings {
       dailyNoteIdentifier: dailyNoteIdentifier ?? this.dailyNoteIdentifier,
       dailyNoteDateFormat: dailyNoteDateFormat ?? this.dailyNoteDateFormat,
       dailyNoteFolder: dailyNoteFolder ?? this.dailyNoteFolder,
+      socialViewMode: socialViewMode ?? this.socialViewMode,
+      folderPaths: folderPaths ?? this.folderPaths,
       quickAddWidgetButton1Label:
           quickAddWidgetButton1Label ?? this.quickAddWidgetButton1Label,
       quickAddWidgetButton1Target:
@@ -250,6 +258,16 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       );
       sigs = _defaultSignatures()..addAll(loaded);
     }
+    final folderPathsJson = prefs.getString('folderPaths');
+    Map<String, String> folderPaths = {};
+    if (folderPathsJson != null) {
+      final decoded = json.decode(folderPathsJson);
+      if (decoded is Map) {
+        folderPaths = decoded.map(
+          (key, value) => MapEntry(key.toString(), value.toString()),
+        );
+      }
+    }
 
     return AppSettings(
       vaultName: prefs.getString('vaultName') ?? 'Obsidian_Productivity_Vault',
@@ -290,6 +308,8 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       dailyNoteDateFormat:
           prefs.getString('dailyNoteDateFormat') ?? 'yyyy-MM-dd',
       dailyNoteFolder: prefs.getString('dailyNoteFolder') ?? 'daily',
+      socialViewMode: prefs.getString('socialViewMode') ?? 'grid',
+      folderPaths: folderPaths,
       quickAddWidgetButton1Label:
           prefs.getString('quickAddWidgetButton1Label') ?? 'Diário',
       quickAddWidgetButton1Target:
@@ -340,6 +360,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
         objectType: 'resource',
         markerType: MarkerType.property,
         markerValue: 'type: resource',
+      ),
+      'event': TypeSignature(
+        objectType: 'event',
+        markerType: MarkerType.property,
+        markerValue: 'type: event',
       ),
       'person': TypeSignature(
         objectType: 'person',
@@ -666,6 +691,26 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       dailyNoteDateFormat: dateFormat,
       dailyNoteFolder: folder,
     );
+  }
+
+  Future<void> updateSocialViewMode(String mode) async {
+    final normalized = mode == 'timeline' ? 'timeline' : 'grid';
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('socialViewMode', normalized);
+    state = state.copyWith(socialViewMode: normalized);
+  }
+
+  Future<void> updateFolderPath(String objectType, String folder) async {
+    final key = objectType.trim();
+    final value = folder.trim().replaceAll('\\', '/').replaceAll(
+      RegExp(r'^/+|/+$'),
+      '',
+    );
+    if (key.isEmpty || value.isEmpty) return;
+    final next = Map<String, String>.from(state.folderPaths)..[key] = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('folderPaths', json.encode(next));
+    state = state.copyWith(folderPaths: next);
   }
 }
 

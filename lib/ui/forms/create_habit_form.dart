@@ -1146,7 +1146,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
     );
   }
 
-  void _saveHabit() {
+  Future<void> _saveHabit() async {
     final habit = Habit(
       id:
           widget.existingHabit?.id ??
@@ -1166,12 +1166,21 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
       schedulers: _schedulers,
       organizers: _organizers,
     );
-    if (widget.existingHabit != null) {
-      ref.read(vaultProvider.notifier).updateObject(habit);
-    } else {
-      ref.read(habitsProvider.notifier).addHabit(habit);
+    try {
+      if (widget.existingHabit != null) {
+        await ref.read(vaultProvider.notifier).updateObject(habit);
+      } else {
+        await ref.read(habitsProvider.notifier).addHabit(habit);
+      }
+    } catch (e) {
+      debugPrint('Failed to save habit: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erro ao salvar hábito: $e')));
+      return;
     }
-    Navigator.pop(context);
+    if (mounted) Navigator.pop(context);
   }
 
   void _deleteHabit() {

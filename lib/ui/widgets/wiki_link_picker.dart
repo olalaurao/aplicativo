@@ -22,6 +22,7 @@ class WikiLinkPicker extends ConsumerStatefulWidget {
 class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
   late TextEditingController _searchController;
   final SearchService _searchService = SearchService();
+  final Set<String> _selectedTypes = {};
 
   @override
   void initState() {
@@ -49,18 +50,64 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
         children: [
           // Handle
           Center(
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.textMuted.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(2),
-              ),
+            child: Stack(
+              children: [
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 12),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.textMuted.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 8,
+                  top: 0,
+                  child: IconButton(
+                    tooltip: 'Fechar',
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ],
             ),
           ),
 
-          // Search Bar
+          allObjectsAsync.when(
+            data: (objects) {
+              final types = objects.map((obj) => obj.type).toSet().toList()
+                ..sort();
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Row(
+                  children: [
+                    _typeChip('Todos', _selectedTypes.isEmpty, () {
+                      setState(_selectedTypes.clear);
+                    }),
+                    for (final type in types)
+                      _typeChip(
+                        _typeLabel(type),
+                        _selectedTypes.contains(type),
+                        () {
+                          setState(() {
+                            if (!_selectedTypes.add(type)) {
+                              _selectedTypes.remove(type);
+                            }
+                          });
+                        },
+                      ),
+                  ],
+                ),
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
+          ),
+
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
@@ -68,8 +115,14 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
               autofocus: true,
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
-                hintText: 'Search pages...',
+                hintText: 'Buscar ou criar link...',
                 prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: _searchController.text.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => setState(_searchController.clear),
+                      ),
                 filled: true,
                 fillColor: AppColors.surfaceVariant,
                 border: OutlineInputBorder(
@@ -83,88 +136,14 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
 
           const SizedBox(height: 8),
 
-          // Results
           Expanded(
             child: allObjectsAsync.when(
               data: (objects) {
-                final query = _searchController.text;
-                final filtered = query.isEmpty
-                    ? objects.take(20).toList()
-                    : _searchService.search(objects, query);
-
-                final exactMatch = objects.any(
-                  (o) => o.title.toLowerCase() == query.toLowerCase(),
-                );
-
-                return ListView.builder(
-                  itemCount:
-                      filtered.length +
-                      (query.isNotEmpty && !exactMatch ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == filtered.length) {
-                      return ListTile(
-                        leading: const Icon(
-                          Icons.add_circle_outline_rounded,
-                          color: AppColors.primary,
-                        ),
-                        title: Text(
-                          'Criar "$query"',
-                          style: const TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        subtitle: const Text('Nova note no vault'),
-                        onTap: () {
-                          // Return a dummy object with the title
-                          widget.onSelected(NewPagePlaceholder(title: query));
-                        },
-                      );
-                    }
-
-                    final obj = filtered[index];
-                    return ListTile(
-                      leading: _buildTypeIcon(obj.type),
-                      title: Text(
-                        obj.title,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: obj.categories.isNotEmpty
-                          ? Wrap(
-                              spacing: 4,
-                              children: obj.categories
-                                  .map(
-                                    (c) => Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary.withValues(
-                                          alpha: 0.1,
-                                        ),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        c,
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                            )
-                          : Text(
-                              obj.displayType,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: AppColors.textMuted,
-                              ),
-                            ),
-                      onTap: () => widget.onSelected(obj),
-                    );
+                return FutureBuilder<List<ContentObject>>(
+                  future: _candidatesIncludingVaultFiles(objects),
+                  builder: (context, snapshot) {
+                    final candidates = snapshot.data ?? objects;
+                    return _buildResults(candidates);
                   },
                 );
               },
@@ -175,6 +154,137 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
         ],
       ),
     );
+  }
+
+  Future<List<ContentObject>> _candidatesIncludingVaultFiles(
+    List<ContentObject> objects,
+  ) async {
+    final byPath = {
+      for (final obj in objects)
+        if (obj.obsidianPath.isNotEmpty)
+          obj.obsidianPath.replaceAll('\\', '/').toLowerCase(): obj,
+    };
+    final result = <ContentObject>[...objects];
+    try {
+      final service = ref.read(obsidianServiceProvider);
+      final files = await service.getFilesInFolder('');
+      for (final file in files.where((file) => file.path.endsWith('.md'))) {
+        final relativePath = service.getRelativePath(file.path);
+        final key = relativePath.replaceAll('\\', '/').toLowerCase();
+        if (byPath.containsKey(key) || key.contains('/_deleted/')) continue;
+        final title = relativePath
+            .split(RegExp(r'[/\\]'))
+            .last
+            .replaceAll(RegExp(r'\.md$'), '');
+        result.add(
+          NewPagePlaceholder(title: title)..obsidianPath = relativePath,
+        );
+      }
+    } catch (e) {
+      debugPrint('WikiLinkPicker failed to load raw vault files: $e');
+    }
+    return result;
+  }
+
+  Widget _buildResults(List<ContentObject> candidates) {
+    final query = _searchController.text.trim();
+    final scoped = _selectedTypes.isEmpty
+        ? candidates
+        : candidates.where((obj) => _selectedTypes.contains(obj.type)).toList();
+    final filtered = query.isEmpty
+        ? scoped.take(40).toList()
+        : _searchService.search(scoped, query);
+
+    final exactMatch = candidates.any(
+      (obj) => obj.title.toLowerCase() == query.toLowerCase(),
+    );
+
+    return ListView.builder(
+      itemCount: filtered.length + (query.isNotEmpty && !exactMatch ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == filtered.length) {
+          return ListTile(
+            leading: const Icon(
+              Icons.add_circle_outline_rounded,
+              color: AppColors.primary,
+            ),
+            title: Text(
+              'Usar "[[$query]]"',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            subtitle: const Text('Link para uma nota existente ou futura'),
+            onTap: () => widget.onSelected(NewPagePlaceholder(title: query)),
+          );
+        }
+
+        final obj = filtered[index];
+        return ListTile(
+          leading: _buildTypeIcon(obj.type),
+          title: Text(
+            obj.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: _buildSubtitle(obj),
+          onTap: () => widget.onSelected(obj),
+        );
+      },
+    );
+  }
+
+  Widget _buildSubtitle(ContentObject obj) {
+    if (obj.aliases.isNotEmpty) {
+      return Text(
+        obj.aliases.join(', '),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+      );
+    }
+    return Text(
+      obj.obsidianPath.isNotEmpty ? obj.obsidianPath : _typeLabel(obj.type),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+    );
+  }
+
+  Widget _typeChip(String label, bool selected, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onTap(),
+        selectedColor: AppColors.primary.withValues(alpha: 0.14),
+        backgroundColor: AppColors.surfaceVariant,
+        side: BorderSide(
+          color: selected ? AppColors.primary : AppColors.divider,
+        ),
+      ),
+    );
+  }
+
+  String _typeLabel(String type) {
+    return switch (type) {
+      'task' => 'Tarefas',
+      'habit' => 'Hábitos',
+      'goal' => 'Metas',
+      'note' => 'Notas',
+      'resource' => 'Recursos',
+      'person' => 'Pessoas',
+      'project' => 'Projetos',
+      'area' => 'Áreas',
+      'activity' => 'Atividades',
+      'social_post' => 'Social',
+      _ => type,
+    };
   }
 
   Widget _buildTypeIcon(String type) {

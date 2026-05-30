@@ -289,7 +289,7 @@ class NotificationService with WidgetsBindingObserver {
 
     // Alarms Channel
     const alarmChannel = AndroidNotificationChannel(
-      'alarm_channel_v4',
+      'alarm_channel_v5',
       'Alarms',
       description: 'High priority intrusive alarms',
       importance: Importance.max,
@@ -301,7 +301,7 @@ class NotificationService with WidgetsBindingObserver {
 
     // Popups Channel
     const popupChannel = AndroidNotificationChannel(
-      'popup_channel_v4',
+      'popup_channel_v5',
       'Popups',
       description: 'Important visual popups',
       importance: Importance.max,
@@ -377,7 +377,7 @@ class NotificationService with WidgetsBindingObserver {
     if (actionId == 'snooze') {
       final notificationService = NotificationService();
       await notificationService.scheduleReminder(
-        id: response.id ?? DateTime.now().millisecondsSinceEpoch % 100000,
+        id: response.id ?? 999998,
         title: response.payload ?? 'Snoozed Reminder',
         config: ReminderConfig(
           id: '${response.id}_snooze',
@@ -416,7 +416,27 @@ class NotificationService with WidgetsBindingObserver {
         actionId == 'quick_task' ||
         actionId == 'quick_habit') {
       try {
+        await _instance.cancelNotification(999);
         await _instance.showQuickCaptureNotification();
+        await _instance._bringAppToForeground();
+        final input = response.input?.trim();
+        if (input != null && input.isNotEmpty) {
+          final title = switch (actionId) {
+            'quick_entry' => 'Entrada salva',
+            'quick_task' => 'Tarefa salva',
+            'quick_habit' => 'Hábito salvo',
+            _ => 'Captura salva',
+          };
+          _instance.showInAppPopup(
+            title: title,
+            body: input.length > 80 ? '${input.substring(0, 80)}...' : input,
+            type: actionId == 'quick_task'
+                ? PopupType.task
+                : actionId == 'quick_habit'
+                ? PopupType.habit
+                : PopupType.reminder,
+          );
+        }
       } catch (e) {
         debugPrint('NotificationService: quick capture reset failed: $e');
       }
@@ -489,8 +509,8 @@ class NotificationService with WidgetsBindingObserver {
 
     final androidDetails = AndroidNotificationDetails(
       isAlarm
-          ? 'alarm_channel_v4'
-          : (isPopup ? 'popup_channel_v4' : 'reminder_channel_v2'),
+          ? 'alarm_channel_v5'
+          : (isPopup ? 'popup_channel_v5' : 'reminder_channel_v2'),
       isAlarm ? 'Alarms' : (isPopup ? 'Popups' : 'Reminders'),
       channelDescription: isAlarm
           ? 'High priority intrusive alarms'
@@ -865,6 +885,15 @@ class NotificationService with WidgetsBindingObserver {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('notification_actions');
+  }
+
+  Future<void> cancelAllScheduled() async {
+    for (final timer in _foregroundTimers.values) {
+      timer.cancel();
+    }
+    _foregroundTimers.clear();
+    _foregroundEntries.clear();
+    await _notifications.cancelAll();
   }
 
   @override

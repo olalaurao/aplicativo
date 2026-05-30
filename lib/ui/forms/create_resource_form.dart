@@ -205,7 +205,10 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
                   // ─── Organizers ───
                   Container(
                     decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
                     child: OrganizerSelectorField(
                       selectedOrganizers: _organizers,
                       onChanged: (val) => setState(() => _organizers = val),
@@ -285,8 +288,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
     final types = {
       if (_resourceType.trim().isNotEmpty) _resourceType.trim(),
       ...configuredTypes.where((type) => type.trim().isNotEmpty),
-    }.toList()
-      ..sort();
+    }.toList()..sort();
 
     return Row(
       children: [
@@ -449,12 +451,12 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
     );
   }
 
-  void _saveResource() {
+  Future<void> _saveResource() async {
     final coverUrl = _coverUrlController.text.trim();
     if (coverUrl.isNotEmpty && !_isValidCoverUrl(coverUrl)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('URL da capa inválida')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('URL da capa inválida')));
       return;
     }
 
@@ -480,12 +482,22 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
       categories: widget.existingResource?.categories,
     );
 
-    if (widget.existingResource != null) {
-      ref.read(vaultProvider.notifier).updateObject(resource);
-    } else {
-      ref.read(resourcesProvider.notifier).addResource(resource);
+    try {
+      if (widget.existingResource != null) {
+        await ref.read(vaultProvider.notifier).updateObject(resource);
+      } else {
+        await ref.read(resourcesProvider.notifier).addResource(resource);
+      }
+    } catch (e) {
+      debugPrint('Failed to save resource: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erro ao salvar recurso: $e')));
+      return;
     }
 
+    if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

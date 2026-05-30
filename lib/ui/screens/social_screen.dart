@@ -1,10 +1,13 @@
 // lib/ui/screens/social_screen.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/shared_types.dart';
 import '../../models/social_post.dart';
+import '../../providers/settings_provider.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/oembed_service.dart';
 import '../forms/create_organizer_form.dart';
@@ -12,7 +15,9 @@ import '../forms/create_social_post_form.dart';
 import '../theme.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/organizer_picker_modal.dart';
+import '../widgets/social_embed_view.dart';
 import '../widgets/social_post_grid_card.dart';
+import '../widgets/universal_search_picker.dart';
 import 'search_screen.dart';
 import 'social_post_detail.dart';
 
@@ -26,7 +31,6 @@ class SocialScreen extends ConsumerStatefulWidget {
 class _SocialScreenState extends ConsumerState<SocialScreen> {
   SocialPlatform? _selectedPlatform;
   String _sortMode = 'saved_desc';
-  bool _isGridMode = true;
   bool _showUnwatchedOnly = false;
   bool _isMultiSelectMode = false;
   String? _selectedOrganizerFilter;
@@ -44,6 +48,10 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
   @override
   Widget build(BuildContext context) {
     final posts = ref.watch(socialPostsProvider);
+    final socialViewMode = ref.watch(
+      settingsProvider.select((settings) => settings.socialViewMode),
+    );
+    final isGridMode = socialViewMode != 'timeline';
     final filtered = _filteredPosts(posts);
     final platforms = posts.map((post) => post.platform).toSet().toList()
       ..sort((a, b) => platformLabel(a).compareTo(platformLabel(b)));
@@ -119,14 +127,19 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
                         onPressed: _showSortSheet,
                       ),
                       IconButton(
-                        tooltip: _isGridMode ? 'Ver lista' : 'Ver grade',
+                        tooltip: isGridMode ? 'Ver timeline' : 'Ver grade',
                         icon: Icon(
-                          _isGridMode
-                              ? Icons.view_list_rounded
+                          isGridMode
+                              ? Icons.view_agenda_rounded
                               : Icons.grid_view_rounded,
                         ),
-                        onPressed: () =>
-                            setState(() => _isGridMode = !_isGridMode),
+                        onPressed: () {
+                          ref
+                              .read(settingsProvider.notifier)
+                              .updateSocialViewMode(
+                                isGridMode ? 'timeline' : 'grid',
+                              );
+                        },
                       ),
                       IconButton(
                         tooltip: 'Novo post',
@@ -147,7 +160,7 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
               SliverFillRemaining(child: _buildEmptyState())
             else if (filtered.isEmpty)
               SliverFillRemaining(child: _buildFilteredEmptyState())
-            else if (_isGridMode)
+            else if (isGridMode)
               SliverPadding(
                 padding: const EdgeInsets.all(16),
                 sliver: SliverGrid(
@@ -174,7 +187,7 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                 sliver: SliverList.builder(
                   itemCount: filtered.length,
-                  itemBuilder: (context, index) => _SocialPostListTile(
+                  itemBuilder: (context, index) => _SocialTimelineCard(
                     post: filtered[index],
                     isMultiSelectMode: _isMultiSelectMode,
                     isSelected: _selectedIds.contains(filtered[index].id),
@@ -686,14 +699,14 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
   }
 }
 
-class _SocialPostListTile extends StatelessWidget {
+class _SocialTimelineCard extends ConsumerStatefulWidget {
   final SocialPost post;
   final bool isMultiSelectMode;
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
-  const _SocialPostListTile({
+  const _SocialTimelineCard({
     required this.post,
     required this.isMultiSelectMode,
     required this.isSelected,
@@ -702,92 +715,325 @@ class _SocialPostListTile extends StatelessWidget {
   });
 
   @override
+  ConsumerState<_SocialTimelineCard> createState() =>
+      _SocialTimelineCardState();
+}
+
+class _SocialTimelineCardState extends ConsumerState<_SocialTimelineCard> {
+  late final TextEditingController _noteController;
+  late final TextEditingController _tagController;
+  Timer? _noteDebounce;
+  ScrollPosition? _scrollPosition;
+  bool _captionExpanded = false;
+  bool _noteExpanded = false;
+  bool _tagsExpanded = false;
+  bool _wasMostlyVisible = false;
+  bool _autoWatched = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _noteController = TextEditingController(
+      text: widget.post.personalNote ?? '',
+    );
+    _tagController = TextEditingController();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SocialTimelineCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.post.personalNote != widget.post.personalNote &&
+        !_noteController.selection.isValid) {
+      _noteController.text = widget.post.personalNote ?? '';
+    }
+    if (oldWidget.post.id != widget.post.id) {
+      _wasMostlyVisible = false;
+      _autoWatched = widget.post.watched;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _checkVisibility());
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextPosition = Scrollable.maybeOf(context)?.position;
+    if (_scrollPosition == nextPosition) return;
+    _scrollPosition?.removeListener(_checkVisibility);
+    _scrollPosition = nextPosition;
+    _scrollPosition?.addListener(_checkVisibility);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkVisibility());
+  }
+
+  @override
+  void dispose() {
+    _noteDebounce?.cancel();
+    _scrollPosition?.removeListener(_checkVisibility);
+    _noteController.dispose();
+    _tagController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final post = widget.post;
     return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
+      onLongPress: widget.onLongPress,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(10),
+        margin: const EdgeInsets.only(bottom: 18),
         decoration: AppTheme.cardDecoration(context),
-        child: Row(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              width: 56,
-              height: 56,
-              child: SocialPostThumbnail(post: post),
+            ListTile(
+              onTap: widget.onTap,
+              leading: CircleAvatar(
+                backgroundColor: socialPlatformColor(
+                  post.platform,
+                ).withValues(alpha: 0.14),
+                child: Icon(
+                  Icons.play_circle_outline_rounded,
+                  color: socialPlatformColor(post.platform),
+                ),
+              ),
+              title: Text(
+                _handle(post),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: Text(
+                '${platformLabel(post.platform)} · ${_relativeTime(post.createdAt)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: widget.isMultiSelectMode
+                  ? Checkbox(
+                      value: widget.isSelected,
+                      onChanged: (_) => widget.onTap(),
+                    )
+                  : IconButton(
+                      tooltip: 'Abrir detalhes',
+                      icon: const Icon(Icons.more_horiz_rounded),
+                      onPressed: widget.onTap,
+                    ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            if (post.embedUrl != null && post.embedUrl!.isNotEmpty)
+              SocialEmbedView(post: post)
+            else
+              AspectRatio(
+                aspectRatio: 1,
+                child: SocialPostThumbnail(post: post, iconSize: 56),
+              ),
+            if (post.caption?.trim().isNotEmpty == true)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      post.caption!.trim(),
+                      maxLines: _captionExpanded ? null : 2,
+                      overflow: _captionExpanded
+                          ? TextOverflow.visible
+                          : TextOverflow.ellipsis,
+                    ),
+                    TextButton(
+                      onPressed: () =>
+                          setState(() => _captionExpanded = !_captionExpanded),
+                      child: Text(_captionExpanded ? 'ver menos' : 'ver mais'),
+                    ),
+                  ],
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          _handle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.info,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      SocialPlatformBadge(platform: post.platform, fontSize: 9),
-                      if (!post.watched) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: AppColors.info,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ],
-                    ],
+                  IconButton(
+                    tooltip: 'Coleção',
+                    icon: const Icon(Icons.folder_outlined),
+                    onPressed: _pickOrganizers,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    post.caption?.trim().isNotEmpty == true
-                        ? post.caption!.trim()
-                        : post.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 14),
+                  IconButton(
+                    tooltip: 'Nota',
+                    icon: const Icon(Icons.note_alt_outlined),
+                    onPressed: () =>
+                        setState(() => _noteExpanded = !_noteExpanded),
                   ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Expanded(child: _OrganizerChips(post: post)),
-                      const SizedBox(width: 8),
-                      Text(
-                        _relativeTime(post.createdAt),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
+                  IconButton(
+                    tooltip: 'Tags',
+                    icon: const Icon(Icons.local_offer_outlined),
+                    onPressed: () =>
+                        setState(() => _tagsExpanded = !_tagsExpanded),
                   ),
+                  IconButton(
+                    tooltip: 'Associar a objeto',
+                    icon: const Icon(Icons.link_rounded),
+                    onPressed: _associateObject,
+                  ),
+                  const Spacer(),
+                  if (!post.watched)
+                    TextButton.icon(
+                      onPressed: () => ref
+                          .read(socialPostsProvider.notifier)
+                          .toggleWatched(post),
+                      icon: const Icon(Icons.visibility_rounded, size: 18),
+                      label: const Text('Visto'),
+                    ),
                 ],
               ),
             ),
-            if (isMultiSelectMode)
-              Checkbox(value: isSelected, onChanged: (_) => onTap()),
+            if (_noteExpanded)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                child: TextField(
+                  controller: _noteController,
+                  minLines: 2,
+                  maxLines: 5,
+                  onChanged: _scheduleNoteSave,
+                  decoration: const InputDecoration(
+                    hintText: 'Nota pessoal',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+            if (_tagsExpanded)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 6,
+                      children: [
+                        for (final tag in post.tags)
+                          InputChip(
+                            label: Text(tag),
+                            onDeleted: () => _removeTag(tag),
+                          ),
+                      ],
+                    ),
+                    TextField(
+                      controller: _tagController,
+                      onSubmitted: (_) => _addTag(),
+                      decoration: const InputDecoration(
+                        hintText: 'Adicionar tag',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
     );
   }
 
-  String get _handle {
+  Future<void> _pickOrganizers() async {
+    final selected = await showOrganizerPickerModal(
+      context,
+      ref,
+      widget.post.organizers,
+    );
+    if (selected == null || !mounted) return;
+    await ref
+        .read(socialPostsProvider.notifier)
+        .updatePost(widget.post.copyWith(organizers: selected));
+  }
+
+  Future<void> _associateObject() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => UniversalSearchPickerSheet(
+        title: 'Associar post a...',
+        showClear: false,
+        onSelected: (object) async {
+          Navigator.pop(sheetContext);
+          final refLink = _objectWikiLink(object);
+          final refs = <String>{...widget.post.socialRefs, refLink}.toList();
+          await ref
+              .read(socialPostsProvider.notifier)
+              .updatePost(widget.post.copyWith(socialRefs: refs));
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Associado a ${object.title}')),
+          );
+        },
+      ),
+    );
+  }
+
+  String _objectWikiLink(dynamic object) {
+    final fileName = object.obsidianFileName?.toString().trim() ?? '';
+    final title = object.title?.toString().trim() ?? '';
+    final target = fileName.isNotEmpty ? fileName : title;
+    return '[[${target.isEmpty ? object.id : target}]]';
+  }
+
+  void _checkVisibility() {
+    if (!mounted || widget.post.watched || _autoWatched) return;
+    final renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) return;
+
+    final topLeft = renderObject.localToGlobal(Offset.zero);
+    final bottom = topLeft.dy + renderObject.size.height;
+    final viewportHeight = MediaQuery.sizeOf(context).height;
+    final visibleTop = topLeft.dy.clamp(0.0, viewportHeight);
+    final visibleBottom = bottom.clamp(0.0, viewportHeight);
+    final visibleHeight = (visibleBottom - visibleTop).clamp(
+      0.0,
+      renderObject.size.height,
+    );
+    final visibleFraction = renderObject.size.height == 0
+        ? 0.0
+        : visibleHeight / renderObject.size.height;
+
+    if (visibleFraction >= 0.8) {
+      _wasMostlyVisible = true;
+      return;
+    }
+
+    if (_wasMostlyVisible && visibleFraction <= 0.2) {
+      _autoWatched = true;
+      ref
+          .read(socialPostsProvider.notifier)
+          .updatePost(widget.post.copyWith(watched: true));
+    }
+  }
+
+  void _scheduleNoteSave(String value) {
+    _noteDebounce?.cancel();
+    _noteDebounce = Timer(const Duration(milliseconds: 800), () {
+      ref
+          .read(socialPostsProvider.notifier)
+          .updatePost(
+            widget.post.copyWith(
+              personalNote: value.trim().isEmpty ? null : value,
+            ),
+          );
+    });
+  }
+
+  void _addTag() {
+    final tag = _tagController.text.trim();
+    if (tag.isEmpty || widget.post.tags.contains(tag)) return;
+    _tagController.clear();
+    ref
+        .read(socialPostsProvider.notifier)
+        .updatePost(widget.post.copyWith(tags: [...widget.post.tags, tag]));
+  }
+
+  void _removeTag(String tag) {
+    final tags = List<String>.from(widget.post.tags)..remove(tag);
+    ref
+        .read(socialPostsProvider.notifier)
+        .updatePost(widget.post.copyWith(tags: tags));
+  }
+
+  String _handle(SocialPost post) {
     final value = post.authorHandle ?? post.authorName ?? 'Post';
     return value.startsWith('@') ? value : '@$value';
   }
@@ -798,43 +1044,5 @@ class _SocialPostListTile extends StatelessWidget {
     if (diff.inHours >= 1) return 'há ${diff.inHours} h';
     if (diff.inMinutes >= 1) return 'há ${diff.inMinutes} min';
     return 'agora';
-  }
-}
-
-class _OrganizerChips extends StatelessWidget {
-  final SocialPost post;
-
-  const _OrganizerChips({required this.post});
-
-  @override
-  Widget build(BuildContext context) {
-    final visible = post.organizers.take(3).toList();
-    final extra = post.organizers.length - visible.length;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (final organizer in visible)
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: Chip(
-                label: Text(
-                  organizer.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                visualDensity: VisualDensity.compact,
-                labelStyle: const TextStyle(fontSize: 10),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-          if (extra > 0)
-            Text(
-              '+$extra',
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
-            ),
-        ],
-      ),
-    );
   }
 }

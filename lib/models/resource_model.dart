@@ -1,5 +1,6 @@
 // lib/models/resource_model.dart
 import 'content_object.dart';
+import 'shared_types.dart';
 
 enum ResourceStatus { toConsume, inProgress, completed, dropped }
 
@@ -59,27 +60,26 @@ class Resource extends ContentObject {
 
   factory Resource.fromMarkdown(Map<String, dynamic> frontmatter, String body) {
     final resource = Resource(
-      title: frontmatter['title'] is List ? (frontmatter['title'] as List).join(', ') : frontmatter['title']?.toString() ?? '',
-      resourceType: frontmatter['resource_type'] is List ? (frontmatter['resource_type'] as List).join(', ') : frontmatter['resource_type']?.toString() ?? 'General',
+      title: _stringValue(frontmatter['title']) ?? '',
+      resourceType: _stringValue(frontmatter['resource_type']) ?? 'General',
     );
     resource.loadBaseMap(frontmatter);
 
-    resource.coverImage =
-        ((frontmatter['cover'] ?? frontmatter['cover_image']) is List ? (frontmatter['cover'] ?? frontmatter['cover_image'] as List).join(', ') : (frontmatter['cover'] ?? frontmatter['cover_image'])?.toString());
-    if (frontmatter['status'] != null) {
+    resource.coverImage = _stringValue(
+      frontmatter['cover'] ?? frontmatter['cover_image'],
+    );
+    final rawStatus = _stringValue(frontmatter['status'])?.toLowerCase();
+    if (rawStatus != null) {
       resource.status = ResourceStatus.values.firstWhere(
-        (e) => e.name == frontmatter['status'],
+        (e) => e.name.toLowerCase() == rawStatus,
         orElse: () => ResourceStatus.toConsume,
       );
     }
-    final rating = frontmatter['rating'];
-    resource.rating = rating is int ? rating : int.tryParse(rating?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '') ?? 0;
-    resource.author = frontmatter['author'] is List ? (frontmatter['author'] as List).join(', ') : frontmatter['author']?.toString();
-    final year = frontmatter['year'];
-    resource.year = year is int ? year : int.tryParse(year?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '');
-    final pages = frontmatter['pages'];
-    resource.pages = pages is int ? pages : int.tryParse(pages?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '');
-    resource.category = frontmatter['category'] is List ? (frontmatter['category'] as List).join(', ') : frontmatter['category']?.toString();
+    resource.rating = _intValue(frontmatter['rating']) ?? 0;
+    resource.author = _stringValue(frontmatter['author']);
+    resource.year = _intValue(frontmatter['year']);
+    resource.pages = _intValue(frontmatter['pages']);
+    resource.category = _stringValue(frontmatter['category']);
     if (frontmatter['read'] != null) {
       resource.readDate = DateTime.tryParse(frontmatter['read'].toString());
     }
@@ -100,7 +100,7 @@ class Resource extends ContentObject {
     int? pages,
     String? category,
     DateTime? readDate,
-    List<dynamic>? organizers,
+    List<OrganizerReference>? organizers,
     List<String>? categories,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -120,12 +120,29 @@ class Resource extends ContentObject {
       pages: pages ?? this.pages,
       category: category ?? this.category,
       readDate: readDate ?? this.readDate,
-      organizers: this.organizers,
+      organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
       order: order ?? this.order,
       obsidianPath: obsidianPath ?? this.obsidianPath,
     )..reminders = reminders;
+  }
+
+  static String? _stringValue(dynamic value) {
+    if (value is List) {
+      final joined = value.map((item) => item.toString()).join(', ').trim();
+      return joined.isEmpty ? null : joined;
+    }
+    final text = value?.toString().trim();
+    return text == null || text.isEmpty ? null : text;
+  }
+
+  static int? _intValue(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    final text = value?.toString();
+    if (text == null) return null;
+    return int.tryParse(text.replaceAll(RegExp(r'[^0-9-]'), ''));
   }
 }

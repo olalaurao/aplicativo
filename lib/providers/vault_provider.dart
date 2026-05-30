@@ -25,6 +25,7 @@ import '../models/scheduler.dart';
 import '../models/day_theme_model.dart';
 import '../models/template_model.dart';
 import '../models/inbox_model.dart';
+import '../models/event_model.dart';
 
 import '../models/sync_action.dart';
 import '../services/sync_queue_service.dart';
@@ -138,8 +139,17 @@ Future<void> _cancelHabitSlotReminderNotification(
       .toList();
   final reminderIndex = enabledSlotIndexes.indexOf(slotIndex);
   if (reminderIndex == -1) return;
-  final baseId = habit.id.hashCode.abs() % 1000000;
+  final baseId = _stableNotificationBaseId(habit.id);
   await NotificationService().cancelNotification(baseId + reminderIndex);
+}
+
+int _stableNotificationBaseId(String value) {
+  var hash = 0x811c9dc5;
+  for (final unit in value.codeUnits) {
+    hash ^= unit;
+    hash = (hash * 0x01000193) & 0x7fffffff;
+  }
+  return 100000 + (hash % 900000);
 }
 
 // Map to store raw daily note data for O(1) lookup
@@ -1271,6 +1281,7 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                       dateStr,
                       data['time']?.toString(),
                     ),
+                    timeOfDay: data['time']?.toString(),
                     title: data['title']?.toString().isNotEmpty == true
                         ? data['title']
                         : data['time'],
@@ -1359,6 +1370,9 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                   ..obsidianPath = relativePath;
               } else if (type == 'resource') {
                 obj = Resource.fromMarkdown(frontmatter, body)
+                  ..obsidianPath = relativePath;
+              } else if (type == 'event') {
+                obj = Event.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
               } else if (type == 'social_post') {
                 obj = SocialPost.fromMarkdown(frontmatter, body)
@@ -1633,6 +1647,7 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
       final entry = JournalEntry(
         body: data['body']?.toString() ?? '',
         date: _journalEntryDateFromDaily(dateStr, time),
+        timeOfDay: time,
         title: title.isNotEmpty ? title : time,
         moodSlug: data['mood']?.toString(),
         obsidianPath: relativePath,
@@ -1962,6 +1977,7 @@ class VaultNotifier extends Notifier<void> {
       'day_theme' => 'day_themes',
       'template' => 'templates',
       'reminder' => 'reminders',
+      'event' => 'events',
       'inbox' => 'inbox',
       _ => 'app',
     };
@@ -1971,7 +1987,7 @@ class VaultNotifier extends Notifier<void> {
     // Cancel previous reminders for this object using the current and legacy
     // ID schemes. Older builds used a hash per reminder config, so keep this
     // cleanup until those scheduled alarms naturally disappear from devices.
-    final baseId = object.id.hashCode.abs() % 1000000;
+    final baseId = _stableNotificationBaseId(object.id);
     for (int i = 0; i < 50; i++) {
       await NotificationService().cancelNotification(baseId + i);
     }
@@ -2100,7 +2116,7 @@ class VaultNotifier extends Notifier<void> {
   }
 
   Future<void> _cancelObjectReminders(ContentObject object) async {
-    final baseId = object.id.hashCode.abs() % 1000000;
+    final baseId = _stableNotificationBaseId(object.id);
     for (int i = 0; i < 50; i++) {
       await NotificationService().cancelNotification(baseId + i);
     }
@@ -2111,10 +2127,12 @@ class VaultNotifier extends Notifier<void> {
   }
 
   Future<void> rescheduleAllObjectReminders() async {
+    await NotificationService().cancelAllScheduled();
     final allObjects = await ref.read(allObjectsProvider.future);
     for (final object in allObjects) {
       await _scheduleObjectReminders(object);
     }
+    await NotificationService().showQuickCaptureNotification();
   }
 
   Future<String> _writeObject(
@@ -2133,7 +2151,10 @@ class VaultNotifier extends Notifier<void> {
     final prepared = MarkdownParser.prepareForSave(
       object,
       sig,
-      defaultFolder: _defaultFolderForSignature(signatureKey),
+      defaultFolder:
+          settings.folderPaths[signatureKey] ??
+          settings.folderPaths[object.type] ??
+          _defaultFolderForSignature(signatureKey),
     );
     final relativePath = prepared['path']!;
     final oldPath = object.obsidianPath;
@@ -2787,11 +2808,13 @@ class VaultNotifier extends Notifier<void> {
 
     final newTime = DateTime.now().add(Duration(minutes: snoozeMinutes));
 
+    final snoozeId = _stableNotificationBaseId('${objectId}_snooze');
+    await NotificationService().cancelNotification(snoozeId);
     await NotificationService().scheduleReminder(
-      id: objectId.hashCode,
+      id: snoozeId,
       title: target.title,
       config: ReminderConfig(
-        id: 'snooze_${objectId}_${DateTime.now().millisecondsSinceEpoch}',
+        id: 'snooze_$objectId',
         triggerTime: newTime,
         type: NotificationType.alarm, // Keep same type for snooze
       ),

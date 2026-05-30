@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 class JournalEntry extends ContentObject {
   String body;
   DateTime date;
+  String? timeOfDay;
   String? moodSlug; // Reference to MoodDefinition.id
   List<String> photos;
   String? location;
@@ -19,6 +20,7 @@ class JournalEntry extends ContentObject {
     String? title,
     required this.body,
     required this.date,
+    this.timeOfDay,
     this.moodSlug,
     this.photos = const [],
     this.location,
@@ -39,6 +41,7 @@ class JournalEntry extends ContentObject {
   String toMarkdown() {
     final frontmatter = toBaseMap();
     frontmatter['date'] = date.toIso8601String();
+    if (timeOfDay != null) frontmatter['time'] = timeOfDay;
     if (moodSlug != null) frontmatter['mood'] = moodSlug;
     if (location != null) frontmatter['location'] = location;
     if (photos.isNotEmpty) frontmatter['photos'] = photos;
@@ -62,13 +65,17 @@ class JournalEntry extends ContentObject {
       title: frontmatter['title'] as String?,
       body: body,
       date: parsedDate ?? DateTime.fromMillisecondsSinceEpoch(0),
+      timeOfDay: frontmatter['time']?.toString(),
     );
     entry.loadBaseMap(frontmatter);
 
     entry.moodSlug = frontmatter['mood'] as String?;
     entry.location = frontmatter['location'] as String?;
-    if (frontmatter['photos'] != null) {
-      entry.photos = List<String>.from(frontmatter['photos'] as List);
+    final rawPhotos = frontmatter['photos'];
+    if (rawPhotos is List) {
+      entry.photos = rawPhotos.map((item) => item.toString()).toList();
+    } else if (rawPhotos is String && rawPhotos.trim().isNotEmpty) {
+      entry.photos = [rawPhotos.trim()];
     }
 
     return entry;
@@ -77,6 +84,7 @@ class JournalEntry extends ContentObject {
   JournalEntry copyWith({
     String? body,
     DateTime? date,
+    String? timeOfDay,
     String? moodSlug,
     List<String>? photos,
     String? location,
@@ -96,6 +104,7 @@ class JournalEntry extends ContentObject {
       title: title ?? this.title,
       body: body ?? this.body,
       date: date ?? this.date,
+      timeOfDay: timeOfDay ?? this.timeOfDay,
       moodSlug: moodSlug ?? this.moodSlug,
       photos: photos ?? this.photos,
       location: location ?? this.location,

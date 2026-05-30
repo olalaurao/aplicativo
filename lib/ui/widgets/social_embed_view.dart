@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../../models/social_post.dart';
 import 'social_post_grid_card.dart';
@@ -42,6 +43,11 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
     super.initState();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setUserAgent(
+        'Mozilla/5.0 (Linux; Android 13; SM-A546E) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) '
+        'Chrome/124.0.0.0 Mobile Safari/537.36',
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (_) {
@@ -57,7 +63,12 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
         ),
       );
 
-    _timeout = Timer(const Duration(seconds: 12), () {
+    if (_controller.platform is AndroidWebViewController) {
+      (_controller.platform as AndroidWebViewController)
+          .setMediaPlaybackRequiresUserGesture(false);
+    }
+
+    _timeout = Timer(const Duration(seconds: 10), () {
       if (mounted && !_isLoaded) setState(() => _hasError = true);
     });
 
@@ -165,7 +176,7 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
 <body>
   <iframe src="$embedUrl"
     allowfullscreen
-    allow="autoplay; encrypted-media; picture-in-picture">
+    allow="autoplay; encrypted-media; picture-in-picture; fullscreen">
   </iframe>
 </body>
 </html>

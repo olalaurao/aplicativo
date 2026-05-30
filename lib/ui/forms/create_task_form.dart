@@ -1600,13 +1600,22 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     task.organizers.clear();
     task.organizers.addAll(_organizers);
 
-    if (widget.existingTask != null) {
-      ref.read(vaultProvider.notifier).updateObject(task);
-    } else {
-      ref.read(tasksProvider.notifier).addTask(task);
-    }
+    try {
+      if (widget.existingTask != null) {
+        await ref.read(vaultProvider.notifier).updateObject(task);
+      } else {
+        await ref.read(tasksProvider.notifier).addTask(task);
+      }
 
-    await _createPromotedSubtasks(task);
+      await _createPromotedSubtasks(task);
+    } catch (e) {
+      debugPrint('Failed to save task: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erro ao salvar tarefa: $e')));
+      return;
+    }
     if (mounted) Navigator.pop(context, true);
   }
 

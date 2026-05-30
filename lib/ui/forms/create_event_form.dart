@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/people_model.dart';
+import '../../models/event_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/task_model.dart';
 import '../../providers/google_calendar_provider.dart';
@@ -263,30 +264,52 @@ class _CreateEventFormState extends ConsumerState<CreateEventForm> {
     if (!end.isAfter(start)) end = start.add(const Duration(hours: 1));
     final duration = end.difference(start).inMinutes;
 
+    final participantRefs = participants
+        .map(
+          (person) => OrganizerReference(
+            type: 'person',
+            slug: person.slug,
+            title: person.title,
+          ),
+        )
+        .toList();
+    final participantSlugs = participants.map((person) => person.slug).toList();
+
     final task = (widget.existingEvent ?? Task(title: _titleController.text.trim()))
         .copyWith(
-          title: _titleController.text.trim(),
-          startDate: start,
-          endDate: end,
-          scheduledTime:
-              '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}',
-          duration: duration,
-          notes: [
-            if (_locationController.text.trim().isNotEmpty)
-              'Local: ${_locationController.text.trim()}',
-            _descriptionController.text.trim(),
-          ].where((line) => line.isNotEmpty).toList(),
-          participants: participants
-              .map(
-                (person) => OrganizerReference(
-                  type: 'person',
-                  slug: person.slug,
-                  title: person.title,
-                ),
-              )
-              .toList(),
-          categories: const ['[[events]]'],
-        );
+      title: _titleController.text.trim(),
+      startDate: start,
+      endDate: end,
+      scheduledTime:
+          '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}',
+      duration: duration,
+      notes: [
+        if (_locationController.text.trim().isNotEmpty)
+          'Local: ${_locationController.text.trim()}',
+        _descriptionController.text.trim(),
+      ].where((line) => line.isNotEmpty).toList(),
+      participants: participantRefs,
+      categories: const ['[[events]]'],
+    );
+
+    Event eventObject({String? googleEventId, String? googleEventUrl}) {
+      return Event(
+        title: _titleController.text.trim(),
+        startDatetime: start,
+        endDatetime: end,
+        location: _locationController.text.trim().isEmpty
+            ? null
+            : _locationController.text.trim(),
+        description: _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text.trim(),
+        participants: participantSlugs,
+        googleEventId: googleEventId,
+        googleEventUrl: googleEventUrl,
+        organizers: participantRefs,
+        categories: const ['[[events]]'],
+      );
+    }
 
     try {
       final authClient = await ref
@@ -312,13 +335,15 @@ class _CreateEventFormState extends ConsumerState<CreateEventForm> {
           linkedGoogleEventUrl: event.htmlLink,
         );
         if (widget.existingEvent == null) {
-          await ref.read(vaultProvider.notifier).createObject(savedTask);
+          await ref.read(vaultProvider.notifier).createObject(
+                eventObject(googleEventId: event.id, googleEventUrl: event.htmlLink),
+              );
         } else {
           await ref.read(vaultProvider.notifier).updateObject(savedTask);
         }
       } else {
         if (widget.existingEvent == null) {
-          await ref.read(vaultProvider.notifier).createObject(task);
+          await ref.read(vaultProvider.notifier).createObject(eventObject());
         } else {
           await ref.read(vaultProvider.notifier).updateObject(task);
         }

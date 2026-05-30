@@ -21,33 +21,80 @@ class ResourcesScreen extends ConsumerStatefulWidget {
 
 class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   bool _isGridView = true;
-  String _selectedType = 'All';
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  final Set<String> _selectedTypes = {};
+  final Set<ResourceStatus> _selectedStatuses = {};
+  final Set<String> _selectedCategories = {};
   String _sortBy = 'manual'; // manual, title, rating, modified
+  bool _sortAscending = true;
   String? _expandedResourceId;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final resources = ref.watch(resourcesProvider);
     final settings = ref.watch(settingsProvider);
 
-    // Filtering
-    List<Resource> filtered = _selectedType == 'All'
-        ? resources
-        : resources.where((r) => r.resourceType == _selectedType).toList();
+    final categories =
+        resources
+            .map((resource) => resource.category?.trim())
+            .whereType<String>()
+            .where((category) => category.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+
+    List<Resource> filtered = resources.where((resource) {
+      if (_selectedTypes.isNotEmpty &&
+          !_selectedTypes.contains(resource.resourceType)) {
+        return false;
+      }
+      if (_selectedStatuses.isNotEmpty &&
+          !_selectedStatuses.contains(resource.status)) {
+        return false;
+      }
+      if (_selectedCategories.isNotEmpty &&
+          !_selectedCategories.contains(resource.category?.trim())) {
+        return false;
+      }
+      if (_searchQuery.trim().isNotEmpty) {
+        final query = _searchQuery.toLowerCase().trim();
+        final haystack = [
+          resource.title,
+          resource.author,
+          resource.category,
+          resource.resourceType,
+          resource.synopsis,
+          ...resource.tags,
+          ...resource.aliases,
+        ].whereType<String>().join(' ').toLowerCase();
+        if (!haystack.contains(query)) return false;
+      }
+      return true;
+    }).toList();
 
     // Sorting
     filtered.sort((a, b) {
-      switch (_sortBy) {
-        case 'manual':
-          return (a.order ?? 0).compareTo(b.order ?? 0);
-        case 'title':
-          return a.title.toLowerCase().compareTo(b.title.toLowerCase());
-        case 'rating':
-          return b.rating.compareTo(a.rating);
-        case 'modified':
-        default:
-          return b.updatedAt.compareTo(a.updatedAt);
-      }
+      final result = switch (_sortBy) {
+        'manual' => (a.order ?? 0).compareTo(b.order ?? 0),
+        'title' => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+        'status' => a.status.name.compareTo(b.status.name),
+        'type' => a.resourceType.toLowerCase().compareTo(
+          b.resourceType.toLowerCase(),
+        ),
+        'category' => (a.category ?? '').toLowerCase().compareTo(
+          (b.category ?? '').toLowerCase(),
+        ),
+        'rating' => a.rating.compareTo(b.rating),
+        'modified' || _ => a.updatedAt.compareTo(b.updatedAt),
+      };
+      return _sortAscending ? result : -result;
     });
 
     final types =
@@ -88,14 +135,47 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
               ),
             ],
           ),
+          SliverToBoxAdapter(child: _buildSearchField()),
           SliverToBoxAdapter(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Row(
                 children: [
-                  _filterChip('All', _selectedType == 'All'),
-                  ...types.map((t) => _filterChip(t, _selectedType == t)),
+                  _clearFilterChip(),
+                  ...types.map(
+                    (type) => _filterChip(
+                      type,
+                      _selectedTypes.contains(type),
+                      () => setState(() {
+                        if (!_selectedTypes.add(type)) {
+                          _selectedTypes.remove(type);
+                        }
+                      }),
+                    ),
+                  ),
+                  ...ResourceStatus.values.map(
+                    (status) => _filterChip(
+                      _statusLabel(status),
+                      _selectedStatuses.contains(status),
+                      () => setState(() {
+                        if (!_selectedStatuses.add(status)) {
+                          _selectedStatuses.remove(status);
+                        }
+                      }),
+                    ),
+                  ),
+                  ...categories.map(
+                    (category) => _filterChip(
+                      category,
+                      _selectedCategories.contains(category),
+                      () => setState(() {
+                        if (!_selectedCategories.add(category)) {
+                          _selectedCategories.remove(category);
+                        }
+                      }),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -150,15 +230,53 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     );
   }
 
+  Widget _buildSearchField() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) => setState(() => _searchQuery = value),
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'Buscar recurso',
+          prefixIcon: const Icon(Icons.search_rounded),
+          suffixIcon: _searchQuery.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => setState(() {
+                    _searchController.clear();
+                    _searchQuery = '';
+                  }),
+                ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSortButton() {
     return PopupMenuButton<String>(
       icon: const Icon(Icons.sort_rounded),
-      onSelected: (val) => setState(() => _sortBy = val),
+      onSelected: (val) => setState(() {
+        if (val == 'direction') {
+          _sortAscending = !_sortAscending;
+        } else {
+          _sortBy = val;
+        }
+      }),
       itemBuilder: (ctx) => [
         const PopupMenuItem(value: 'manual', child: Text('Sort Manually')),
         const PopupMenuItem(value: 'modified', child: Text('Sort by Modified')),
         const PopupMenuItem(value: 'rating', child: Text('Sort by Rating')),
         const PopupMenuItem(value: 'title', child: Text('Sort by Title')),
+        const PopupMenuItem(value: 'status', child: Text('Sort by Status')),
+        const PopupMenuItem(value: 'type', child: Text('Sort by Type')),
+        const PopupMenuItem(value: 'category', child: Text('Sort by Category')),
+        PopupMenuItem(
+          value: 'direction',
+          child: Text(_sortAscending ? 'Direction: Asc' : 'Direction: Desc'),
+        ),
       ],
     );
   }
@@ -218,9 +336,23 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     });
   }
 
-  Widget _filterChip(String label, bool selected) {
+  Widget _clearFilterChip() {
+    final selected =
+        _selectedTypes.isEmpty &&
+        _selectedStatuses.isEmpty &&
+        _selectedCategories.isEmpty;
+    return _filterChip('Todos', selected, () {
+      setState(() {
+        _selectedTypes.clear();
+        _selectedStatuses.clear();
+        _selectedCategories.clear();
+      });
+    });
+  }
+
+  Widget _filterChip(String label, bool selected, VoidCallback onTap) {
     return GestureDetector(
-      onTap: () => setState(() => _selectedType = label),
+      onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -342,9 +474,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                             icon: const Icon(Icons.delete_outline_rounded),
                             color: AppColors.error,
                             onPressed: () => setSheetState(() {
-                              if (_selectedType == filter) {
-                                _selectedType = 'All';
-                              }
+                              _selectedTypes.remove(filter);
                               filters.removeAt(index);
                             }),
                           ),
@@ -373,6 +503,15 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
         },
       ),
     ).whenComplete(controller.dispose);
+  }
+
+  String _statusLabel(ResourceStatus status) {
+    return switch (status) {
+      ResourceStatus.toConsume => 'Para ler',
+      ResourceStatus.inProgress => 'Lendo',
+      ResourceStatus.completed => 'Concluído',
+      ResourceStatus.dropped => 'Abandonado',
+    };
   }
 
   Future<String?> _editFilterName(String current) async {
