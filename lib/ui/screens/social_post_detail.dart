@@ -156,41 +156,46 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
         borderRadius: BorderRadius.circular(12),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (imageUrl != null)
-            Image.network(
-              imageUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Center(
+      child: GestureDetector(
+        onTap: imageUrl == null
+            ? () => _openOriginal(post)
+            : () => _openImagePreview(imageUrl),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (imageUrl != null)
+              Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Center(
+                  child: Icon(
+                    socialPlatformIcon(post.platform),
+                    size: 48,
+                    color: color,
+                  ),
+                ),
+              )
+            else
+              Center(
                 child: Icon(
                   socialPlatformIcon(post.platform),
                   size: 48,
                   color: color,
                 ),
               ),
-            )
-          else
-            Center(
-              child: Icon(
-                socialPlatformIcon(post.platform),
-                size: 48,
-                color: color,
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: FilledButton.icon(
+                  onPressed: () => _openOriginal(post),
+                  icon: const Icon(Icons.open_in_new_rounded),
+                  label: const Text('Abrir em navegador interno'),
+                ),
               ),
             ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: FilledButton.icon(
-                onPressed: () => _openOriginal(post),
-                icon: const Icon(Icons.open_in_new_rounded),
-                label: const Text('Abrir no app original'),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -568,13 +573,38 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
   Future<void> _openOriginal(SocialPost post) async {
     final uri = Uri.tryParse(post.url);
     if (uri == null ||
-        !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        !await launchUrl(uri, mode: LaunchMode.inAppBrowserView)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Não foi possível abrir o link.')),
         );
       }
     }
+  }
+
+  void _openImagePreview(String imageUrl) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (context) => GestureDetector(
+        onTap: () => Navigator.pop(context),
+        child: InteractiveViewer(
+          minScale: 0.8,
+          maxScale: 4,
+          child: Center(
+            child: Image.network(
+              imageUrl,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.broken_image_rounded,
+                color: Colors.white,
+                size: 56,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openInObsidian(SocialPost post) async {

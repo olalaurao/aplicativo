@@ -821,9 +821,12 @@ class _SocialTimelineCardState extends ConsumerState<_SocialTimelineCard> {
             if (post.embedUrl != null && post.embedUrl!.isNotEmpty)
               SocialEmbedView(post: post)
             else
-              AspectRatio(
-                aspectRatio: 1,
-                child: SocialPostThumbnail(post: post, iconSize: 56),
+              GestureDetector(
+                onTap: widget.onTap,
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: SocialPostThumbnail(post: post, iconSize: 56),
+                ),
               ),
             if (post.caption?.trim().isNotEmpty == true)
               Padding(

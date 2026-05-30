@@ -131,6 +131,20 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
               child: WebViewWidget(controller: _controller),
             ),
             if (!_isLoaded) _buildLoading(),
+            if (_isLoaded &&
+                widget.post.platform == SocialPlatform.tiktok &&
+                widget.post.mediaType == SocialMediaType.video)
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: FilledButton.icon(
+                    onPressed: _openOriginal,
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: const Text('Abrir vídeo aqui'),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -157,57 +171,58 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
         borderRadius: BorderRadius.circular(12),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          SocialPostThumbnail(
-            post: widget.post,
-            iconSize: 48,
-            borderRadius: BorderRadius.zero,
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withValues(alpha: 0.72),
-                ],
+      child: GestureDetector(
+        onTap: hasImage ? _openImagePreview : _openOriginal,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            SocialPostThumbnail(
+              post: widget.post,
+              iconSize: 48,
+              borderRadius: BorderRadius.zero,
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.72),
+                  ],
+                ),
               ),
             ),
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    widget.post.platform == SocialPlatform.tiktok &&
-                            widget.post.mediaType != SocialMediaType.video
-                        ? 'Preview do carrossel'
-                        : 'Não foi possível reproduzir este post inline.',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.post.platform == SocialPlatform.tiktok &&
+                              widget.post.mediaType != SocialMediaType.video
+                          ? 'Toque para ampliar o preview'
+                          : 'Não foi possível reproduzir este post inline.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  FilledButton.icon(
-                    onPressed: _openOriginal,
-                    icon: const Icon(Icons.open_in_new_rounded),
-                    label: Text(
-                      'Abrir no ${platformLabel(widget.post.platform)}',
+                    const SizedBox(height: 10),
+                    FilledButton.icon(
+                      onPressed: _openOriginal,
+                      icon: const Icon(Icons.open_in_new_rounded),
+                      label: const Text('Abrir em navegador interno'),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -215,8 +230,46 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
   Future<void> _openOriginal() async {
     final uri = Uri.tryParse(widget.post.url);
     if (uri != null) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final opened = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+      if (!opened) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
     }
+  }
+
+  void _openImagePreview() {
+    final imageUrl = widget.post.thumbnailUrl?.isNotEmpty == true
+        ? widget.post.thumbnailUrl!
+        : widget.post.mediaUrls
+              .where((url) => url.trim().isNotEmpty)
+              .firstOrNull;
+    if (imageUrl == null) {
+      _openOriginal();
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (context) => GestureDetector(
+        onTap: () => Navigator.pop(context),
+        child: InteractiveViewer(
+          minScale: 0.8,
+          maxScale: 4,
+          child: Center(
+            child: Image.network(
+              imageUrl,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.broken_image_rounded,
+                color: Colors.white,
+                size: 56,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   String _buildEmbedHtml(SocialPost post) {
