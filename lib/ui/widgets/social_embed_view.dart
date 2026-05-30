@@ -50,6 +50,24 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
       )
       ..setNavigationDelegate(
         NavigationDelegate(
+          onNavigationRequest: (request) {
+            if (widget.post.platform != SocialPlatform.tiktok) {
+              return NavigationDecision.navigate;
+            }
+            final uri = Uri.tryParse(request.url);
+            if (uri == null) return NavigationDecision.prevent;
+            final scheme = uri.scheme.toLowerCase();
+            if (scheme != 'http' && scheme != 'https') {
+              return NavigationDecision.prevent;
+            }
+            final host = uri.host.toLowerCase();
+            if (!host.contains('tiktok.com') &&
+                !host.contains('tiktokcdn.com') &&
+                !host.contains('byteoversea.com')) {
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
           onPageFinished: (_) {
             _timeout?.cancel();
             if (widget.post.platform == SocialPlatform.substack) {
@@ -72,8 +90,16 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
       if (mounted && !_isLoaded) setState(() => _hasError = true);
     });
 
+    if (widget.post.platform == SocialPlatform.tiktok &&
+        widget.post.mediaType != SocialMediaType.video) {
+      _hasError = true;
+      return;
+    }
+
     final embedUrl = widget.post.embedUrl;
-    if (widget.post.platform == SocialPlatform.substack) {
+    if (widget.post.platform == SocialPlatform.tiktok) {
+      _controller.loadRequest(Uri.parse(widget.post.url));
+    } else if (widget.post.platform == SocialPlatform.substack) {
       _controller.loadRequest(Uri.parse(widget.post.url));
     } else if (embedUrl != null && embedUrl.isNotEmpty) {
       _controller.loadHtmlString(_buildEmbedHtml(widget.post));
@@ -121,32 +147,65 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
 
   Widget _buildFallback(BuildContext context) {
     final color = socialPlatformColor(widget.post.platform);
+    final hasImage =
+        widget.post.thumbnailUrl?.isNotEmpty == true ||
+        widget.post.mediaUrls.isNotEmpty;
     return Container(
-      height: 220,
+      height: hasImage ? 360 : 220,
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
       ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          SizedBox(
-            width: 84,
-            height: 84,
-            child: SocialPostThumbnail(post: widget.post, iconSize: 40),
+          SocialPostThumbnail(
+            post: widget.post,
+            iconSize: 48,
+            borderRadius: BorderRadius.zero,
           ),
-          const SizedBox(height: 12),
-          const Text(
-            'Não foi possível carregar o embed deste post.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontWeight: FontWeight.w700),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.72),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: _openOriginal,
-            icon: const Icon(Icons.open_in_new_rounded),
-            label: Text('Abrir no ${platformLabel(widget.post.platform)}'),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.post.platform == SocialPlatform.tiktok &&
+                            widget.post.mediaType != SocialMediaType.video
+                        ? 'Preview do carrossel'
+                        : 'Não foi possível reproduzir este post inline.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  FilledButton.icon(
+                    onPressed: _openOriginal,
+                    icon: const Icon(Icons.open_in_new_rounded),
+                    label: Text(
+                      'Abrir no ${platformLabel(widget.post.platform)}',
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

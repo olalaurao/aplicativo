@@ -146,6 +146,9 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
 
   Widget _buildEmbedPlaceholder(SocialPost post) {
     final color = socialPlatformColor(post.platform);
+    final imageUrl = post.thumbnailUrl?.isNotEmpty == true
+        ? post.thumbnailUrl!
+        : post.mediaUrls.where((url) => url.trim().isNotEmpty).firstOrNull;
     return Container(
       height: 220,
       decoration: BoxDecoration(
@@ -156,9 +159,9 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (post.thumbnailUrl?.isNotEmpty == true)
+          if (imageUrl != null)
             Image.network(
-              post.thumbnailUrl!,
+              imageUrl,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => Center(
                 child: Icon(

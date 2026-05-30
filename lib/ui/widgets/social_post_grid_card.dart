@@ -118,6 +118,9 @@ class SocialPostThumbnail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = socialPlatformColor(post.platform);
+    final imageUrl = post.thumbnailUrl?.isNotEmpty == true
+        ? post.thumbnailUrl!
+        : post.mediaUrls.where((url) => url.trim().isNotEmpty).firstOrNull;
     final fallback = ColoredBox(
       color: color.withValues(alpha: 0.12),
       child: Center(
@@ -131,9 +134,9 @@ class SocialPostThumbnail extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: borderRadius,
-      child: post.thumbnailUrl?.isNotEmpty == true
+      child: imageUrl != null
           ? Image.network(
-              post.thumbnailUrl!,
+              imageUrl,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => fallback,
             )

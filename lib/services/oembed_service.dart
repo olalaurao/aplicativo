@@ -34,7 +34,11 @@ class OEmbedService {
   static SocialMediaType detectMediaType(SocialPlatform platform, String url) {
     final lower = url.toLowerCase();
     return switch (platform) {
-      SocialPlatform.tiktok || SocialPlatform.youtube => SocialMediaType.video,
+      SocialPlatform.tiktok =>
+        lower.contains('/photo/')
+            ? SocialMediaType.carousel
+            : SocialMediaType.video,
+      SocialPlatform.youtube => SocialMediaType.video,
       SocialPlatform.instagram =>
         lower.contains('/reel/')
             ? SocialMediaType.video
@@ -123,6 +127,19 @@ class OEmbedService {
             _stringValue(result['image']);
         authorHandle = _extractHandle(_stringValue(result['author_url']));
       }
+
+      if (platform == SocialPlatform.tiktok &&
+          (thumbnailUrl == null || caption == null)) {
+        final og = await _fetchOpenGraph(normalizedUrl);
+        if (og != null) {
+          title = _stringValue(og['title']) ?? title;
+          caption ??=
+              _stringValue(og['description']) ??
+              _stringValue(og['og:description']);
+          thumbnailUrl ??= _stringValue(og['image']);
+          authorName ??= _stringValue(og['site_name']);
+        }
+      }
     } catch (error) {
       debugPrint('OEmbedService.fetchMetadata failed: $error');
     }
@@ -137,6 +154,7 @@ class OEmbedService {
       authorName: authorName,
       thumbnailUrl: thumbnailUrl,
       embedUrl: embedUrl,
+      mediaUrls: thumbnailUrl == null ? const [] : [thumbnailUrl],
     );
   }
 
@@ -161,7 +179,13 @@ class OEmbedService {
           .get(
             Uri.parse(url),
             headers: const {
-              'User-Agent': 'Mozilla/5.0 (compatible; Citrine/1.0)',
+              'User-Agent':
+                  'Mozilla/5.0 (Linux; Android 13; SM-A546E) '
+                  'AppleWebKit/537.36 (KHTML, like Gecko) '
+                  'Chrome/124.0.0.0 Mobile Safari/537.36',
+              'Accept':
+                  'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
             },
           )
           .timeout(const Duration(seconds: 10));
