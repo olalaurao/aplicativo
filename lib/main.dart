@@ -151,7 +151,9 @@ Future<void> _handleWidgetToggleUri(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('pt_BR');
-  await HomeWidget.registerInteractivityCallback(homeWidgetInteractiveCallback);
+  if (Platform.isAndroid || Platform.isIOS) {
+    await HomeWidget.registerInteractivityCallback(homeWidgetInteractiveCallback);
+  }
   // #region agent log
   await _emitAgentDebugLog(
     location: 'main.dart:main',
@@ -242,6 +244,8 @@ class _BootstrapAppState extends State<BootstrapApp> {
   }
 
   void _initShareIntentHandling() {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+
     _shareIntentSub = ReceiveSharingIntent.instance.getMediaStream().listen(
       _handleSharedMedia,
       onError: (error) => debugPrint('Share intent stream failed: $error'),

@@ -3,6 +3,7 @@
 // Bridge between Flutter snapshots and Android home screen widgets.
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
@@ -16,7 +17,10 @@ class WidgetService {
   static const _quickAddProvider = 'CitrineQuickAddWidgetProvider';
   static const _noteProvider = 'CitrineNoteWidgetProvider';
 
+  static bool get _isSupportedPlatform => Platform.isAndroid || Platform.isIOS;
+
   static Future<void> init() async {
+    if (!_isSupportedPlatform) return;
     await refreshAllWidgets();
   }
 
@@ -141,6 +145,7 @@ class WidgetService {
   }
 
   static Future<List<int>> universalWidgetIds() async {
+    if (!_isSupportedPlatform) return [];
     try {
       final installed = await HomeWidget.getInstalledWidgets();
       final ids =
@@ -347,6 +352,7 @@ class WidgetService {
   }
 
   static Future<void> _saveJson(String key, Map<String, dynamic> value) {
+    if (!_isSupportedPlatform) return Future.value();
     return HomeWidget.saveWidgetData<String>(key, jsonEncode(value));
   }
 
@@ -359,6 +365,7 @@ class WidgetService {
   }
 
   static Future<void> _update(String provider) async {
+    if (!_isSupportedPlatform) return;
     try {
       await HomeWidget.updateWidget(
         androidName: provider,
