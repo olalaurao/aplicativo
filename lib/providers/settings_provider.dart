@@ -62,6 +62,8 @@ class AppSettings {
   final String dailyNoteDateFormat;
   final String dailyNoteFolder;
   final String socialViewMode;
+  final String tiktokResolverEndpoint;
+  final String tiktokResolverApiKey;
   final Map<String, String> folderPaths;
 
   AppSettings({
@@ -96,6 +98,8 @@ class AppSettings {
     this.dailyNoteDateFormat = 'yyyy-MM-dd',
     this.dailyNoteFolder = 'daily',
     this.socialViewMode = 'grid',
+    this.tiktokResolverEndpoint = '',
+    this.tiktokResolverApiKey = '',
     this.folderPaths = const {},
     this.quickAddWidgetButton1Label = 'Diário',
     this.quickAddWidgetButton1Target = 'journal',
@@ -159,6 +163,8 @@ class AppSettings {
     String? dailyNoteDateFormat,
     String? dailyNoteFolder,
     String? socialViewMode,
+    String? tiktokResolverEndpoint,
+    String? tiktokResolverApiKey,
     Map<String, String>? folderPaths,
     String? quickAddWidgetButton1Label,
     String? quickAddWidgetButton1Target,
@@ -208,6 +214,9 @@ class AppSettings {
       dailyNoteDateFormat: dailyNoteDateFormat ?? this.dailyNoteDateFormat,
       dailyNoteFolder: dailyNoteFolder ?? this.dailyNoteFolder,
       socialViewMode: socialViewMode ?? this.socialViewMode,
+      tiktokResolverEndpoint:
+          tiktokResolverEndpoint ?? this.tiktokResolverEndpoint,
+      tiktokResolverApiKey: tiktokResolverApiKey ?? this.tiktokResolverApiKey,
       folderPaths: folderPaths ?? this.folderPaths,
       quickAddWidgetButton1Label:
           quickAddWidgetButton1Label ?? this.quickAddWidgetButton1Label,
@@ -309,6 +318,8 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
           prefs.getString('dailyNoteDateFormat') ?? 'yyyy-MM-dd',
       dailyNoteFolder: prefs.getString('dailyNoteFolder') ?? 'daily',
       socialViewMode: prefs.getString('socialViewMode') ?? 'grid',
+      tiktokResolverEndpoint: prefs.getString('tiktokResolverEndpoint') ?? '',
+      tiktokResolverApiKey: prefs.getString('tiktokResolverApiKey') ?? '',
       folderPaths: folderPaths,
       quickAddWidgetButton1Label:
           prefs.getString('quickAddWidgetButton1Label') ?? 'Diário',
@@ -700,12 +711,29 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     state = state.copyWith(socialViewMode: normalized);
   }
 
+  Future<void> updateTikTokResolverSettings({
+    String? endpoint,
+    String? apiKey,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (endpoint != null) {
+      await prefs.setString('tiktokResolverEndpoint', endpoint.trim());
+    }
+    if (apiKey != null) {
+      await prefs.setString('tiktokResolverApiKey', apiKey.trim());
+    }
+    state = state.copyWith(
+      tiktokResolverEndpoint: endpoint,
+      tiktokResolverApiKey: apiKey,
+    );
+  }
+
   Future<void> updateFolderPath(String objectType, String folder) async {
     final key = objectType.trim();
-    final value = folder.trim().replaceAll('\\', '/').replaceAll(
-      RegExp(r'^/+|/+$'),
-      '',
-    );
+    final value = folder
+        .trim()
+        .replaceAll('\\', '/')
+        .replaceAll(RegExp(r'^/+|/+$'), '');
     if (key.isEmpty || value.isEmpty) return;
     final next = Map<String, String>.from(state.folderPaths)..[key] = value;
     final prefs = await SharedPreferences.getInstance();

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/shared_types.dart';
 import '../../models/social_post.dart';
+import '../../providers/settings_provider.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/oembed_service.dart';
 import '../theme.dart';
@@ -353,7 +354,12 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
     });
 
     try {
-      final post = await _oembedService.fetchMetadata(url);
+      final settings = ref.read(settingsProvider);
+      final post = await _oembedService.fetchMetadata(
+        url,
+        tiktokResolverEndpoint: settings.tiktokResolverEndpoint,
+        tiktokResolverApiKey: settings.tiktokResolverApiKey,
+      );
       if (!mounted) return;
       setState(() {
         _draft = post;

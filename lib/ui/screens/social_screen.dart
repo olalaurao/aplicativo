@@ -818,7 +818,8 @@ class _SocialTimelineCardState extends ConsumerState<_SocialTimelineCard> {
                       onPressed: widget.onTap,
                     ),
             ),
-            if (post.embedUrl != null && post.embedUrl!.isNotEmpty)
+            if (post.videoUrl?.isNotEmpty == true ||
+                post.embedUrl?.isNotEmpty == true)
               SocialEmbedView(post: post)
             else
               GestureDetector(

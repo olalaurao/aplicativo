@@ -190,6 +190,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const Divider(height: 1, indent: 16),
+                      ListTile(
+                        title: const Text(
+                          'Player TikTok nativo',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(
+                          settings.tiktokResolverEndpoint.isEmpty
+                              ? 'Configure uma API para extrair URL direta de vídeo'
+                              : settings.tiktokResolverEndpoint,
+                          style: const TextStyle(fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: const Icon(
+                          Icons.video_settings_rounded,
+                          size: 20,
+                          color: AppColors.primary,
+                        ),
+                        onTap: () => _showTikTokResolverDialog(
+                          context,
+                          settings,
+                          notifier,
+                        ),
+                      ),
+                      const Divider(height: 1, indent: 16),
                       _switchTileSimple('Sync Hidden Files', false, (v) {}),
                     ],
                   ),
@@ -1444,6 +1472,74 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       for (final controller in controllers.values) {
         controller.dispose();
       }
+    });
+  }
+
+  void _showTikTokResolverDialog(
+    BuildContext context,
+    AppSettings settings,
+    SettingsNotifier notifier,
+  ) {
+    final endpointController = TextEditingController(
+      text: settings.tiktokResolverEndpoint,
+    );
+    final apiKeyController = TextEditingController(
+      text: settings.tiktokResolverApiKey,
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Player TikTok nativo'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Configure uma API que devolva uma URL direta de vídeo. '
+                'Use {url} no endpoint para inserir o link do TikTok; sem {url}, o app envia ?url=...',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: endpointController,
+                decoration: const InputDecoration(
+                  labelText: 'Endpoint',
+                  hintText: 'https://api.exemplo.com/download?url={url}',
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: apiKeyController,
+                decoration: const InputDecoration(
+                  labelText: 'API key opcional',
+                  hintText: 'Enviada no header x-api-key',
+                ),
+                obscureText: true,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CANCELAR'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await notifier.updateTikTokResolverSettings(
+                endpoint: endpointController.text,
+                apiKey: apiKeyController.text,
+              );
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('SALVAR'),
+          ),
+        ],
+      ),
+    ).whenComplete(() {
+      endpointController.dispose();
+      apiKeyController.dispose();
     });
   }
 

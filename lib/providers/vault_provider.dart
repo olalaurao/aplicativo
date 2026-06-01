@@ -1587,19 +1587,41 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
+  String _entryTimeFor(JournalEntry entry) {
+    final explicitTime = entry.timeOfDay?.trim();
+    if (explicitTime != null &&
+        RegExp(r'^\d{1,2}:\d{2}$').hasMatch(explicitTime)) {
+      final parts = explicitTime.split(':');
+      final hour = int.tryParse(parts[0]);
+      final minute = int.tryParse(parts[1]);
+      if (hour != null &&
+          minute != null &&
+          hour >= 0 &&
+          hour < 24 &&
+          minute >= 0 &&
+          minute < 60) {
+        return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+      }
+    }
+    return _entryTime(entry.date);
+  }
+
   bool _isImplicitTimeTitle(String title, String time) {
     final trimmed = title.trim();
     return trimmed.isEmpty || trimmed == time;
   }
 
   String _storedTitleForEntry(JournalEntry entry) {
-    final time = _entryTime(entry.date);
+    final time = _entryTimeFor(entry);
     final title = entry.title.trim();
     return _isImplicitTimeTitle(title, time) ? '' : title;
   }
 
   Map<String, dynamic> _dailyMapForEntry(JournalEntry entry, String dateStr) {
-    final time = _entryTime(entry.date);
+    final time = _entryTimeFor(entry);
+    final parts = time.split(':');
+    final hour = int.tryParse(parts[0]) ?? entry.date.hour;
+    final minute = int.tryParse(parts[1]) ?? entry.date.minute;
     return {
       'time': time,
       'title': _storedTitleForEntry(entry),
@@ -1610,8 +1632,8 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
         entry.date.year,
         entry.date.month,
         entry.date.day,
-        entry.date.hour,
-        entry.date.minute,
+        hour,
+        minute,
       ).toIso8601String(),
     };
   }
@@ -1620,7 +1642,7 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     List<Map<String, dynamic>> entries,
     JournalEntry sourceEntry,
   ) {
-    final originalTime = _entryTime(sourceEntry.date);
+    final originalTime = _entryTimeFor(sourceEntry);
     final originalTitle = sourceEntry.title.trim();
 
     return entries.indexWhere((candidate) {

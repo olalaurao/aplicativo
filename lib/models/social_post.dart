@@ -25,6 +25,7 @@ class SocialPost extends ContentObject {
   String? authorName;
   String? thumbnailUrl;
   String? embedUrl;
+  String? videoUrl;
   List<String> mediaUrls;
   int primaryMediaIndex;
   DateTime? postedAt;
@@ -43,6 +44,7 @@ class SocialPost extends ContentObject {
     this.authorName,
     this.thumbnailUrl,
     this.embedUrl,
+    this.videoUrl,
     List<String>? mediaUrls,
     this.primaryMediaIndex = 0,
     this.postedAt,
@@ -97,6 +99,7 @@ class SocialPost extends ContentObject {
     if (_hasText(authorName)) frontmatter['author_name'] = authorName;
     if (_hasText(thumbnailUrl)) frontmatter['thumbnail'] = thumbnailUrl;
     if (_hasText(embedUrl)) frontmatter['embed_url'] = embedUrl;
+    if (_hasText(videoUrl)) frontmatter['video_url'] = videoUrl;
     if (mediaUrls.isNotEmpty) frontmatter['media_urls'] = mediaUrls;
     frontmatter['primary_media_index'] = primaryMediaIndex;
     if (postedAt != null) {
@@ -154,11 +157,12 @@ class SocialPost extends ContentObject {
       frontmatter['thumbnail'] ?? frontmatter['thumbnail_url'],
     );
     post.embedUrl = _stringValue(frontmatter['embed_url']);
+    post.videoUrl = _stringValue(
+      frontmatter['video_url'] ?? frontmatter['direct_video_url'],
+    );
     post.mediaUrls = _stringList(frontmatter['media_urls']);
-    post.primaryMediaIndex = int.tryParse(
-          frontmatter['primary_media_index']?.toString() ?? '',
-        ) ??
-        0;
+    post.primaryMediaIndex =
+        int.tryParse(frontmatter['primary_media_index']?.toString() ?? '') ?? 0;
     post.watched = _boolValue(frontmatter['watched']);
     post.postedAt = DateTime.tryParse(
       _stringValue(frontmatter['posted_at']) ?? '',
@@ -178,6 +182,7 @@ class SocialPost extends ContentObject {
     String? authorName,
     String? thumbnailUrl,
     String? embedUrl,
+    String? videoUrl,
     List<String>? mediaUrls,
     int? primaryMediaIndex,
     DateTime? postedAt,
@@ -206,6 +211,7 @@ class SocialPost extends ContentObject {
       authorName: authorName ?? this.authorName,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       embedUrl: embedUrl ?? this.embedUrl,
+      videoUrl: videoUrl ?? this.videoUrl,
       mediaUrls: mediaUrls ?? List<String>.from(this.mediaUrls),
       primaryMediaIndex: primaryMediaIndex ?? this.primaryMediaIndex,
       postedAt: postedAt ?? this.postedAt,

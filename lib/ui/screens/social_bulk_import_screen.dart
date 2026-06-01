@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../providers/settings_provider.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/oembed_service.dart';
 import '../theme.dart';
@@ -104,7 +105,12 @@ class _SocialBulkImportScreenState
 
     for (final url in urls) {
       try {
-        final post = await _oembedService.fetchMetadata(url);
+        final settings = ref.read(settingsProvider);
+        final post = await _oembedService.fetchMetadata(
+          url,
+          tiktokResolverEndpoint: settings.tiktokResolverEndpoint,
+          tiktokResolverApiKey: settings.tiktokResolverApiKey,
+        );
         final withPath = post.copyWith(
           obsidianPath: 'social/${post.socialSlug}.md',
         );

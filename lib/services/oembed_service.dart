@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/social_post.dart';
+import 'tiktok_video_resolver.dart';
 
 class OEmbedService {
   static SocialPlatform detectPlatform(String url) {
@@ -84,17 +85,22 @@ class OEmbedService {
     }
   }
 
-  Future<SocialPost> fetchMetadata(String url) async {
+  Future<SocialPost> fetchMetadata(
+    String url, {
+    String? tiktokResolverEndpoint,
+    String? tiktokResolverApiKey,
+  }) async {
     final normalizedUrl = url.trim();
     final platform = detectPlatform(normalizedUrl);
     final mediaType = detectMediaType(platform, normalizedUrl);
-    final embedUrl = buildEmbedUrl(platform, normalizedUrl);
+    var embedUrl = buildEmbedUrl(platform, normalizedUrl);
 
     var title = normalizedUrl;
     String? caption;
     String? authorHandle;
     String? authorName;
     String? thumbnailUrl;
+    String? videoUrl;
 
     try {
       final result = await switch (platform) {
@@ -126,6 +132,9 @@ class OEmbedService {
             _stringValue(result['thumbnail_url']) ??
             _stringValue(result['image']);
         authorHandle = _extractHandle(_stringValue(result['author_url']));
+        if (platform == SocialPlatform.tiktok) {
+          embedUrl ??= _tiktokEmbedUrlFromOEmbed(result);
+        }
       }
 
       if (platform == SocialPlatform.tiktok &&
@@ -139,6 +148,15 @@ class OEmbedService {
           thumbnailUrl ??= _stringValue(og['image']);
           authorName ??= _stringValue(og['site_name']);
         }
+      }
+
+      if (platform == SocialPlatform.tiktok &&
+          mediaType == SocialMediaType.video &&
+          tiktokResolverEndpoint?.trim().isNotEmpty == true) {
+        videoUrl = await TikTokVideoResolver(
+          endpoint: tiktokResolverEndpoint!,
+          apiKey: tiktokResolverApiKey,
+        ).resolve(normalizedUrl);
       }
     } catch (error) {
       debugPrint('OEmbedService.fetchMetadata failed: $error');
@@ -154,6 +172,7 @@ class OEmbedService {
       authorName: authorName,
       thumbnailUrl: thumbnailUrl,
       embedUrl: embedUrl,
+      videoUrl: videoUrl,
       mediaUrls: thumbnailUrl == null ? const [] : [thumbnailUrl],
     );
   }
@@ -252,6 +271,22 @@ class OEmbedService {
       return uri.pathSegments.first;
     }
     return uri.queryParameters['v'];
+  }
+
+  static String? _tiktokEmbedUrlFromOEmbed(Map<String, dynamic> result) {
+    final html = _stringValue(result['html']);
+    final authorUrl = _stringValue(result['author_url']);
+    final candidates = [html, authorUrl, _stringValue(result['url'])];
+    for (final candidate in candidates) {
+      if (candidate == null) continue;
+      final id =
+          RegExp(
+            r"""data-video-id=["']?(\d+)""",
+          ).firstMatch(candidate)?.group(1) ??
+          RegExp(r'/video/(\d+)').firstMatch(candidate)?.group(1);
+      if (id != null) return 'https://www.tiktok.com/embed/v2/$id';
+    }
+    return null;
   }
 
   static String? _extractHandle(String? authorUrl) {

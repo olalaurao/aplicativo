@@ -100,7 +100,8 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  if (post.embedUrl != null ||
+                  if (post.videoUrl?.isNotEmpty == true ||
+                      post.embedUrl != null ||
                       post.platform == SocialPlatform.substack)
                     SocialEmbedView(post: post)
                   else

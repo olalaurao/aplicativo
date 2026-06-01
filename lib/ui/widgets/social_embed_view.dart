@@ -2,11 +2,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../../models/social_post.dart';
+import '../../services/oembed_service.dart';
+import '../../services/tiktok_video_resolver.dart';
+import 'social_native_video_player.dart';
 import 'social_post_grid_card.dart';
 
 class SocialEmbedView extends StatefulWidget {
@@ -23,6 +27,8 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
   Timer? _timeout;
   bool _isLoaded = false;
   bool _hasError = false;
+  bool _resolvingVideo = false;
+  String? _resolvedVideoUrl;
 
   double get _height {
     return switch (widget.post.platform) {
@@ -41,6 +47,7 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
   @override
   void initState() {
     super.initState();
+    _resolvedVideoUrl = widget.post.videoUrl;
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setUserAgent(
@@ -86,20 +93,31 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
           .setMediaPlaybackRequiresUserGesture(false);
     }
 
-    _timeout = Timer(const Duration(seconds: 10), () {
+    final timeoutDuration = widget.post.platform == SocialPlatform.tiktok
+        ? const Duration(seconds: 20)
+        : const Duration(seconds: 10);
+    _timeout = Timer(timeoutDuration, () {
       if (mounted && !_isLoaded) setState(() => _hasError = true);
     });
 
+    if (_resolvedVideoUrl != null && _resolvedVideoUrl!.isNotEmpty) {
+      _timeout?.cancel();
+      return;
+    }
+
     if (widget.post.platform == SocialPlatform.tiktok &&
-        widget.post.mediaType != SocialMediaType.video) {
+        widget.post.mediaType == SocialMediaType.video) {
+      _startTikTokPlayback();
+      return;
+    }
+
+    if (widget.post.platform == SocialPlatform.tiktok) {
       _hasError = true;
       return;
     }
 
     final embedUrl = widget.post.embedUrl;
-    if (widget.post.platform == SocialPlatform.tiktok) {
-      _controller.loadRequest(Uri.parse(widget.post.url));
-    } else if (widget.post.platform == SocialPlatform.substack) {
+    if (widget.post.platform == SocialPlatform.substack) {
       _controller.loadRequest(Uri.parse(widget.post.url));
     } else if (embedUrl != null && embedUrl.isNotEmpty) {
       _controller.loadHtmlString(_buildEmbedHtml(widget.post));
@@ -116,6 +134,15 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
 
   @override
   Widget build(BuildContext context) {
+    final videoUrl = _resolvedVideoUrl;
+    if (videoUrl != null && videoUrl.isNotEmpty) {
+      return SocialNativeVideoPlayer(
+        videoUrl: videoUrl,
+        thumbnailUrl: widget.post.thumbnailUrl,
+      );
+    }
+
+    if (_resolvingVideo) return _buildResolvingVideo();
     if (_hasError) return _buildFallback(context);
 
     return SizedBox(
@@ -131,20 +158,6 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
               child: WebViewWidget(controller: _controller),
             ),
             if (!_isLoaded) _buildLoading(),
-            if (_isLoaded &&
-                widget.post.platform == SocialPlatform.tiktok &&
-                widget.post.mediaType == SocialMediaType.video)
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: FilledButton.icon(
-                    onPressed: _openOriginal,
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    label: const Text('Abrir vídeo aqui'),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -155,6 +168,18 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
     final color = socialPlatformColor(widget.post.platform);
     return ColoredBox(
       color: color.withValues(alpha: 0.12),
+      child: Center(child: CircularProgressIndicator(color: color)),
+    );
+  }
+
+  Widget _buildResolvingVideo() {
+    final color = socialPlatformColor(widget.post.platform);
+    return Container(
+      height: 360,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Center(child: CircularProgressIndicator(color: color)),
     );
   }
@@ -230,11 +255,60 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
   Future<void> _openOriginal() async {
     final uri = Uri.tryParse(widget.post.url);
     if (uri != null) {
-      final opened = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+      final opened = await launchUrl(uri, mode: LaunchMode.inAppWebView);
       if (!opened) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
     }
+  }
+
+  Future<void> _startTikTokPlayback() async {
+    final resolved = await _resolveTikTokVideoIfPossible();
+    if (!mounted || resolved) return;
+    _loadTikTokEmbedOrFallback();
+  }
+
+  Future<bool> _resolveTikTokVideoIfPossible() async {
+    if (widget.post.platform != SocialPlatform.tiktok ||
+        widget.post.mediaType != SocialMediaType.video) {
+      return false;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final endpoint = prefs.getString('tiktokResolverEndpoint') ?? '';
+    if (endpoint.trim().isEmpty) return false;
+    final apiKey = prefs.getString('tiktokResolverApiKey') ?? '';
+
+    if (mounted) setState(() => _resolvingVideo = true);
+    final resolved = await TikTokVideoResolver(
+      endpoint: endpoint,
+      apiKey: apiKey,
+    ).resolve(widget.post.url);
+    if (!mounted) return false;
+    setState(() {
+      _resolvingVideo = false;
+      _resolvedVideoUrl = resolved;
+      if (resolved != null) {
+        _timeout?.cancel();
+        _hasError = false;
+      }
+    });
+    return resolved != null;
+  }
+
+  void _loadTikTokEmbedOrFallback() {
+    final embedUrl =
+        widget.post.embedUrl ??
+        OEmbedService.buildEmbedUrl(widget.post.platform, widget.post.url);
+    if (embedUrl == null || embedUrl.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _timeout?.cancel();
+          _hasError = true;
+        });
+      }
+      return;
+    }
+    _controller.loadHtmlString(_buildEmbedHtml(widget.post, embedUrl: embedUrl));
   }
 
   void _openImagePreview() {
@@ -272,8 +346,8 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
     );
   }
 
-  String _buildEmbedHtml(SocialPost post) {
-    final embedUrl = post.embedUrl ?? '';
+  String _buildEmbedHtml(SocialPost post, {String? embedUrl}) {
+    final resolvedEmbedUrl = embedUrl ?? post.embedUrl ?? '';
     return '''
 <!DOCTYPE html>
 <html>
@@ -286,7 +360,7 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
   </style>
 </head>
 <body>
-  <iframe src="$embedUrl"
+  <iframe src="$resolvedEmbedUrl"
     allowfullscreen
     allow="autoplay; encrypted-media; picture-in-picture; fullscreen">
   </iframe>
