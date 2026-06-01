@@ -61,6 +61,7 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
             if (widget.post.platform != SocialPlatform.tiktok) {
               return NavigationDecision.navigate;
             }
+            if (!request.isMainFrame) return NavigationDecision.navigate;
             final uri = Uri.tryParse(request.url);
             if (uri == null) return NavigationDecision.prevent;
             final scheme = uri.scheme.toLowerCase();
@@ -82,8 +83,11 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
             }
             if (mounted) setState(() => _isLoaded = true);
           },
-          onWebResourceError: (_) {
-            if (mounted && !_isLoaded) setState(() => _hasError = true);
+          onWebResourceError: (error) {
+            final isMainFrame = error.isForMainFrame ?? true;
+            if (mounted && !_isLoaded && isMainFrame) {
+              setState(() => _hasError = true);
+            }
           },
         ),
       );
@@ -265,7 +269,7 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
   Future<void> _startTikTokPlayback() async {
     final resolved = await _resolveTikTokVideoIfPossible();
     if (!mounted || resolved) return;
-    _loadTikTokEmbedOrFallback();
+    _loadTikTokWebPlayback();
   }
 
   Future<bool> _resolveTikTokVideoIfPossible() async {
@@ -308,7 +312,18 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
       }
       return;
     }
-    _controller.loadHtmlString(_buildEmbedHtml(widget.post, embedUrl: embedUrl));
+    _controller.loadHtmlString(
+      _buildEmbedHtml(widget.post, embedUrl: embedUrl),
+    );
+  }
+
+  void _loadTikTokWebPlayback() {
+    final uri = Uri.tryParse(widget.post.url);
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      _loadTikTokEmbedOrFallback();
+      return;
+    }
+    _controller.loadRequest(uri);
   }
 
   void _openImagePreview() {

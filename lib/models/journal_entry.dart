@@ -29,10 +29,14 @@ class JournalEntry extends ContentObject {
     this.weather,
     super.organizers,
     super.categories,
-    super.createdAt,
-    super.updatedAt,
+    DateTime? createdAt,
+    DateTime? updatedAt,
     super.obsidianPath,
-  }) : super(title: title ?? '');
+  }) : super(
+         title: title ?? '',
+         createdAt: createdAt ?? date,
+         updatedAt: updatedAt ?? createdAt ?? date,
+       );
 
   @override
   String get type => 'journal_entry';

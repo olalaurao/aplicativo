@@ -23,23 +23,37 @@ class _SocialNativeVideoPlayerState extends State<SocialNativeVideoPlayer> {
   bool _initialized = false;
   bool _failed = false;
 
+  static const _httpHeaders = {
+    'User-Agent':
+        'Mozilla/5.0 (Linux; Android 13; SM-A546E) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) '
+        'Chrome/124.0.0.0 Mobile Safari/537.36',
+    'Referer': 'https://www.tiktok.com/',
+  };
+
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
-      ..initialize()
-          .then((_) {
-            if (!mounted) return;
-            setState(() => _initialized = true);
-          })
-          .catchError((error) {
-            if (!mounted) return;
-            setState(() => _failed = true);
-          });
+    _controller =
+        VideoPlayerController.networkUrl(
+            Uri.parse(widget.videoUrl),
+            httpHeaders: _httpHeaders,
+          )
+          ..addListener(_handlePlaybackError)
+          ..initialize()
+              .then((_) {
+                if (!mounted) return;
+                setState(() => _initialized = true);
+              })
+              .catchError((error) {
+                if (!mounted) return;
+                setState(() => _failed = true);
+              });
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_handlePlaybackError);
     _controller.dispose();
     super.dispose();
   }
@@ -149,5 +163,10 @@ class _SocialNativeVideoPlayerState extends State<SocialNativeVideoPlayer> {
         _controller.play();
       }
     });
+  }
+
+  void _handlePlaybackError() {
+    if (!mounted || _failed || !_controller.value.hasError) return;
+    setState(() => _failed = true);
   }
 }

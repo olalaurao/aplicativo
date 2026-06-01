@@ -35,10 +35,10 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
     // Combine everything into a unified list
     final allItems = <ContentObject>[...entries, ...tasks, ...habits];
 
-    // Sort by creation date
+    // Sort journal entries by their actual daily-note date/time, not parse time.
     allItems.sort((a, b) {
-      final aTime = a.createdAt;
-      final bTime = b.createdAt;
+      final aTime = _timelineDate(a);
+      final bTime = _timelineDate(b);
       return bTime.compareTo(aTime);
     });
 
@@ -88,17 +88,18 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate((context, index) {
                   final item = filteredItems[index];
+                  final itemDate = _timelineDate(item);
                   final showDate =
                       index == 0 ||
                       !_isSameDay(
-                        item.createdAt,
-                        filteredItems[index - 1].createdAt,
+                        itemDate,
+                        _timelineDate(filteredItems[index - 1]),
                       );
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (showDate) _buildDateSeparator(item.createdAt),
+                      if (showDate) _buildDateSeparator(itemDate),
                       _buildTimelineItem(context, item),
                     ],
                   );
@@ -189,6 +190,7 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
   }
 
   Widget _buildTimelineItem(BuildContext context, ContentObject item) {
+    final itemDate = _timelineDate(item);
     final moods = item is JournalEntry
         ? ref.watch(moodsProvider)
         : const <MoodDefinition>[];
@@ -229,10 +231,12 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           Text(
-                            DateFormat('HH:mm').format(item.createdAt),
+                            DateFormat('HH:mm').format(itemDate),
                             style: const TextStyle(
                               fontSize: 11,
                               color: AppColors.textMuted,
@@ -392,4 +396,35 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
 
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
+
+  DateTime _timelineDate(ContentObject item) {
+    if (item is JournalEntry) {
+      final explicitTime = item.timeOfDay?.trim();
+      if (explicitTime != null &&
+          RegExp(r'^\d{1,2}:\d{2}$').hasMatch(explicitTime)) {
+        final parts = explicitTime.split(':');
+        final hour = int.tryParse(parts[0]);
+        final minute = int.tryParse(parts[1]);
+        if (hour != null &&
+            minute != null &&
+            hour >= 0 &&
+            hour < 24 &&
+            minute >= 0 &&
+            minute < 60) {
+          return DateTime(
+            item.date.year,
+            item.date.month,
+            item.date.day,
+            hour,
+            minute,
+            item.date.second,
+            item.date.millisecond,
+            item.date.microsecond,
+          );
+        }
+      }
+      return item.date;
+    }
+    return item.createdAt;
+  }
 }

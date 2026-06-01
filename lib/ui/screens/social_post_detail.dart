@@ -102,6 +102,8 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
                 delegate: SliverChildListDelegate([
                   if (post.videoUrl?.isNotEmpty == true ||
                       post.embedUrl != null ||
+                      (post.platform == SocialPlatform.tiktok &&
+                          post.mediaType == SocialMediaType.video) ||
                       post.platform == SocialPlatform.substack)
                     SocialEmbedView(post: post)
                   else

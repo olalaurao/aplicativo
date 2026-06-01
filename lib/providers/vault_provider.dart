@@ -1007,6 +1007,8 @@ final combinedAnalysisProvider =
       return CombinedAnalysisNotifier();
     });
 
+final analysesProvider = combinedAnalysisProvider;
+
 class TimeBlocksNotifier extends Notifier<List<TimeBlock>> {
   @override
   List<TimeBlock> build() {
