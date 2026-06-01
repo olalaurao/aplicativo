@@ -203,13 +203,14 @@ const dailyNotes = dv.pages('"daily"').sort(p => p.file.name, "desc").limit(30);
 
 for (const habit of habitFiles) {
   const slug = habit.file.name;
+  const title = habit.title ?? habit.file.aliases?.[0] ?? "Sem título";
   let streak = 0;
   for (const note of dailyNotes) {
     const val = note[slug];
     if (val === true || (typeof val === "number" && val > 0)) streak++;
     else break;
   }
-  dv.paragraph(`**\${habit.title}**: streak \${streak} dias`);
+  dv.paragraph(`**\${title}**: streak \${streak} dias`);
 }
 ```
 ''';

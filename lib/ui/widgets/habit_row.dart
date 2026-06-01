@@ -37,7 +37,7 @@ class HabitRow extends StatelessWidget {
             Expanded(
               flex: 3,
               child: Text(
-                habit.title,
+                habit.displayTitle,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -172,7 +172,7 @@ class HabitProgressRow extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    habit.title,
+                    habit.displayTitle,
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,

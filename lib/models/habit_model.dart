@@ -339,11 +339,16 @@ class Habit extends ContentObject {
   }
 
   factory Habit.fromMarkdown(Map<String, dynamic> frontmatter, String body) {
+    final resolvedTitle = _resolveHabitTitle(frontmatter, body);
     final habit = Habit(
-      title: frontmatter['title'] as String? ?? '',
+      title: resolvedTitle,
       color: frontmatter['color'] as String? ?? '#000000',
     );
     habit.loadBaseMap(frontmatter);
+    if (displayTitleFromValue(habit.title, id: habit.id) == null &&
+        resolvedTitle.isNotEmpty) {
+      habit.title = resolvedTitle;
+    }
 
     habit.description = frontmatter['description'] as String?;
     habit.icon = frontmatter['icon'] as String?;
@@ -362,10 +367,16 @@ class Habit extends ContentObject {
           if (s['reminder_time'] != null) {
             final parts = s['reminder_time'].toString().split(':');
             if (parts.length == 2) {
-              rTime = TimeOfDay(
-                hour: int.parse(parts[0]),
-                minute: int.parse(parts[1]),
-              );
+              final hour = int.tryParse(parts[0]);
+              final minute = int.tryParse(parts[1]);
+              if (hour != null &&
+                  minute != null &&
+                  hour >= 0 &&
+                  hour <= 23 &&
+                  minute >= 0 &&
+                  minute <= 59) {
+                rTime = TimeOfDay(hour: hour, minute: minute);
+              }
             }
           }
           return HabitSlot(
@@ -445,4 +456,29 @@ class Habit extends ContentObject {
 
     return habit;
   }
+}
+
+String _resolveHabitTitle(Map<String, dynamic> frontmatter, String body) {
+  final frontmatterTitle = displayTitleFromValue(
+    frontmatter['title']?.toString(),
+    id: frontmatter['id']?.toString(),
+  );
+  if (frontmatterTitle != null) return frontmatterTitle;
+
+  final aliases = frontmatter['aliases'];
+  if (aliases is List) {
+    for (final alias in aliases) {
+      final aliasTitle = displayTitleFromValue(
+        alias?.toString(),
+        id: frontmatter['id']?.toString(),
+      );
+      if (aliasTitle != null) return aliasTitle;
+    }
+  }
+
+  final heading = RegExp(
+    r'^\s{0,3}#{1,6}\s+(.+?)\s*$',
+    multiLine: true,
+  ).firstMatch(body)?.group(1);
+  return displayTitleFromValue(heading, id: frontmatter['id']?.toString()) ?? '';
 }

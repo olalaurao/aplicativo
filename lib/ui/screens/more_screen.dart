@@ -41,10 +41,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
 
     // All items that CAN be in more (to show in edit mode)
     final editableItems = navItems
-        .where(
-          (it) =>
-              it.section != NavSection.home && it.section != NavSection.more,
-        )
+        .where((it) => it.section != NavSection.home)
         .toList();
 
     return Scaffold(
@@ -58,18 +55,26 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
         actions: [
           if (_isEditingNav)
             IconButton(
-              icon: const Icon(Icons.add_link_rounded, color: AppColors.primary),
+              icon: const Icon(
+                Icons.add_link_rounded,
+                color: AppColors.primary,
+              ),
               onPressed: () => _showAddShortcut(context),
             ),
           IconButton(
             icon: Icon(
               _isEditingNav ? Icons.check_rounded : Icons.tune_rounded,
-              color: _isEditingNav ? AppColors.primary : AppColors.textSecondary,
+              color: _isEditingNav
+                  ? AppColors.primary
+                  : AppColors.textSecondary,
             ),
             onPressed: () => setState(() => _isEditingNav = !_isEditingNav),
           ),
           IconButton(
-            icon: const Icon(Icons.settings_outlined, color: AppColors.textSecondary),
+            icon: const Icon(
+              Icons.settings_outlined,
+              color: AppColors.textSecondary,
+            ),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const SettingsScreen()),
@@ -99,20 +104,28 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                   ReorderableListView(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
                     onReorder: (oldIndex, newIndex) {
                       ref
                           .read(navigationProvider.notifier)
-                          .reorder(oldIndex, newIndex);
+                          .reorderVisibleItems(
+                            editableItems,
+                            oldIndex,
+                            newIndex,
+                          );
                     },
                     children: editableItems
+                        .asMap()
+                        .entries
                         .map(
                           (item) => _buildNavigationMenuRow(
                             context,
-                            item,
+                            item.value,
+                            reorderIndex: item.key,
                             key: ValueKey(
-                              item.isCustom
-                                  ? (item.id ?? item.route)
-                                  : item.section.toString(),
+                              item.value.isCustom
+                                  ? (item.value.id ?? item.value.route)
+                                  : item.value.section.toString(),
                             ),
                           ),
                         )
@@ -287,7 +300,14 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     BuildContext context,
     NavigationItem item, {
     Key? key,
+    int? reorderIndex,
   }) {
+    final canDelete = _isEditingNav && item.isCustom;
+    final canToggle =
+        _isEditingNav &&
+        item.section != NavSection.home &&
+        item.section != NavSection.more;
+
     return Padding(
       key: key,
       padding: const EdgeInsets.only(bottom: 8),
@@ -300,11 +320,21 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
           child: Row(
             children: [
               if (_isEditingNav) ...[
-                const Icon(
-                  Icons.drag_indicator_rounded,
-                  color: AppColors.textMuted,
-                  size: 20,
-                ),
+                if (reorderIndex != null)
+                  ReorderableDragStartListener(
+                    index: reorderIndex,
+                    child: const Icon(
+                      Icons.drag_indicator_rounded,
+                      color: AppColors.textMuted,
+                      size: 20,
+                    ),
+                  )
+                else
+                  const Icon(
+                    Icons.drag_indicator_rounded,
+                    color: AppColors.textMuted,
+                    size: 20,
+                  ),
                 const SizedBox(width: 12),
               ],
               (() {
@@ -312,8 +342,9 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: (item.isCustom ? AppColors.accent : AppColors.primary)
-                        .withValues(alpha: 0.1),
+                    color:
+                        (item.isCustom ? AppColors.accent : AppColors.primary)
+                            .withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -341,6 +372,8 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                   children: [
                     Text(
                       item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -349,6 +382,8 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                     if (item.isCustom)
                       Text(
                         item.type?.toUpperCase() ?? 'SHORTCUT',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 9,
                           color: AppColors.textMuted,
@@ -360,32 +395,43 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                 ),
               ),
               if (_isEditingNav) ...[
-                IconButton(
-                  icon: Icon(
-                    item.inBottomBar
-                        ? Icons.visibility_rounded
-                        : Icons.visibility_off_rounded,
-                    color: item.inBottomBar
-                        ? AppColors.primary
-                        : AppColors.textMuted,
-                    size: 20,
+                if (canToggle)
+                  IconButton(
+                    icon: Icon(
+                      item.inBottomBar
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
+                      color: item.inBottomBar
+                          ? AppColors.primary
+                          : AppColors.textMuted,
+                      size: 20,
+                    ),
+                    onPressed: () => ref
+                        .read(navigationProvider.notifier)
+                        .toggleInBottomBar(
+                          item.isCustom ? item.id : item.section,
+                        ),
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Icon(
+                      Icons.lock_outline_rounded,
+                      color: AppColors.textMuted,
+                      size: 20,
+                    ),
                   ),
-                  onPressed: () => ref
-                      .read(navigationProvider.notifier)
-                      .toggleInBottomBar(
-                        item.isCustom ? item.id : item.section,
-                      ),
-                ),
-                IconButton(
-                  icon: const Icon(
-                    Icons.delete_outline_rounded,
-                    color: AppColors.error,
-                    size: 20,
+                if (canDelete)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: AppColors.error,
+                      size: 20,
+                    ),
+                    onPressed: () => ref
+                        .read(navigationProvider.notifier)
+                        .removeShortcut(item.id ?? ''),
                   ),
-                  onPressed: () => ref
-                      .read(navigationProvider.notifier)
-                      .removeShortcut(item.id ?? ''),
-                ),
                 if (item.isCustom)
                   IconButton(
                     icon: const Icon(
@@ -458,6 +504,8 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                     ),
                     Text(
                       isSignedIn ? 'Connected' : 'Tap to connect',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.textMuted,
@@ -469,6 +517,8 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               if (isSignedIn)
                 const Text(
                   'Sign out',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.priorityHigh,
@@ -518,6 +568,8 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               Expanded(
                 child: Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,

@@ -166,7 +166,10 @@ class _CombinedAnalysisScreenState
                               )
                             : CitrineChart(
                                 type:
-                                    _currentAnalysis?.charts.firstOrNull?.type ??
+                                    _currentAnalysis
+                                        ?.charts
+                                        .firstOrNull
+                                        ?.type ??
                                     ChartType.line,
                                 title: 'Tendência (Últimos 14 dias)',
                                 data: chartSeries.first,
@@ -200,8 +203,10 @@ class _CombinedAnalysisScreenState
                             icon: const Icon(Icons.chevron_left_rounded),
                           ),
                           Text(
-                            DateFormat('MMMM yyyy', 'pt_BR')
-                                .format(_currentMonth),
+                            DateFormat(
+                              'MMMM yyyy',
+                              'pt_BR',
+                            ).format(_currentMonth),
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -637,7 +642,7 @@ class _CombinedAnalysisScreenState
     return records
         .where(
           (r) =>
-              r.trackerId == trackerId &&
+              _recordBelongsToTracker(r, trackerId) &&
               r.date.year == date.year &&
               r.date.month == date.month &&
               r.date.day == date.day,
@@ -695,24 +700,42 @@ class _CombinedAnalysisScreenState
     DateTime date,
   ) {
     final records = ref.read(trackingRecordsProvider);
-    final record = records
+    final dayRecords = records
         .where(
           (r) =>
-              r.trackerId == trackerId &&
+              _recordBelongsToTracker(r, trackerId) &&
               r.date.year == date.year &&
               r.date.month == date.month &&
               r.date.day == date.day,
         )
-        .firstOrNull;
+        .toList();
 
-    if (record != null) {
+    var total = 0.0;
+    for (final record in dayRecords) {
       final val = record.fieldValues[fieldId];
-      if (val is num) return val.toDouble();
-      if (val is bool) return val ? 1.0 : 0.0;
-      if (val is List) return val.length.toDouble();
-      if (val is String) return double.tryParse(val) ?? 0;
+      if (val is num) {
+        total += val.toDouble();
+      } else if (val is bool) {
+        total += val ? 1.0 : 0.0;
+      } else if (val is List) {
+        total += val.length.toDouble();
+      } else if (val is String) {
+        total += double.tryParse(val) ?? 0;
+      }
     }
-    return 0;
+    return total;
+  }
+
+  bool _recordBelongsToTracker(TrackingRecord record, String trackerId) {
+    if (record.trackerId == trackerId) return true;
+    final tracker = ref
+        .read(trackersProvider)
+        .where((t) => t.id == trackerId || t.slug == trackerId)
+        .firstOrNull;
+    if (tracker == null) return false;
+    return record.trackerId == tracker.slug ||
+        record.trackerId == tracker.title ||
+        record.trackerId == tracker.id;
   }
 
   double _getGoogleEventValueForDate(DateTime date) {
@@ -1338,14 +1361,14 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                     ctx,
                     icon: Icons.repeat_rounded,
                     color: AppColors.habitGreen,
-                    title: h.title,
+                    title: h.displayTitle,
                     subtitle: 'Frequência de conclusão do hábito',
                     onTap: () {
                       _onSourceSelected(
                         MetricSource(
                           type: MetricType.habit,
                           id: h.id,
-                          label: h.title,
+                          label: h.displayTitle,
                           color: AppColors.habitGreen,
                         ),
                       );
@@ -1508,6 +1531,12 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
 
   void _saveForm() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_tempSources.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Adicione pelo menos uma métrica')),
+      );
+      return;
+    }
 
     final analysis = CombinedAnalysis(
       id: widget.analysis?.id ?? const Uuid().v4(),
@@ -1519,6 +1548,7 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
       updatedAt: DateTime.now(),
       obsidianPath: widget.analysis?.obsidianPath ?? '',
       dataSources: List.from(_tempSources),
+      categories: const ['[[analyses]]'],
       charts: [
         AnalysisChart(
           title: 'Gráfico Comparativo',
@@ -1528,12 +1558,20 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
       ],
     );
 
-    if (widget.analysis == null) {
-      await ref.read(combinedAnalysisProvider.notifier).addAnalysis(analysis);
-    } else {
-      await ref
-          .read(combinedAnalysisProvider.notifier)
-          .updateAnalysis(analysis);
+    try {
+      if (widget.analysis == null) {
+        await ref.read(combinedAnalysisProvider.notifier).addAnalysis(analysis);
+      } else {
+        await ref
+            .read(combinedAnalysisProvider.notifier)
+            .updateAnalysis(analysis);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erro ao salvar análise: $e')));
+      return;
     }
 
     widget.onSaved(analysis);

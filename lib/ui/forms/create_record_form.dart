@@ -33,7 +33,8 @@ class _CreateRecordFormState extends ConsumerState<CreateRecordForm> {
   }
 
   void _initializeValues() {
-    for (var section in _selectedTracker!.sections) {
+    _values.clear();
+    for (final section in _selectedTracker!.sections) {
       for (var field in section.inputFields) {
         _values[field.id] = field.defaultValue;
       }
@@ -300,7 +301,7 @@ class _CreateRecordFormState extends ConsumerState<CreateRecordForm> {
             ],
           ),
         ),
-        if (_selectedTracker!.sections.last.inputFields.last != field)
+        if (!_isLastField(field))
           const Divider(height: 1, indent: 12, endIndent: 12),
       ],
     );
@@ -339,18 +340,26 @@ class _CreateRecordFormState extends ConsumerState<CreateRecordForm> {
         );
       case InputFieldType.checkbox:
         return Switch(
-          value: _values[field.id] ?? false,
+          value: _values[field.id] is bool ? _values[field.id] as bool : false,
           onChanged: (v) => setState(() => _values[field.id] = v),
           activeThumbColor: _parseColor(_selectedTracker!.color),
         );
       case InputFieldType.range:
+        final rawMin = field.min ?? 0.0;
+        final rawMax = field.max ?? 10.0;
+        final min = rawMin <= rawMax ? rawMin : rawMax;
+        final max = rawMax >= rawMin ? rawMax : rawMin;
+        final value = _asDouble(
+          _values[field.id] ?? min,
+        ).clamp(min, max).toDouble();
+        final divisions = (max - min).round();
         return Expanded(
           child: Slider(
-            value: _asDouble(_values[field.id] ?? field.min ?? 0.0),
-            min: field.min ?? 0.0,
-            max: field.max ?? 10.0,
-            divisions: ((field.max ?? 10.0) - (field.min ?? 0.0)).toInt(),
-            label: (_values[field.id] ?? field.min ?? 0.0).toString(),
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions > 0 ? divisions : null,
+            label: _asDouble(_values[field.id] ?? min).toString(),
             activeColor: _parseColor(_selectedTracker!.color),
             onChanged: (v) => setState(() => _values[field.id] = v),
           ),
@@ -392,10 +401,15 @@ class _CreateRecordFormState extends ConsumerState<CreateRecordForm> {
           ),
         );
       case InputFieldType.selection:
+        final options = field.options ?? const <String>[];
+        final rawValue = _values[field.id];
+        final selectedValue = rawValue is String && options.contains(rawValue)
+            ? rawValue
+            : null;
         return DropdownButton<String>(
-          value: _values[field.id] as String?,
+          value: selectedValue,
           hint: const Text('Select...'),
-          items: (field.options ?? [])
+          items: options
               .map((o) => DropdownMenuItem(value: o, child: Text(o)))
               .toList(),
           onChanged: (v) => setState(() => _values[field.id] = v),
@@ -454,6 +468,17 @@ class _CreateRecordFormState extends ConsumerState<CreateRecordForm> {
           onPressed: () => _pickMedia(field),
         );
     }
+  }
+
+  bool _isLastField(InputField field) {
+    final sections = _selectedTracker?.sections;
+    if (sections == null) return true;
+
+    for (final section in sections.reversed) {
+      if (section.inputFields.isEmpty) continue;
+      return identical(section.inputFields.last, field);
+    }
+    return true;
   }
 
   void _editFieldSettings(InputField field) {
@@ -539,7 +564,9 @@ class _CreateRecordFormState extends ConsumerState<CreateRecordForm> {
             .read(trackingRecordsProvider)
             .where(
               (record) =>
-                  record.trackerId == tracker.id &&
+                  (record.trackerId == tracker.id ||
+                      record.trackerId == tracker.slug ||
+                      record.trackerId == tracker.title) &&
                   record.fieldValues.containsKey(field.id) &&
                   record.fieldValues[field.id] != null,
             )

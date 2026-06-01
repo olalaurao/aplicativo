@@ -931,7 +931,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      habit.title,
+                      habit.displayTitle,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,

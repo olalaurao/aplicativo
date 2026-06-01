@@ -673,28 +673,7 @@ String _displayType(ContentObject item) {
 }
 
 String _displayTitle(ContentObject item) {
-  final title = item.title.trim();
-  if (title.isNotEmpty && title != item.id && !_looksLikeTechnicalId(title)) {
-    return title;
-  }
-  final fileName = item.obsidianFileName.trim();
-  if (fileName.isNotEmpty &&
-      fileName != item.id &&
-      !_looksLikeTechnicalId(fileName)) {
-    return fileName;
-  }
-  if (item.aliases.isNotEmpty && item.aliases.first.trim().isNotEmpty) {
-    return item.aliases.first.trim();
-  }
-  return 'Sem título';
-}
-
-bool _looksLikeTechnicalId(String value) {
-  final trimmed = value.trim();
-  return RegExp(
-        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
-      ).hasMatch(trimmed) ||
-      RegExp(r'^\d{10,}$').hasMatch(trimmed);
+  return item.displayTitle;
 }
 
 String _dateKey(DateTime date) {

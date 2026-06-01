@@ -361,7 +361,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        habit.title,
+                        habit.displayTitle,
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
@@ -1015,7 +1015,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
           ? (completedDays / totalDays) * 100
           : 0.0;
       habitsSummary.add(
-        '- ${habit.title}: $completedDays/$totalDays dias (${percentage.toStringAsFixed(0)}%)',
+        '- ${habit.displayTitle}: $completedDays/$totalDays dias (${percentage.toStringAsFixed(0)}%)',
       );
     }
 

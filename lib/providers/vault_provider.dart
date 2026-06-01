@@ -605,8 +605,9 @@ Future<void> saveTrackerRecord(
   DateTime date,
   Map<String, dynamic> values,
 ) async {
+  final timestamp = date.toIso8601String();
   final record = TrackingRecord(
-    title: '${tracker.title} ${date.toIso8601String().split('T').first}',
+    title: '${tracker.title} $timestamp',
     trackerId: tracker.id,
     date: date,
     fieldValues: Map<String, dynamic>.from(values),
@@ -984,16 +985,16 @@ class CombinedAnalysisNotifier extends Notifier<List<CombinedAnalysis>> {
   }
 
   Future<void> addAnalysis(CombinedAnalysis analysis) async {
-    state = [...state, analysis];
     await ref.read(vaultProvider.notifier).createObject(analysis);
+    state = [...state, analysis];
   }
 
   Future<void> updateAnalysis(CombinedAnalysis analysis) async {
+    await ref.read(vaultProvider.notifier).updateObject(analysis);
     state = [
       for (final a in state)
         if (a.id == analysis.id) analysis else a,
     ];
-    await ref.read(vaultProvider.notifier).updateObject(analysis);
   }
 
   Future<void> deleteAnalysis(CombinedAnalysis analysis) async {
@@ -2227,8 +2228,24 @@ class VaultNotifier extends Notifier<void> {
     await _updateWidgetsFor(object);
     _invalidateObjectProviders(object);
 
-    Future.microtask(() => AutomationService.updateAllKPIs(ref));
+    if (_shouldUpdateKpisAfterWrite(object)) {
+      Future.microtask(() async {
+        try {
+          await AutomationService.updateAllKPIs(ref);
+        } catch (e, st) {
+          debugPrint('Failed to update KPIs after vault write: $e\n$st');
+        }
+      });
+    }
     return relativePath;
+  }
+
+  bool _shouldUpdateKpisAfterWrite(ContentObject object) {
+    return object is Habit ||
+        object is TrackingRecord ||
+        object is JournalEntry ||
+        object is Note ||
+        object is MoodDefinition;
   }
 
   Future<void> createObject(ContentObject object) async {

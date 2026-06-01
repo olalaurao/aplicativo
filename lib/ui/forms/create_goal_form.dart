@@ -750,7 +750,10 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
               ),
               items: habits
                   .map(
-                    (h) => DropdownMenuItem(value: h.id, child: Text(h.title)),
+                    (h) => DropdownMenuItem(
+                      value: h.id,
+                      child: Text(h.displayTitle),
+                    ),
                   )
                   .toList(),
               onChanged: (v) => setState(() => _sourceId = v),

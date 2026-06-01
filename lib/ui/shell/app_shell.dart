@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../../providers/navigation_provider.dart';
 import '../../models/navigation_item.dart';
 import '../../providers/vault_provider.dart';
+import '../../models/content_object.dart';
 import '../widgets/create_menu_sheet.dart';
 import '../../providers/history_provider.dart';
 import '../screens/universal_detail_view.dart';
@@ -46,7 +47,8 @@ class _AppShellState extends ConsumerState<AppShell> {
       location = GoRouterState.of(context).uri.path;
     } catch (_) {}
 
-    final isDetailRoute = location.startsWith('/detail/') || location.startsWith('/organizer/');
+    final isDetailRoute =
+        location.startsWith('/detail/') || location.startsWith('/organizer/');
     final currentIndex = _calculateSelectedIndex(location, bottomBarItems);
 
     // Update the last list screen if not on a detail view
@@ -58,22 +60,38 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     return Shortcuts(
       shortcuts: const <ShortcutActivator, Intent>{
-        SingleActivator(LogicalKeyboardKey.keyK, control: true): _OpenCommandCenterIntent(),
-        SingleActivator(LogicalKeyboardKey.keyK, meta: true): _OpenCommandCenterIntent(),
-        SingleActivator(LogicalKeyboardKey.keyN, control: true): _CreateNewItemIntent(),
-        SingleActivator(LogicalKeyboardKey.keyN, meta: true): _CreateNewItemIntent(),
-        SingleActivator(LogicalKeyboardKey.keyF, control: true): _OpenSearchIntent(),
-        SingleActivator(LogicalKeyboardKey.keyF, meta: true): _OpenSearchIntent(),
-        SingleActivator(LogicalKeyboardKey.digit1, control: true): _SwitchTabIntent(0),
-        SingleActivator(LogicalKeyboardKey.digit1, meta: true): _SwitchTabIntent(0),
-        SingleActivator(LogicalKeyboardKey.digit2, control: true): _SwitchTabIntent(1),
-        SingleActivator(LogicalKeyboardKey.digit2, meta: true): _SwitchTabIntent(1),
-        SingleActivator(LogicalKeyboardKey.digit3, control: true): _SwitchTabIntent(2),
-        SingleActivator(LogicalKeyboardKey.digit3, meta: true): _SwitchTabIntent(2),
-        SingleActivator(LogicalKeyboardKey.digit4, control: true): _SwitchTabIntent(3),
-        SingleActivator(LogicalKeyboardKey.digit4, meta: true): _SwitchTabIntent(3),
-        SingleActivator(LogicalKeyboardKey.digit5, control: true): _SwitchTabIntent(4),
-        SingleActivator(LogicalKeyboardKey.digit5, meta: true): _SwitchTabIntent(4),
+        SingleActivator(LogicalKeyboardKey.keyK, control: true):
+            _OpenCommandCenterIntent(),
+        SingleActivator(LogicalKeyboardKey.keyK, meta: true):
+            _OpenCommandCenterIntent(),
+        SingleActivator(LogicalKeyboardKey.keyN, control: true):
+            _CreateNewItemIntent(),
+        SingleActivator(LogicalKeyboardKey.keyN, meta: true):
+            _CreateNewItemIntent(),
+        SingleActivator(LogicalKeyboardKey.keyF, control: true):
+            _OpenSearchIntent(),
+        SingleActivator(LogicalKeyboardKey.keyF, meta: true):
+            _OpenSearchIntent(),
+        SingleActivator(LogicalKeyboardKey.digit1, control: true):
+            _SwitchTabIntent(0),
+        SingleActivator(LogicalKeyboardKey.digit1, meta: true):
+            _SwitchTabIntent(0),
+        SingleActivator(LogicalKeyboardKey.digit2, control: true):
+            _SwitchTabIntent(1),
+        SingleActivator(LogicalKeyboardKey.digit2, meta: true):
+            _SwitchTabIntent(1),
+        SingleActivator(LogicalKeyboardKey.digit3, control: true):
+            _SwitchTabIntent(2),
+        SingleActivator(LogicalKeyboardKey.digit3, meta: true):
+            _SwitchTabIntent(2),
+        SingleActivator(LogicalKeyboardKey.digit4, control: true):
+            _SwitchTabIntent(3),
+        SingleActivator(LogicalKeyboardKey.digit4, meta: true):
+            _SwitchTabIntent(3),
+        SingleActivator(LogicalKeyboardKey.digit5, control: true):
+            _SwitchTabIntent(4),
+        SingleActivator(LogicalKeyboardKey.digit5, meta: true):
+            _SwitchTabIntent(4),
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
@@ -116,10 +134,18 @@ class _AppShellState extends ConsumerState<AppShell> {
                     drawer: _buildHistoryDrawer(context, ref),
                     body: Row(
                       children: [
-                        _buildSideRail(context, ref, bottomBarItems, currentIndex, isSpacious),
+                        _buildSideRail(
+                          context,
+                          ref,
+                          bottomBarItems,
+                          currentIndex,
+                          isSpacious,
+                        ),
                         Expanded(
                           child: Container(
-                            color: isDark ? AppColors.darkBackground : AppColors.background,
+                            color: isDark
+                                ? AppColors.darkBackground
+                                : AppColors.background,
                             child: isDetailRoute
                                 ? Row(
                                     children: [
@@ -133,10 +159,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                                       VerticalDivider(
                                         width: 1,
                                         thickness: 0.5,
-                                        color: (isDark
-                                                ? AppColors.darkDivider
-                                                : AppColors.divider)
-                                            .withValues(alpha: 0.5),
+                                        color:
+                                            (isDark
+                                                    ? AppColors.darkDivider
+                                                    : AppColors.divider)
+                                                .withValues(alpha: 0.5),
                                       ),
                                       Expanded(
                                         flex: 5,
@@ -170,7 +197,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                       child: const Icon(Icons.add_rounded),
                     ),
                   ),
-                  floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+                  floatingActionButtonLocation:
+                      FloatingActionButtonLocation.endFloat,
                   bottomNavigationBar: bottomBarItems.length < 2
                       ? null
                       : ClipRect(
@@ -178,16 +206,18 @@ class _AppShellState extends ConsumerState<AppShell> {
                             filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                             child: Container(
                               decoration: BoxDecoration(
-                                color: (isDark
-                                        ? AppColors.darkSurface
-                                        : AppColors.surface)
-                                    .withValues(alpha: 0.8),
+                                color:
+                                    (isDark
+                                            ? AppColors.darkSurface
+                                            : AppColors.surface)
+                                        .withValues(alpha: 0.8),
                                 border: Border(
                                   top: BorderSide(
-                                    color: (isDark
-                                            ? AppColors.darkDivider
-                                            : AppColors.divider)
-                                        .withValues(alpha: 0.5),
+                                    color:
+                                        (isDark
+                                                ? AppColors.darkDivider
+                                                : AppColors.divider)
+                                            .withValues(alpha: 0.5),
                                     width: 0.5,
                                   ),
                                 ),
@@ -196,56 +226,70 @@ class _AppShellState extends ConsumerState<AppShell> {
                                 top: false,
                                 child: BottomNavigationBar(
                                   currentIndex: currentIndex,
-                                  onTap: (int index) =>
-                                      _onItemTapped(index, context, bottomBarItems),
+                                  onTap: (int index) => _onItemTapped(
+                                    index,
+                                    context,
+                                    bottomBarItems,
+                                  ),
                                   type: BottomNavigationBarType.fixed,
-                                  backgroundColor: Colors.transparent, // Important for glass effect
+                                  backgroundColor: Colors
+                                      .transparent, // Important for glass effect
                                   elevation: 0,
                                   selectedFontSize: 10,
                                   unselectedFontSize: 10,
                                   selectedItemColor: AppColors.accent,
                                   unselectedItemColor: AppColors.textMuted,
-                                  items: bottomBarItems
-                                      .map(
-                                        (item) {
-                                          final iconWidget = Icon(item.icon, size: 22);
-                                          final activeIconWidget = Icon(item.activeIcon, size: 22);
-                                          final isInboxInBottomBar = bottomBarItems.any((it) => it.section == NavSection.inbox);
-                                          final isMoreWithInboxBadge = item.section == NavSection.more &&
-                                              !isInboxInBottomBar &&
-                                              ref.watch(inboxCountProvider) > 0;
-                                          final count = item.section == NavSection.inbox
+                                  items: bottomBarItems.map((item) {
+                                    final iconWidget = Icon(
+                                      item.icon,
+                                      size: 22,
+                                    );
+                                    final activeIconWidget = Icon(
+                                      item.activeIcon,
+                                      size: 22,
+                                    );
+                                    final isInboxInBottomBar = bottomBarItems
+                                        .any(
+                                          (it) =>
+                                              it.section == NavSection.inbox,
+                                        );
+                                    final isMoreWithInboxBadge =
+                                        item.section == NavSection.more &&
+                                        !isInboxInBottomBar &&
+                                        ref.watch(inboxCountProvider) > 0;
+                                    final count =
+                                        item.section == NavSection.inbox
+                                        ? ref.watch(inboxCountProvider)
+                                        : (isMoreWithInboxBadge
                                               ? ref.watch(inboxCountProvider)
-                                              : (isMoreWithInboxBadge ? ref.watch(inboxCountProvider) : 0);
+                                              : 0);
 
-                                          return BottomNavigationBarItem(
-                                            icon: Padding(
-                                              padding: const EdgeInsets.only(
-                                                bottom: 4,
-                                              ),
-                                              child: count > 0
-                                                  ? Badge(
-                                                      label: Text(count.toString()),
-                                                      child: iconWidget,
-                                                    )
-                                                  : iconWidget,
-                                            ),
-                                            activeIcon: Padding(
-                                              padding: const EdgeInsets.only(
-                                                bottom: 4,
-                                              ),
-                                              child: count > 0
-                                                  ? Badge(
-                                                      label: Text(count.toString()),
-                                                      child: activeIconWidget,
-                                                    )
-                                                  : activeIconWidget,
-                                            ),
-                                            label: item.label,
-                                          );
-                                        },
-                                      )
-                                      .toList(),
+                                    return BottomNavigationBarItem(
+                                      icon: Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 4,
+                                        ),
+                                        child: count > 0
+                                            ? Badge(
+                                                label: Text(count.toString()),
+                                                child: iconWidget,
+                                              )
+                                            : iconWidget,
+                                      ),
+                                      activeIcon: Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 4,
+                                        ),
+                                        child: count > 0
+                                            ? Badge(
+                                                label: Text(count.toString()),
+                                                child: activeIconWidget,
+                                              )
+                                            : activeIconWidget,
+                                      ),
+                                      label: item.label,
+                                    );
+                                  }).toList(),
                                 ),
                               ),
                             ),
@@ -322,12 +366,16 @@ class _AppShellState extends ConsumerState<AppShell> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
-                    'Citrine',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
+                  const Expanded(
+                    child: Text(
+                      'Citrine',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
                 ],
@@ -358,7 +406,10 @@ class _AppShellState extends ConsumerState<AppShell> {
                     onTap: () => showCreateMenu(context),
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
+                      ),
                       decoration: BoxDecoration(
                         gradient: AppTheme.primaryGradient,
                         borderRadius: BorderRadius.circular(16),
@@ -375,11 +426,15 @@ class _AppShellState extends ConsumerState<AppShell> {
                         children: [
                           Icon(Icons.add_rounded, color: Colors.white),
                           SizedBox(width: 8),
-                          Text(
-                            'Nova Captura',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                          Flexible(
+                            child: Text(
+                              'Nova Captura',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
@@ -408,12 +463,19 @@ class _AppShellState extends ConsumerState<AppShell> {
                 final isSelected = index == currentIndex;
                 final isInbox = item.section == NavSection.inbox;
                 final isMore = item.section == NavSection.more;
-                final isInboxInItems = items.any((it) => it.section == NavSection.inbox);
-                final isMoreWithInboxBadge = isMore && !isInboxInItems && ref.watch(inboxCountProvider) > 0;
-                
+                final isInboxInItems = items.any(
+                  (it) => it.section == NavSection.inbox,
+                );
+                final isMoreWithInboxBadge =
+                    isMore &&
+                    !isInboxInItems &&
+                    ref.watch(inboxCountProvider) > 0;
+
                 final count = isInbox
                     ? ref.watch(inboxCountProvider)
-                    : (isMoreWithInboxBadge ? ref.watch(inboxCountProvider) : 0);
+                    : (isMoreWithInboxBadge
+                          ? ref.watch(inboxCountProvider)
+                          : 0);
 
                 final iconWidget = Icon(
                   isSelected ? item.activeIcon : item.icon,
@@ -453,9 +515,15 @@ class _AppShellState extends ConsumerState<AppShell> {
                             Expanded(
                               child: Text(
                                 item.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                                  color: isSelected ? AppColors.accent : AppColors.textPrimary,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                  color: isSelected
+                                      ? AppColors.accent
+                                      : AppColors.textPrimary,
                                 ),
                               ),
                             ),
@@ -495,7 +563,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                 ? TextButton.icon(
                     onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                     icon: const Icon(Icons.history_rounded),
-                    label: const Text('Histórico'),
+                    label: const Text(
+                      'Histórico',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.textMuted,
                     ),
@@ -571,10 +643,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 
-  int _calculateSelectedIndex(
-    String location,
-    List<NavigationItem> items,
-  ) {
+  int _calculateSelectedIndex(String location, List<NavigationItem> items) {
     for (int i = 0; i < items.length; i++) {
       if (items[i].route == '/') {
         if (location == '/') return i;
@@ -625,6 +694,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                         leading: _buildTypeIcon(entry.type),
                         title: Text(
                           entry.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -632,6 +703,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                         ),
                         subtitle: Text(
                           entry.type.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 10,
                             color: AppColors.textMuted,
@@ -642,14 +715,30 @@ class _AppShellState extends ConsumerState<AppShell> {
                           final allObjects = await ref.read(
                             allObjectsProvider.future,
                           );
-                          final obj = allObjects.firstWhere(
-                            (o) => o.id == entry.id,
-                          );
+                          ContentObject? obj;
+                          for (final object in allObjects) {
+                            if (object.id == entry.id) {
+                              obj = object;
+                              break;
+                            }
+                          }
                           if (!context.mounted) return;
+                          if (obj == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Este item nao esta mais disponivel.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          final selectedObject = obj;
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => UniversalDetailView(object: obj),
+                              builder: (_) =>
+                                  UniversalDetailView(object: selectedObject),
                             ),
                           );
                         },

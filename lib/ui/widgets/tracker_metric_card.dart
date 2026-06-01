@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../models/tracker_model.dart';
+import '../theme.dart';
 
 class TrackerMetricCard extends StatelessWidget {
   final TrackerDefinition definition;
@@ -21,9 +22,7 @@ class TrackerMetricCard extends StatelessWidget {
     final field = _getField();
     if (field == null) return const SizedBox.shrink();
 
-    final trackerColor = Color(
-      int.parse(definition.color.replaceAll('#', '0xFF')),
-    );
+    final trackerColor = _parseColor(definition.color);
 
     return Container(
       margin: const EdgeInsets.only(right: 12),
@@ -63,7 +62,7 @@ class TrackerMetricCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           _buildValueDisplay(field, trackerColor),
-          const Spacer(),
+          const SizedBox(height: 8),
           if (history != null && history!.length > 1)
             SizedBox(height: 24, child: _buildSparkline(trackerColor)),
         ],
@@ -259,5 +258,13 @@ class TrackerMetricCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Color _parseColor(String color) {
+    try {
+      return Color(int.parse(color.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return AppColors.primary;
+    }
   }
 }

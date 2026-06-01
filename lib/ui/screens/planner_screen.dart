@@ -356,7 +356,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Hábito "${habit.title}" agendado para ${DateFormat('HH:mm').format(time)}',
+                                'Hábito "${habit.displayTitle}" agendado para ${DateFormat('HH:mm').format(time)}',
                               ),
                             ),
                           );
@@ -1298,7 +1298,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             context,
           ).copyWith(color: AppColors.habitGreen.withValues(alpha: 0.9)),
           child: Text(
-            habit.title,
+            habit.displayTitle,
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
@@ -1362,7 +1362,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          'Negative habit "${habit.title}" — tap to log an occurrence',
+                          'Negative habit "${habit.displayTitle}" — tap to log an occurrence',
                         ),
                         action: SnackBarAction(
                           label: 'REGISTRAR',
@@ -1388,7 +1388,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
               ],
               Expanded(
                 child: Text(
-                  habit.title,
+                  habit.displayTitle,
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
               ),
@@ -1786,7 +1786,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  habit.title,
+                  habit.displayTitle,
                   style: TextStyle(
                     fontSize: 12,
                     decoration: completed ? TextDecoration.lineThrough : null,

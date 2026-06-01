@@ -538,7 +538,7 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
       builder: (ctx) => AlertDialog(
         title: const Text('Excluir Hábito?'),
         content: Text(
-          'Tem certeza que deseja excluir "${habit.title}"? Esta ação não pode ser desfeita.',
+          'Tem certeza que deseja excluir "${habit.displayTitle}"? Esta ação não pode ser desfeita.',
         ),
         actions: [
           TextButton(

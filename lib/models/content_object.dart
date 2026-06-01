@@ -104,9 +104,49 @@ abstract class ContentObject {
       ? title
       : obsidianPath.split('/').last.split('\\').last.replaceAll('.md', '');
 
+  String get displayTitle {
+    final candidates = <String>[
+      title,
+      ...aliases,
+      obsidianFileName,
+    ];
+    for (final candidate in candidates) {
+      final resolved = displayTitleFromValue(candidate, id: id);
+      if (resolved != null) return resolved;
+    }
+    return 'Sem título';
+  }
+
   DateTime? get baseTime => null;
 
   String get displayType => type.toUpperCase();
+}
+
+String? displayTitleFromValue(String? value, {String? id}) {
+  final trimmed = value?.trim() ?? '';
+  if (trimmed.isEmpty) return null;
+  if (id != null && trimmed == id) return null;
+  if (looksLikeTechnicalId(trimmed)) return null;
+  if (RegExp(r'^[a-z0-9]+([-_][a-z0-9]+)+$').hasMatch(trimmed) &&
+      RegExp(r'[a-zA-Z]').hasMatch(trimmed)) {
+    return trimmed
+        .split(RegExp(r'[-_]+'))
+        .where((part) => part.isNotEmpty)
+        .map((part) => part[0].toUpperCase() + part.substring(1))
+        .join(' ');
+  }
+  return trimmed;
+}
+
+bool looksLikeTechnicalId(String value) {
+  final trimmed = value.trim();
+  return RegExp(
+        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+      ).hasMatch(trimmed) ||
+      RegExp(r'^\d{10,}$').hasMatch(trimmed) ||
+      RegExp(
+        r'^(tasks|habits|goals|notes|resources|organizers|daily|moods|trackers)[_-].+',
+      ).hasMatch(trimmed);
 }
 
 String generateMarkdown(Map<String, dynamic> frontmatter, String body) {
@@ -132,15 +172,27 @@ String generateMarkdown(Map<String, dynamic> frontmatter, String body) {
       if (key.isNotEmpty) buffer.writeln('$indentStr$key:');
       for (final item in value) {
         if (item is Map) {
-          bool first = true;
+          if (item.isEmpty) {
+            buffer.writeln('$indentStr  - {}');
+            continue;
+          }
+
+          var first = true;
           item.forEach((k, v) {
-            if (first) {
-              buffer.writeln('$indentStr  - $k: ${formatYamlScalar(v)}');
-              first = false;
+            final itemIndent = first ? '$indentStr  - ' : '$indentStr    ';
+            first = false;
+            if (v is Map || v is List) {
+              buffer.writeln('$itemIndent$k:');
+              writeYaml('', v, indent + 4);
+            } else if (v != null) {
+              buffer.writeln('$itemIndent$k: ${formatYamlScalar(v)}');
             } else {
-              buffer.writeln('$indentStr    $k: ${formatYamlScalar(v)}');
+              buffer.writeln('$itemIndent$k:');
             }
           });
+        } else if (item is List) {
+          buffer.writeln('$indentStr  -');
+          writeYaml('', item, indent + 4);
         } else {
           buffer.writeln('$indentStr  - ${formatYamlScalar(item)}');
         }

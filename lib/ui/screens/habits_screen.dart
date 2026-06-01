@@ -410,7 +410,7 @@ class _TodayHabitCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      habit.title,
+                      habit.displayTitle,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -1022,7 +1022,7 @@ class _HabitWeekCard extends ConsumerWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    habit.title,
+                    habit.displayTitle,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -1226,7 +1226,7 @@ class _HabitMonthCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    habit.title,
+                    habit.displayTitle,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,

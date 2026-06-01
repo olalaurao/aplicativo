@@ -20,6 +20,7 @@ import 'package:citrine/providers/settings_provider.dart';
 import 'package:citrine/providers/widget_sync_provider.dart';
 import 'package:citrine/services/markdown_parser.dart';
 import 'package:citrine/services/kpi_engine.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -354,6 +355,47 @@ Texto original.
         );
       },
     );
+
+    test('combined analysis writes nested tracker sources as valid YAML', () {
+      final analysis = CombinedAnalysis(
+        title: 'Menstruação',
+        dataSources: [
+          MetricSource(
+            type: MetricType.trackerField,
+            id: '23f14f0e-b575-4e47-b8ff-cc05bbc38eb2',
+            label: 'menstruação: fluxo',
+            fieldId: 'field_1',
+            color: const Color(0xffef4444),
+          ),
+        ],
+        charts: [
+          AnalysisChart(
+            title: 'Gráfico Comparativo',
+            sources: [
+              MetricSource(
+                type: MetricType.trackerField,
+                id: '23f14f0e-b575-4e47-b8ff-cc05bbc38eb2',
+                label: 'menstruação: fluxo',
+                fieldId: 'field_1',
+                color: const Color(0xffef4444),
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final markdown = analysis.toMarkdown();
+      final frontmatter = MarkdownParser.parseFrontmatter(markdown);
+      final parsed = CombinedAnalysis.fromMarkdown(
+        frontmatter,
+        MarkdownParser.extractBody(markdown),
+      );
+
+      expect(markdown, contains('sources:'));
+      expect(markdown, isNot(contains('sources: [{')));
+      expect(parsed.dataSources.single.label, 'menstruação: fluxo');
+      expect(parsed.dataSources.single.color?.toARGB32(), 0xffef4444);
+    });
 
     test('collection KPI counts JSON arrays instead of string fragments', () {
       final kpi = kpi_model.KPI(

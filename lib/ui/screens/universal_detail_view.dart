@@ -1952,7 +1952,14 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       final tracker = object as TrackerDefinition;
       final allRecords = ref.watch(trackingRecordsProvider);
       final trackerRecords =
-          allRecords.where((r) => r.trackerId == tracker.id).toList()
+          allRecords
+              .where(
+                (r) =>
+                    r.trackerId == tracker.id ||
+                    r.trackerId == tracker.slug ||
+                    r.trackerId == tracker.title,
+              )
+              .toList()
             ..sort((a, b) => b.date.compareTo(a.date));
 
       return [

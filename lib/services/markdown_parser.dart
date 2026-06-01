@@ -107,9 +107,55 @@ class MarkdownParser {
         return _convertNode(doc) as Map<String, dynamic>;
       }
     } catch (e) {
+      final repaired = _repairLegacyInlineAnalysisYaml(yamlStr);
+      if (repaired != yamlStr) {
+        try {
+          final doc = loadYaml(repaired);
+          if (doc is YamlMap) {
+            debugPrint(
+              'Repaired legacy YAML frontmatter after parse error: $e',
+            );
+            return _convertNode(doc) as Map<String, dynamic>;
+          }
+        } catch (_) {
+          // Fall through to the original error log below.
+        }
+      }
       debugPrint('Error parsing YAML: $e');
     }
     return {};
+  }
+
+  static String _repairLegacyInlineAnalysisYaml(String yamlStr) {
+    if (!yamlStr.contains('sources: [{') &&
+        !yamlStr.contains('data_sources: [{')) {
+      return yamlStr;
+    }
+
+    String quoteFlowValue(String input, String key) {
+      return input.replaceAllMapped(RegExp('($key:\\s*)([^,}\\]\\n]+)'), (
+        match,
+      ) {
+        final prefix = match.group(1)!;
+        final raw = match.group(2)!.trim();
+        if (raw.isEmpty ||
+            raw.startsWith('"') ||
+            raw.startsWith("'") ||
+            raw == 'true' ||
+            raw == 'false' ||
+            num.tryParse(raw) != null) {
+          return '$prefix$raw';
+        }
+        final escaped = raw.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+        return '$prefix"$escaped"';
+      });
+    }
+
+    var repaired = yamlStr;
+    for (final key in const ['label', 'color']) {
+      repaired = quoteFlowValue(repaired, key);
+    }
+    return repaired;
   }
 
   static Future<Map<String, dynamic>> asyncParseFrontmatter(
@@ -154,6 +200,12 @@ class MarkdownParser {
     String filename = object.type == 'resource'
         ? _sanitizeFileName(object.title)
         : object.slug;
+    if (object.type == 'tracker_record' || object.type == 'combined_analysis') {
+      final suffix = object.id.length > 8
+          ? object.id.substring(0, 8)
+          : object.id;
+      filename = filename.isEmpty ? suffix : '$filename-$suffix';
+    }
     if (filename.isEmpty) filename = object.id;
 
     String path = '$folder/$filename.md';

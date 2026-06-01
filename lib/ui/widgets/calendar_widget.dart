@@ -460,7 +460,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    habit.title,
+                    habit.displayTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

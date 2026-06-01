@@ -386,7 +386,7 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.title,
+                      item.displayTitle,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w500,
                         fontSize: 15,
@@ -450,7 +450,7 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
               child: InkWell(
                 onTap: () => context.push('/detail/${item.id}'),
                 child: Text(
-                  item.title,
+                  item.displayTitle,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w500,
                     fontSize: 15,
@@ -481,7 +481,7 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    item.title,
+                    item.displayTitle,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w500,
                           fontSize: 15,

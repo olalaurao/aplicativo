@@ -1036,12 +1036,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onReorder: notifier.reorder,
             itemBuilder: (context, index) {
               final item = navItems[index];
-              final isLocked =
+              final isPinned =
                   item.section == NavSection.home ||
                   item.section == NavSection.more;
 
               return ListTile(
-                key: ValueKey(item.section),
+                key: ValueKey(
+                  item.isCustom ? item.id ?? item.route : item.section.name,
+                ),
                 leading: Icon(
                   item.icon,
                   color: item.inBottomBar
@@ -1050,6 +1052,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 title: Text(
                   item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -1058,33 +1062,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         : AppColors.textMuted,
                   ),
                 ),
-                trailing: isLocked
-                    ? const Icon(
-                        Icons.lock_outline_rounded,
-                        size: 18,
-                        color: AppColors.textMuted,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isPinned)
+                      const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Icon(
+                          Icons.lock_outline_rounded,
+                          size: 18,
+                          color: AppColors.textMuted,
+                        ),
                       )
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Switch.adaptive(
-                            value: item.inBottomBar,
-                            onChanged: (_) =>
-                                notifier.toggleInBottomBar(item.section),
-                            activeThumbColor: AppColors.primary,
-                          ),
-                          ReorderableDragStartListener(
-                            index: index,
-                            child: const Padding(
-                              padding: EdgeInsets.all(8.0),
-                              child: Icon(
-                                Icons.drag_handle_rounded,
-                                color: AppColors.textMuted,
-                              ),
-                            ),
-                          ),
-                        ],
+                    else
+                      Switch.adaptive(
+                        value: item.inBottomBar,
+                        onChanged: (_) => notifier.toggleInBottomBar(
+                          item.isCustom ? item.id : item.section,
+                        ),
+                        activeThumbColor: AppColors.primary,
                       ),
+                    ReorderableDragStartListener(
+                      index: index,
+                      child: const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: Icon(
+                          Icons.drag_handle_rounded,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               );
             },
           ),

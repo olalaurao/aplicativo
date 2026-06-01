@@ -1366,7 +1366,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             SizedBox(
               width: 50,
               child: Text(
-                habit.title,
+                habit.displayTitle,
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -4370,7 +4370,7 @@ extension on _HomeScreenState {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                item.title,
+                item.displayTitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -4394,7 +4394,7 @@ extension on _HomeScreenState {
   Widget _buildPlannerItem(dynamic item, {bool showDate = false}) {
     final object = item as ContentObject;
     final task = item is Task ? item : null;
-    final title = task?.title ?? object.title;
+    final title = object.displayTitle;
     final time = task != null ? (task.scheduledTime ?? 'All day') : '';
     final date = task?.endDate ?? object.createdAt;
 

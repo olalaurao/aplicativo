@@ -338,7 +338,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                                 ),
                                 padding: const EdgeInsets.all(12),
                                 child: Text(
-                                  habit.title,
+                                  habit.displayTitle,
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -816,7 +816,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          habit.title,
+                          habit.displayTitle,
                           style: TextStyle(
                             fontSize: isShort ? 11 : 13,
                             fontWeight: FontWeight.w700,
@@ -1026,7 +1026,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      habit.title,
+                      habit.displayTitle,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,

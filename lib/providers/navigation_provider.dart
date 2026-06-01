@@ -18,16 +18,19 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
         final savedItems = decoded
             .map((item) => NavigationItem.fromMap(item))
             .toList();
-        final migratedItems = _withMissingDefaultItems(savedItems);
-        if (migratedItems.length != savedItems.length) {
+        final migratedItems = _normalizeItems(
+          _withMissingDefaultItems(savedItems),
+        );
+        if (jsonEncode(migratedItems.map((e) => e.toMap()).toList()) !=
+            jsonEncode(savedItems.map((e) => e.toMap()).toList())) {
           await _saveItems(prefs, migratedItems);
         }
         return migratedItems;
       } catch (e) {
-        return _defaultItems;
+        return _normalizeItems(_defaultItems);
       }
     }
-    return _defaultItems;
+    return _normalizeItems(_defaultItems);
   }
 
   static final List<NavigationItem> _defaultItems = [
@@ -163,30 +166,121 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
     return [...savedItems, ...missingDefaults];
   }
 
-  Future<void> toggleInBottomBar(dynamic idOrSection) async {
-    final current = state.valueOrNull ?? [];
-    state = AsyncData([
-      for (final item in current)
-        if ((idOrSection is NavSection && item.section == idOrSection) ||
-            (idOrSection is String && item.id == idOrSection))
-          NavigationItem(
-            section: item.section,
-            label: item.label,
-            route: item.route,
-            inBottomBar: !item.inBottomBar,
-            isCustom: item.isCustom,
-            id: item.id,
-            type: item.type,
-          )
+  static List<NavigationItem> _normalizeItems(List<NavigationItem> items) {
+    final normalized = [
+      for (final item in items)
+        if (item.section == NavSection.home || item.section == NavSection.more)
+          _copyItem(item, inBottomBar: true)
         else
           item,
-    ]);
+    ];
+
+    final bottomItems = normalized.where((item) => item.inBottomBar).toList();
+    if (bottomItems.length <= 5) return normalized;
+
+    final keptKeys = <String>{};
+    for (final item in normalized) {
+      if (!item.inBottomBar) continue;
+      if (item.section == NavSection.home || item.section == NavSection.more) {
+        keptKeys.add(_itemKey(item));
+      }
+    }
+    for (final item in normalized) {
+      if (keptKeys.length >= 5) break;
+      if (!item.inBottomBar ||
+          item.section == NavSection.home ||
+          item.section == NavSection.more) {
+        continue;
+      }
+      keptKeys.add(_itemKey(item));
+    }
+
+    return [
+      for (final item in normalized)
+        _copyItem(item, inBottomBar: keptKeys.contains(_itemKey(item))),
+    ];
+  }
+
+  static NavigationItem _copyItem(
+    NavigationItem item, {
+    bool? inBottomBar,
+    String? label,
+  }) {
+    return NavigationItem(
+      section: item.section,
+      label: label ?? item.label,
+      route: item.route,
+      inBottomBar: inBottomBar ?? item.inBottomBar,
+      isCustom: item.isCustom,
+      id: item.id,
+      type: item.type,
+    );
+  }
+
+  static String _itemKey(NavigationItem item) {
+    return item.isCustom
+        ? 'custom:${item.id ?? item.route}'
+        : item.section.name;
+  }
+
+  static bool _sameItem(NavigationItem a, NavigationItem b) {
+    return _itemKey(a) == _itemKey(b);
+  }
+
+  Future<void> toggleInBottomBar(dynamic idOrSection) async {
+    final current = state.valueOrNull ?? [];
+    NavigationItem? target;
+    for (final item in current) {
+      if ((idOrSection is NavSection && item.section == idOrSection) ||
+          (idOrSection is String && item.id == idOrSection)) {
+        target = item;
+        break;
+      }
+    }
+    if (target == null ||
+        target.section == NavSection.home ||
+        target.section == NavSection.more) {
+      return;
+    }
+
+    final targetWillBePinned = !target.inBottomBar;
+    var toggled = [
+      for (final item in current)
+        if (_sameItem(item, target))
+          _copyItem(item, inBottomBar: !item.inBottomBar)
+        else
+          item,
+    ];
+
+    if (targetWillBePinned &&
+        toggled.where((item) => item.inBottomBar).length > 5) {
+      final targetKey = _itemKey(target);
+      for (var i = toggled.length - 1; i >= 0; i--) {
+        final item = toggled[i];
+        if (!item.inBottomBar ||
+            item.section == NavSection.home ||
+            item.section == NavSection.more ||
+            _itemKey(item) == targetKey) {
+          continue;
+        }
+        toggled = [
+          for (var j = 0; j < toggled.length; j++)
+            if (j == i)
+              _copyItem(toggled[j], inBottomBar: false)
+            else
+              toggled[j],
+        ];
+        break;
+      }
+    }
+
+    state = AsyncData(_normalizeItems(toggled));
     await _save();
   }
 
   Future<void> addShortcut(NavigationItem shortcut) async {
     final current = state.valueOrNull ?? [];
-    state = AsyncData([...current, shortcut]);
+    state = AsyncData(_normalizeItems([...current, shortcut]));
     await _save();
   }
 
@@ -203,11 +297,66 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
     if (newIndex > oldIndex) newIndex -= 1;
     final current = state.valueOrNull ?? [];
     final list = List<NavigationItem>.from(current);
-    if (oldIndex < 0 || oldIndex >= list.length) return;
+    if (oldIndex < 0 ||
+        oldIndex >= list.length ||
+        newIndex < 0 ||
+        newIndex > list.length) {
+      return;
+    }
     final item = list.removeAt(oldIndex);
     list.insert(newIndex, item);
-    state = AsyncData(list);
+    state = AsyncData(_normalizeItems(list));
     await _save();
+  }
+
+  Future<void> reorderVisibleItems(
+    List<NavigationItem> visibleItems,
+    int oldIndex,
+    int newIndex,
+  ) async {
+    if (newIndex > oldIndex) newIndex -= 1;
+    if (oldIndex < 0 ||
+        oldIndex >= visibleItems.length ||
+        newIndex < 0 ||
+        newIndex > visibleItems.length) {
+      return;
+    }
+
+    final reorderedVisible = List<NavigationItem>.from(visibleItems);
+    final moved = reorderedVisible.removeAt(oldIndex);
+    reorderedVisible.insert(newIndex, moved);
+
+    final current = List<NavigationItem>.from(state.valueOrNull ?? []);
+    final movedFullIndex = current.indexWhere((item) => _sameItem(item, moved));
+    if (movedFullIndex == -1) return;
+
+    final movedFullItem = current.removeAt(movedFullIndex);
+    final beforeMoved = newIndex + 1 < reorderedVisible.length
+        ? reorderedVisible[newIndex + 1]
+        : null;
+    final insertIndex = beforeMoved == null
+        ? _lastVisibleIndex(current, visibleItems) + 1
+        : current.indexWhere((item) => _sameItem(item, beforeMoved));
+
+    current.insert(
+      insertIndex < 0 ? current.length : insertIndex,
+      movedFullItem,
+    );
+    state = AsyncData(_normalizeItems(current));
+    await _save();
+  }
+
+  int _lastVisibleIndex(
+    List<NavigationItem> items,
+    List<NavigationItem> visibleItems,
+  ) {
+    var lastIndex = -1;
+    for (var i = 0; i < items.length; i++) {
+      if (visibleItems.any((visible) => _sameItem(visible, items[i]))) {
+        lastIndex = i;
+      }
+    }
+    return lastIndex;
   }
 
   Future<void> renameShortcut(String id, String newLabel) async {
@@ -215,15 +364,7 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
     state = AsyncData([
       for (final item in current)
         if (item.isCustom && item.id == id)
-          NavigationItem(
-            section: item.section,
-            label: newLabel,
-            route: item.route,
-            inBottomBar: item.inBottomBar,
-            isCustom: true,
-            id: item.id,
-            type: item.type,
-          )
+          _copyItem(item, label: newLabel)
         else
           item,
     ]);
