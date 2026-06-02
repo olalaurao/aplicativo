@@ -419,6 +419,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
 
   SocialPost _buildPostForSave() {
     final base = _draft ?? _fallbackDraft();
+    final existingPath = widget.existingPost?.obsidianPath;
     final post = base.copyWith(
       title: _titleController.text.trim().isEmpty
           ? base.title
@@ -431,8 +432,9 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
           : _noteController.text.trim(),
       organizers: _organizers,
       tags: _tags,
-      obsidianPath: widget.existingPost?.obsidianPath,
+      obsidianPath: existingPath,
     );
+    if (existingPath != null && existingPath.isNotEmpty) return post;
     return post.copyWith(obsidianPath: 'social/${post.socialSlug}.md');
   }
 

@@ -71,6 +71,33 @@ class SocialPost extends ContentObject {
   String get displayType => platform.name.toUpperCase();
 
   String get socialSlug {
+    if (obsidianPath.isNotEmpty) {
+      return obsidianPath
+          .split('/')
+          .last
+          .split('\\')
+          .last
+          .replaceAll('.md', '');
+    }
+    final fallbackTitle = title.trim().isEmpty ? url : title;
+    final base = '${platform.name}-$fallbackTitle'
+        .toLowerCase()
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '-')
+        .replaceAll(RegExp(r'[^a-z0-9-]'), '')
+        .replaceAll(RegExp(r'-+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    final readable = base.isEmpty ? '${platform.name}-post' : base;
+    final trimmed = readable.length > 48
+        ? readable.substring(0, 48).replaceAll(RegExp(r'-+$'), '')
+        : readable;
+    final suffix = id.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
+    final shortId = suffix.length > 8 ? suffix.substring(0, 8) : suffix;
+    if (shortId.isEmpty || trimmed.endsWith('-$shortId')) return trimmed;
+    return '$trimmed-$shortId';
+  }
+
+  String get legacySocialSlug {
     final fallbackTitle = title.trim().isEmpty ? url : title;
     final base = '${platform.name}-$fallbackTitle'
         .toLowerCase()

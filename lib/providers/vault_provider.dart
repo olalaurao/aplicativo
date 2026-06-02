@@ -1557,17 +1557,38 @@ final backlinksProvider = FutureProvider.family<List<ContentObject>, String>((
     orElse: () => throw Exception('Target not found'),
   );
   final targetSlug = target.slug;
+  final targetKeys =
+      <String>{
+            target.id,
+            targetSlug,
+            target.title,
+            target.obsidianFileName,
+            if (target.obsidianPath.isNotEmpty)
+              target.obsidianPath.replaceAll(RegExp(r'\.md$'), ''),
+          }
+          .map((value) => value.trim().toLowerCase())
+          .where((value) => value.isNotEmpty)
+          .toSet();
 
   return allObjects.where((obj) {
     if (obj.id == targetId) return false;
+    if (target is MoodDefinition && obj is JournalEntry) {
+      final moodSlug = obj.moodSlug?.trim().toLowerCase();
+      if (moodSlug != null && targetKeys.contains(moodSlug)) return true;
+    }
     if (obj.organizers.any(
       (ref) => ref.slug == targetId || ref.slug == targetSlug,
     )) {
       return true;
     }
     final content = obj.toMarkdown().toLowerCase();
-    return content.contains('[[${targetSlug.toLowerCase()}]]') ||
-        content.contains('[[${target.title.toLowerCase()}]]');
+    return targetKeys.any(
+      (key) =>
+          content.contains('[[$key]]') ||
+          content.contains('[[$key|') ||
+          content.contains('[[moods/$key]]') ||
+          content.contains('[[moods/$key|'),
+    );
   }).toList();
 });
 

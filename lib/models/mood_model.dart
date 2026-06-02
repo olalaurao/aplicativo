@@ -46,6 +46,9 @@ class MoodDefinition extends ContentObject {
   String get type => 'mood_definition';
 
   @override
+  String get slug => id;
+
+  @override
   String toMarkdown() {
     final frontmatter = toBaseMap();
     frontmatter['label'] = label;
