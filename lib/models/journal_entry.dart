@@ -48,6 +48,7 @@ class JournalEntry extends ContentObject {
     if (timeOfDay != null) frontmatter['time'] = timeOfDay;
     if (moodSlug != null) frontmatter['mood'] = moodSlug;
     if (location != null) frontmatter['location'] = location;
+    if (templateId != null) frontmatter['template_id'] = templateId;
     if (photos.isNotEmpty) frontmatter['photos'] = photos;
 
     return generateMarkdown(
@@ -75,6 +76,7 @@ class JournalEntry extends ContentObject {
 
     entry.moodSlug = frontmatter['mood'] as String?;
     entry.location = frontmatter['location'] as String?;
+    entry.templateId = frontmatter['template_id'] as String?;
     final rawPhotos = frontmatter['photos'];
     if (rawPhotos is List) {
       entry.photos = rawPhotos.map((item) => item.toString()).toList();

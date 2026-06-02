@@ -1569,9 +1569,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     }
 
     final task = Task(
-      id:
-          widget.existingTask?.id ??
-          DateTime.now().millisecondsSinceEpoch.toString(),
+      id: widget.existingTask?.id,
       createdAt: widget.existingTask?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
       title: _titleController.text.trim(),

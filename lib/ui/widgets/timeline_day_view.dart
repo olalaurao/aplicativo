@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../models/task_model.dart';
+import '../../models/day_theme_model.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import 'package:googleapis/calendar/v3.dart' as google_calendar;
@@ -16,6 +17,7 @@ class TimeLineDayView extends ConsumerStatefulWidget {
   final List<Task> tasks;
   final List<google_calendar.Event> googleEvents;
   final List<dynamic> allDayEvents; // Can be tasks, habits, etc.
+  final List<TimeBlock> timeBlocks;
   final DateTime selectedDate;
   final Function(Task, DateTime)? onTaskDrop;
   final Function(Habit, DateTime)? onHabitDrop;
@@ -31,6 +33,7 @@ class TimeLineDayView extends ConsumerStatefulWidget {
     this.tasks = const [],
     this.googleEvents = const [],
     this.allDayEvents = const [],
+    this.timeBlocks = const [],
     this.onTaskDrop,
     this.onHabitDrop,
     this.onDurationChange,
@@ -257,6 +260,8 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                         );
                       }),
                     ),
+
+                    ..._buildTimeBlockBands(hourHeight, leftColumnWidth),
 
                     // Drop targets stay behind the scheduled cards so taps open items.
                     ..._buildDropTargets(hourHeight, leftColumnWidth),
@@ -559,6 +564,61 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
     });
   }
 
+  List<Widget> _buildTimeBlockBands(double hourHeight, double leftColumnWidth) {
+    final bands = <Widget>[];
+
+    for (final block in widget.timeBlocks) {
+      for (final range in block.timeRanges) {
+        final startMinutes =
+            (range.startHour.clamp(0, 23) * 60) +
+            range.startMinute.clamp(0, 59);
+        final rawEndMinutes =
+            (range.endHour.clamp(0, 24) * 60) + range.endMinute.clamp(0, 59);
+        final endMinutes = rawEndMinutes.clamp(startMinutes + 1, 24 * 60);
+        final topOffset = startMinutes / 60 * hourHeight;
+        final height = (endMinutes - startMinutes) / 60 * hourHeight;
+        final bandColor = _parseOptionalColor(block.color) ?? AppColors.primary;
+
+        bands.add(
+          Positioned(
+            top: topOffset,
+            left: leftColumnWidth,
+            right: 0,
+            height: height,
+            child: IgnorePointer(
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: bandColor.withValues(alpha: 0.06),
+                  border: Border(
+                    left: BorderSide(
+                      color: bandColor.withValues(alpha: 0.45),
+                      width: 3,
+                    ),
+                  ),
+                ),
+                padding: const EdgeInsets.only(left: 10, top: 4),
+                alignment: Alignment.topLeft,
+                child: Text(
+                  block.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: bandColor.withValues(alpha: 0.8),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return bands;
+  }
+
   Widget _buildTaskBlock(BuildContext context, Task task, double height) {
     final baseColor = widget.colorMode == 'priority'
         ? _getPriorityColor(task.priority)
@@ -852,15 +912,22 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
   }
 
   Color _getHabitColor(Habit habit) {
+    return _parseOptionalColor(habit.color) ?? AppColors.habitGreen;
+  }
+
+  Color? _parseOptionalColor(String? color) {
+    if (color == null || color.trim().isEmpty) return null;
     try {
-      final colorStr = habit.color.replaceAll('#', '');
+      final colorStr = color.trim().replaceAll('#', '');
       if (colorStr.length == 6) {
         return Color(int.parse('0xFF$colorStr'));
       } else if (colorStr.length == 8) {
         return Color(int.parse('0x$colorStr'));
       }
-    } catch (_) {}
-    return AppColors.habitGreen;
+    } catch (_) {
+      debugPrint('Invalid timeline color: $color');
+    }
+    return null;
   }
 
   bool _isHabitSlotCompleted(Habit habit, DateTime date, int slotIndex) {

@@ -41,6 +41,7 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
   DateTime _entryDate = DateTime.now();
   String? _moodSlug;
   String? _location;
+  String? _templateId;
   List<OrganizerReference> _organizers = [];
 
   // We will load moods from provider
@@ -80,6 +81,7 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
       _entryDate = entry.date;
       _moodSlug = entry.moodSlug;
       _location = entry.location;
+      _templateId = entry.templateId;
       _organizers = List.of(entry.organizers);
     } else {
       final now = DateTime.now();
@@ -127,6 +129,7 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
               widget.initialTitle ?? 'Nova Entry',
             );
             _content = body;
+            _templateId = reviewTemplate.id;
 
             if (reviewTemplate.frontmatterDefaults.containsKey('mood')) {
               _moodSlug = reviewTemplate.frontmatterDefaults['mood'] as String?;
@@ -839,6 +842,7 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
                     } else {
                       _content += '\n$body';
                     }
+                    _templateId = t.id;
 
                     if (t.frontmatterDefaults.containsKey('mood')) {
                       _moodSlug = t.frontmatterDefaults['mood'] as String?;
@@ -867,9 +871,7 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
 
   Future<void> _saveEntry() async {
     final entry = JournalEntry(
-      id:
-          widget.existingEntry?.id ??
-          DateTime.now().millisecondsSinceEpoch.toString(),
+      id: widget.existingEntry?.id,
       createdAt: widget.existingEntry?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
       title: _titleController.text.trim(),
@@ -877,6 +879,7 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
       date: _entryDate,
       moodSlug: _moodSlug,
       location: _location,
+      templateId: _templateId,
       organizers: _organizers,
     );
     try {

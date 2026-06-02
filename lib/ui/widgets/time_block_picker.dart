@@ -74,13 +74,7 @@ class TimeBlockPicker extends ConsumerWidget {
     String? colorStr,
     required VoidCallback onTap,
   }) {
-    Color? blockColor;
-    if (colorStr != null && colorStr.isNotEmpty) {
-      if (colorStr.startsWith('#')) {
-        blockColor = Color(int.parse(colorStr.substring(1), radix: 16) + 0xFF000000);
-      }
-    }
-    
+    final blockColor = _parseColor(colorStr);
     final activeColor = blockColor ?? AppColors.accent;
 
     return GestureDetector(
@@ -88,7 +82,9 @@ class TimeBlockPicker extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? activeColor.withValues(alpha: 0.2) : Colors.transparent,
+          color: isSelected
+              ? activeColor.withValues(alpha: 0.2)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected ? activeColor : AppColors.divider,
@@ -105,5 +101,21 @@ class TimeBlockPicker extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Color? _parseColor(String? colorStr) {
+    if (colorStr == null || colorStr.trim().isEmpty) return null;
+    try {
+      final value = colorStr.trim().replaceAll('#', '');
+      if (value.length == 6) {
+        return Color(int.parse('0xFF$value'));
+      }
+      if (value.length == 8) {
+        return Color(int.parse('0x$value'));
+      }
+    } catch (_) {
+      debugPrint('Invalid time block color: $colorStr');
+    }
+    return null;
   }
 }

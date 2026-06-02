@@ -83,6 +83,23 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       (theme) => theme != null && theme.daysOfWeek.contains(dayName),
       orElse: () => null,
     );
+    final activeTimeBlocks =
+        activeTheme == null
+              ? <TimeBlock>[]
+              : timeBlocks
+                    .where((block) => activeTheme.blockIds.contains(block.id))
+                    .toList()
+          ..sort((a, b) {
+            final aStart = a.timeRanges.isEmpty
+                ? 24 * 60
+                : (a.timeRanges.first.startHour * 60) +
+                      a.timeRanges.first.startMinute;
+            final bStart = b.timeRanges.isEmpty
+                ? 24 * 60
+                : (b.timeRanges.first.startHour * 60) +
+                      b.timeRanges.first.startMinute;
+            return aStart.compareTo(bStart);
+          });
 
     bool isThemeActive(String themeId, DateTime date) {
       const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -218,15 +235,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                       color:
-                          activeTheme.color != null &&
-                              activeTheme.color!.isNotEmpty
-                          ? Color(
-                              int.parse(
-                                activeTheme.color!.replaceFirst('#', 'ff'),
-                                radix: 16,
-                              ),
-                            )
-                          : AppColors.primary,
+                          _parsePlannerColor(activeTheme.color) ??
+                          AppColors.primary,
                     ),
                   ),
               ],
@@ -288,6 +298,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                           data: (events) => events,
                           orElse: () => [],
                         ),
+                        timeBlocks: activeTimeBlocks,
                         onTaskDrop: (task, time) {
                           final timeStr = DateFormat('HH:mm').format(time);
                           final isBacklog =
@@ -2291,5 +2302,21 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
 
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  Color? _parsePlannerColor(String? color) {
+    if (color == null || color.trim().isEmpty) return null;
+    try {
+      final colorStr = color.trim().replaceAll('#', '');
+      if (colorStr.length == 6) {
+        return Color(int.parse('0xFF$colorStr'));
+      }
+      if (colorStr.length == 8) {
+        return Color(int.parse('0x$colorStr'));
+      }
+    } catch (_) {
+      debugPrint('Invalid planner color: $color');
+    }
+    return null;
   }
 }
