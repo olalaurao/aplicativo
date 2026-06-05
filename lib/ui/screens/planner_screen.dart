@@ -42,6 +42,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   int _viewMode = 0; // 0=Day, 1=Week, 2=Month
   bool _isTimeline = true;
   late DateTime _selectedDate;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -59,6 +60,13 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         _showDayDetailsSheet(_selectedDate, tasks, habits);
       });
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToNow());
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -219,6 +227,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           SliverAppBar(
             title: Column(
@@ -261,7 +270,15 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 ),
               IconButton(
                 icon: const Icon(Icons.today_rounded, color: AppColors.primary),
-                onPressed: () => setState(() => _selectedDate = DateTime.now()),
+                onPressed: () {
+                  setState(() {
+                    _selectedDate = DateTime.now();
+                    _viewMode = 0;
+                  });
+                  WidgetsBinding.instance.addPostFrameCallback(
+                    (_) => _scrollToNow(animate: true),
+                  );
+                },
               ),
             ],
             bottom: PreferredSize(
@@ -466,6 +483,36 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     );
   }
 
+  void _scrollToNow({bool animate = false}) {
+    if (!mounted ||
+        !_scrollController.hasClients ||
+        _viewMode != 0 ||
+        !_isTimeline ||
+        !_isSameDay(_selectedDate, DateTime.now())) {
+      return;
+    }
+    const hourHeight = 80.0;
+    const sliverHeaderEstimate = 190.0;
+    final now = DateTime.now();
+    final viewport = MediaQuery.of(context).size.height;
+    final target =
+        sliverHeaderEstimate +
+        (now.hour * hourHeight) +
+        (now.minute / 60 * hourHeight) -
+        (viewport / 3);
+    final max = _scrollController.position.maxScrollExtent;
+    final offset = target.clamp(0.0, max);
+    if (animate) {
+      _scrollController.animateTo(
+        offset,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      _scrollController.jumpTo(offset);
+    }
+  }
+
   Widget _buildDateStrip() {
     return SizedBox(
       height: 70,
@@ -654,6 +701,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   Widget _buildJournalEntryItem(JournalEntry entry) {
+    final moodLabel = _journalMoodLabel(entry);
     return ObjectActionWrapper(
       object: entry,
       child: InkWell(
@@ -684,11 +732,15 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                   children: [
                     Text(
                       entry.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    if (entry.moodSlug != null)
+                    if (moodLabel != null)
                       Text(
-                        'Mood: ${entry.moodSlug}',
+                        moodLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textMuted,
@@ -702,6 +754,19 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         ),
       ),
     );
+  }
+
+  String? _journalMoodLabel(JournalEntry entry) {
+    final raw = entry.moodSlug?.trim();
+    if (raw == null || raw.isEmpty) return null;
+    final moods = ref.read(moodsProvider);
+    final mood = moods
+        .where(
+          (item) => item.id == raw || item.slug == raw || item.title == raw,
+        )
+        .firstOrNull;
+    if (mood == null) return null;
+    return '${mood.emoji} ${mood.title}';
   }
 
   Widget _buildPendingReminderCard(Reminder reminder) {
@@ -1297,7 +1362,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   Widget _buildHabitItem(Habit habit) {
-    final isDone = habit.daysSinceLastCompletion == 0;
+    final slots = habit.slots.isEmpty ? <HabitSlot>[HabitSlot()] : habit.slots;
+    final isDone = _isHabitSlotDone(habit, 0);
     return LongPressDraggable<Habit>(
       data: habit,
       feedback: Material(
@@ -1319,13 +1385,13 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       ),
       childWhenDragging: Opacity(
         opacity: 0.3,
-        child: _buildHabitCard(habit, isDone),
+        child: _buildHabitCard(habit, slots, isDone),
       ),
-      child: _buildHabitCard(habit, isDone),
+      child: _buildHabitCard(habit, slots, isDone),
     );
   }
 
-  Widget _buildHabitCard(Habit habit, bool isDone) {
+  Widget _buildHabitCard(Habit habit, List<HabitSlot> slots, bool isDone) {
     return ObjectActionWrapper(
       object: habit,
       child: InkWell(
@@ -1342,104 +1408,177 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(16),
           decoration: AppTheme.cardDecoration(context),
-          child: Row(
+          child: Column(
             children: [
-              if (!habit.isNegative) ...[
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    ref
-                        .read(habitsProvider.notifier)
-                        .toggleHabit(habit, _selectedDate);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(4.0),
-                    child: Icon(
-                      isDone
-                          ? Icons.check_circle_rounded
-                          : Icons.radio_button_unchecked_rounded,
-                      size: 20,
-                      color: isDone
-                          ? AppColors.habitGreen
-                          : AppColors.textMuted,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      habit.displayTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-              ] else ...[
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Negative habit "${habit.displayTitle}" — tap to log an occurrence',
-                        ),
-                        action: SnackBarAction(
-                          label: 'REGISTRAR',
-                          onPressed: () {
-                            ref
-                                .read(habitsProvider.notifier)
-                                .toggleHabit(habit, _selectedDate);
-                          },
+                  if (habit.isNegative)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: habit.streak > 3
+                            ? AppColors.habitGreen.withValues(alpha: 0.1)
+                            : AppColors.priorityHigh.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${habit.streak} dias livres',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: habit.streak > 3
+                              ? AppColors.habitGreen
+                              : AppColors.priorityHigh,
                         ),
                       ),
-                    );
-                  },
-                  child: const Padding(
-                    padding: EdgeInsets.all(4.0),
-                    child: Icon(
-                      Icons.do_not_disturb_on_rounded,
-                      size: 20,
-                      color: AppColors.priorityHigh,
+                    )
+                  else
+                    Text(
+                      '🔥 ${habit.streak}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.priorityHigh,
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
-              Expanded(
-                child: Text(
-                  habit.displayTitle,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                ),
+                ],
               ),
-              if (habit.isNegative)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: habit.streak > 3
-                        ? AppColors.habitGreen.withValues(alpha: 0.1)
-                        : AppColors.priorityHigh.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '${habit.streak} dias livres',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: habit.streak > 3
-                          ? AppColors.habitGreen
-                          : AppColors.priorityHigh,
-                    ),
-                  ),
-                )
-              else
-                Text(
-                  '🔥 ${habit.streak}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.priorityHigh,
-                  ),
-                ),
+              const SizedBox(height: 10),
+              ...slots.asMap().entries.map((entry) {
+                final slotIndex = entry.key;
+                final slot = entry.value;
+                final slotDone = _isHabitSlotDone(habit, slotIndex);
+                return _buildHabitSlotRow(habit, slot, slotIndex, slotDone);
+              }),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildHabitSlotRow(
+    Habit habit,
+    HabitSlot slot,
+    int slotIndex,
+    bool isDone,
+  ) {
+    final time = slot.reminderTime;
+    final label = slot.label?.trim();
+    final slotTitle = label == null || label.isEmpty
+        ? (habit.slots.length > 1 ? 'Slot ${slotIndex + 1}' : 'Concluir')
+        : label;
+    final timeLabel = time == null
+        ? null
+        : MaterialLocalizations.of(context).formatTimeOfDay(time);
+
+    return Padding(
+      padding: EdgeInsets.only(top: slotIndex == 0 ? 0 : 8),
+      child: Row(
+        children: [
+          if (!habit.isNegative) ...[
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                ref
+                    .read(habitsProvider.notifier)
+                    .toggleHabit(habit, _selectedDate, slotIndex: slotIndex);
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(4.0),
+                child: Icon(
+                  isDone
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  size: 20,
+                  color: isDone ? AppColors.habitGreen : AppColors.textMuted,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ] else ...[
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Hábito negativo "${habit.displayTitle}" registrado',
+                    ),
+                    action: SnackBarAction(
+                      label: 'REGISTRAR',
+                      onPressed: () {
+                        ref
+                            .read(habitsProvider.notifier)
+                            .toggleHabit(
+                              habit,
+                              _selectedDate,
+                              slotIndex: slotIndex,
+                            );
+                      },
+                    ),
+                  ),
+                );
+              },
+              child: const Padding(
+                padding: EdgeInsets.all(4.0),
+                child: Icon(
+                  Icons.do_not_disturb_on_rounded,
+                  size: 20,
+                  color: AppColors.priorityHigh,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+          Expanded(
+            child: Text(
+              timeLabel == null ? slotTitle : '$slotTitle • $timeLabel',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _isHabitSlotDone(Habit habit, int slotIndex) {
+    final selectedDay = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+    );
+    for (final record in habit.completionHistory) {
+      final recordDay = DateTime(
+        record.date.year,
+        record.date.month,
+        record.date.day,
+      );
+      if (recordDay != selectedDay) continue;
+      final slotCompletions = record.slotCompletions;
+      if (slotCompletions != null && slotIndex < slotCompletions.length) {
+        return slotCompletions[slotIndex];
+      }
+      return record.successful || record.completions > 0;
+    }
+    return false;
   }
 
   void _showBacklogSheet() {

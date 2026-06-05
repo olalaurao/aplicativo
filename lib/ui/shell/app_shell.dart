@@ -30,6 +30,8 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget? _lastListChild;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   DateTime? _lastCommandCenterOverscrollAt;
+  double _commandCenterOverscroll = 0;
+  bool _commandCenterOpenedThisScroll = false;
 
   @override
   Widget build(BuildContext context) {
@@ -306,15 +308,32 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   Widget _withCommandCenterOverscroll(BuildContext context, Widget child) {
-    return NotificationListener<OverscrollNotification>(
+    return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
-        if (notification.metrics.pixels <=
+        if (notification is ScrollStartNotification) {
+          _commandCenterOverscroll = 0;
+          _commandCenterOpenedThisScroll = false;
+          return false;
+        }
+
+        if (notification is ScrollEndNotification) {
+          _commandCenterOverscroll = 0;
+          _commandCenterOpenedThisScroll = false;
+          return false;
+        }
+
+        if (notification is OverscrollNotification &&
+            notification.metrics.pixels <=
                 notification.metrics.minScrollExtent + 2 &&
-            notification.overscroll < -18) {
+            notification.overscroll < 0 &&
+            !_commandCenterOpenedThisScroll) {
+          _commandCenterOverscroll += notification.overscroll.abs();
           final now = DateTime.now();
           final last = _lastCommandCenterOverscrollAt;
-          if (last == null || now.difference(last).inSeconds > 1) {
+          if (_commandCenterOverscroll >= 140 &&
+              (last == null || now.difference(last).inSeconds > 1)) {
             _lastCommandCenterOverscrollAt = now;
+            _commandCenterOpenedThisScroll = true;
             _openCommandCenter(context);
           }
         }

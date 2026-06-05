@@ -17,6 +17,7 @@ import '../widgets/organizer_picker_modal.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../widgets/social_embed_view.dart';
 import '../widgets/social_post_grid_card.dart';
+import '../widgets/universal_search_picker.dart';
 import 'universal_detail_view.dart';
 
 class SocialPostDetail extends ConsumerStatefulWidget {
@@ -102,6 +103,7 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
                 delegate: SliverChildListDelegate([
                   if (post.videoUrl?.isNotEmpty == true ||
                       post.embedUrl != null ||
+                      post.platform == SocialPlatform.pinterest ||
                       (post.platform == SocialPlatform.tiktok &&
                           post.mediaType == SocialMediaType.video) ||
                       post.platform == SocialPlatform.substack)
@@ -116,6 +118,8 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
                   _buildNoteSection(post),
                   const SizedBox(height: 12),
                   _buildOrganizerSection(post),
+                  const SizedBox(height: 12),
+                  _buildLinkedObjectsSection(post),
                   const SizedBox(height: 12),
                   _buildTagsSection(post),
                   backlinks.when(
@@ -149,9 +153,10 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
 
   Widget _buildEmbedPlaceholder(SocialPost post) {
     final color = socialPlatformColor(post.platform);
-    final imageUrl = post.thumbnailUrl?.isNotEmpty == true
-        ? post.thumbnailUrl!
-        : post.mediaUrls.where((url) => url.trim().isNotEmpty).firstOrNull;
+    final imageSource = socialPostImageSource(post);
+    final fallback = Center(
+      child: Icon(socialPlatformIcon(post.platform), size: 48, color: color),
+    );
     return Container(
       height: 220,
       decoration: BoxDecoration(
@@ -160,32 +165,17 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
       ),
       clipBehavior: Clip.antiAlias,
       child: GestureDetector(
-        onTap: imageUrl == null
+        onTap: imageSource == null
             ? () => _openOriginal(post)
-            : () => _openImagePreview(imageUrl),
+            : () => _openImagePreview(imageSource),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (imageUrl != null)
-              Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Center(
-                  child: Icon(
-                    socialPlatformIcon(post.platform),
-                    size: 48,
-                    color: color,
-                  ),
-                ),
-              )
-            else
-              Center(
-                child: Icon(
-                  socialPlatformIcon(post.platform),
-                  size: 48,
-                  color: color,
-                ),
-              ),
+            SocialPostImage(
+              source: imageSource,
+              fallback: fallback,
+              fit: BoxFit.cover,
+            ),
             Align(
               alignment: Alignment.bottomCenter,
               child: Padding(
@@ -262,6 +252,74 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
             .read(socialPostsProvider.notifier)
             .updatePost(post.copyWith(organizers: value)),
       ),
+    );
+  }
+
+  Widget _buildLinkedObjectsSection(SocialPost post) {
+    final objects = ref.watch(allObjectsProvider).valueOrNull ?? [];
+    final linked = _resolveSocialRefs(objects, post.socialRefs);
+    final grouped = <String, List<ContentObject>>{};
+    for (final object in linked) {
+      grouped.putIfAbsent(object.displayType, () => []).add(object);
+    }
+
+    return _section(
+      title: 'Objetos vinculados',
+      trailing: TextButton.icon(
+        onPressed: () => _pickLinkedObject(post),
+        icon: const Icon(Icons.add_link_rounded, size: 18),
+        label: const Text('Vincular'),
+      ),
+      child: linked.isEmpty
+          ? const Text(
+              'Nenhum objeto vinculado',
+              style: TextStyle(color: AppColors.textMuted),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: grouped.entries.map((entry) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.key,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: entry.value.map((object) {
+                          return InputChip(
+                            label: Text(
+                              object.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    UniversalDetailView(object: object),
+                              ),
+                            ),
+                            onDeleted: () => _removeLinkedObject(post, object),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
     );
   }
 
@@ -422,6 +480,92 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
     ref
         .read(socialPostsProvider.notifier)
         .updatePost(post.copyWith(tags: tags));
+  }
+
+  Future<void> _pickLinkedObject(SocialPost post) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => UniversalSearchPickerSheet(
+        title: 'Vincular objeto',
+        showClear: false,
+        onSelected: (object) async {
+          Navigator.pop(sheetContext);
+          final refLink = _objectWikiLink(object);
+          final refs = <String>{...post.socialRefs, refLink}.toList();
+          await ref
+              .read(socialPostsProvider.notifier)
+              .updatePost(post.copyWith(socialRefs: refs));
+        },
+      ),
+    );
+  }
+
+  Future<void> _removeLinkedObject(
+    SocialPost post,
+    ContentObject object,
+  ) async {
+    final refs = post.socialRefs
+        .where((ref) => !_sameSocialRef(ref, object))
+        .toList();
+    await ref
+        .read(socialPostsProvider.notifier)
+        .updatePost(post.copyWith(socialRefs: refs));
+  }
+
+  List<ContentObject> _resolveSocialRefs(
+    List<ContentObject> objects,
+    List<String> refs,
+  ) {
+    return refs
+        .map((ref) => _resolveSocialRef(objects, ref))
+        .whereType<ContentObject>()
+        .toList();
+  }
+
+  ContentObject? _resolveSocialRef(List<ContentObject> objects, String ref) {
+    final key = _cleanWikiRef(ref).toLowerCase();
+    if (key.isEmpty) return null;
+    return objects.where((object) {
+      final keys = {
+        object.id,
+        object.slug,
+        object.title,
+        object.obsidianFileName,
+        if (object.obsidianPath.isNotEmpty)
+          object.obsidianPath.replaceAll(RegExp(r'\.md$'), ''),
+      }.map((value) => value.trim().toLowerCase()).toSet();
+      return keys.contains(key);
+    }).firstOrNull;
+  }
+
+  bool _sameSocialRef(String ref, ContentObject object) {
+    final key = _cleanWikiRef(ref).toLowerCase();
+    return key == object.id.toLowerCase() ||
+        key == object.slug.toLowerCase() ||
+        key == object.title.toLowerCase() ||
+        key == object.obsidianFileName.toLowerCase() ||
+        key ==
+            object.obsidianPath
+                .replaceAll(RegExp(r'\.md$'), '')
+                .trim()
+                .toLowerCase();
+  }
+
+  String _cleanWikiRef(String ref) {
+    var cleaned = ref.trim();
+    if (cleaned.startsWith('[[') && cleaned.endsWith(']]')) {
+      cleaned = cleaned.substring(2, cleaned.length - 2);
+    }
+    return cleaned.split('|').first.trim();
+  }
+
+  String _objectWikiLink(ContentObject object) {
+    final target = object.obsidianFileName.trim().isNotEmpty
+        ? object.obsidianFileName
+        : object.slug;
+    return '[[${target.isEmpty ? object.id : target}]]';
   }
 
   Future<void> _showActionSheet(SocialPost post) async {
@@ -585,7 +729,12 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
     }
   }
 
-  void _openImagePreview(String imageUrl) {
+  void _openImagePreview(String imageSource) {
+    const fallback = Icon(
+      Icons.broken_image_rounded,
+      color: Colors.white,
+      size: 56,
+    );
     showDialog<void>(
       context: context,
       barrierColor: Colors.black,
@@ -595,14 +744,10 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
           minScale: 0.8,
           maxScale: 4,
           child: Center(
-            child: Image.network(
-              imageUrl,
+            child: SocialPostImage(
+              source: imageSource,
               fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const Icon(
-                Icons.broken_image_rounded,
-                color: Colors.white,
-                size: 56,
-              ),
+              fallback: fallback,
             ),
           ),
         ),

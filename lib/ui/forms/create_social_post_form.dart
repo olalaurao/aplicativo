@@ -6,11 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/shared_types.dart';
 import '../../models/social_post.dart';
+import '../../models/content_object.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/oembed_service.dart';
 import '../theme.dart';
 import '../widgets/organizer_selector_field.dart';
+import '../widgets/social_post_grid_card.dart';
+import '../widgets/universal_search_picker.dart';
 
 class CreateSocialPostForm extends ConsumerStatefulWidget {
   final String? initialUrl;
@@ -33,6 +36,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
 
   SocialPost? _draft;
   List<OrganizerReference> _organizers = [];
+  final List<String> _socialRefs = [];
   final List<String> _tags = [];
   bool _isFetching = false;
   bool _urlLocked = false;
@@ -54,6 +58,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
     _draft = existing;
     _urlLocked = existing != null;
     _organizers = List.of(existing?.organizers ?? []);
+    _socialRefs.addAll(existing?.socialRefs ?? []);
     _tags.addAll(existing?.tags ?? []);
 
     final initial = widget.initialUrl?.trim();
@@ -113,6 +118,8 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
               _buildNoteSection(),
               const SizedBox(height: 16),
               _buildOrganizerSection(),
+              const SizedBox(height: 16),
+              _buildLinkedObjectsSection(),
               const SizedBox(height: 16),
               _buildTagsSection(),
             ],
@@ -292,6 +299,95 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
     );
   }
 
+  Widget _buildLinkedObjectsSection() {
+    final objects = ref.watch(allObjectsProvider).valueOrNull ?? [];
+    final linked = _resolveRefs(objects, _socialRefs);
+    final grouped = <String, List<ContentObject>>{};
+    for (final object in linked) {
+      grouped.putIfAbsent(object.displayType, () => []).add(object);
+    }
+
+    return Container(
+      decoration: AppTheme.cardDecoration(context),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Objetos vinculados',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _pickLinkedObject,
+                icon: const Icon(Icons.add_link_rounded, size: 18),
+                label: const Text('Vincular'),
+              ),
+            ],
+          ),
+          if (linked.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Nenhum objeto vinculado',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+              ),
+            )
+          else
+            ...grouped.entries.map(
+              (entry) => Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry.key,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: entry.value.map((object) {
+                        final refLink = _objectWikiLink(object);
+                        return InputChip(
+                          label: Text(
+                            object.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onDeleted: () => setState(
+                            () => _socialRefs.removeWhere(
+                              (ref) => _sameRef(ref, refLink, object),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTagsSection() {
     return Container(
       decoration: AppTheme.cardDecoration(context),
@@ -431,6 +527,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
           ? null
           : _noteController.text.trim(),
       organizers: _organizers,
+      socialRefs: _socialRefs,
       tags: _tags,
       obsidianPath: existingPath,
     );
@@ -448,6 +545,77 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
       mediaType: OEmbedService.detectMediaType(platform, url),
       embedUrl: OEmbedService.buildEmbedUrl(platform, url),
     );
+  }
+
+  Future<void> _pickLinkedObject() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => UniversalSearchPickerSheet(
+        title: 'Vincular objeto',
+        showClear: false,
+        onSelected: (object) {
+          Navigator.pop(sheetContext);
+          final refLink = _objectWikiLink(object);
+          setState(() {
+            if (!_socialRefs.any((ref) => _sameRef(ref, refLink, object))) {
+              _socialRefs.add(refLink);
+            }
+          });
+        },
+      ),
+    );
+  }
+
+  List<ContentObject> _resolveRefs(
+    List<ContentObject> objects,
+    List<String> refs,
+  ) {
+    return refs
+        .map((ref) => _resolveRef(objects, ref))
+        .whereType<ContentObject>()
+        .toList();
+  }
+
+  ContentObject? _resolveRef(List<ContentObject> objects, String ref) {
+    final key = _cleanWikiRef(ref).toLowerCase();
+    if (key.isEmpty) return null;
+    return objects.where((object) {
+      final keys = {
+        object.id,
+        object.slug,
+        object.title,
+        object.obsidianFileName,
+        if (object.obsidianPath.isNotEmpty)
+          object.obsidianPath.replaceAll(RegExp(r'\.md$'), ''),
+      }.map((value) => value.trim().toLowerCase()).toSet();
+      return keys.contains(key);
+    }).firstOrNull;
+  }
+
+  bool _sameRef(String current, String refLink, ContentObject object) {
+    final currentKey = _cleanWikiRef(current).toLowerCase();
+    final refKey = _cleanWikiRef(refLink).toLowerCase();
+    return currentKey == refKey ||
+        currentKey == object.id.toLowerCase() ||
+        currentKey == object.slug.toLowerCase() ||
+        currentKey == object.obsidianFileName.toLowerCase();
+  }
+
+  String _cleanWikiRef(String ref) {
+    var cleaned = ref.trim();
+    if (cleaned.startsWith('[[') && cleaned.endsWith(']]')) {
+      cleaned = cleaned.substring(2, cleaned.length - 2);
+    }
+    return cleaned.split('|').first.trim();
+  }
+
+  String _objectWikiLink(ContentObject object) {
+    final target = object.obsidianFileName.trim().isNotEmpty
+        ? object.obsidianFileName
+        : object.slug;
+    return '[[${target.isEmpty ? object.id : target}]]';
   }
 }
 
@@ -487,19 +655,16 @@ class _Thumbnail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _platformColor(post.platform);
+    final fallback = _fallback(color, post.platform);
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: SizedBox(
         width: 72,
         height: 72,
-        child: post.thumbnailUrl?.isNotEmpty == true
-            ? Image.network(
-                post.thumbnailUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    _fallback(color, post.platform),
-              )
-            : _fallback(color, post.platform),
+        child: SocialPostImage(
+          source: socialPostImageSource(post),
+          fallback: fallback,
+        ),
       ),
     );
   }

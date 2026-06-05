@@ -152,7 +152,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('pt_BR');
   if (Platform.isAndroid || Platform.isIOS) {
-    await HomeWidget.registerInteractivityCallback(homeWidgetInteractiveCallback);
+    await HomeWidget.registerInteractivityCallback(
+      homeWidgetInteractiveCallback,
+    );
   }
   // #region agent log
   await _emitAgentDebugLog(
@@ -714,8 +716,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/detail/:id',
-            builder: (context, state) =>
-                _ObjectDetailResolver(id: state.pathParameters['id']!),
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return _ObjectDetailResolver(
+                id: state.pathParameters['id']!,
+                searchQuery: extra?['searchQuery'] as String?,
+                searchSnippet: extra?['searchSnippet'] as String?,
+              );
+            },
           ),
           GoRoute(
             path: '/organizer/:id',
@@ -791,7 +799,13 @@ class MapPlaceholderScreen extends StatelessWidget {
 
 class _ObjectDetailResolver extends ConsumerWidget {
   final String id;
-  const _ObjectDetailResolver({required this.id});
+  final String? searchQuery;
+  final String? searchSnippet;
+  const _ObjectDetailResolver({
+    required this.id,
+    this.searchQuery,
+    this.searchSnippet,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -804,7 +818,11 @@ class _ObjectDetailResolver extends ConsumerWidget {
         if (object == null) {
           return const Scaffold(body: Center(child: Text('Object not found')));
         }
-        return UniversalDetailView(object: object);
+        return UniversalDetailView(
+          object: object,
+          searchQuery: searchQuery,
+          searchSnippet: searchSnippet,
+        );
       },
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),

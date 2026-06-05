@@ -31,7 +31,7 @@ open class CitrineCalendarWidgetProvider : AppWidgetProvider() {
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_citrine_calendar)
 
-        val mode = data.optString("mode", "day")
+        val mode = "week"
         val isDark = CitrineWidgetUtils.isDark(context)
         val bgColor = if (isDark) 0xFF1F2024.toInt() else android.graphics.Color.WHITE
         val textColor = if (isDark) 0xFFF4F4F5.toInt() else 0xFF1F2430.toInt()
@@ -64,34 +64,21 @@ open class CitrineCalendarWidgetProvider : AppWidgetProvider() {
             )
         )
 
-        // Toggles
-        views.setTextColor(R.id.toggle_day, if (mode == "day") textColor else mutedColor)
-        views.setTextColor(R.id.toggle_week, if (mode == "week") textColor else mutedColor)
-        views.setTextColor(R.id.toggle_month, if (mode == "month") textColor else mutedColor)
-
-        views.setInt(R.id.toggle_day, "setBackgroundResource", if (mode == "day") R.drawable.widget_pill_bg else 0)
-        views.setInt(R.id.toggle_week, "setBackgroundResource", if (mode == "week") R.drawable.widget_pill_bg else 0)
-        views.setInt(R.id.toggle_month, "setBackgroundResource", if (mode == "month") R.drawable.widget_pill_bg else 0)
-
+        // Header actions
+        views.setTextColor(R.id.widget_sync_button, mutedColor)
+        views.setTextColor(R.id.widget_add_button, textColor)
         views.setOnClickPendingIntent(
-            R.id.toggle_day,
+            R.id.widget_sync_button,
             CitrineWidgetUtils.openUriIntent(
                 context,
-                "citrine://widget-toggle?type=calendar_mode&mode=day",
+                "citrine://widget-toggle?type=calendar_offset&offset=0",
             )
         )
         views.setOnClickPendingIntent(
-            R.id.toggle_week,
+            R.id.widget_add_button,
             CitrineWidgetUtils.openUriIntent(
                 context,
-                "citrine://widget-toggle?type=calendar_mode&mode=week",
-            )
-        )
-        views.setOnClickPendingIntent(
-            R.id.toggle_month,
-            CitrineWidgetUtils.openUriIntent(
-                context,
-                "citrine://widget-toggle?type=calendar_mode&mode=month",
+                "citrine:///",
             )
         )
 

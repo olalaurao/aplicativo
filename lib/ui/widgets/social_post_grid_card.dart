@@ -1,4 +1,6 @@
 // lib/ui/widgets/social_post_grid_card.dart
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../models/social_post.dart';
@@ -118,9 +120,6 @@ class SocialPostThumbnail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = socialPlatformColor(post.platform);
-    final imageUrl = post.thumbnailUrl?.isNotEmpty == true
-        ? post.thumbnailUrl!
-        : post.mediaUrls.where((url) => url.trim().isNotEmpty).firstOrNull;
     final fallback = ColoredBox(
       color: color.withValues(alpha: 0.12),
       child: Center(
@@ -134,15 +133,60 @@ class SocialPostThumbnail extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: borderRadius,
-      child: imageUrl != null
-          ? Image.network(
-              imageUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => fallback,
-            )
-          : fallback,
+      child: SocialPostImage(
+        source: socialPostImageSource(post),
+        fit: BoxFit.cover,
+        fallback: fallback,
+      ),
     );
   }
+}
+
+class SocialPostImage extends StatelessWidget {
+  final String? source;
+  final BoxFit fit;
+  final Widget fallback;
+
+  const SocialPostImage({
+    super.key,
+    required this.source,
+    required this.fallback,
+    this.fit = BoxFit.cover,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imageSource = source?.trim();
+    if (imageSource == null || imageSource.isEmpty) return fallback;
+    final uri = Uri.tryParse(imageSource);
+    final isRemote =
+        uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
+    if (isRemote) {
+      return Image.network(
+        imageSource,
+        fit: fit,
+        errorBuilder: (context, error, stackTrace) => fallback,
+      );
+    }
+    final filePath = uri?.scheme == 'file' ? uri!.toFilePath() : imageSource;
+    return Image.file(
+      File(filePath),
+      fit: fit,
+      errorBuilder: (context, error, stackTrace) => fallback,
+    );
+  }
+}
+
+String? socialPostImageSource(SocialPost post) {
+  final media = post.mediaUrls
+      .map((url) => url.trim())
+      .where((url) => url.isNotEmpty)
+      .toList();
+  final thumbnail = post.thumbnailUrl?.trim();
+  final candidates = post.platform == SocialPlatform.pinterest
+      ? [...media, if (thumbnail != null && thumbnail.isNotEmpty) thumbnail]
+      : [if (thumbnail != null && thumbnail.isNotEmpty) thumbnail, ...media];
+  return candidates.firstOrNull;
 }
 
 class SocialPlatformBadge extends StatelessWidget {

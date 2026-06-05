@@ -31,7 +31,7 @@
             android:textSize="18sp"
             android:textStyle="bold" />
 
-        <!-- TOGGLES -->
+        <!-- ACTIONS -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="32dp"
@@ -39,34 +39,23 @@
             android:padding="2dp">
 
             <TextView
-                android:id="@+id/toggle_day"
-                android:layout_width="wrap_content"
+                android:id="@+id/widget_sync_button"
+                android:layout_width="32dp"
                 android:layout_height="match_parent"
                 android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="Dia"
+                android:text="↻"
                 android:textColor="#9AA0AA"
-                android:textSize="13sp" />
+                android:textSize="18sp" />
 
             <TextView
-                android:id="@+id/toggle_week"
-                android:layout_width="wrap_content"
+                android:id="@+id/widget_add_button"
+                android:layout_width="32dp"
                 android:layout_height="match_parent"
                 android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="Sem."
-                android:textColor="#9AA0AA"
-                android:textSize="13sp" />
-
-            <TextView
-                android:id="@+id/toggle_month"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="Mês"
-                android:textColor="#9AA0AA"
-                android:textSize="13sp" />
+                android:text="+"
+                android:textColor="#1F2430"
+                android:textSize="22sp"
+                android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
 

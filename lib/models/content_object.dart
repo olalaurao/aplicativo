@@ -105,11 +105,7 @@ abstract class ContentObject {
       : obsidianPath.split('/').last.split('\\').last.replaceAll('.md', '');
 
   String get displayTitle {
-    final candidates = <String>[
-      title,
-      ...aliases,
-      obsidianFileName,
-    ];
+    final candidates = <String>[title, ...aliases, obsidianFileName];
     for (final candidate in candidates) {
       final resolved = displayTitleFromValue(candidate, id: id);
       if (resolved != null) return resolved;
@@ -143,6 +139,7 @@ bool looksLikeTechnicalId(String value) {
   return RegExp(
         r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
       ).hasMatch(trimmed) ||
+      RegExp(r'^[0-9a-fA-F]{24,64}$').hasMatch(trimmed) ||
       RegExp(r'^\d{10,}$').hasMatch(trimmed) ||
       RegExp(
         r'^(tasks|habits|goals|notes|resources|organizers|daily|moods|trackers)[_-].+',

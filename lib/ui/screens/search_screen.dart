@@ -1,11 +1,11 @@
 // lib/ui/screens/search_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/vault_provider.dart';
 import '../../models/content_object.dart';
 import '../../services/search_service.dart';
 import '../theme.dart';
-import 'universal_detail_view.dart';
 import 'pomodoro_screen.dart';
 import 'archive_screen.dart';
 import 'settings_screen.dart';
@@ -433,15 +433,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 _recentSearches = [query, ..._recentSearches].take(5).toList();
               });
             }
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => UniversalDetailView(
-                  object: obj,
-                  searchQuery: query,
-                  searchSnippet: obj.snippet,
-                ),
-              ),
+            context.push(
+              '/detail/${obj.id}',
+              extra: {'searchQuery': query, 'searchSnippet': obj.snippet},
             );
           },
           borderRadius: BorderRadius.circular(16),

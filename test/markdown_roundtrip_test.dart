@@ -12,6 +12,7 @@ import 'package:citrine/models/reminder_model.dart';
 import 'package:citrine/models/resource_model.dart';
 import 'package:citrine/models/shared_types.dart';
 import 'package:citrine/models/snapshot_model.dart';
+import 'package:citrine/models/social_post.dart';
 import 'package:citrine/models/task_model.dart';
 import 'package:citrine/models/tracker_model.dart';
 import 'package:citrine/models/kpi_model.dart' as kpi_model;
@@ -526,6 +527,62 @@ Texto original.
         expect(row['title'], isNot(contains(uuid)));
       },
     );
+
+    test('calendar widget snapshot resolves organizer ids for habits', () {
+      const organizerId = '1a915725634c42e8979d94d631c95886';
+      final organizer = Organizer(
+        id: organizerId,
+        title: 'Saúde',
+        organizerType: OrganizerType.area,
+      );
+      final habit = Habit(
+        id: 'habit-venlafaxina',
+        title: 'venlafaxina',
+        color: '#4D9DE0',
+        organizers: [
+          OrganizerReference(
+            type: 'area',
+            slug: organizerId,
+            title: organizerId,
+          ),
+        ],
+      );
+      final snapshot = buildCalendarSnapshotForTest(
+        [organizer, habit],
+        AppSettings(vaultName: 'Test', calendarWidgetType: 'day'),
+        const [],
+        0,
+      );
+      final row = (snapshot['items'] as List).single as Map<String, dynamic>;
+
+      expect(row['id'], 'habit-venlafaxina');
+      expect(row['title'], 'venlafaxina');
+      expect(row['subtitle'], 'Saúde');
+      expect(row['subtitle'], isNot(contains(organizerId)));
+    });
+
+    test('social posts read Pinterest image aliases from frontmatter', () {
+      final parsed = SocialPost.fromMarkdown(const {
+        'title': 'Pin salvo',
+        'url': 'https://br.pinterest.com/pin/123/',
+        'platform': 'pinterest',
+        'image': 'https://i.pinimg.com/originals/pin.jpg',
+      }, '');
+
+      expect(parsed.platform, SocialPlatform.pinterest);
+      expect(parsed.thumbnailUrl, 'https://i.pinimg.com/originals/pin.jpg');
+    });
+
+    test('social posts rebuild Pinterest embed for old saved pins', () {
+      final parsed = SocialPost.fromMarkdown(const {
+        'title': 'Pin antigo',
+        'url': 'https://br.pinterest.com/pin/123456789/',
+        'platform': 'pinterest',
+      }, '');
+
+      expect(parsed.embedUrl, contains('assets.pinterest.com/ext/embed.html'));
+      expect(parsed.embedUrl, contains('123456789'));
+    });
 
     test('filter widget snapshot uses saved widget settings', () {
       final organizer = Organizer(

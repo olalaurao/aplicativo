@@ -68,7 +68,9 @@ class OEmbedService {
       case SocialPlatform.linkedin:
         return null;
       case SocialPlatform.pinterest:
-        final id = RegExp(r'/pin/(\d+)').firstMatch(originalUrl)?.group(1);
+        final id =
+            RegExp(r'/pin/(\d+)').firstMatch(originalUrl)?.group(1) ??
+            Uri.tryParse(originalUrl)?.queryParameters['pin'];
         return id == null
             ? null
             : 'https://assets.pinterest.com/ext/embed.html?id=$id';
@@ -138,6 +140,19 @@ class OEmbedService {
       }
 
       if (platform == SocialPlatform.tiktok &&
+          (thumbnailUrl == null || caption == null)) {
+        final og = await _fetchOpenGraph(normalizedUrl);
+        if (og != null) {
+          title = _stringValue(og['title']) ?? title;
+          caption ??=
+              _stringValue(og['description']) ??
+              _stringValue(og['og:description']);
+          thumbnailUrl ??= _stringValue(og['image']);
+          authorName ??= _stringValue(og['site_name']);
+        }
+      }
+
+      if (platform == SocialPlatform.pinterest &&
           (thumbnailUrl == null || caption == null)) {
         final og = await _fetchOpenGraph(normalizedUrl);
         if (og != null) {

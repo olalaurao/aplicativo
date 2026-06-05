@@ -59,6 +59,35 @@ class CitrineChart extends StatelessWidget {
   Widget _buildLineChart(BuildContext context) {
     final series = multiData ?? [data];
     final seriesColors = colors ?? [color ?? AppColors.primary];
+    final lineBars = series
+        .asMap()
+        .entries
+        .map((entry) {
+          final idx = entry.key;
+          final d = entry.value;
+          final spots = d
+              .asMap()
+              .entries
+              .where((e) => e.value.value != null)
+              .map((e) => FlSpot(e.key.toDouble(), e.value.value!))
+              .toList();
+          return LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            color: seriesColors[idx % seriesColors.length],
+            barWidth: 3,
+            isStrokeCapRound: true,
+            dotData: const FlDotData(show: true),
+            belowBarData: BarAreaData(
+              show: spots.length > 1,
+              color: seriesColors[idx % seriesColors.length].withValues(
+                alpha: 0.1,
+              ),
+            ),
+          );
+        })
+        .where((bar) => bar.spots.isNotEmpty)
+        .toList();
 
     return LineChart(
       LineChartData(
@@ -105,54 +134,36 @@ class CitrineChart extends StatelessWidget {
           ),
         ),
         borderData: FlBorderData(show: false),
-        lineBarsData: series.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final d = entry.value;
-          return LineChartBarData(
-            spots: d
-                .asMap()
-                .entries
-                .map((e) => FlSpot(e.key.toDouble(), e.value.value))
-                .toList(),
-            isCurved: true,
-            color: seriesColors[idx % seriesColors.length],
-            barWidth: 3,
-            isStrokeCapRound: true,
-            dotData: FlDotData(show: d.length < 15),
-            belowBarData: BarAreaData(
-              show: true,
-              color: seriesColors[idx % seriesColors.length].withValues(
-                alpha: 0.1,
-              ),
-            ),
-          );
-        }).toList(),
+        lineBarsData: lineBars,
       ),
     );
   }
 
   Widget _buildBarChart(BuildContext context) {
+    final nonNullData = data
+        .asMap()
+        .entries
+        .where((e) => e.value.value != null)
+        .toList();
     return BarChart(
       BarChartData(
         alignment: BarChartAlignment.spaceAround,
-        maxY: data.isEmpty
+        maxY: nonNullData.isEmpty
             ? 1.0
-            : data
-                      .map((e) => e.value)
+            : nonNullData
+                      .map((e) => e.value.value!)
                       .fold(0.0, (prev, curr) => curr > prev ? curr : prev) *
                   1.2,
         gridData: const FlGridData(show: false),
         titlesData: const FlTitlesData(show: false),
         borderData: FlBorderData(show: false),
-        barGroups: data
-            .asMap()
-            .entries
+        barGroups: nonNullData
             .map(
               (e) => BarChartGroupData(
                 x: e.key,
                 barRods: [
                   BarChartRodData(
-                    toY: e.value.value,
+                    toY: e.value.value!,
                     color: color ?? AppColors.primary,
                     width: 16,
                     borderRadius: BorderRadius.circular(4),
@@ -173,8 +184,8 @@ class CitrineChart extends StatelessWidget {
         sections: data
             .map(
               (e) => PieChartSectionData(
-                value: e.value,
-                title: '${e.value.toInt()}',
+                value: e.value ?? 0,
+                title: '${(e.value ?? 0).toInt()}',
                 color: e.color ?? AppColors.primary,
                 radius: 50,
                 titleStyle: const TextStyle(
@@ -205,12 +216,12 @@ class CitrineChart extends StatelessWidget {
           spacing: spacing,
           runSpacing: spacing,
           children: data.map((e) {
-            final intensity = (e.value).clamp(0.0, 1.0);
+            final intensity = e.value?.clamp(0.0, 1.0);
             return Container(
               width: cellSize,
               height: cellSize,
               decoration: BoxDecoration(
-                color: intensity > 0
+                color: intensity != null && intensity > 0
                     ? color?.withValues(alpha: 0.2 + (intensity * 0.8))
                     : AppTheme.surfaceVariantColor(
                         context,
@@ -227,7 +238,7 @@ class CitrineChart extends StatelessWidget {
 
 class ChartDataPoint {
   final String label;
-  final double value;
+  final double? value;
   final Color? color;
 
   ChartDataPoint({required this.label, required this.value, this.color});

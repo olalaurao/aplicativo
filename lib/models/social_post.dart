@@ -181,13 +181,25 @@ class SocialPost extends ContentObject {
     post.authorHandle = _stringValue(frontmatter['author_handle']);
     post.authorName = _stringValue(frontmatter['author_name']);
     post.thumbnailUrl = _stringValue(
-      frontmatter['thumbnail'] ?? frontmatter['thumbnail_url'],
+      frontmatter['thumbnail'] ??
+          frontmatter['thumbnail_url'] ??
+          frontmatter['image'] ??
+          frontmatter['image_url'] ??
+          frontmatter['cover'] ??
+          frontmatter['cover_image'],
     );
-    post.embedUrl = _stringValue(frontmatter['embed_url']);
+    post.embedUrl =
+        _stringValue(frontmatter['embed_url']) ??
+        _embedUrlFromPlatformUrl(platform, url);
     post.videoUrl = _stringValue(
       frontmatter['video_url'] ?? frontmatter['direct_video_url'],
     );
-    post.mediaUrls = _stringList(frontmatter['media_urls']);
+    post.mediaUrls = _stringList(
+      frontmatter['media_urls'] ??
+          frontmatter['media'] ??
+          frontmatter['images'] ??
+          frontmatter['image_urls'],
+    );
     post.primaryMediaIndex =
         int.tryParse(frontmatter['primary_media_index']?.toString() ?? '') ?? 0;
     post.watched = _boolValue(frontmatter['watched']);
@@ -307,6 +319,15 @@ class SocialPost extends ContentObject {
         .lastOrNull;
     if (segment != null && segment.isNotEmpty) return segment;
     return url.isEmpty ? 'Post social' : url;
+  }
+
+  static String? _embedUrlFromPlatformUrl(SocialPlatform platform, String url) {
+    if (platform != SocialPlatform.pinterest) return null;
+    final pinId =
+        RegExp(r'/pin/(\d+)').firstMatch(url)?.group(1) ??
+        Uri.tryParse(url)?.queryParameters['pin'];
+    if (pinId == null || pinId.isEmpty) return null;
+    return 'https://assets.pinterest.com/ext/embed.html?id=$pinId';
   }
 
   static String? _personalNoteFromBody(String body, String? caption) {

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/day_theme_model.dart';
 import '../../providers/day_theme_provider.dart';
 import '../theme.dart';
+import '../widgets/app_color_picker.dart';
 
 class DayThemeScreen extends ConsumerWidget {
   const DayThemeScreen({super.key});
@@ -107,6 +108,10 @@ class DayThemeScreen extends ConsumerWidget {
   }
 
   Widget _buildBlockTile(BuildContext context, WidgetRef ref, TimeBlock block) {
+    final blockColor = AppColorPicker.parseHex(
+      block.color ?? '#FFB000',
+      fallback: AppColors.accent,
+    );
     final rangeText = block.timeRanges.isEmpty
         ? 'Sem horário definido'
         : block.timeRanges
@@ -120,6 +125,14 @@ class DayThemeScreen extends ConsumerWidget {
       decoration: AppTheme.cardDecoration(context),
       child: ListTile(
         onTap: () => _showBlockDialog(context, ref, block: block),
+        leading: Container(
+          width: 12,
+          height: 44,
+          decoration: BoxDecoration(
+            color: blockColor,
+            borderRadius: BorderRadius.circular(6),
+          ),
+        ),
         title: Text(block.title, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: Text(rangeText, maxLines: 1, overflow: TextOverflow.ellipsis),
         trailing: PopupMenuButton<String>(
@@ -149,6 +162,10 @@ class DayThemeScreen extends ConsumerWidget {
     DayTheme theme,
     List<TimeBlock> blocks,
   ) {
+    final themeColor = AppColorPicker.parseHex(
+      theme.color ?? '#FFB000',
+      fallback: AppColors.accent,
+    );
     final blockTitles = blocks
         .where((block) => theme.blockIds.contains(block.id))
         .map((block) => block.title)
@@ -158,6 +175,11 @@ class DayThemeScreen extends ConsumerWidget {
       decoration: AppTheme.cardDecoration(context),
       child: ListTile(
         onTap: () => _showThemeDialog(context, ref, theme: theme),
+        leading: CircleAvatar(
+          radius: 18,
+          backgroundColor: themeColor.withValues(alpha: 0.16),
+          child: Icon(Icons.palette_rounded, color: themeColor, size: 18),
+        ),
         title: Text(theme.title, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: Text(
           [
@@ -194,7 +216,9 @@ class DayThemeScreen extends ConsumerWidget {
     TimeBlock? block,
   }) {
     final nameController = TextEditingController(text: block?.title ?? '');
-    final colorController = TextEditingController(text: block?.color ?? '');
+    String selectedColor = AppColorPicker.normalizeHex(
+      block?.color ?? '#FFB000',
+    );
     final ranges =
         block?.timeRanges
             .map(
@@ -213,112 +237,117 @@ class DayThemeScreen extends ConsumerWidget {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text(block == null ? 'Novo bloco' : 'Editar bloco'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Nome'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: colorController,
-                decoration: const InputDecoration(
-                  labelText: 'Cor',
-                  hintText: '#FF8A00',
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Nome'),
                 ),
-              ),
-              const SizedBox(height: 16),
-              ...ranges.asMap().entries.map((entry) {
-                final index = entry.key;
-                final range = entry.value;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () async {
-                            final picked = await showTimePicker(
-                              context: context,
-                              initialTime: TimeOfDay(
-                                hour: range.startHour.clamp(0, 23),
-                                minute: range.startMinute.clamp(0, 59),
-                              ),
-                            );
-                            if (picked != null) {
-                              setDialogState(() {
-                                ranges[index] = TimeRange(
-                                  startHour: picked.hour,
-                                  startMinute: picked.minute,
-                                  endHour: range.endHour,
-                                  endMinute: range.endMinute,
-                                );
-                              });
-                            }
-                          },
-                          child: Text(
-                            'Início ${_formatRangeTime(range.startHour, range.startMinute)}',
+                const SizedBox(height: 16),
+                AppColorPicker(
+                  value: selectedColor,
+                  onChanged: (color) =>
+                      setDialogState(() => selectedColor = color),
+                ),
+                const SizedBox(height: 16),
+                ...ranges.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final range = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () async {
+                              final picked = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay(
+                                  hour: range.startHour.clamp(0, 23),
+                                  minute: range.startMinute.clamp(0, 59),
+                                ),
+                              );
+                              if (picked != null) {
+                                setDialogState(() {
+                                  ranges[index] = TimeRange(
+                                    startHour: picked.hour,
+                                    startMinute: picked.minute,
+                                    endHour: range.endHour,
+                                    endMinute: range.endMinute,
+                                  );
+                                });
+                              }
+                            },
+                            child: Text(
+                              'Início ${_formatRangeTime(range.startHour, range.startMinute)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () async {
-                            final picked = await showTimePicker(
-                              context: context,
-                              initialTime: TimeOfDay(
-                                hour: range.endHour.clamp(0, 23),
-                                minute: range.endMinute.clamp(0, 59),
-                              ),
-                            );
-                            if (picked != null) {
-                              setDialogState(() {
-                                ranges[index] = TimeRange(
-                                  startHour: range.startHour,
-                                  startMinute: range.startMinute,
-                                  endHour: picked.hour,
-                                  endMinute: picked.minute,
-                                );
-                              });
-                            }
-                          },
-                          child: Text(
-                            'Fim ${_formatRangeTime(range.endHour, range.endMinute)}',
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () async {
+                              final picked = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay(
+                                  hour: range.endHour.clamp(0, 23),
+                                  minute: range.endMinute.clamp(0, 59),
+                                ),
+                              );
+                              if (picked != null) {
+                                setDialogState(() {
+                                  ranges[index] = TimeRange(
+                                    startHour: range.startHour,
+                                    startMinute: range.startMinute,
+                                    endHour: picked.hour,
+                                    endMinute: picked.minute,
+                                  );
+                                });
+                              }
+                            },
+                            child: Text(
+                              'Fim ${_formatRangeTime(range.endHour, range.endMinute)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
-                      ),
-                      IconButton(
-                        tooltip: 'Remover intervalo',
-                        onPressed: ranges.length == 1
-                            ? null
-                            : () =>
-                                  setDialogState(() => ranges.removeAt(index)),
-                        icon: const Icon(Icons.remove_circle_outline_rounded),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: () => setDialogState(
-                    () => ranges.add(
-                      TimeRange(
-                        startHour: 9,
-                        startMinute: 0,
-                        endHour: 10,
-                        endMinute: 0,
+                        IconButton(
+                          tooltip: 'Remover intervalo',
+                          onPressed: ranges.length == 1
+                              ? null
+                              : () => setDialogState(
+                                  () => ranges.removeAt(index),
+                                ),
+                          icon: const Icon(Icons.remove_circle_outline_rounded),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => setDialogState(
+                      () => ranges.add(
+                        TimeRange(
+                          startHour: 9,
+                          startMinute: 0,
+                          endHour: 10,
+                          endMinute: 0,
+                        ),
                       ),
                     ),
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Adicionar intervalo'),
                   ),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Adicionar intervalo'),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -339,9 +368,7 @@ class DayThemeScreen extends ConsumerWidget {
                 final updated = TimeBlock(
                   id: block?.id,
                   title: name,
-                  color: colorController.text.trim().isEmpty
-                      ? null
-                      : colorController.text.trim(),
+                  color: selectedColor,
                   timeRanges: normalizedRanges,
                   order: block?.order ?? ref.read(timeBlocksProvider).length,
                 );
@@ -371,7 +398,9 @@ class DayThemeScreen extends ConsumerWidget {
     DayTheme? theme,
   }) {
     final nameController = TextEditingController(text: theme?.title ?? '');
-    final colorController = TextEditingController(text: theme?.color ?? '');
+    String selectedColor = AppColorPicker.normalizeHex(
+      theme?.color ?? '#FFB000',
+    );
     final selectedDays = {...?theme?.daysOfWeek};
     final blocks = ref.read(timeBlocksProvider);
     final selectedBlocks = {...?theme?.blockIds};
@@ -391,13 +420,11 @@ class DayThemeScreen extends ConsumerWidget {
                   controller: nameController,
                   decoration: const InputDecoration(labelText: 'Nome'),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: colorController,
-                  decoration: const InputDecoration(
-                    labelText: 'Cor',
-                    hintText: '#FF8A00',
-                  ),
+                const SizedBox(height: 16),
+                AppColorPicker(
+                  value: selectedColor,
+                  onChanged: (color) =>
+                      setDialogState(() => selectedColor = color),
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -457,9 +484,7 @@ class DayThemeScreen extends ConsumerWidget {
                 final updated = DayTheme(
                   id: theme?.id,
                   title: name,
-                  color: colorController.text.trim().isEmpty
-                      ? null
-                      : colorController.text.trim(),
+                  color: selectedColor,
                   daysOfWeek: selectedDays.toList(),
                   blockIds: selectedBlocks.toList(),
                 );

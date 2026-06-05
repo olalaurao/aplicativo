@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/mood_model.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
+import '../widgets/app_color_picker.dart';
 import 'universal_detail_view.dart';
 
 class MoodSettingsScreen extends ConsumerWidget {
@@ -17,9 +18,11 @@ class MoodSettingsScreen extends ConsumerWidget {
     final moods = ref.watch(moodsProvider);
     final sortedMoods = List<MoodDefinition>.from(moods)
       ..sort((a, b) {
-        final byValue = a.numericValue.compareTo(b.numericValue);
-        if (byValue != 0) return byValue;
-        return (a.order ?? 0).compareTo(b.order ?? 0);
+        final byOrder = (a.order ?? a.numericValue).compareTo(
+          b.order ?? b.numericValue,
+        );
+        if (byOrder != 0) return byOrder;
+        return a.numericValue.compareTo(b.numericValue);
       });
     final canAdd = moods.length < _maxMoods;
 
@@ -106,114 +109,152 @@ class MoodSettingsScreen extends ConsumerWidget {
     final valueController = TextEditingController(
       text: (mood?.numericValue ?? defaultValue).toString(),
     );
-    final colorController = TextEditingController(
-      text: mood?.color ?? _defaultColorForValue(defaultValue),
+    String selectedColor = AppColorPicker.normalizeHex(
+      mood?.color ?? _defaultColorForValue(defaultValue),
     );
 
     showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(isNew ? 'Novo humor' : 'Editar humor'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(labelText: 'Nome'),
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: emojiController,
-                decoration: const InputDecoration(labelText: 'Emoji'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: valueController,
-                decoration: const InputDecoration(
-                  labelText: 'Valor numérico (1-15)',
-                ),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: colorController,
-                decoration: const InputDecoration(
-                  labelText: 'Cor hex (ex: #9E9E9E)',
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final title = titleController.text.trim();
-              if (title.isEmpty) return;
-
-              final numericValue =
-                  ((int.tryParse(valueController.text.trim()) ?? defaultValue)
-                          .clamp(1, _maxMoods))
-                      .toInt();
-              if (_hasDuplicateValue(
-                ref.read(moodsProvider),
-                numericValue,
-                mood?.id,
-              )) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('O valor $numericValue já está em uso.'),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(isNew ? 'Novo humor' : 'Editar humor'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColorPicker.parseHex(
+                      selectedColor,
+                    ).withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                );
-                return;
-              }
-
-              final id = mood?.id ?? _uniqueMoodId(ref, title);
-              final updatedMood = MoodDefinition(
-                id: id,
-                title: title,
-                label: title,
-                emoji: emojiController.text.trim().isEmpty
-                    ? '😐'
-                    : emojiController.text.trim(),
-                numericValue: numericValue,
-                color: _normalizeHexColor(colorController.text),
-                order: mood?.order ?? numericValue - 1,
-                obsidianPath: mood?.obsidianPath ?? 'moods/$id.md',
-              );
-
-              try {
-                if (isNew) {
-                  await ref.read(moodsProvider.notifier).addMood(updatedMood);
-                } else {
-                  await ref
-                      .read(moodsProvider.notifier)
-                      .updateMood(updatedMood);
-                }
-                if (!dialogContext.mounted) return;
-                Navigator.pop(dialogContext);
-              } catch (e) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Erro ao salvar humor: $e')),
-                );
-              }
-            },
-            style: AppTheme.primaryButtonStyle,
-            child: const Text('Salvar'),
+                  child: Row(
+                    children: [
+                      Text(
+                        emojiController.text.trim().isEmpty
+                            ? '😐'
+                            : emojiController.text.trim(),
+                        style: const TextStyle(fontSize: 28),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          titleController.text.trim().isEmpty
+                              ? 'Preview do humor'
+                              : titleController.text.trim(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColorPicker.parseHex(selectedColor),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(labelText: 'Nome'),
+                  textCapitalization: TextCapitalization.words,
+                  onChanged: (_) => setDialogState(() {}),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emojiController,
+                  decoration: const InputDecoration(labelText: 'Emoji'),
+                  onChanged: (_) => setDialogState(() {}),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: valueController,
+                  decoration: const InputDecoration(
+                    labelText: 'Valor numérico (1-15)',
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 16),
+                AppColorPicker(
+                  value: selectedColor,
+                  onChanged: (color) =>
+                      setDialogState(() => selectedColor = color),
+                ),
+              ],
+            ),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final title = titleController.text.trim();
+                if (title.isEmpty) return;
+
+                final numericValue =
+                    ((int.tryParse(valueController.text.trim()) ?? defaultValue)
+                            .clamp(1, _maxMoods))
+                        .toInt();
+                if (_hasDuplicateValue(
+                  ref.read(moodsProvider),
+                  numericValue,
+                  mood?.id,
+                )) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('O valor $numericValue já está em uso.'),
+                    ),
+                  );
+                  return;
+                }
+
+                final id = mood?.id ?? _uniqueMoodId(ref, title);
+                final updatedMood = MoodDefinition(
+                  id: id,
+                  title: title,
+                  label: title,
+                  emoji: emojiController.text.trim().isEmpty
+                      ? '😐'
+                      : emojiController.text.trim(),
+                  numericValue: numericValue,
+                  color: selectedColor,
+                  order: mood?.order ?? numericValue - 1,
+                  obsidianPath: mood?.obsidianPath ?? 'moods/$id.md',
+                );
+
+                try {
+                  if (isNew) {
+                    await ref.read(moodsProvider.notifier).addMood(updatedMood);
+                  } else {
+                    await ref
+                        .read(moodsProvider.notifier)
+                        .updateMood(updatedMood);
+                  }
+                  if (!dialogContext.mounted) return;
+                  Navigator.pop(dialogContext);
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Erro ao salvar humor: $e')),
+                  );
+                }
+              },
+              style: AppTheme.primaryButtonStyle,
+              child: const Text('Salvar'),
+            ),
+          ],
+        ),
       ),
     ).whenComplete(() {
       titleController.dispose();
       emojiController.dispose();
       valueController.dispose();
-      colorController.dispose();
     });
   }
 
@@ -331,14 +372,6 @@ class MoodSettingsScreen extends ConsumerWidget {
       index++;
     }
     return '$base-$index';
-  }
-
-  String _normalizeHexColor(String value) {
-    final trimmed = value.trim();
-    final withHash = trimmed.startsWith('#') ? trimmed : '#$trimmed';
-    return RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(withHash)
-        ? withHash.toUpperCase()
-        : '#9E9E9E';
   }
 
   String _defaultColorForValue(int value) {
@@ -483,7 +516,7 @@ class _MoodTile extends StatelessWidget {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            mood.color,
+                            'Valor ${mood.numericValue}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(

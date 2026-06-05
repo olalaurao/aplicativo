@@ -29,6 +29,7 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
   bool _hasError = false;
   bool _resolvingVideo = false;
   String? _resolvedVideoUrl;
+  SocialPost? _resolvedPost;
 
   double get _height {
     return switch (widget.post.platform) {
@@ -120,11 +121,15 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
       return;
     }
 
-    final embedUrl = widget.post.embedUrl;
+    final embedUrl = _embedUrlFor(widget.post);
     if (widget.post.platform == SocialPlatform.substack) {
       _controller.loadRequest(Uri.parse(widget.post.url));
     } else if (embedUrl != null && embedUrl.isNotEmpty) {
-      _controller.loadHtmlString(_buildEmbedHtml(widget.post));
+      _controller.loadHtmlString(
+        _buildEmbedHtml(widget.post, embedUrl: embedUrl),
+      );
+    } else if (widget.post.platform == SocialPlatform.pinterest) {
+      _resolvePinterestPreview();
     } else {
       _hasError = true;
     }
@@ -189,10 +194,10 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
   }
 
   Widget _buildFallback(BuildContext context) {
+    final post = _resolvedPost ?? widget.post;
     final color = socialPlatformColor(widget.post.platform);
     final hasImage =
-        widget.post.thumbnailUrl?.isNotEmpty == true ||
-        widget.post.mediaUrls.isNotEmpty;
+        post.thumbnailUrl?.isNotEmpty == true || post.mediaUrls.isNotEmpty;
     return Container(
       height: hasImage ? 360 : 220,
       decoration: BoxDecoration(
@@ -206,7 +211,7 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
           fit: StackFit.expand,
           children: [
             SocialPostThumbnail(
-              post: widget.post,
+              post: post,
               iconSize: 48,
               borderRadius: BorderRadius.zero,
             ),
@@ -300,9 +305,7 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
   }
 
   void _loadTikTokEmbedOrFallback() {
-    final embedUrl =
-        widget.post.embedUrl ??
-        OEmbedService.buildEmbedUrl(widget.post.platform, widget.post.url);
+    final embedUrl = _embedUrlFor(widget.post);
     if (embedUrl == null || embedUrl.isEmpty) {
       if (mounted) {
         setState(() {
@@ -327,11 +330,10 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
   }
 
   void _openImagePreview() {
-    final imageUrl = widget.post.thumbnailUrl?.isNotEmpty == true
-        ? widget.post.thumbnailUrl!
-        : widget.post.mediaUrls
-              .where((url) => url.trim().isNotEmpty)
-              .firstOrNull;
+    final post = _resolvedPost ?? widget.post;
+    final imageUrl = post.thumbnailUrl?.isNotEmpty == true
+        ? post.thumbnailUrl!
+        : post.mediaUrls.where((url) => url.trim().isNotEmpty).firstOrNull;
     if (imageUrl == null) {
       _openOriginal();
       return;
@@ -359,6 +361,26 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
         ),
       ),
     );
+  }
+
+  Future<void> _resolvePinterestPreview() async {
+    final resolved = await OEmbedService().fetchMetadata(widget.post.url);
+    if (!mounted) return;
+    final embedUrl = _embedUrlFor(resolved);
+    if (embedUrl != null && embedUrl.isNotEmpty) {
+      _controller.loadHtmlString(_buildEmbedHtml(resolved, embedUrl: embedUrl));
+      return;
+    }
+    setState(() {
+      _timeout?.cancel();
+      _resolvedPost = resolved;
+      _hasError = true;
+    });
+  }
+
+  String? _embedUrlFor(SocialPost post) {
+    return post.embedUrl ??
+        OEmbedService.buildEmbedUrl(post.platform, post.url);
   }
 
   String _buildEmbedHtml(SocialPost post, {String? embedUrl}) {

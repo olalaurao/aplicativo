@@ -6,9 +6,15 @@ import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../models/task_model.dart';
 import '../../models/habit_model.dart';
+import '../../models/content_object.dart';
+import '../../models/reminder_model.dart';
 import '../../providers/vault_provider.dart';
-import '../../providers/settings_provider.dart';
+import '../../providers/google_calendar_provider.dart';
+import '../../providers/widget_sync_provider.dart';
 import '../theme.dart';
+import '../screens/google_event_detail_screen.dart';
+import 'create_menu_sheet.dart';
+import 'package:googleapis/calendar/v3.dart' as google_calendar;
 
 class CalendarWidget extends ConsumerStatefulWidget {
   const CalendarWidget({super.key});
@@ -19,12 +25,32 @@ class CalendarWidget extends ConsumerStatefulWidget {
 
 class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
   DateTime _selectedDay = DateTime.now();
-  CalendarView _currentView = CalendarView.day; // Default to Day view
+  final CalendarView _currentView = CalendarView.week;
 
   @override
   Widget build(BuildContext context) {
     final allTasks = ref.watch(tasksProvider);
     final habits = ref.watch(habitsProvider);
+    final reminders = ref.watch(remindersProvider);
+    final organizerObjects =
+        ref
+            .watch(allObjectsProvider)
+            .valueOrNull
+            ?.where(
+              (object) =>
+                  object.type == 'organizer' ||
+                  object.type == 'goal' ||
+                  object.type == 'project' ||
+                  object.type == 'person',
+            )
+            .toList() ??
+        const <ContentObject>[];
+    final googleEvents = ref
+        .watch(googleCalendarEventsProvider(_selectedDay))
+        .maybeWhen(
+          data: (events) => events,
+          orElse: () => <google_calendar.Event>[],
+        );
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -61,7 +87,26 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                   ),
                 ],
               ),
-              _buildViewToggle(),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Sincronizar',
+                    onPressed: () async {
+                      ref.invalidate(googleCalendarEventsProvider);
+                      await forceWidgetSync(
+                        ProviderScope.containerOf(context, listen: false),
+                      );
+                    },
+                    icon: const Icon(Icons.sync_rounded, size: 18),
+                  ),
+                  IconButton(
+                    tooltip: 'Adicionar',
+                    onPressed: () => showCreateMenu(context),
+                    icon: const Icon(Icons.add_rounded, size: 20),
+                  ),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -70,77 +115,18 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
           if (_currentView == CalendarView.month)
             _buildMonthGrid(allTasks, habits)
           else if (_currentView == CalendarView.week)
-            _buildWeekAgenda(allTasks, habits)
+            _buildWeekAgenda(
+              allTasks,
+              habits,
+              reminders,
+              organizerObjects,
+              googleEvents,
+            )
           else
-            _buildDayAgenda(allTasks, habits),
+            _buildDayAgenda(allTasks, habits, organizerObjects),
         ],
       ),
     );
-  }
-
-  Widget _buildViewToggle() {
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceVariantColor(context),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: CalendarView.values.map((view) {
-          final isSelected = _currentView == view;
-          return InkWell(
-            onTap: () {
-              setState(() => _currentView = view);
-              ref
-                  .read(settingsProvider.notifier)
-                  .updateWidgetCalendarSettings(type: view.name);
-            },
-            borderRadius: BorderRadius.circular(10),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppTheme.surfaceColor(context)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Text(
-                _getViewName(view),
-                style: TextStyle(
-                  fontSize: 11,
-                  color: isSelected
-                      ? AppColors.accent
-                      : AppTheme.textSecondaryColor(context),
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  String _getViewName(CalendarView view) {
-    switch (view) {
-      case CalendarView.day:
-        return 'Dia';
-      case CalendarView.week:
-        return 'Sem.';
-      case CalendarView.month:
-        return 'Mês';
-    }
   }
 
   Widget _buildCalendarNavigation() {
@@ -199,7 +185,11 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
     );
   }
 
-  Widget _buildDayAgenda(List<Task> tasks, List<Habit> habits) {
+  Widget _buildDayAgenda(
+    List<Task> tasks,
+    List<Habit> habits,
+    List<ContentObject> organizerObjects,
+  ) {
     final tasksForSelectedDay = _tasksForDay(tasks, _selectedDay);
     final activeHabits = habits
         .where((h) => h.status == HabitStatus.active)
@@ -231,15 +221,26 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
           ),
         ),
         const SizedBox(height: 10),
-        ...activeHabits.map(_buildHabitRow),
+        ...activeHabits.map((habit) => _buildHabitRow(habit, organizerObjects)),
       ],
     );
   }
 
-  Widget _buildWeekAgenda(List<Task> tasks, List<Habit> habits) {
+  Widget _buildWeekAgenda(
+    List<Task> tasks,
+    List<Habit> habits,
+    List<Reminder> reminders,
+    List<ContentObject> organizerObjects,
+    List<google_calendar.Event> googleEvents,
+  ) {
     final start = _startOfWeek(_selectedDay);
     final days = List.generate(7, (index) => start.add(Duration(days: index)));
     final selectedTasks = _tasksForDay(tasks, _selectedDay);
+    final selectedReminders =
+        reminders
+            .where((reminder) => _sameDay(reminder.time, _selectedDay))
+            .toList()
+          ..sort((a, b) => a.time.compareTo(b.time));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -307,7 +308,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
         ),
         const SizedBox(height: 18),
         Text(
-          '${_sameDay(_selectedDay, DateTime.now()) ? 'Hoje' : DateFormat("d 'de' MMM", 'pt_BR').format(_selectedDay)} · ${selectedTasks.length} tarefas',
+          '${_sameDay(_selectedDay, DateTime.now()) ? 'Hoje' : DateFormat("d 'de' MMM", 'pt_BR').format(_selectedDay)} · ${selectedTasks.length} tarefas · ${selectedReminders.length} lembretes · ${googleEvents.length} eventos',
           style: TextStyle(
             color: AppTheme.textMutedColor(context),
             fontSize: 13,
@@ -327,6 +328,14 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
           )
         else
           ...selectedTasks.map(_buildAgendaTask),
+        if (googleEvents.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          ...googleEvents.map(_buildGoogleEventRow),
+        ],
+        if (selectedReminders.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          ...selectedReminders.map(_buildReminderRow),
+        ],
         const SizedBox(height: 4),
         Text(
           'Hábitos',
@@ -339,7 +348,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
         ...habits
             .where((h) => h.status == HabitStatus.active)
             .take(4)
-            .map(_buildHabitRow),
+            .map((habit) => _buildHabitRow(habit, organizerObjects)),
       ],
     );
   }
@@ -427,7 +436,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                   Text(
                     task.organizers.isNotEmpty
                         ? task.organizers.first.title
-                        : 'Sem área',
+                        : '',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -444,9 +453,117 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
     );
   }
 
-  Widget _buildHabitRow(Habit habit) {
+  Widget _buildGoogleEventRow(google_calendar.Event event) {
+    final title = event.summary?.trim().isNotEmpty == true
+        ? event.summary!.trim()
+        : 'Evento do Google';
+    final start = event.start?.dateTime ?? event.start?.date;
+    final time = start == null ? '--:--' : DateFormat('HH:mm').format(start);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => GoogleEventDetailScreen(event: event),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.event_rounded,
+              color: AppColors.secondary,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 42,
+              child: Text(
+                time,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.secondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReminderRow(Reminder reminder) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: InkWell(
+        onTap: () => context.push('/detail/${reminder.id}'),
+        child: Row(
+          children: [
+            Icon(
+              reminder.isCompleted
+                  ? Icons.notifications_off_rounded
+                  : Icons.notifications_active_rounded,
+              color: reminder.isCompleted
+                  ? AppColors.success
+                  : AppColors.warning,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 42,
+              child: Text(
+                DateFormat('HH:mm').format(reminder.time),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: reminder.isCompleted
+                      ? AppColors.success
+                      : AppColors.warning,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                reminder.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHabitRow(
+    Habit habit, [
+    List<ContentObject> organizerObjects = const [],
+  ]) {
     final done = _isHabitCompletedOn(habit, _selectedDay);
     final time = _habitTime(habit);
+    final subtitle = _habitSubtitle(habit, time, organizerObjects);
     return InkWell(
       onTap: () => context.push('/detail/${habit.id}'),
       child: Padding(
@@ -460,7 +577,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    habit.displayTitle,
+                    _habitTitle(habit),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -468,11 +585,11 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  if (time != null)
+                  if (subtitle.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(
-                        time,
+                        subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -484,20 +601,12 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                 ],
               ),
             ),
-            if (habit.organizers.isNotEmpty)
-              Text(
-                habit.organizers.first.title,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppTheme.textMutedColor(context),
-                ),
-              ),
             const SizedBox(width: 10),
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => ref
                   .read(habitsProvider.notifier)
-                  .toggleHabit(habit, _selectedDay),
+                  .toggleHabit(habit, _selectedDay, slotIndex: 0),
               child: Padding(
                 padding: const EdgeInsets.all(2),
                 child: Icon(
@@ -759,6 +868,40 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
       }
     }
     return null;
+  }
+
+  String _habitTitle(Habit habit) {
+    final resolved = displayTitleFromValue(habit.displayTitle, id: habit.id);
+    return resolved ?? 'Hábito';
+  }
+
+  String _habitSubtitle(
+    Habit habit,
+    String? time, [
+    List<ContentObject> organizerObjects = const [],
+  ]) {
+    final organizer = habit.organizers
+        .map((item) {
+          final resolved = organizerObjects
+              .where(
+                (organizer) =>
+                    item.matches(organizer.id, organizer.slug, organizer.title),
+              )
+              .firstOrNull;
+          if (resolved != null) {
+            return displayTitleFromValue(resolved.displayTitle) ?? '';
+          }
+          return displayTitleFromValue(item.title) ??
+              displayTitleFromValue(item.slug) ??
+              '';
+        })
+        .where((item) => item.isNotEmpty)
+        .join(', ');
+    final parts = [
+      if (time != null && time.isNotEmpty) time,
+      if (organizer.isNotEmpty) organizer,
+    ];
+    return parts.join(' · ');
   }
 
   IconData _habitIcon(Habit habit) {

@@ -57,13 +57,8 @@ final widgetSyncProvider = Provider<void>((ref) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
-  final isMonthWidget = settings.calendarWidgetType == 'month';
-  final googleStart = isMonthWidget
-      ? DateTime(today.year, today.month, 1)
-      : startOfWeek;
-  final googleDays = isMonthWidget
-      ? DateTime(today.year, today.month + 1, 0).day
-      : 35;
+  final googleStart = startOfWeek;
+  const googleDays = 7;
   final googleEventsAsync = ref.watch(
     googleCalendarRangeEventsProvider(
       GoogleCalendarParams(startDate: googleStart, days: googleDays),
@@ -100,13 +95,8 @@ Future<void> forceWidgetSync(ProviderContainer container) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
-    final isMonthWidget = settings.calendarWidgetType == 'month';
-    final googleStart = isMonthWidget
-        ? DateTime(today.year, today.month, 1)
-        : startOfWeek;
-    final googleDays = isMonthWidget
-        ? DateTime(today.year, today.month + 1, 0).day
-        : 35;
+    final googleStart = startOfWeek;
+    const googleDays = 7;
 
     List<calendar.Event> googleEvents = [];
     try {
@@ -190,8 +180,17 @@ Map<String, dynamic> _buildCalendarSnapshot(
   final tasks = objects.whereType<Task>().toList();
   final habits = objects.whereType<Habit>().toList();
   final reminders = objects.whereType<Reminder>().toList();
+  final organizerObjects = objects
+      .where(
+        (object) =>
+            object is Organizer ||
+            object is Goal ||
+            object.type == 'project' ||
+            object.type == 'person',
+      )
+      .toList();
 
-  final mode = settings.calendarWidgetType; // 'day', 'week', 'month'
+  const mode = 'week';
   const dayHeaders = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
   if (mode == 'day') {
@@ -202,6 +201,7 @@ Map<String, dynamic> _buildCalendarSnapshot(
       tasks,
       habits,
       reminders,
+      organizerObjects,
       googleEvents,
       settings,
     );
@@ -230,6 +230,7 @@ Map<String, dynamic> _buildCalendarSnapshot(
         tasks,
         habits,
         reminders,
+        organizerObjects,
         googleEvents,
         settings,
       );
@@ -256,6 +257,7 @@ Map<String, dynamic> _buildCalendarSnapshot(
       tasks,
       habits,
       reminders,
+      organizerObjects,
       googleEvents,
       settings,
     );
@@ -290,7 +292,15 @@ Map<String, dynamic> _buildCalendarSnapshot(
       final isCurrentMonth =
           date.month == focusMonth.month && date.year == focusMonth.year;
       final dayItems = isCurrentMonth
-          ? _dayItems(date, tasks, habits, reminders, googleEvents, settings)
+          ? _dayItems(
+              date,
+              tasks,
+              habits,
+              reminders,
+              organizerObjects,
+              googleEvents,
+              settings,
+            )
           : <Map<String, dynamic>>[];
 
       // Build pills (max 3) with short titles and type-based colors
@@ -376,6 +386,7 @@ List<Map<String, dynamic>> _dayItems(
   List<Task> tasks,
   List<Habit> habits,
   List<Reminder> reminders,
+  List<ContentObject> organizerObjects,
   List<calendar.Event> googleEvents,
   AppSettings settings,
 ) {
@@ -399,7 +410,7 @@ List<Map<String, dynamic>> _dayItems(
         'id': task.id,
         'title': _displayTitle(task),
         'time': task.scheduledTime ?? (task.allDay ? 'Dia inteiro' : '00:00'),
-        'subtitle': _organizerLabel(task),
+        'subtitle': _organizerLabel(task, organizerObjects),
         'sort': _sortTime(task.scheduledTime),
         'completed': task.isCompleted,
         'linkUri': 'citrine:///detail/${task.id}',
@@ -420,7 +431,7 @@ List<Map<String, dynamic>> _dayItems(
       'id': reminder.id,
       'title': reminder.title,
       'time': DateFormat('HH:mm').format(reminder.time),
-      'subtitle': _organizerLabel(reminder),
+      'subtitle': _organizerLabel(reminder, organizerObjects),
       'sort': _sortTime(DateFormat('HH:mm').format(reminder.time)),
       'linkUri': 'citrine:///detail/${reminder.id}',
     });
@@ -446,7 +457,7 @@ List<Map<String, dynamic>> _dayItems(
           'id': habit.id,
           'title': _displayTitle(habit),
           'time': '00:00',
-          'subtitle': _organizerLabel(habit),
+          'subtitle': _organizerLabel(habit, organizerObjects),
           'sort': 0,
           'completed': completed,
           'linkUri': 'citrine:///detail/${habit.id}',
@@ -464,7 +475,7 @@ List<Map<String, dynamic>> _dayItems(
             'id': habit.id,
             'title': _displayTitle(habit),
             'time': time,
-            'subtitle': _organizerLabel(habit),
+            'subtitle': _organizerLabel(habit, organizerObjects),
             'sort': _sortTime(time),
             'completed': completed,
             'linkUri': 'citrine:///detail/${habit.id}',
@@ -655,8 +666,27 @@ Map<String, dynamic> _buildPomodoroSnapshot(List<PomodoroSession> history) {
   };
 }
 
-String _organizerLabel(ContentObject object) {
-  return object.organizers.isEmpty ? 'Sem área' : object.organizers.first.title;
+String _organizerLabel(
+  ContentObject object, [
+  List<ContentObject> organizerObjects = const [],
+]) {
+  if (object.organizers.isEmpty) return '';
+  final labels = object.organizers
+      .map((ref) {
+        final resolved = organizerObjects
+            .where(
+              (organizer) =>
+                  ref.matches(organizer.id, organizer.slug, organizer.title),
+            )
+            .firstOrNull;
+        if (resolved != null) {
+          return _userFacingText(resolved.displayTitle);
+        }
+        return _userFacingText(ref.title, fallback: _userFacingText(ref.slug));
+      })
+      .where((label) => label.isNotEmpty)
+      .toList();
+  return labels.join(', ');
 }
 
 String _displayType(ContentObject item) {
@@ -673,7 +703,15 @@ String _displayType(ContentObject item) {
 }
 
 String _displayTitle(ContentObject item) {
-  return item.displayTitle;
+  return _userFacingText(item.displayTitle, fallback: item.displayType);
+}
+
+String _userFacingText(String value, {String fallback = ''}) {
+  final text = value.trim();
+  if (text.isEmpty) return fallback;
+  final isWikiLink = text.startsWith('[[') && text.endsWith(']]');
+  if (isWikiLink || looksLikeTechnicalId(text)) return fallback;
+  return text;
 }
 
 String _dateKey(DateTime date) {

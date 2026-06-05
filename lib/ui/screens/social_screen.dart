@@ -820,6 +820,7 @@ class _SocialTimelineCardState extends ConsumerState<_SocialTimelineCard> {
             ),
             if (post.videoUrl?.isNotEmpty == true ||
                 post.embedUrl?.isNotEmpty == true ||
+                post.platform == SocialPlatform.pinterest ||
                 (post.platform == SocialPlatform.tiktok &&
                     post.mediaType == SocialMediaType.video))
               SocialEmbedView(post: post)

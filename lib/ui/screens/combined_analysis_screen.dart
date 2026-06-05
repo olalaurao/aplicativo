@@ -550,8 +550,14 @@ class _CombinedAnalysisScreenState
     if (series.length < 2) {
       return 'Adicione mais uma métrica para calcularmos a correlação de comportamento entre elas.';
     }
-    final a = series[0].map((p) => p.value).toList();
-    final b = series[1].map((p) => p.value).toList();
+    final a = series[0]
+        .where((p) => p.value != null)
+        .map((p) => p.value!)
+        .toList();
+    final b = series[1]
+        .where((p) => p.value != null)
+        .map((p) => p.value!)
+        .toList();
     final correlation = _correlation(a, b);
 
     if (correlation.abs() < 0.25) {
@@ -595,7 +601,7 @@ class _CombinedAnalysisScreenState
 
       for (var source in _activeSources) {
         final value = _getValueForDate(source, date);
-        if (value > 0) {
+        if (value != null) {
           daySources.add(source);
         }
       }
@@ -620,7 +626,7 @@ class _CombinedAnalysisScreenState
     return points;
   }
 
-  double _getValueForDate(MetricSource source, DateTime date) {
+  double? _getValueForDate(MetricSource source, DateTime date) {
     switch (source.type) {
       case MetricType.mood:
         return _getMoodValueForDate(date);
@@ -637,9 +643,9 @@ class _CombinedAnalysisScreenState
     }
   }
 
-  double _getTrackerScoreForDate(String trackerId, DateTime date) {
+  double? _getTrackerScoreForDate(String trackerId, DateTime date) {
     final records = ref.read(trackingRecordsProvider);
-    return records
+    final count = records
         .where(
           (r) =>
               _recordBelongsToTracker(r, trackerId) &&
@@ -649,9 +655,10 @@ class _CombinedAnalysisScreenState
         )
         .length
         .toDouble();
+    return count == 0 ? null : count;
   }
 
-  double _getMoodValueForDate(DateTime date) {
+  double? _getMoodValueForDate(DateTime date) {
     final entries = ref.read(allEntriesProvider);
     final moods = ref.read(moodsProvider);
 
@@ -677,24 +684,27 @@ class _CombinedAnalysisScreenState
         return values.reduce((a, b) => a + b) / values.length;
       }
     }
-    return 0;
+    return null;
   }
 
-  double _getHabitValueForDate(String habitId, DateTime date) {
+  double? _getHabitValueForDate(String habitId, DateTime date) {
     final habits = ref.read(habitsProvider);
     final habit = habits.where((h) => h.id == habitId).firstOrNull;
-    if (habit == null) return 0;
+    if (habit == null) return null;
 
-    final completed = habit.completionHistory.any(
-      (c) =>
-          c.date.year == date.year &&
-          c.date.month == date.month &&
-          c.date.day == date.day,
-    );
-    return completed ? 1.0 : 0.0;
+    final record = habit.completionHistory
+        .where(
+          (c) =>
+              c.date.year == date.year &&
+              c.date.month == date.month &&
+              c.date.day == date.day,
+        )
+        .firstOrNull;
+    if (record == null) return null;
+    return record.successful || record.completions > 0 ? 1.0 : 0.0;
   }
 
-  double _getTrackerValueForDate(
+  double? _getTrackerValueForDate(
     String trackerId,
     String fieldId,
     DateTime date,
@@ -709,21 +719,30 @@ class _CombinedAnalysisScreenState
               r.date.day == date.day,
         )
         .toList();
+    if (dayRecords.isEmpty) return null;
 
     var total = 0.0;
+    var foundValue = false;
     for (final record in dayRecords) {
       final val = record.fieldValues[fieldId];
       if (val is num) {
         total += val.toDouble();
+        foundValue = true;
       } else if (val is bool) {
         total += val ? 1.0 : 0.0;
+        foundValue = true;
       } else if (val is List) {
         total += val.length.toDouble();
+        foundValue = true;
       } else if (val is String) {
-        total += double.tryParse(val) ?? 0;
+        final parsed = double.tryParse(val);
+        if (parsed != null) {
+          total += parsed;
+          foundValue = true;
+        }
       }
     }
-    return total;
+    return foundValue ? total : null;
   }
 
   bool _recordBelongsToTracker(TrackingRecord record, String trackerId) {
@@ -746,7 +765,7 @@ class _CombinedAnalysisScreenState
     );
   }
 
-  double _getPomodoroValueForDate(DateTime date) {
+  double? _getPomodoroValueForDate(DateTime date) {
     try {
       final pState = ref.read(pomodoroProvider);
       final sessions = pState.history.where(
@@ -756,9 +775,10 @@ class _CombinedAnalysisScreenState
             s.startTime.day == date.day &&
             s.completed,
       );
+      if (sessions.isEmpty) return null;
       return sessions.fold<double>(0, (sum, s) => sum + s.duration.inMinutes);
     } catch (_) {
-      return 0;
+      return null;
     }
   }
 
