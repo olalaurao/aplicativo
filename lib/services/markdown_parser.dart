@@ -23,20 +23,22 @@ class MarkdownParser {
         if (sig.markerValue.contains(':')) {
           final parts = sig.markerValue.split(':');
           final key = parts[0].trim();
-          final value = parts[1].trim();
-          return frontmatter[key]?.toString() == value;
+          final value = parts.sublist(1).join(':').trim();
+          return _frontmatterValueMatches(frontmatter[key], value);
         } else {
-          // Just check if key exists or if value matches one of the values if it's a list
           final key = sig.markerValue.trim();
           final val = frontmatter[key];
           if (val == null) return false;
           if (val is List) {
-            return val.contains(key); // Case of categories: [[project]]
+            return _frontmatterValueMatches(val, key);
           }
           return true;
         }
       case MarkerType.folder:
-        return path.startsWith(sig.markerValue);
+        final folder = _normalizeFolder(sig.markerValue);
+        final normalizedPath = path.replaceAll('\\', '/');
+        return normalizedPath == folder ||
+            normalizedPath.startsWith('$folder/');
     }
   }
 
@@ -61,6 +63,40 @@ class MarkdownParser {
         // Folder is handled by the path when saving
         break;
     }
+  }
+
+  static bool _frontmatterValueMatches(dynamic actual, String expected) {
+    final normalizedExpected = _normalizePropertyValue(expected);
+    if (actual is List) {
+      return actual.any(
+        (item) =>
+            _normalizePropertyValue(item.toString()) == normalizedExpected,
+      );
+    }
+    return _normalizePropertyValue(actual?.toString() ?? '') ==
+        normalizedExpected;
+  }
+
+  static String _normalizePropertyValue(String value) {
+    var normalized = value.trim();
+    if (normalized.startsWith('"') && normalized.endsWith('"')) {
+      normalized = normalized.substring(1, normalized.length - 1);
+    }
+    if (normalized.startsWith("'") && normalized.endsWith("'")) {
+      normalized = normalized.substring(1, normalized.length - 1);
+    }
+    final wikiMatch = RegExp(r'^\[\[(.*)\]\]$').firstMatch(normalized);
+    if (wikiMatch != null) {
+      normalized = wikiMatch.group(1)!.trim();
+    }
+    return normalized.toLowerCase();
+  }
+
+  static String _normalizeFolder(String folder) {
+    return folder
+        .trim()
+        .replaceAll('\\', '/')
+        .replaceAll(RegExp(r'^/+|/+$'), '');
   }
 
   static Map<String, dynamic> mergeFrontmatter(
@@ -185,9 +221,7 @@ class MarkdownParser {
     // Determine folder
     String folder = defaultFolder;
     if (sig != null && sig.markerType == MarkerType.folder) {
-      folder = sig.markerValue.endsWith('/')
-          ? sig.markerValue.substring(0, sig.markerValue.length - 1)
-          : sig.markerValue;
+      folder = _normalizeFolder(sig.markerValue);
     } else if (object.obsidianPath.isNotEmpty) {
       final parts = object.obsidianPath.split('/');
       if (parts.length > 1) {
@@ -219,9 +253,7 @@ class MarkdownParser {
       markdown = generateMarkdown(frontmatter, bodyBuffer.toString());
 
       if (sig.markerType == MarkerType.folder) {
-        final sigFolder = sig.markerValue.endsWith('/')
-            ? sig.markerValue.substring(0, sig.markerValue.length - 1)
-            : sig.markerValue;
+        final sigFolder = _normalizeFolder(sig.markerValue);
         path = '$sigFolder/$filename.md';
       }
     }

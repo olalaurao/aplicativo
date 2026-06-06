@@ -109,6 +109,11 @@ class ObsidianService {
     return null;
   }
 
+  Future<bool> fileExists(String relativePath) async {
+    if (vaultDir == null) return false;
+    return File('${vaultDir!.path}/$relativePath').exists();
+  }
+
   Future<void> writeFile(String relativePath, String content) async {
     if (vaultDir == null) return;
     final file = File('${vaultDir!.path}/$relativePath');
@@ -210,6 +215,21 @@ class ObsidianService {
     if (await file.exists()) {
       await file.delete();
     }
+  }
+
+  Future<void> moveFile(String fromRelativePath, String toRelativePath) async {
+    if (vaultDir == null) return;
+    final source = File('${vaultDir!.path}/$fromRelativePath');
+    if (!await source.exists()) return;
+
+    final target = File('${vaultDir!.path}/$toRelativePath');
+    if (!await target.parent.exists()) {
+      await target.parent.create(recursive: true);
+    }
+    if (await target.exists()) {
+      await target.delete();
+    }
+    await source.rename(target.path);
   }
 
   // Phase 1.2 additions

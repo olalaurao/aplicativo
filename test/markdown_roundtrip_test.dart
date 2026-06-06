@@ -71,6 +71,52 @@ void main() {
       expect(parsed.slug, 'launch');
     });
 
+    test('type signatures match wiki-link category list values', () {
+      final signature = TypeSignature(
+        objectType: 'habit',
+        markerType: MarkerType.property,
+        markerValue: 'categoria:[[habits]]',
+      );
+
+      expect(
+        MarkdownParser.matchesSignature(
+          {
+            'categoria': ['[[notes]]', '[[habits]]'],
+          },
+          '',
+          'notes/meditar.md',
+          signature,
+        ),
+        isTrue,
+      );
+    });
+
+    test('folder signatures match normalized organizer paths', () {
+      final signature = TypeSignature(
+        objectType: 'area',
+        markerType: MarkerType.folder,
+        markerValue: '01/',
+      );
+
+      expect(
+        MarkdownParser.matchesSignature(
+          const {},
+          '',
+          '01/carreira.md',
+          signature,
+        ),
+        isTrue,
+      );
+      expect(
+        MarkdownParser.prepareForSave(
+          Organizer(title: 'Carreira', organizerType: OrganizerType.area),
+          signature,
+          defaultFolder: 'organizers/areas',
+        )['path'],
+        '01/carreira.md',
+      );
+    });
+
     test(
       'daily note body preserves entries, tasks, habits, trackers and pomodoros',
       () {

@@ -29,6 +29,7 @@ import '../forms/create_resource_form.dart';
 import '../forms/create_task_form.dart';
 import '../forms/create_tracker_form.dart';
 import '../theme.dart';
+import 'universal_search_picker.dart';
 
 class ObjectActionWrapper extends ConsumerWidget {
   final ContentObject object;
@@ -112,6 +113,17 @@ Future<void> showObjectActionSheet(
             ),
             ListTile(
               leading: const Icon(
+                Icons.call_merge_rounded,
+                color: AppColors.primary,
+              ),
+              title: const Text('Mesclar com outra nota'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showMergeTargetPicker(context, ref, object);
+              },
+            ),
+            ListTile(
+              leading: const Icon(
                 Icons.open_in_new_rounded,
                 color: AppColors.info,
               ),
@@ -137,6 +149,85 @@ Future<void> showObjectActionSheet(
       ),
     ),
   );
+}
+
+Future<void> _showMergeTargetPicker(
+  BuildContext context,
+  WidgetRef ref,
+  ContentObject source,
+) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (pickerContext) => UniversalSearchPickerSheet(
+      title: 'Escolher nota correta',
+      initialFilter: 'note',
+      showClear: false,
+      onSelected: (target) async {
+        Navigator.pop(pickerContext);
+        if (target.id == source.id ||
+            target.obsidianPath == source.obsidianPath) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Escolha uma nota diferente.')),
+          );
+          return;
+        }
+        await _confirmMergeIntoTarget(context, ref, source, target);
+      },
+    ),
+  );
+}
+
+Future<void> _confirmMergeIntoTarget(
+  BuildContext context,
+  WidgetRef ref,
+  ContentObject source,
+  ContentObject target,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Mesclar notas?'),
+      content: Text(
+        'Todas as conexões de "${source.title}" serão redirecionadas para '
+        '"${target.title}". O conteúdo será anexado à nota correta e a nota '
+        'errada será movida para a lixeira.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+          child: const Text('Mesclar'),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed != true) return;
+
+  try {
+    await ref
+        .read(vaultProvider.notifier)
+        .redirectAndDeleteObject(source: source, target: target);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"${source.title}" mesclada em "${target.title}".'),
+        ),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erro ao mesclar notas: $e')));
+    }
+  }
 }
 
 void _showChangeTypeSheet(

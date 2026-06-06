@@ -215,46 +215,6 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
               iconSize: 48,
               borderRadius: BorderRadius.zero,
             ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.72),
-                  ],
-                ),
-              ),
-            ),
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      widget.post.platform == SocialPlatform.tiktok &&
-                              widget.post.mediaType != SocialMediaType.video
-                          ? 'Toque para ampliar o preview'
-                          : 'Não foi possível reproduzir este post inline.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    FilledButton.icon(
-                      onPressed: _openOriginal,
-                      icon: const Icon(Icons.open_in_new_rounded),
-                      label: const Text('Abrir em navegador interno'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ],
         ),
       ),

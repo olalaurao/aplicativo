@@ -2184,6 +2184,7 @@ class VaultNotifier extends Notifier<void> {
   Future<String> _writeObject(
     ContentObject object, {
     required SyncOperation operation,
+    String? preservedSourceMarkdown,
   }) async {
     final obsidianService = ref.read(obsidianServiceProvider);
     final syncQueue = ref.read(syncQueueServiceProvider);
@@ -2205,15 +2206,22 @@ class VaultNotifier extends Notifier<void> {
     final relativePath = prepared['path']!;
     final oldPath = object.obsidianPath;
 
-    if (operation == SyncOperation.update &&
-        oldPath.isNotEmpty &&
-        oldPath != relativePath) {
-      await obsidianService.deleteFile(oldPath);
-    }
-
     object.obsidianPath = relativePath;
 
     var markdown = prepared['markdown']!;
+    if (preservedSourceMarkdown != null) {
+      if (oldPath != relativePath &&
+          await obsidianService.fileExists(relativePath)) {
+        throw Exception(
+          'Target file already exists: $relativePath. Use merge instead.',
+        );
+      }
+      markdown = _mergeConvertedMarkdown(
+        sourceMarkdown: preservedSourceMarkdown,
+        convertedMarkdown: markdown,
+        target: object,
+      );
+    }
     if (object is TrackerDefinition) {
       final dataviewBlock = DataviewGenerator.generateTrackerDataviewBlock(
         object,
@@ -2237,6 +2245,11 @@ class VaultNotifier extends Notifier<void> {
     }
 
     await obsidianService.writeFile(relativePath, markdown);
+    if (operation == SyncOperation.update &&
+        oldPath.isNotEmpty &&
+        oldPath != relativePath) {
+      await obsidianService.deleteFile(oldPath);
+    }
     await syncQueue.enqueueAction(
       SyncAction(
         objectType: signatureKey,
@@ -2259,6 +2272,62 @@ class VaultNotifier extends Notifier<void> {
       });
     }
     return relativePath;
+  }
+
+  String _mergeConvertedMarkdown({
+    required String sourceMarkdown,
+    required String convertedMarkdown,
+    required ContentObject target,
+  }) {
+    final sourceFrontmatter = MarkdownParser.parseFrontmatter(sourceMarkdown);
+    final convertedFrontmatter = MarkdownParser.parseFrontmatter(
+      convertedMarkdown,
+    );
+    final sourceBody = MarkdownParser.extractBody(sourceMarkdown);
+    final convertedBody = MarkdownParser.extractBody(convertedMarkdown);
+
+    final mergedFrontmatter = <String, dynamic>{
+      ...sourceFrontmatter,
+      ...convertedFrontmatter,
+    };
+
+    final sourceCategories = sourceFrontmatter['categories'];
+    final convertedCategories = convertedFrontmatter['categories'];
+    if (sourceCategories is List || convertedCategories is List) {
+      mergedFrontmatter['categories'] = <dynamic>{
+        if (sourceCategories is List) ...sourceCategories,
+        if (convertedCategories is List) ...convertedCategories,
+      }.toList();
+    }
+
+    final sourceTags = sourceFrontmatter['tags'];
+    final convertedTags = convertedFrontmatter['tags'];
+    if (sourceTags is List || convertedTags is List) {
+      mergedFrontmatter['tags'] = <dynamic>{
+        if (sourceTags is List) ...sourceTags,
+        if (convertedTags is List) ...convertedTags,
+      }.toList();
+    }
+
+    final sourceAliases = sourceFrontmatter['aliases'];
+    final convertedAliases = convertedFrontmatter['aliases'];
+    if (sourceAliases is List || convertedAliases is List) {
+      mergedFrontmatter['aliases'] = <dynamic>{
+        if (sourceAliases is List) ...sourceAliases,
+        if (convertedAliases is List) ...convertedAliases,
+      }.toList();
+    }
+
+    final body = convertedBody.trim().isEmpty && sourceBody.trim().isNotEmpty
+        ? sourceBody
+        : convertedBody;
+
+    debugPrint(
+      'Converted ${target.id} to ${_signatureKeyFor(target)} at '
+      '${target.obsidianPath}; preserved '
+      '${sourceFrontmatter.length} source frontmatter fields.',
+    );
+    return generateMarkdown(mergedFrontmatter, body);
   }
 
   bool _shouldUpdateKpisAfterWrite(ContentObject object) {
@@ -2316,33 +2385,28 @@ class VaultNotifier extends Notifier<void> {
   }) async {
     final obsidianService = ref.read(obsidianServiceProvider);
     final syncQueue = ref.read(syncQueueServiceProvider);
-
-    // 1. Move old file to _deleted/ and delete original
-    if (object.obsidianPath.isNotEmpty) {
-      debugPrint('Deleting: ${object.obsidianPath}');
-      final fileName = object.obsidianPath.split('/').last;
-      final deletedPath = '_deleted/$fileName';
-
-      final content = await obsidianService.readFile(object.obsidianPath);
-      if (content != null) {
-        await obsidianService.writeFile(deletedPath, content);
-      }
-
-      await obsidianService.deleteFile(object.obsidianPath);
-
-      await syncQueue.enqueueAction(
-        SyncAction(
-          objectType: _signatureKeyFor(object),
-          objectId: object.id,
-          operation: SyncOperation.delete,
-          payload: object.toBaseMap(),
-        ),
+    final sourcePath = object.obsidianPath;
+    final sourceMarkdown = sourcePath.isNotEmpty
+        ? await obsidianService.readFile(sourcePath)
+        : null;
+    if (sourcePath.isNotEmpty && sourceMarkdown == null) {
+      final error = Exception('Could not read source file: $sourcePath');
+      await _recordConversionFailure(
+        object: object,
+        targetType: targetType,
+        sourcePath: sourcePath,
+        extraFields: extraFields,
+        error: error,
+        stackTrace: StackTrace.current,
       );
+      throw error;
     }
 
     // 2. Map old object fields and body content to the new object
     String bodyContent = '';
-    if (object is Task) {
+    if (sourceMarkdown != null) {
+      bodyContent = MarkdownParser.extractBody(sourceMarkdown);
+    } else if (object is Task) {
       bodyContent = object.notes.join('\n');
     } else if (object is Habit) {
       bodyContent = object.description ?? '';
@@ -2360,7 +2424,10 @@ class VaultNotifier extends Notifier<void> {
     final baseId = object.id;
     final baseTitle = object.title;
     final baseCreatedAt = object.createdAt;
+    final baseUpdatedAt = object.updatedAt;
     final baseOrganizers = object.organizers;
+    final baseCategories = object.categories;
+    final baseTags = object.tags;
 
     switch (targetType.toLowerCase()) {
       case 'task':
@@ -2370,8 +2437,10 @@ class VaultNotifier extends Notifier<void> {
           stage: TaskStage.idea,
           notes: bodyContent.isNotEmpty ? [bodyContent] : const [],
           createdAt: baseCreatedAt,
+          updatedAt: baseUpdatedAt,
           organizers: baseOrganizers,
-          categories: ['[[tasks]]'],
+          categories: _mergedCategories(baseCategories, '[[tasks]]'),
+          tags: baseTags,
         );
         break;
       case 'habit':
@@ -2381,8 +2450,10 @@ class VaultNotifier extends Notifier<void> {
           color: '#F97316',
           description: bodyContent,
           createdAt: baseCreatedAt,
+          updatedAt: baseUpdatedAt,
           organizers: baseOrganizers,
-          categories: ['[[habits]]'],
+          categories: _mergedCategories(baseCategories, '[[habits]]'),
+          tags: baseTags,
         );
         break;
       case 'goal':
@@ -2391,8 +2462,9 @@ class VaultNotifier extends Notifier<void> {
           title: baseTitle,
           description: bodyContent,
           createdAt: baseCreatedAt,
+          updatedAt: baseUpdatedAt,
           organizers: baseOrganizers,
-          categories: ['[[goals]]'],
+          categories: _mergedCategories(baseCategories, '[[goals]]'),
         );
         break;
       case 'note':
@@ -2402,8 +2474,10 @@ class VaultNotifier extends Notifier<void> {
           subtype: NoteSubtype.text,
           body: bodyContent,
           createdAt: baseCreatedAt,
+          updatedAt: baseUpdatedAt,
           organizers: baseOrganizers,
-          categories: ['[[notes]]'],
+          categories: _mergedCategories(baseCategories, '[[notes]]'),
+          tags: baseTags,
         );
         break;
       case 'project':
@@ -2412,8 +2486,9 @@ class VaultNotifier extends Notifier<void> {
           title: baseTitle,
           description: bodyContent,
           createdAt: baseCreatedAt,
+          updatedAt: baseUpdatedAt,
           organizers: baseOrganizers,
-          categories: ['[[projects]]'],
+          categories: _mergedCategories(baseCategories, '[[projects]]'),
         );
         break;
       case 'organizer':
@@ -2427,8 +2502,9 @@ class VaultNotifier extends Notifier<void> {
           title: baseTitle,
           organizerType: orgType,
           createdAt: baseCreatedAt,
+          updatedAt: baseUpdatedAt,
           organizers: baseOrganizers,
-          categories: ['[[organizers]]'],
+          categories: _mergedCategories(baseCategories, '[[organizers]]'),
         );
         break;
       case 'person':
@@ -2436,8 +2512,9 @@ class VaultNotifier extends Notifier<void> {
           id: baseId,
           title: baseTitle,
           createdAt: baseCreatedAt,
+          updatedAt: baseUpdatedAt,
           organizers: baseOrganizers,
-          categories: ['[[people]]'],
+          categories: _mergedCategories(baseCategories, '[[people]]'),
         );
         break;
       case 'resource':
@@ -2447,8 +2524,9 @@ class VaultNotifier extends Notifier<void> {
           resourceType: 'General',
           synopsis: bodyContent,
           createdAt: baseCreatedAt,
+          updatedAt: baseUpdatedAt,
           organizers: baseOrganizers,
-          categories: ['[[resources]]'],
+          categories: _mergedCategories(baseCategories, '[[resources]]'),
         );
         break;
       case 'tracker':
@@ -2458,20 +2536,288 @@ class VaultNotifier extends Notifier<void> {
           title: baseTitle,
           description: bodyContent,
           createdAt: baseCreatedAt,
+          updatedAt: baseUpdatedAt,
           organizers: baseOrganizers,
-          categories: ['[[trackers]]'],
+          categories: _mergedCategories(baseCategories, '[[trackers]]'),
+          tags: baseTags,
         );
         break;
       default:
         throw Exception('Unsupported conversion target type: $targetType');
     }
 
-    // 3. Write new file and invalidate providers
-    await _writeObject(newObject, operation: SyncOperation.create);
+    try {
+      final targetPath = await _writeObject(
+        newObject,
+        operation: SyncOperation.create,
+        preservedSourceMarkdown: sourceMarkdown,
+      );
+
+      if (sourcePath.isNotEmpty && sourcePath != targetPath) {
+        final timestamp = DateTime.now()
+            .toIso8601String()
+            .replaceAll(':', '-')
+            .replaceAll('.', '-');
+        final fileName = sourcePath.split('/').last;
+        final deletedPath = '_deleted/${timestamp}_$fileName';
+
+        await obsidianService.moveFile(sourcePath, deletedPath);
+        await syncQueue.enqueueAction(
+          SyncAction(
+            objectType: _signatureKeyFor(object),
+            objectId: object.id,
+            operation: SyncOperation.delete,
+            payload: object.toBaseMap(),
+          ),
+        );
+        debugPrint(
+          'Converted ${object.id}: moved old file $sourcePath to $deletedPath '
+          'after writing $targetPath.',
+        );
+      }
+    } catch (e, st) {
+      await _recordConversionFailure(
+        object: object,
+        targetType: targetType,
+        sourcePath: sourcePath,
+        extraFields: extraFields,
+        error: e,
+        stackTrace: st,
+      );
+      debugPrint(
+        'Failed to convert ${object.id} from ${object.type} to $targetType. '
+        'sourcePath=$sourcePath targetExtra=$extraFields error=$e\n$st',
+      );
+      rethrow;
+    }
 
     _invalidateObjectProviders(object);
     _invalidateObjectProviders(newObject);
     await _updateWidgetsFor(newObject);
+  }
+
+  Future<void> redirectAndDeleteObject({
+    required ContentObject source,
+    required ContentObject target,
+    bool mergeBodyIntoTarget = true,
+  }) async {
+    if (source.id == target.id || source.obsidianPath == target.obsidianPath) {
+      throw Exception('Source and target must be different objects.');
+    }
+
+    final obsidianService = ref.read(obsidianServiceProvider);
+    final syncQueue = ref.read(syncQueueServiceProvider);
+    final sourcePath = source.obsidianPath;
+    final targetPath = target.obsidianPath;
+    if (sourcePath.isEmpty || targetPath.isEmpty) {
+      throw Exception('Both objects need vault file paths before merging.');
+    }
+
+    final sourceMarkdown = await obsidianService.readFile(sourcePath);
+    final targetMarkdown = await obsidianService.readFile(targetPath);
+    if (sourceMarkdown == null) {
+      throw Exception('Could not read source file: $sourcePath');
+    }
+    if (targetMarkdown == null) {
+      throw Exception('Could not read target file: $targetPath');
+    }
+
+    try {
+      if (mergeBodyIntoTarget) {
+        final mergedTarget = _mergeSourceContentIntoTargetMarkdown(
+          source: source,
+          sourceMarkdown: sourceMarkdown,
+          targetMarkdown: targetMarkdown,
+        );
+        if (mergedTarget != targetMarkdown) {
+          await obsidianService.writeFile(targetPath, mergedTarget);
+        }
+      }
+
+      final files = await obsidianService.getAllMarkdownFiles();
+      final changedPaths = <String>{};
+      for (final file in files) {
+        final relativePath = obsidianService.getRelativePath(file.path);
+        if (relativePath == sourcePath) continue;
+
+        final content = await file.readAsString();
+        final updated = _replaceObjectReferences(content, source, target);
+        if (updated != content) {
+          await obsidianService.writeFile(relativePath, updated);
+          changedPaths.add(relativePath);
+        }
+      }
+
+      for (final path in changedPaths) {
+        await syncQueue.enqueueAction(
+          SyncAction(
+            objectType: 'vault_file',
+            objectId: path,
+            operation: SyncOperation.update,
+            payload: {'path': path},
+          ),
+        );
+      }
+
+      await deleteObject(source);
+      _invalidateObjectProviders(source);
+      _invalidateObjectProviders(target);
+      debugPrint(
+        'Redirected ${source.id} ($sourcePath) into ${target.id} '
+        '($targetPath); updated ${changedPaths.length} files.',
+      );
+    } catch (e, st) {
+      await _recordMergeFailure(
+        source: source,
+        target: target,
+        error: e,
+        stackTrace: st,
+      );
+      debugPrint('Failed to redirect ${source.id} into ${target.id}: $e\n$st');
+      rethrow;
+    }
+  }
+
+  String _mergeSourceContentIntoTargetMarkdown({
+    required ContentObject source,
+    required String sourceMarkdown,
+    required String targetMarkdown,
+  }) {
+    final sourceBody = MarkdownParser.extractBody(sourceMarkdown).trim();
+    final targetBody = MarkdownParser.extractBody(targetMarkdown).trimRight();
+    final frontmatter = MarkdownParser.parseFrontmatter(targetMarkdown);
+
+    final aliases = <String>{
+      ...((frontmatter['aliases'] as List?)?.map((item) => item.toString()) ??
+          const <String>[]),
+      source.title,
+      source.obsidianFileName,
+    }..removeWhere((item) => item.trim().isEmpty);
+    frontmatter['aliases'] = aliases.toList();
+
+    if (sourceBody.isEmpty || targetBody.contains(sourceBody)) {
+      return generateMarkdown(frontmatter, targetBody);
+    }
+
+    final mergedBody = [
+      targetBody,
+      '',
+      '## Conteúdo mesclado de ${source.title}',
+      '',
+      sourceBody,
+    ].join('\n').trim();
+    return generateMarkdown(frontmatter, mergedBody);
+  }
+
+  String _replaceObjectReferences(
+    String content,
+    ContentObject source,
+    ContentObject target,
+  ) {
+    var updated = content;
+    final targetRef = _primaryWikiLinkTarget(target);
+    for (final key in _referenceKeysFor(source)) {
+      final escaped = RegExp.escape(key);
+      updated = updated.replaceAllMapped(
+        RegExp(
+          r'\[\[\s*' + escaped + r'\s*(\|[^\]]+)?\]\]',
+          caseSensitive: false,
+        ),
+        (match) => '[[$targetRef${match.group(1) ?? ''}]]',
+      );
+    }
+    return updated;
+  }
+
+  Set<String> _referenceKeysFor(ContentObject object) {
+    final withoutExtension = object.obsidianPath.replaceAll(
+      RegExp(r'\.md$', caseSensitive: false),
+      '',
+    );
+    return {
+      object.id,
+      object.slug,
+      object.title,
+      object.obsidianFileName,
+      if (withoutExtension.isNotEmpty) withoutExtension,
+      if (object.type.isNotEmpty && object.slug.isNotEmpty)
+        '${object.type}/${object.slug}',
+      if (object is Note && object.slug.isNotEmpty) 'note/${object.slug}',
+    }.map((item) => item.trim()).where((item) => item.isNotEmpty).toSet();
+  }
+
+  String _primaryWikiLinkTarget(ContentObject object) {
+    final withoutExtension = object.obsidianPath.replaceAll(
+      RegExp(r'\.md$', caseSensitive: false),
+      '',
+    );
+    if (withoutExtension.isNotEmpty) return withoutExtension;
+    if (object.slug.isNotEmpty) return object.slug;
+    return object.title;
+  }
+
+  List<String> _mergedCategories(List<String> current, String required) {
+    return <String>{...current, required}.toList();
+  }
+
+  Future<void> _recordConversionFailure({
+    required ContentObject object,
+    required String targetType,
+    required String sourcePath,
+    required Map<String, dynamic>? extraFields,
+    required Object error,
+    required StackTrace stackTrace,
+  }) async {
+    try {
+      final obsidianService = ref.read(obsidianServiceProvider);
+      const logPath = '_conflicts/conversion_errors.log';
+      final existing = await obsidianService.readFile(logPath) ?? '';
+      final timestamp = DateTime.now().toIso8601String();
+      final entry = [
+        '[$timestamp] changeObjectType failed',
+        'objectId: ${object.id}',
+        'title: ${object.title}',
+        'fromType: ${object.type}',
+        'targetType: $targetType',
+        'sourcePath: $sourcePath',
+        'extraFields: $extraFields',
+        'error: $error',
+        'stackTrace: $stackTrace',
+        '',
+      ].join('\n');
+      await obsidianService.writeFile(logPath, '$existing$entry');
+    } catch (logError, logStack) {
+      debugPrint('Failed to record conversion failure: $logError\n$logStack');
+    }
+  }
+
+  Future<void> _recordMergeFailure({
+    required ContentObject source,
+    required ContentObject target,
+    required Object error,
+    required StackTrace stackTrace,
+  }) async {
+    try {
+      final obsidianService = ref.read(obsidianServiceProvider);
+      const logPath = '_conflicts/merge_errors.log';
+      final existing = await obsidianService.readFile(logPath) ?? '';
+      final timestamp = DateTime.now().toIso8601String();
+      final entry = [
+        '[$timestamp] redirectAndDeleteObject failed',
+        'sourceId: ${source.id}',
+        'sourceTitle: ${source.title}',
+        'sourcePath: ${source.obsidianPath}',
+        'targetId: ${target.id}',
+        'targetTitle: ${target.title}',
+        'targetPath: ${target.obsidianPath}',
+        'error: $error',
+        'stackTrace: $stackTrace',
+        '',
+      ].join('\n');
+      await obsidianService.writeFile(logPath, '$existing$entry');
+    } catch (logError, logStack) {
+      debugPrint('Failed to record merge failure: $logError\n$logStack');
+    }
   }
 
   Future<void> _purgeOldDeletedFiles() async {

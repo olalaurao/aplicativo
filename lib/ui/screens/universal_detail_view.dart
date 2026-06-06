@@ -42,6 +42,7 @@ import '../../models/template_model.dart';
 import '../widgets/wiki_text_view.dart';
 import '../widgets/journal_body_view.dart';
 import '../widgets/markdown_body_view.dart';
+import '../widgets/universal_search_picker.dart';
 import '../../providers/settings_provider.dart';
 import '../forms/create_task_form.dart';
 import '../forms/create_habit_form.dart';
@@ -650,23 +651,25 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         'focus',
         'edit',
         'change_type',
+        'merge_note',
         'save_template',
         'archive',
         'delete',
         'obsidian',
       ],
-      'habit': ['edit', 'change_type', 'archive', 'delete'],
+      'habit': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
       'note': [
         'edit',
         'change_type',
+        'merge_note',
         'save_template',
         'archive',
         'delete',
         'obsidian',
       ],
-      'project': ['edit', 'change_type', 'archive', 'delete'],
-      'person': ['edit', 'change_type', 'delete'],
-      'resource': ['edit', 'change_type', 'archive', 'delete'],
+      'project': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
+      'person': ['edit', 'change_type', 'merge_note', 'delete'],
+      'resource': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
       'journal_entry': [
         'edit',
         'change_type',
@@ -674,7 +677,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         'delete',
         'obsidian',
       ],
-      'goal': ['edit', 'change_type', 'archive', 'delete'],
+      'goal': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
     };
 
     final actions =
@@ -723,6 +726,17 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   Icon(Icons.swap_horiz_rounded, size: 18),
                   SizedBox(width: 12),
                   Text('Alterar Tipo'),
+                ],
+              ),
+            );
+          case 'merge_note':
+            return const PopupMenuItem(
+              value: 'merge_note',
+              child: Row(
+                children: [
+                  Icon(Icons.call_merge_rounded, size: 18),
+                  SizedBox(width: 12),
+                  Text('Mesclar com outra nota'),
                 ],
               ),
             );
@@ -2551,6 +2565,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       case 'change_type':
         _showChangeTypeSheet(context, ref);
         break;
+      case 'merge_note':
+        _showMergeTargetPicker(context, ref);
+        break;
       case 'save_template':
         _saveAsTemplate(context, ref);
         break;
@@ -2566,6 +2583,84 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       case 'export_google':
         _exportToGoogleCalendar(context, ref);
         break;
+    }
+  }
+
+  Future<void> _showMergeTargetPicker(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (pickerContext) => UniversalSearchPickerSheet(
+        title: 'Escolher nota correta',
+        initialFilter: 'note',
+        showClear: false,
+        onSelected: (target) async {
+          Navigator.pop(pickerContext);
+          if (target.id == object.id ||
+              target.obsidianPath == object.obsidianPath) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Escolha uma nota diferente.')),
+            );
+            return;
+          }
+          await _confirmMergeIntoTarget(context, ref, target);
+        },
+      ),
+    );
+  }
+
+  Future<void> _confirmMergeIntoTarget(
+    BuildContext context,
+    WidgetRef ref,
+    ContentObject target,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Mesclar notas?'),
+        content: Text(
+          'Todas as conexões de "${object.title}" serão redirecionadas para '
+          '"${target.title}". O conteúdo será anexado à nota correta e a nota '
+          'errada será movida para a lixeira.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            child: const Text('Mesclar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await ref
+          .read(vaultProvider.notifier)
+          .redirectAndDeleteObject(source: object, target: target);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"${object.title}" mesclada em "${target.title}".'),
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro ao mesclar notas: $e')));
+      }
     }
   }
 
