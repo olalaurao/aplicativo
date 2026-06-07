@@ -1276,24 +1276,24 @@ month:
 
 ## PARTE 12 — SYNC, OFFLINE E CONFLITOS
 
-### Arquitetura Offline-First com OneDrive
-
+### Arquitetura Offline-First com Google Drive
+*IMPORTANTE*: O SYNC É FEITO PELO GOOGLE DRIVE, NÃO PELO ONE DRIVE. SEMPRE QUE ACHAR ALGO CITANDO O ONE DRIVE, CORRIJA: **SYNC E CALENDÁRIO SÃO FEITOS PELO GOOGLE!!!** 
 **Fluxo de sync:**
-- Armazenamento primário: OneDrive (vault = pasta sincronizada com OneDrive)
-- Toda mudança é escrita imediatamente no OneDrive se disponível
+- Armazenamento primário: GOOGLE DRIVE (vault = pasta sincronizada com GOOGLE DRIVE)
+- Toda mudança é escrita imediatamente no GOOGLE DRIVE se disponível
 - Se indisponível: mudança vai para storage local e fila de sync
-- Quando OneDrive volta: mudanças fila são empurradas em ordem
+- Quando GOOGLE DRIVE volta: mudanças fila são empurradas em ordem
 - Indicador de status: ícone de nuvem com estados synced/syncing/offline/error
 
 **Resolução de conflito:**
 1. Nenhum vencedor silencioso
 2. Backup de ambas as versões em `_conflicts/`
 3. Notificação in-app com comparação visual dos campos alterados (não raw markdown)
-4. Opções: "Manter local", "Manter OneDrive", "Mesclar"
+4. Opções: "Manter local", "Manter GOOGLE DRIVE", "Mesclar"
 5. Se "mesclar" falhar: resolução campo a campo
 6. `_conflicts/` limpo automaticamente após 30 dias
 
-**Backup:** ZIP do vault periódico (configurável: diário/semanal/por abertura). Salvo em `_backups/` no OneDrive ou localmente. Retenção configurável.
+**Backup:** ZIP do vault periódico (configurável: diário/semanal/por abertura). Salvo em `_backups/` no GOOGLE DRIVE ou localmente. Retenção configurável.
 
 ---
 
