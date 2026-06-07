@@ -566,102 +566,6 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
     );
   }
 
-  Widget _buildThemeSelector() {
-    final dayThemes = ref.watch(dayThemesProvider);
-    final selectedTheme = dayThemes.cast<DayTheme?>().firstWhere((t) => t?.id == _themeId, orElse: () => null);
-
-    return ListTile(
-      title: const Text('Day Theme'),
-      subtitle: Text(selectedTheme?.title ?? _themeId ?? 'Select theme...'),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () {
-        showModalBottomSheet(
-          context: context,
-          builder: (context) {
-            return Container(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Select Day Theme',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: dayThemes.length,
-                      itemBuilder: (context, index) {
-                        final theme = dayThemes[index];
-                        return ListTile(
-                          title: Text(theme.title),
-                          selected: theme.id == _themeId,
-                          onTap: () {
-                            setState(() => _themeId = theme.id);
-                            Navigator.pop(context);
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildBlockSelector() {
-    final timeBlocks = ref.watch(timeBlocksProvider);
-    final selectedBlock = timeBlocks.cast<TimeBlock?>().firstWhere((b) => b?.id == _blockId, orElse: () => null);
-
-    return ListTile(
-      title: const Text('Time Block'),
-      subtitle: Text(selectedBlock?.title ?? _blockId ?? 'Select block...'),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () {
-        showModalBottomSheet(
-          context: context,
-          builder: (context) {
-            return Container(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Select Time Block',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: timeBlocks.length,
-                      itemBuilder: (context, index) {
-                        final block = timeBlocks[index];
-                        return ListTile(
-                          title: Text(block.title),
-                          selected: block.id == _blockId,
-                          onTap: () {
-                            setState(() => _blockId = block.id);
-                            Navigator.pop(context);
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   Widget _buildStepScopeAndExclusions() {
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -820,6 +724,153 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildThemeSelector() {
+    final themes = ref.watch(dayThemesProvider);
+    if (themes.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 24),
+        child: Text(
+          'No Day Themes configured.\nCreate themes in Settings → Day Themes.',
+          style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Fire on active Day Theme:',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 16),
+        ...themes.map((theme) {
+          final isSelected = _themeId == theme.id;
+          return GestureDetector(
+            onTap: () => setState(() => _themeId = theme.id),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primary.withValues(alpha: 0.1)
+                    : AppColors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : AppColors.divider,
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.wb_sunny_outlined, size: 18),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      theme.title,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  if (isSelected)
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildBlockSelector() {
+    final blocks = ref.watch(timeBlocksProvider);
+    if (blocks.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 24),
+        child: Text(
+          'No Time Blocks configured.\nCreate blocks in Settings → Day Themes.',
+          style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Fire when Time Block is active:',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 16),
+        ...blocks.map((block) {
+          final isSelected = _blockId == block.id;
+          final rangeLabel = block.timeRanges.isNotEmpty
+              ? '${block.timeRanges.first.startHour.toString().padLeft(2, '0')}:${block.timeRanges.first.startMinute.toString().padLeft(2, '0')} – ${block.timeRanges.first.endHour.toString().padLeft(2, '0')}:${block.timeRanges.first.endMinute.toString().padLeft(2, '0')}'
+              : '';
+          return GestureDetector(
+            onTap: () => setState(() => _blockId = block.id),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primary.withValues(alpha: 0.1)
+                    : AppColors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : AppColors.divider,
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.view_day_rounded, size: 18),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          block.title,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                        ),
+                        if (rangeLabel.isNotEmpty)
+                          Text(
+                            rangeLabel,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (isSelected)
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
     );
   }
 

@@ -52,7 +52,35 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
   Widget build(BuildContext context) {
     final hasTitle = _titleController.text.trim().isNotEmpty;
 
-    return Scaffold(
+    final isDirty = _titleController.text.trim().isNotEmpty;
+
+    return PopScope(
+      canPop: !isDirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final discard = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Descartar alteraÃ§Ãµes?'),
+            content: const Text('VocÃª possui alteraÃ§Ãµes nÃ£o salvas. Deseja sair mesmo assim?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('Descartar'),
+              ),
+            ],
+          ),
+        );
+        if ((discard ?? false) && context.mounted) {
+          Navigator.pop(context, result);
+        }
+      },
+      child:  Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
@@ -169,7 +197,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Tipo de Notificação',
+                          'Tipo de NotificaÃƒÂ§ÃƒÂ£o',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -345,7 +373,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildTypeChip(NotificationType type, String label, IconData icon) {

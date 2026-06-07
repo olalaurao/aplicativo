@@ -101,17 +101,44 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
   @override
   Widget build(BuildContext context) {
     final canSave = _canSave;
+    final isDirty = _titleController.text.trim().isNotEmpty;
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            pinned: true,
-            leading: IconButton(
-              icon: const Icon(Icons.close_rounded),
-              onPressed: () => Navigator.pop(context),
-            ),
+    return PopScope(
+      canPop: !isDirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final discard = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Descartar alterações?'),
+            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('Descartar'),
+              ),
+            ],
+          ),
+        );
+        if ((discard ?? false) && context.mounted) {
+          Navigator.pop(context, result);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              pinned: true,
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.maybePop(context),
+              ),
             title: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -576,7 +603,8 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   bool get _canSave =>

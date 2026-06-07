@@ -72,7 +72,35 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
   Widget build(BuildContext context) {
     final hasTitle = _titleController.text.trim().isNotEmpty;
 
-    return Scaffold(
+    final isDirty = _titleController.text.trim().isNotEmpty;
+
+    return PopScope(
+      canPop: !isDirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final discard = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Descartar alteraÃ§Ãµes?'),
+            content: const Text('VocÃª possui alteraÃ§Ãµes nÃ£o salvas. Deseja sair mesmo assim?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('Descartar'),
+              ),
+            ],
+          ),
+        );
+        if ((discard ?? false) && context.mounted) {
+          Navigator.pop(context, result);
+        }
+      },
+      child:  Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
@@ -114,7 +142,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Column(
                 children: [
-                  // ─── Type Selector ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Type Selector Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
@@ -144,7 +172,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
 
                   const SizedBox(height: 24),
 
-                  // ─── Title ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Title Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   TextField(
                     controller: _titleController,
                     onChanged: (_) => setState(() {}),
@@ -163,7 +191,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
 
                   const SizedBox(height: 12),
 
-                  // ─── Metadata Strip ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Metadata Strip Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   MetadataStrip(
                     chips: [
                       MetadataChip(
@@ -196,7 +224,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
 
                   const SizedBox(height: 24),
 
-                  // ─── Content ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Content Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   _noteType == NoteType.outline
                       ? OutlineEditor(
                           initialContent: _richContent,
@@ -221,7 +249,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   Widget _typeSelector(NoteType type, String label, IconData icon) {
@@ -279,7 +307,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
       case NoteType.text:
         return 'Start writing...';
       case NoteType.outline:
-        return '• Use bullets for your outline...';
+        return 'Ã¢Â€Â¢ Use bullets for your outline...';
       case NoteType.collection:
         return 'Add items to your collection...';
     }

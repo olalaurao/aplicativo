@@ -707,11 +707,14 @@ String _displayTitle(ContentObject item) {
 }
 
 String _userFacingText(String value, {String fallback = ''}) {
-  final text = value.trim();
+  var text = value.trim();
   if (text.isEmpty) return fallback;
-  final isWikiLink = text.startsWith('[[') && text.endsWith(']]');
-  if (isWikiLink || looksLikeTechnicalId(text)) return fallback;
-  return text;
+  if (text.startsWith('[[') && text.endsWith(']]')) {
+    text = text.substring(2, text.length - 2).trim();
+  }
+  final clean = displayTitleFromValue(text);
+  if (clean == null || clean.isEmpty) return fallback;
+  return clean;
 }
 
 String _dateKey(DateTime date) {

@@ -1652,6 +1652,13 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                             context,
                             ref,
                             Icons.chat_bubble_outline_rounded,
+                            'WhatsApp',
+                            const Color(0xFF25D366),
+                          ),
+                          _contactActionButton(
+                            context,
+                            ref,
+                            Icons.message_outlined,
                             'Message',
                             AppColors.primary,
                           ),
@@ -2140,7 +2147,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: InkWell(
-                onTap: () => _showRecordDetails(context, tracker, record),
+                onTap: () => _showRecordDetails(context, ref, tracker, record),
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: AppTheme.cardDecoration(context),
@@ -3956,7 +3963,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       onTap: () async {
         final person = object as Person;
         String? url;
-        if (label == 'Message') {
+        if (label == 'WhatsApp') {
+          url = 'https://wa.me/${person.phone?.replaceAll(RegExp(r"[^\d+]"), "") ?? ""}';
+        } else if (label == 'Message') {
           // Try WhatsApp or SMS
           url = 'sms:${person.phone ?? ""}';
         } else if (label == 'Call') {
@@ -4240,9 +4249,42 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
   void _showRecordDetails(
     BuildContext context,
+    WidgetRef ref,
     TrackerDefinition tracker,
     TrackingRecord record,
   ) {
+    String formatFieldValue(dynamic val, InputField field) {
+      if (val == null) return 'Não preenchido';
+      
+      switch (field.type) {
+        case InputFieldType.checkbox:
+          return (val == true || val == 'true') ? 'Sim' : 'Não';
+        case InputFieldType.duration:
+          final mins = int.tryParse(val.toString()) ?? 0;
+          final h = mins ~/ 60;
+          final m = mins % 60;
+          if (h > 0 && m > 0) return '${h}h ${m}m';
+          if (h > 0) return '${h}h';
+          return '${m}m';
+        case InputFieldType.mood:
+          final slug = val.toString().replaceAll(RegExp(r'\[\[|\]\]'), '');
+          final moods = ref.read(moodsProvider);
+          final mood = moods.where((m) => m.slug == slug).firstOrNull;
+          if (mood != null) return '${mood.emoji} ${mood.title}';
+          return slug;
+        case InputFieldType.checklist:
+          if (val is List) return val.join(', ');
+          return val.toString();
+        case InputFieldType.media:
+          if (val is List) return '${val.length} anexo(s)';
+          return 'Mídia anexada';
+        case InputFieldType.quantity:
+        case InputFieldType.range:
+          return val.toString();
+        default:
+          return val.toString();
+      }
+    }
     showModalBottomSheet(
       context: context,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -4328,7 +4370,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Text(
-                        val?.toString() ?? 'No preenchido',
+                        formatFieldValue(val, field),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,

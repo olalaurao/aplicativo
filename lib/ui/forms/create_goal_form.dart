@@ -82,7 +82,35 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
   Widget build(BuildContext context) {
     final hasTitle = _titleController.text.trim().isNotEmpty;
 
-    return Scaffold(
+    final isDirty = _titleController.text.trim().isNotEmpty;
+
+    return PopScope(
+      canPop: !isDirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final discard = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Descartar alteraÃ§Ãµes?'),
+            content: const Text('VocÃª possui alteraÃ§Ãµes nÃ£o salvas. Deseja sair mesmo assim?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('Descartar'),
+              ),
+            ],
+          ),
+        );
+        if ((discard ?? false) && context.mounted) {
+          Navigator.pop(context, result);
+        }
+      },
+      child:  Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
@@ -105,7 +133,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ─── Title ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Title Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   TextField(
                     controller: _titleController,
                     onChanged: (_) => setState(() {}),
@@ -130,7 +158,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                   const SizedBox(height: 16),
 
-                  // ─── Color Swatches ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Color Swatches Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   SizedBox(
                     height: 44,
                     child: ListView.separated(
@@ -177,7 +205,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                   const SizedBox(height: 20),
 
-                  // ─── Status ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Status Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.all(16),
@@ -218,7 +246,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                   const SizedBox(height: 12),
 
-                  // ─── Goal Type Card ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Goal Type Card Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.all(16),
@@ -255,7 +283,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                   const SizedBox(height: 12),
 
-                  // ─── Deadline Card ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Deadline Card Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   GestureDetector(
                     onTap: _pickDate,
                     child: Container(
@@ -296,7 +324,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                   const SizedBox(height: 12),
 
-                  // ─── KPIs ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ KPIs Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.all(16),
@@ -397,7 +425,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                   const SizedBox(height: 12),
 
-                  // ─── Organizers ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Organizers Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.symmetric(
@@ -412,7 +440,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                   const SizedBox(height: 12),
 
-                  // ─── Description ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Description Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.all(16),
@@ -451,7 +479,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
         ],
       ),
 
-      // ─── Save Button ───
+      // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Save Button Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
@@ -476,7 +504,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Widget _typeButton(GoalType type, String label, IconData icon) {
@@ -572,7 +600,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
           const SizedBox(height: 8),
           OutlinedButton.icon(
             icon: const Icon(Icons.add_link_rounded),
-            label: const Text('Adicionar post de referência'),
+            label: const Text('Adicionar post de referÃƒÂªncia'),
             onPressed: _pickSocialReference,
           ),
         ],

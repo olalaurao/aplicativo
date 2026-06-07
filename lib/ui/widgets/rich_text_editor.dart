@@ -25,10 +25,10 @@ class RichTextEditor extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<RichTextEditor> createState() => _RichTextEditorState();
+  ConsumerState<RichTextEditor> createState() => RichTextEditorState();
 }
 
-class _RichTextEditorState extends ConsumerState<RichTextEditor>
+class RichTextEditorState extends ConsumerState<RichTextEditor>
     with WidgetsBindingObserver {
   late QuillController _controller;
   final FocusNode _focusNode = FocusNode();
@@ -101,6 +101,12 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor>
         }
       }
     });
+  }
+
+  void appendText(String text) {
+    final length = _controller.document.length;
+    final index = length > 0 ? length - 1 : 0;
+    _controller.replaceText(index, 0, '\n$text', null);
   }
 
   @override

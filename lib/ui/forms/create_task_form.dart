@@ -118,9 +118,36 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
   Widget build(BuildContext context) {
     final hasTitle = _titleController.text.trim().isNotEmpty;
     final settings = ref.watch(settingsProvider);
+    final isDirty = hasTitle || _notesContent.trim().isNotEmpty;
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return PopScope(
+      canPop: !isDirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final discard = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Descartar alterações?'),
+            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('Descartar'),
+              ),
+            ],
+          ),
+        );
+        if ((discard ?? false) && context.mounted) {
+          Navigator.pop(context, result);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
           // ─── App Bar ───
@@ -128,7 +155,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
             pinned: true,
             leading: IconButton(
               icon: const Icon(Icons.close_rounded),
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.maybePop(context),
             ),
             title: Text(
               widget.existingTask != null ? 'Editar Tarefa' : 'Nova Tarefa',
@@ -721,7 +748,8 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   void _addSessionHeader() {

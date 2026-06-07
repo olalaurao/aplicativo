@@ -165,10 +165,42 @@ class MoodSettingsScreen extends ConsumerWidget {
                   onChanged: (_) => setDialogState(() {}),
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: emojiController,
-                  decoration: const InputDecoration(labelText: 'Emoji'),
-                  onChanged: (_) => setDialogState(() {}),
+                const SizedBox(height: 12),
+                const Text(
+                  'Selecione um Emoji',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    '😁', '😀', '🙂', '😐', '🙁', '😢', '😭',
+                    '😡', '🤬', '😴', '🥱', '🤢', '🤮', '🤕',
+                    '🥳', '😎', '🤔', '🥰', '😍', '🤩', '🤯',
+                  ].map((e) => GestureDetector(
+                    onTap: () {
+                      emojiController.text = e;
+                      setDialogState(() {});
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: emojiController.text == e
+                            ? AppColors.primary.withValues(alpha: 0.2)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: emojiController.text == e
+                            ? Border.all(color: AppColors.primary)
+                            : Border.all(color: Colors.transparent),
+                      ),
+                      child: Text(e, style: const TextStyle(fontSize: 24)),
+                    ),
+                  )).toList(),
                 ),
                 const SizedBox(height: 12),
                 TextField(

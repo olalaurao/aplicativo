@@ -57,6 +57,7 @@ class AppSettings {
   final String sleepInUntil;
   final String sleepInDate;
   final String reviewDailyTemplateId;
+  final String accentColor;
   final bool nlpTaskParsingEnabled;
   final String dailyNoteIdentifier;
   final String dailyNoteDateFormat;
@@ -93,6 +94,7 @@ class AppSettings {
     this.sleepInUntil = '10:00',
     this.sleepInDate = '',
     this.reviewDailyTemplateId = '',
+    this.accentColor = '#F97316',
     this.nlpTaskParsingEnabled = true,
     this.dailyNoteIdentifier = 'filename_format',
     this.dailyNoteDateFormat = 'yyyy-MM-dd',
@@ -101,7 +103,7 @@ class AppSettings {
     this.tiktokResolverEndpoint = '',
     this.tiktokResolverApiKey = '',
     this.folderPaths = const {},
-    this.quickAddWidgetButton1Label = 'Diário',
+    this.quickAddWidgetButton1Label = 'DiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡rio',
     this.quickAddWidgetButton1Target = 'journal',
     this.quickAddWidgetButton2Label = 'Tarefa',
     this.quickAddWidgetButton2Target = 'task',
@@ -158,6 +160,7 @@ class AppSettings {
     String? sleepInUntil,
     String? sleepInDate,
     String? reviewDailyTemplateId,
+    String? accentColor,
     bool? nlpTaskParsingEnabled,
     String? dailyNoteIdentifier,
     String? dailyNoteDateFormat,
@@ -311,6 +314,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       sleepInUntil: prefs.getString('sleepInUntil') ?? '10:00',
       sleepInDate: prefs.getString('sleepInDate') ?? '',
       reviewDailyTemplateId: prefs.getString('reviewDailyTemplateId') ?? '',
+    accentColor: prefs.getString('accentColor') ?? '#F97316',
       nlpTaskParsingEnabled: prefs.getBool('nlpTaskParsingEnabled') ?? true,
       dailyNoteIdentifier:
           prefs.getString('dailyNoteIdentifier') ?? 'filename_format',
@@ -322,7 +326,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       tiktokResolverApiKey: prefs.getString('tiktokResolverApiKey') ?? '',
       folderPaths: folderPaths,
       quickAddWidgetButton1Label:
-          prefs.getString('quickAddWidgetButton1Label') ?? 'Diário',
+          prefs.getString('quickAddWidgetButton1Label') ?? 'DiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡rio',
       quickAddWidgetButton1Target:
           prefs.getString('quickAddWidgetButton1Target') ?? 'journal',
       quickAddWidgetButton2Label:
@@ -464,6 +468,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       json.encode(rules.map((r) => r.toMap()).toList()),
     );
     state = state.copyWith(autoCategoryRules: rules);
+  }
+
+  Future<void> updateAccentColor(String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('accentColor', value);
+    state = state.copyWith(accentColor: value);
   }
 
   Future<void> updateAutoSync(bool value) async {

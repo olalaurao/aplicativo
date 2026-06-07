@@ -22,6 +22,7 @@ import '../../services/pomodoro_bg_service.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'category_management_screen.dart';
 import 'type_signatures_screen.dart';
+import 'diagnostic_reports_screen.dart';
 import '../../models/template_model.dart';
 import '../../services/permission_service.dart';
 import '../../services/dataview_generator.dart';
@@ -149,7 +150,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ),
                         subtitle: const Text(
-                          'Seleciona uma pasta existente e indexa os arquivos compatíveis.',
+                          'Seleciona uma pasta existente e indexa os arquivos compatÃƒÆ’Ã‚Â­veis.',
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: const Icon(
@@ -200,7 +201,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         subtitle: Text(
                           settings.tiktokResolverEndpoint.isEmpty
-                              ? 'Configure uma API para extrair URL direta de vídeo'
+                              ? 'Configure uma API para extrair URL direta de vÃƒÆ’Ã‚Â­deo'
                               : settings.tiktokResolverEndpoint,
                           style: const TextStyle(fontSize: 12),
                           maxLines: 1,
@@ -226,6 +227,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _section('Interface Customization'),
                 const SizedBox(height: 12),
                 _buildBottomBarEditor(),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: ListTile(
+                    title: const Text(
+                      'Accent Color',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Cor principal do app',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    trailing: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: _parseColor(settings.accentColor),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Theme.of(context).dividerColor, width: 1),
+                      ),
+                    ),
+                    onTap: () => _showAccentColorPicker(context, settings, notifier),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 Container(
                   decoration: AppTheme.cardDecoration(context),
@@ -402,7 +430,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     children: [
                       ListTile(
                         title: const Text(
-                          'Dormir Até Mais Tarde',
+                          'Dormir AtÃƒÆ’Ã‚Â© Mais Tarde',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -410,8 +438,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         subtitle: Text(
                           settings.sleepInTomorrow
-                              ? 'Ignorar alarmes de hábitos amanhã até ${settings.sleepInUntil}'
-                              : 'Ignorar alarmes de hábitos do dia seguinte',
+                              ? 'Ignorar alarmes de hÃƒÆ’Ã‚Â¡bitos amanhÃƒÆ’Ã‚Â£ atÃƒÆ’Ã‚Â© ${settings.sleepInUntil}'
+                              : 'Ignorar alarmes de hÃƒÆ’Ã‚Â¡bitos do dia seguinte',
                           style: const TextStyle(fontSize: 12),
                         ),
                         trailing: Switch.adaptive(
@@ -426,8 +454,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 SnackBar(
                                   content: Text(
                                     v
-                                        ? 'Modo dormir ativado: alarmes de hábitos ignorados até ${settings.sleepInUntil} de amanhã.'
-                                        : 'Alarmes de hábitos restaurados.',
+                                        ? 'Modo dormir ativado: alarmes de hÃƒÆ’Ã‚Â¡bitos ignorados atÃƒÆ’Ã‚Â© ${settings.sleepInUntil} de amanhÃƒÆ’Ã‚Â£.'
+                                        : 'Alarmes de hÃƒÆ’Ã‚Â¡bitos restaurados.',
                                   ),
                                 ),
                               );
@@ -440,7 +468,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         const Divider(height: 1, indent: 16),
                         ListTile(
                           title: const Text(
-                            'Silenciar alarmes até',
+                            'Silenciar alarmes atÃƒÆ’Ã‚Â©',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
@@ -481,7 +509,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'Alarmes de hábitos serão silenciados até $formattedTime de amanhã.',
+                                      'Alarmes de hÃƒÆ’Ã‚Â¡bitos serÃƒÆ’Ã‚Â£o silenciados atÃƒÆ’Ã‚Â© $formattedTime de amanhÃƒÆ’Ã‚Â£.',
                                     ),
                                   ),
                                 );
@@ -523,8 +551,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                               subtitle: Text(
                                 granted
-                                    ? 'Granted — alarms fire at exact times'
-                                    : 'Not granted — alarms may be delayed',
+                                    ? 'Granted ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â alarms fire at exact times'
+                                    : 'Not granted ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â alarms may be delayed',
                                 style: const TextStyle(fontSize: 12),
                               ),
                               trailing: granted
@@ -568,8 +596,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                               subtitle: Text(
                                 granted
-                                    ? 'Granted — popups show over lock screen'
-                                    : 'Not granted — popups may not show on lock screen',
+                                    ? 'Granted ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â popups show over lock screen'
+                                    : 'Not granted ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â popups may not show on lock screen',
                                 style: const TextStyle(fontSize: 12),
                               ),
                               trailing: granted
@@ -657,7 +685,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ),
                         subtitle: const Text(
-                          'Detectar datas, horários e prioridades ao digitar tarefas',
+                          'Detectar datas, horÃƒÆ’Ã‚Â¡rios e prioridades ao digitar tarefas',
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: Switch.adaptive(
@@ -799,7 +827,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ),
                         subtitle: Text(
-                          '${_dailyIdentifierLabel(settings.dailyNoteIdentifier)} · ${settings.dailyNoteFolder}/${_dailyPreview(settings.dailyNoteDateFormat)}',
+                          '${_dailyIdentifierLabel(settings.dailyNoteIdentifier)} Ãƒâ€šÃ‚Â· ${settings.dailyNoteFolder}/${_dailyPreview(settings.dailyNoteDateFormat)}',
                           style: const TextStyle(fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -822,7 +850,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ),
                         subtitle: const Text(
-                          'Define onde novos objetos serão salvos no vault',
+                          'Define onde novos objetos serÃƒÆ’Ã‚Â£o salvos no vault',
                           style: TextStyle(fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -845,7 +873,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ),
                         subtitle: const Text(
-                          'Aponta para uma pasta de vault e indexa os arquivos compatíveis',
+                          'Aponta para uma pasta de vault e indexa os arquivos compatÃƒÆ’Ã‚Â­veis',
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: const Icon(Icons.chevron_right_rounded),
@@ -962,6 +990,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ),
                           );
                         },
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      ListTile(
+                        leading: const Icon(
+                          Icons.bug_report_outlined,
+                          color: AppColors.primary,
+                        ),
+                        title: const Text(
+                          'RelatÃƒÆ’Ã‚Â³rios de diagnÃƒÆ’Ã‚Â³stico',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Exibir relatÃƒÆ’Ã‚Â³rios de erros locais e ANRs',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const DiagnosticReportsScreen(),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1269,7 +1322,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ),
                             subtitle: const Text(
-                              'Prompt de revisão diária',
+                              'Prompt de revisÃƒÆ’Ã‚Â£o diÃƒÆ’Ã‚Â¡ria',
                               style: TextStyle(
                                 color: AppColors.textMuted,
                                 fontSize: 12,
@@ -1331,7 +1384,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               DropdownButtonFormField<String>(
                 initialValue: identifier,
-                decoration: const InputDecoration(labelText: 'Identificação'),
+                decoration: const InputDecoration(labelText: 'IdentificaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o'),
                 items: const [
                   DropdownMenuItem(
                     value: 'filename_format',
@@ -1505,7 +1558,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Configure uma API que devolva uma URL direta de vídeo. '
+                'Configure uma API que devolva uma URL direta de vÃƒÆ’Ã‚Â­deo. '
                 'Use {url} no endpoint para inserir o link do TikTok; sem {url}, o app envia ?url=...',
               ),
               const SizedBox(height: 12),
@@ -1869,6 +1922,57 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+    Color _parseColor(String hexString) {
+    try {
+      final buffer = StringBuffer();
+      if (hexString.length == 6 || hexString.length == 7) buffer.write('ff');
+      buffer.write(hexString.replaceFirst('#', ''));
+      return Color(int.parse(buffer.toString(), radix: 16));
+    } catch (_) {
+      return AppColors.primary;
+    }
+  }
+
+  void _showAccentColorPicker(BuildContext context, AppSettings settings, SettingsNotifier notifier) {
+    final colors = ['#F97316', '#0EA5E9', '#10B981', '#8B5CF6', '#F43F5E', '#EAB308'];
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Selecione a Cor Principal'),
+        content: Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: colors.map((hex) {
+            final color = _parseColor(hex);
+            final isSelected = settings.accentColor.toUpperCase() == hex.toUpperCase();
+            return GestureDetector(
+              onTap: () {
+                notifier.updateAccentColor(hex); // Assume this method exists or we need to add it
+                Navigator.pop(context);
+              },
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: isSelected ? Border.all(color: AppColors.textPrimary, width: 3) : null,
+                ),
+                child: isSelected ? const Icon(Icons.check, color: Colors.white) : null,
+              ),
+            );
+          }).toList(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showCategoryColorsDialog(
     BuildContext context,
     AppSettings settings,
@@ -2006,7 +2110,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: Text(
               googleUser != null
                   ? 'Conectado como ${googleUser.email}'
-                  : 'Não conectado',
+                  : 'NÃƒÆ’Ã‚Â£o conectado',
               style: const TextStyle(fontSize: 12),
             ),
             trailing: googleUser != null
@@ -2042,7 +2146,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Nenhum calendário encontrado.',
+                        'Nenhum calendÃƒÆ’Ã‚Â¡rio encontrado.',
                         style: TextStyle(
                           color: AppColors.textMuted,
                           fontSize: 12,
@@ -2072,7 +2176,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         subtitle: Text(
                           calendar.primary == true
-                              ? 'Calendário principal'
+                              ? 'CalendÃƒÆ’Ã‚Â¡rio principal'
                               : id,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -2109,7 +2213,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Não foi possível carregar calendários: $error',
+                    'NÃƒÆ’Ã‚Â£o foi possÃƒÆ’Ã‚Â­vel carregar calendÃƒÆ’Ã‚Â¡rios: $error',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -2129,7 +2233,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final dir = Directory(path);
       if (!await dir.exists()) {
-        return 'A pasta selecionada não existe.';
+        return 'A pasta selecionada nÃƒÆ’Ã‚Â£o existe.';
       }
       final probe = File(
         '${dir.path}${Platform.pathSeparator}.citrine_write_test',
@@ -2140,7 +2244,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
       return null;
     } catch (e) {
-      return 'Sem permissão de escrita nesta pasta: $e';
+      return 'Sem permissÃƒÆ’Ã‚Â£o de escrita nesta pasta: $e';
     }
   }
 }

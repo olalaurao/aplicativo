@@ -147,7 +147,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: TextField(
           controller: _searchController,
@@ -434,7 +434,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               });
             }
             context.push(
-              '/detail/${obj.id}',
+              '/detail/${Uri.encodeComponent(obj.id)}',
               extra: {'searchQuery': query, 'searchSnippet': obj.snippet},
             );
           },

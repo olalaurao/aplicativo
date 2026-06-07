@@ -99,7 +99,35 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
   Widget build(BuildContext context) {
     final hasTitle = _titleController.text.trim().isNotEmpty;
 
-    return Scaffold(
+    final isDirty = _titleController.text.trim().isNotEmpty;
+
+    return PopScope(
+      canPop: !isDirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final discard = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Descartar alteraÃ§Ãµes?'),
+            content: const Text('VocÃª possui alteraÃ§Ãµes nÃ£o salvas. Deseja sair mesmo assim?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('Descartar'),
+              ),
+            ],
+          ),
+        );
+        if ((discard ?? false) && context.mounted) {
+          Navigator.pop(context, result);
+        }
+      },
+      child:  Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
@@ -202,7 +230,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
 
                   const SizedBox(height: 12),
 
-                  // ─── Organizers ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Organizers Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.symmetric(
@@ -280,7 +308,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildTypeRow() {
@@ -456,7 +484,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
     if (coverUrl.isNotEmpty && !_isValidCoverUrl(coverUrl)) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('URL da capa inválida')));
+      ).showSnackBar(const SnackBar(content: Text('URL da capa invÃƒÂ¡lida')));
       return;
     }
 

@@ -56,7 +56,35 @@ class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
   Widget build(BuildContext context) {
     final hasName = _nameController.text.trim().isNotEmpty;
 
-    return Scaffold(
+    final isDirty = _nameController.text.trim().isNotEmpty;
+
+    return PopScope(
+      canPop: !isDirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final discard = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Descartar alteraÃ§Ãµes?'),
+            content: const Text('VocÃª possui alteraÃ§Ãµes nÃ£o salvas. Deseja sair mesmo assim?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('Descartar'),
+              ),
+            ],
+          ),
+        );
+        if ((discard ?? false) && context.mounted) {
+          Navigator.pop(context, result);
+        }
+      },
+      child:  Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
@@ -146,7 +174,7 @@ class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildFieldRow(

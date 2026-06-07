@@ -76,7 +76,35 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
   Widget build(BuildContext context) {
     final hasTitle = _titleController.text.trim().isNotEmpty;
 
-    return Scaffold(
+    final isDirty = _titleController.text.trim().isNotEmpty;
+
+    return PopScope(
+      canPop: !isDirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final discard = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Descartar alteraÃ§Ãµes?'),
+            content: const Text('VocÃª possui alteraÃ§Ãµes nÃ£o salvas. Deseja sair mesmo assim?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('Descartar'),
+              ),
+            ],
+          ),
+        );
+        if ((discard ?? false) && context.mounted) {
+          Navigator.pop(context, result);
+        }
+      },
+      child:  Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
@@ -99,7 +127,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ─── Title ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Title Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   TextField(
                     controller: _titleController,
                     onChanged: (_) => setState(() {}),
@@ -124,7 +152,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
 
                   const SizedBox(height: 16),
 
-                  // ─── Color Swatches ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Color Swatches Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   SizedBox(
                     height: 44,
                     child: ListView.separated(
@@ -171,7 +199,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
 
                   const SizedBox(height: 20),
 
-                  // ─── State & Priority ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ State & Priority Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.all(16),
@@ -196,7 +224,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
 
                   const SizedBox(height: 12),
 
-                  // ─── Dates ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Dates Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.all(16),
@@ -219,7 +247,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
 
                   const SizedBox(height: 12),
 
-                  // ─── Description ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Description Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.all(16),
@@ -252,7 +280,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
 
                   const SizedBox(height: 12),
 
-                  // ─── Organizers ───
+                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Organizers Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -291,7 +319,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildDropdownRow<T extends Enum>(

@@ -48,6 +48,8 @@ import '../../providers/sync_provider.dart';
 import '../../services/sync_manager.dart';
 import '../../providers/google_calendar_provider.dart';
 import '../../services/notification_service.dart';
+import '../widgets/skeleton_loader.dart';
+import '../widgets/empty_state_view.dart';
 import '../../services/pomodoro_bg_service.dart';
 import '../../services/scheduler_service.dart';
 import '../forms/create_entry_form.dart';
@@ -56,6 +58,8 @@ import '../forms/create_habit_form.dart';
 import '../widgets/pomodoro_week_overview.dart';
 import '../widgets/organizer_tasks_widget.dart';
 import '../widgets/universal_search_picker.dart';
+import '../../providers/day_theme_provider.dart';
+import '../../models/day_theme_model.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -70,6 +74,7 @@ final _quickTaskSubmittingProvider = StateProvider<bool>((ref) => false);
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   bool _isEditMode = false;
+  bool _commandCenterOpenedThisScroll = false;
   final TextEditingController _quickAddController = TextEditingController();
   final TextEditingController _quickTaskController = TextEditingController();
 
@@ -163,8 +168,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       data: (allBlocks) {
         final dashboardBlocks = allBlocks
             .where((b) => b.visible || _isEditMode)
-            .toList();
-        dashboardBlocks.sort((a, b) => a.order.compareTo(b.order));
+            .toList()
+          ..sort((a, b) => a.order.compareTo(b.order));
+
+        if (dashboardBlocks.isEmpty) {
+          return const Center(
+            child: Text(
+              'O Dashboard estÃƒÂ¡ vazio.\nAdicione blocos pelas ConfiguraÃƒÂ§ÃƒÂµes.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textMuted),
+            ),
+          );
+        }
 
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -175,21 +190,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             scrolledUnderElevation: 0,
             backgroundColor: Colors.transparent,
           ),
-          body: NotificationListener<ScrollUpdateNotification>(
+          body: NotificationListener<ScrollNotification>(
             onNotification: (notification) {
-              if (notification.metrics.pixels < -80 &&
-                  notification.dragDetails != null) {
-                // Throttle this so it doesn't open multiple times
-                if (ModalRoute.of(context)?.isCurrent == true) {
-                  showCommandCenter(context);
+              if (notification is ScrollUpdateNotification) {
+                if (notification.metrics.pixels < -140 &&
+                    notification.dragDetails != null) {
+                  // Throttle this so it doesn't open multiple times
+                  if (!_commandCenterOpenedThisScroll &&
+                      ModalRoute.of(context)?.isCurrent == true) {
+                    _commandCenterOpenedThisScroll = true;
+                    showCommandCenter(context);
+                  }
                 }
+              } else if (notification is ScrollEndNotification) {
+                _commandCenterOpenedThisScroll = false;
               }
               return false;
             },
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Header Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await ref.read(syncManagerProvider).performSync();
+              },
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                slivers: [
+                // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Header ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
@@ -230,7 +257,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
-                              'Drag to reorder or tap ⋯ to configure',
+                              'Drag to reorder or tap Ã¢â€¹Â¯ to configure',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppColors.primary.withValues(alpha: 0.8),
@@ -243,7 +270,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ),
                 ),
 
-                // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Blocks Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+                // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Blocks ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                   sliver: _isEditMode
@@ -332,6 +359,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
               ],
             ),
+            ), // Close RefreshIndicator
           ),
         );
       },
@@ -379,14 +407,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _skeletonLine({required double width, required double height}) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceVariantColor(context),
-        borderRadius: BorderRadius.circular(6),
-      ),
-    );
+    return SkeletonLoader(width: width, height: height, borderRadius: 6);
   }
 
   Widget _editModeButton({
@@ -1111,26 +1132,173 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildQuoteBlock() {
+    const _defaultQuotes = [
+      '"The best way to predict the future is to create it." Ã¢â‚¬â€ Peter Drucker',
+      '"You do not rise to the level of your goals. You fall to the level of your systems." Ã¢â‚¬â€ James Clear',
+      '"Energy flows where attention goes." Ã¢â‚¬â€ Tony Robbins',
+      '"Small daily improvements over time lead to stunning results." Ã¢â‚¬â€ Robin Sharma',
+      '"Discipline is the bridge between goals and accomplishment." Ã¢â‚¬â€ Jim Rohn',
+    ];
+
+    final blocks = ref.watch(dashboardProvider).valueOrNull ?? [];
+    final block = blocks.cast<DashboardBlock?>().firstWhere(
+      (b) => b?.type == BlockType.quotes,
+      orElse: () => null,
+    );
+    final rawQuotes = block?.metadata['quotes'] as List?;
+    final quotes = rawQuotes != null
+        ? rawQuotes.cast<String>().toList()
+        : _defaultQuotes;
+
+    final now = DateTime.now();
+    final dayOfYear = now.difference(DateTime(now.year, 1, 1)).inDays;
+    final todayIndex = dayOfYear % quotes.length;
+    final todayQuote = quotes[todayIndex];
+
+    // Try to split author from quote
+    final dashIdx = todayQuote.lastIndexOf('Ã¢â‚¬â€');
+    final quoteText = dashIdx > 0
+        ? todayQuote.substring(0, dashIdx).trim()
+        : todayQuote.trim();
+    final author = dashIdx > 0 ? todayQuote.substring(dashIdx + 1).trim() : null;
+
     return _buildCard(
       title: 'Quote of the Day',
       icon: Icons.format_quote_rounded,
-      child: const Column(
+      onConfigure: _isEditMode ? () => _showQuotePoolEditor(block, quotes) : null,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '"The best way to predict the future is to create it."',
-            style: TextStyle(
-              fontSize: 16,
+            quoteText,
+            style: const TextStyle(
+              fontSize: 15,
               fontStyle: FontStyle.italic,
               fontWeight: FontWeight.w500,
+              height: 1.5,
             ),
           ),
-          SizedBox(height: 8),
-          Text(
-            '- Peter Drucker',
-            style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-          ),
+          if (author != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Ã¢â‚¬â€ $author',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  void _showQuotePoolEditor(DashboardBlock? block, List<String> quotes) {
+    final localQuotes = List<String>.from(quotes);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Container(
+          decoration: AppTheme.sheetDecoration(context),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.textMuted.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('Pool de CitaÃƒÂ§ÃƒÂµes',
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      final ctrl = TextEditingController();
+                      showDialog<void>(
+                        context: ctx,
+                        builder: (dialogCtx) => AlertDialog(
+                          title: const Text('Nova citaÃƒÂ§ÃƒÂ£o'),
+                          content: TextField(
+                            controller: ctrl,
+                            maxLines: 3,
+                            decoration: const InputDecoration(
+                              hintText: '"Frase" Ã¢â‚¬â€ Autor',
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dialogCtx),
+                              child: const Text('Cancelar'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                if (ctrl.text.trim().isNotEmpty) {
+                                  setModalState(() => localQuotes.add(ctrl.text.trim()));
+                                }
+                                Navigator.pop(dialogCtx);
+                              },
+                              child: const Text('Adicionar'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Adicionar'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 260,
+                child: ListView.builder(
+                  itemCount: localQuotes.length,
+                  itemBuilder: (_, i) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      localQuotes[i],
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
+                      onPressed: () => setModalState(() => localQuotes.removeAt(i)),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: AppTheme.primaryButtonStyle,
+                  onPressed: () {
+                    if (block != null) {
+                      final updated = block.copyWith(
+                        metadata: {...block.metadata, 'quotes': localQuotes},
+                      );
+                      ref.read(dashboardProvider.notifier).updateBlock(updated);
+                    }
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text('Salvar'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1305,17 +1473,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         .toList();
     if (habits.isEmpty) {
       return _buildCard(
-        title: 'Hábitos de hoje',
+        title: 'HÃƒÂ¡bitos de hoje',
         icon: Icons.loop_rounded,
         child: const Text(
-          'Nenhum hábito para hoje',
+          'Nenhum hÃƒÂ¡bito para hoje',
           style: TextStyle(color: AppColors.textMuted, fontSize: 13),
         ),
       );
     }
 
     return _buildCard(
-      title: 'Hábitos de hoje',
+      title: 'HÃƒÂ¡bitos de hoje',
       icon: Icons.loop_rounded,
       onAdd: () => showCreateMenu(context),
       child: SingleChildScrollView(
@@ -1724,12 +1892,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (mood != null) return mood.emoji;
 
     return switch (moodSlug) {
-      'terrible' => '😞',
-      'bad' => '😕',
-      'neutral' => '😐',
-      'good' => '🙂',
-      'great' => '😄',
-      _ => '😐',
+      'terrible' => 'Ã°Å¸ËœÅ¾',
+      'bad' => 'Ã°Å¸Ëœâ€¢',
+      'neutral' => 'Ã°Å¸ËœÂ',
+      'good' => 'Ã°Å¸â„¢â€š',
+      'great' => 'Ã°Å¸Ëœâ€ž',
+      _ => 'Ã°Å¸ËœÂ',
     };
   }
 
@@ -1971,10 +2139,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         title: 'Last Metric',
         icon: Icons.show_chart_rounded,
         onAdd: () => showCreateMenu(context),
-        child: const Text(
-          'Nenhum entry de rastreador ainda',
-          style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-        ),
+        child: EmptyStateView(icon: Icons.track_changes_rounded, headline: 'Nenhum entry ainda', isSmall: true),
       );
     }
 
@@ -2024,10 +2189,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       title: 'Contatos Pendings',
       icon: Icons.people_alt_rounded,
       child: people.isEmpty
-          ? const Text(
-              'Nenhum contato pendente',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-            )
+          ? EmptyStateView(icon: Icons.people_outline, headline: 'Nenhum contato pendente', isSmall: true)
           : Column(
               children: people
                   .take(2)
@@ -2086,10 +2248,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       icon: Icons.book_rounded,
       onAdd: () => showCreateMenu(context),
       child: current == null
-          ? const Text(
-              'Nenhum recurso cadastrado',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-            )
+          ? EmptyStateView(icon: Icons.bookmark_border_rounded, headline: 'Nenhum recurso', isSmall: true)
           : ObjectActionWrapper(
               object: current,
               child: ListTile(
@@ -2139,10 +2298,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _buildAnalysisBlock() {
     final habits = ref.watch(habitsProvider);
-    final totalStreaks = habits.fold(0, (sum, h) => sum + h.streak);
-    final avgConsistency = habits.isEmpty
-        ? 0
-        : totalStreaks / (habits.length * 7);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final activeHabits = habits.where((h) => h.status == HabitStatus.active).toList();
+
+    // Calculate per-habit consistency over last 30 days
+    double totalConsistency = 0;
+    int totalStreak = 0;
+    int bestStreak = 0;
+    String? bestHabitTitle;
+    int completedToday = 0;
+
+    for (final habit in activeHabits) {
+      // Count successful days in last 30 days
+      int successDays = 0;
+      for (int i = 0; i < 30; i++) {
+        final checkDate = today.subtract(Duration(days: i));
+        final record = habit.completionHistory.where((r) {
+          final rDate = DateTime(r.date.year, r.date.month, r.date.day);
+          return rDate == checkDate;
+        }).firstOrNull;
+        if (record != null && record.successful) successDays++;
+      }
+      final consistency = successDays / 30.0;
+      totalConsistency += consistency;
+      totalStreak += habit.streak;
+      if (habit.streak > bestStreak) {
+        bestStreak = habit.streak;
+        bestHabitTitle = habit.title;
+      }
+      if (habit.isCompletedToday) completedToday++;
+    }
+
+    final avgConsistency = activeHabits.isEmpty
+        ? 0.0
+        : totalConsistency / activeHabits.length;
+
+    String motivationText;
+    if (activeHabits.isEmpty) {
+      motivationText = 'Add habits to track your consistency!';
+    } else if (avgConsistency >= 0.8) {
+      motivationText = 'Exceptional consistency! Keep it up Ã°Å¸â€Â¥';
+    } else if (avgConsistency >= 0.5) {
+      motivationText = 'You\'re doing well Ã¢â‚¬â€ push for that 80%+ week!';
+    } else if (completedToday == activeHabits.length) {
+      motivationText = 'All habits done today! Ã°Å¸Å½â€° Great effort!';
+    } else {
+      motivationText = 'You\'ve got $completedToday/${activeHabits.length} habits done today.';
+    }
 
     return _buildCard(
       title: 'Consistency Insights',
@@ -2154,17 +2357,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildSimpleStat(
-                'Average',
+                'Avg rate (30d)',
                 '${(avgConsistency * 100).toInt()}%',
-                AppColors.primary,
+                avgConsistency >= 0.7
+                    ? AppColors.habitGreen
+                    : avgConsistency >= 0.4
+                        ? AppColors.primary
+                        : AppColors.error,
               ),
-              _buildSimpleStat('Streaks', '$totalStreaks', AppColors.warning),
+              _buildSimpleStat('Total streaks', '$totalStreak', AppColors.warning),
+              _buildSimpleStat(
+                'Today',
+                '$completedToday/${activeHabits.length}',
+                AppColors.secondary,
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'You are keeping a great average this week!',
-            style: TextStyle(
+          if (bestHabitTitle != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.emoji_events_rounded,
+                      color: AppColors.primary, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Ã°Å¸Ââ€  Best streak: $bestHabitTitle ($bestStreak days)',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Text(
+            motivationText,
+            style: const TextStyle(
               fontSize: 12,
               color: AppColors.textSecondary,
               fontStyle: FontStyle.italic,
@@ -2201,24 +2442,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _buildHabitHeatmapBlock() {
     final habits = ref.watch(habitsProvider);
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final activeHabits = habits.where((h) => h.status == HabitStatus.active).toList();
+    final habitCount = activeHabits.length;
 
-    // Generate real data for the last 28 days
+    // Count successful completions per day for the last 28 days
     final data = List.generate(28, (index) {
-      final date = now.subtract(Duration(days: 27 - index));
-      final dateStr = DateFormat('yyyy-MM-dd').format(date);
-
-      // Activity level based on habit completions for this specific day
-      // For now, we estimate based on the habit's last completion date
-      // compared to this date in the heatmap
-      double activity = 0;
-      for (final habit in habits) {
-        if (habit.daysSinceLastCompletion == now.difference(date).inDays) {
-          activity += 0.4;
-        }
+      final date = today.subtract(Duration(days: 27 - index));
+      final dateKey = DateFormat('yyyy-MM-dd').format(date);
+      int successCount = 0;
+      for (final habit in activeHabits) {
+        final record = habit.completionHistory.where((r) {
+          final rDate = DateTime(r.date.year, r.date.month, r.date.day);
+          return rDate == date;
+        }).firstOrNull;
+        if (record != null && record.successful) successCount++;
       }
-
-      return ChartDataPoint(label: dateStr, value: activity.clamp(0.0, 1.0));
+      final activity = habitCount > 0
+          ? (successCount / habitCount).clamp(0.0, 1.0)
+          : 0.0;
+      return ChartDataPoint(label: dateKey, value: activity);
     });
+
+    // Overall stats
+    final totalCompleted = data.where((d) => (d.value ?? 0.0) > 0).length;
+    final perfectDays = data.where((d) => (d.value ?? 0.0) >= 1.0).length;
+    final activeDays = data.where((d) => (d.value ?? 0.0) > 0).length;
+    final avgActivity = activeDays > 0
+        ? (data.fold(0.0, (s, d) => s + (d.value ?? 0.0)) / 28 * 100).toInt()
+        : 0;
 
     return _buildCard(
       title: 'Habit Activity',
@@ -2226,18 +2478,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Last 28 days',
-            style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+          Text(
+            'Last 28 days Ã‚Â· ${activeHabits.length} active habits',
+            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 180, // Increased height to accommodate multiple rows
+            height: 180,
             child: CitrineChart(
               type: ChartType.heatmap,
               data: data,
               color: AppColors.habitGreen,
             ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildSimpleStat(
+                'Active days',
+                '$totalCompleted/28',
+                AppColors.habitGreen,
+              ),
+              _buildSimpleStat(
+                'Perfect days',
+                '$perfectDays',
+                AppColors.primary,
+              ),
+              _buildSimpleStat(
+                'Avg rate',
+                '$avgActivity%',
+                AppColors.secondary,
+              ),
+            ],
           ),
         ],
       ),
@@ -2468,80 +2741,96 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildTimeBlockingBlock() {
-    final tasks = ref.watch(tasksProvider);
     final today = DateTime.now();
-    final todayStr = DateFormat('yyyy-MM-dd').format(today);
-    final todayTasks =
-        tasks.where((t) {
-          return t.endDate != null &&
-              DateFormat('yyyy-MM-dd').format(t.endDate!) == todayStr &&
-              t.scheduledTime != null;
-        }).toList()..sort((a, b) {
-          return (a.scheduledTime ?? '00:00').compareTo(
-            b.scheduledTime ?? '00:00',
-          );
-        });
+    const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final todayDayName = weekDayNames[today.weekday - 1];
+
+    final allThemes = ref.watch(dayThemesProvider);
+    final allTimeBlocks = ref.watch(timeBlocksProvider);
+
+    // Find the active DayTheme for today
+    final activeTheme = allThemes.cast<DayTheme?>().firstWhere(
+      (t) => t != null && t.daysOfWeek.contains(todayDayName),
+      orElse: () => null,
+    );
+
+    // Get the TimeBlocks belonging to the active theme
+    final activeBlocks = activeTheme == null
+        ? <TimeBlock>[]
+        : allTimeBlocks
+            .where((b) => activeTheme.blockIds.contains(b.id))
+            .toList()
+          ..sort((a, b) {
+            final aStart = a.timeRanges.isEmpty ? 0 : a.timeRanges.first.startHour * 60 + a.timeRanges.first.startMinute;
+            final bStart = b.timeRanges.isEmpty ? 0 : b.timeRanges.first.startHour * 60 + b.timeRanges.first.startMinute;
+            return aStart.compareTo(bStart);
+          });
 
     return _buildCard(
-      title: 'Time Blocks de Today',
+      title: activeTheme != null ? activeTheme.title : "Today's Time Blocks",
       icon: Icons.view_day_rounded,
-      onAdd: () => showCreateMenu(context),
-      child: todayTasks.isEmpty
-          ? const Text(
-              'Nenhum bloco agendado para hoje',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-            )
-          : Column(
-              children: todayTasks.map((task) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: InkWell(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => UniversalDetailView(object: task),
+      onConfigure: () => context.push('/day-themes'),
+      child: activeTheme == null
+          ? EmptyStateView(icon: Icons.calendar_today_rounded, headline: 'Sem tema hoje', isSmall: true)
+          : activeBlocks.isEmpty
+              ? const Text(
+                  'Tema sem blocos de tempo configurados',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                )
+              : Column(
+                  children: activeBlocks.map((block) {
+                    final blockColor = block.color != null
+                        ? Color(int.tryParse('FF${block.color!.replaceAll('#', '')}', radix: 16) ?? 0xFFFFB000)
+                        : AppColors.primary;
+                    final rangeText = block.timeRanges.isEmpty
+                        ? 'Sem horÃƒÂ¡rio'
+                        : block.timeRanges
+                            .map((r) =>
+                                '${r.startHour.toString().padLeft(2, '0')}:${r.startMinute.toString().padLeft(2, '0')}Ã¢â‚¬â€œ${r.endHour.toString().padLeft(2, '0')}:${r.endMinute.toString().padLeft(2, '0')}')
+                            .join(' | ');
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 4,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: blockColor,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  block.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  rangeText,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 4,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                task.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                task.scheduledTime ?? 'No time set',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textMuted,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
+                    );
+                  }).toList(),
+                ),
     );
   }
 
@@ -2594,12 +2883,93 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildCustomMarkdownBlock() {
+    // Find the customMarkdown block from dashboard to read/write metadata
+    final blocks = ref.watch(dashboardProvider).valueOrNull ?? [];
+    final block = blocks.cast<DashboardBlock?>().firstWhere(
+      (b) => b?.type == BlockType.customMarkdown,
+      orElse: () => null,
+    );
+    final content = block?.metadata['content'] as String? ??
+        '**Lembretes:**\n- Beber ÃƒÂ¡gua\n- Alongar a cada hora';
+
     return _buildCard(
-      title: 'Custom Notes',
+      title: 'Notas Fixas',
       icon: Icons.text_snippet_rounded,
-      child: const Text(
-        '**Reminder:**\n- Drink water\n- Stretch every hour',
-        style: TextStyle(fontSize: 14),
+      onConfigure: _isEditMode
+          ? () => _showCustomMarkdownEditor(block, content)
+          : null,
+      child: Text(
+        content,
+        style: const TextStyle(fontSize: 14, height: 1.5),
+        maxLines: 10,
+        overflow: TextOverflow.fade,
+      ),
+    );
+  }
+
+  void _showCustomMarkdownEditor(DashboardBlock? block, String currentContent) {
+    final controller = TextEditingController(text: currentContent);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          decoration: AppTheme.sheetDecoration(context),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.textMuted.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Editar Notas Fixas',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLines: 8,
+                decoration: const InputDecoration(
+                  hintText: 'Escreva suas notas ou lembretes aqui...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: AppTheme.primaryButtonStyle,
+                  onPressed: () {
+                    if (block != null) {
+                      final updated = block.copyWith(
+                        metadata: {
+                          ...block.metadata,
+                          'content': controller.text,
+                        },
+                      );
+                      ref.read(dashboardProvider.notifier).updateBlock(updated);
+                    }
+                    Navigator.pop(ctx);
+                    controller.dispose();
+                  },
+                  child: const Text('Salvar'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -2625,7 +2995,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             return const Padding(
               padding: EdgeInsets.symmetric(vertical: 8.0),
               child: Text(
-                'Sem compromissos no período',
+                'Sem compromissos no perÃƒÂ­odo',
                 style: TextStyle(color: AppColors.textMuted, fontSize: 13),
               ),
             );
@@ -2672,7 +3042,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              event.summary ?? 'Compromisso sem título',
+                              event.summary ?? 'Compromisso sem tÃƒÂ­tulo',
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
@@ -2682,7 +3052,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '$dateLabel  •  $time',
+                              '$dateLabel  Ã¢â‚¬Â¢  $time',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.textSecondaryColor(context),
@@ -2724,7 +3094,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ),
                   ),
                   title: Text(
-                    event.summary ?? 'Compromisso sem título',
+                    event.summary ?? 'Compromisso sem tÃƒÂ­tulo',
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
@@ -2745,7 +3115,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         error: (_, _) => const Padding(
           padding: EdgeInsets.symmetric(vertical: 8.0),
           child: Text(
-            'Não foi possível carregar o Google Agenda',
+            'NÃƒÂ£o foi possÃƒÂ­vel carregar o Google Agenda',
             style: TextStyle(color: AppColors.textMuted, fontSize: 13),
           ),
         ),
@@ -2807,7 +3177,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(height: 16),
 
                   const Text(
-                    'Período a Exibir',
+                    'PerÃƒÂ­odo a Exibir',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 8),
@@ -2833,7 +3203,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(height: 20),
 
                   const Text(
-                    'Formato de Exibição',
+                    'Formato de ExibiÃƒÂ§ÃƒÂ£o',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 8),
@@ -2883,7 +3253,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             .updateBlock(updated);
                         Navigator.pop(context);
                       },
-                      child: const Text('Salvar Configuração'),
+                      child: const Text('Salvar ConfiguraÃƒÂ§ÃƒÂ£o'),
                     ),
                   ),
                 ],
@@ -3619,7 +3989,7 @@ extension on _HomeScreenState {
 
   static const _filterObjectTypes = <String, String>{
     'task': 'Tarefas',
-    'habit': 'Hábitos',
+    'habit': 'HÃƒÂ¡bitos',
     'pomodoro': 'Pomodoros agendados',
     'goal': 'Goals',
     'note': 'Notas',
@@ -3711,7 +4081,7 @@ extension on _HomeScreenState {
                                 value: organizer.slug,
                                 child: Text(
                                   organizer is Goal
-                                      ? 'Goal · ${organizer.title}'
+                                      ? 'Goal Ã‚Â· ${organizer.title}'
                                       : organizer.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,

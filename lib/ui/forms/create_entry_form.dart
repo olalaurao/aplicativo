@@ -44,7 +44,8 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
   String? _templateId;
   List<OrganizerReference> _organizers = [];
 
-  // We will load moods from provider
+  final GlobalKey<RichTextEditorState> _editorKey =
+      GlobalKey<RichTextEditorState>();
 
   static const _feelingChips = [
     'Ansioso',
@@ -150,8 +151,41 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    final isDirty = _titleController.text.trim().isNotEmpty ||
+        _content.trim().isNotEmpty;
+
+    return PopScope(
+      canPop: !isDirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final discard = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Descartar alterações?'),
+            content: const Text(
+              'Você possui alterações não salvas. Deseja sair mesmo assim?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                ),
+                child: const Text('Descartar'),
+              ),
+            ],
+          ),
+        );
+        if ((discard ?? false) && context.mounted) {
+          Navigator.pop(context, result);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           // ─── Top Bar ───
@@ -163,7 +197,7 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.maybePop(context),
                   ),
                   const Spacer(),
                   const Text(
@@ -217,6 +251,7 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
                   SizedBox(
                     height: 300,
                     child: RichTextEditor(
+                      key: _editorKey,
                       content: _content,
                       onChanged: (val) {
                         setState(() {
@@ -242,7 +277,8 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
           _buildBottomControls(),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildBottomControls() {
@@ -837,11 +873,12 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
                   );
 
                   setState(() {
-                    if (_content.isEmpty) {
+                    if (_content.trim().isEmpty) {
                       _content = body;
                     } else {
                       _content += '\n$body';
                     }
+                    _editorKey.currentState?.appendText(body);
                     _templateId = t.id;
 
                     if (t.frontmatterDefaults.containsKey('mood')) {

@@ -225,6 +225,30 @@ class MainActivity : FlutterActivity() {
                         result.error("ERROR", e.message, null)
                     }
                 }
+                "getDiagnosticReports" -> {
+                    try {
+                        val reportDir = java.io.File(filesDir, "app_flutter/diagnostics/crash_reports")
+                        if (reportDir.exists()) {
+                            val files = reportDir.listFiles()?.map { it.absolutePath } ?: emptyList()
+                            result.success(files)
+                        } else {
+                            result.success(emptyList<String>())
+                        }
+                    } catch (e: Exception) {
+                        result.error("ERROR", e.message, null)
+                    }
+                }
+                "clearDiagnosticReports" -> {
+                    try {
+                        val reportDir = java.io.File(filesDir, "app_flutter/diagnostics/crash_reports")
+                        if (reportDir.exists()) {
+                            reportDir.deleteRecursively()
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("ERROR", e.message, null)
+                    }
+                }
                 else -> {
                     result.notImplemented()
                 }

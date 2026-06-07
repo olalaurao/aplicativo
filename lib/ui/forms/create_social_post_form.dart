@@ -82,7 +82,35 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
   Widget build(BuildContext context) {
     final canSave = _urlController.text.trim().isNotEmpty && !_isFetching;
 
-    return Scaffold(
+    final isDirty = _urlController.text.trim().isNotEmpty || _noteController.text.trim().isNotEmpty;
+
+    return PopScope(
+      canPop: !isDirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final discard = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Descartar alteraÃ§Ãµes?'),
+            content: const Text('VocÃª possui alteraÃ§Ãµes nÃ£o salvas. Deseja sair mesmo assim?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('Descartar'),
+              ),
+            ],
+          ),
+        );
+        if ((discard ?? false) && context.mounted) {
+          Navigator.pop(context, result);
+        }
+      },
+      child:  Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         leading: IconButton(
@@ -126,7 +154,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildUrlSection() {
@@ -215,7 +243,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
                       controller: _titleController,
                       maxLines: 1,
                       decoration: const InputDecoration(
-                        hintText: 'Título',
+                        hintText: 'TÃƒÂ­tulo',
                         border: InputBorder.none,
                       ),
                       onChanged: (_) => setState(() {}),
@@ -278,7 +306,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
             minLines: 2,
             maxLines: 6,
             decoration: const InputDecoration(
-              hintText: 'O que esse post significa pra você?',
+              hintText: 'O que esse post significa pra vocÃƒÂª?',
               border: InputBorder.none,
             ),
           ),
@@ -292,7 +320,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
       decoration: AppTheme.cardDecoration(context),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: OrganizerSelectorField(
-        label: 'Coleções',
+        label: 'ColeÃƒÂ§ÃƒÂµes',
         selectedOrganizers: _organizers,
         onChanged: (value) => setState(() => _organizers = value),
       ),
@@ -421,7 +449,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
             onChanged: _onTagChanged,
             onSubmitted: (_) => _commitTag(),
             decoration: const InputDecoration(
-              hintText: 'Digite uma tag e pressione vírgula ou enter',
+              hintText: 'Digite uma tag e pressione vÃƒÂ­rgula ou enter',
               border: InputBorder.none,
             ),
           ),
@@ -468,7 +496,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
       setState(() {
         _draft = _fallbackDraft();
         _titleController.text = _draft!.title;
-        _errorText = 'Não conseguimos buscar esse link. Preencha manualmente.';
+        _errorText = 'NÃƒÂ£o conseguimos buscar esse link. Preencha manualmente.';
       });
     } finally {
       if (mounted) setState(() => _isFetching = false);
