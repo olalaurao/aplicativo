@@ -183,11 +183,11 @@ class SubtaskSession {
   factory SubtaskSession.fromMap(Map<String, dynamic> map) => SubtaskSession(
     id: map['id']?.toString() ?? '',
     name: map['name']?.toString() ?? '',
-    subtaskIds:
-        ((map['subtask_ids'] ?? map['subtaskIds']) as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        [],
+    subtaskIds: () {
+      final raw = map['subtask_ids'] ?? map['subtaskIds'];
+      if (raw is Iterable) return raw.map((e) => e.toString()).toList();
+      return <String>[];
+    }(),
   );
 }
 

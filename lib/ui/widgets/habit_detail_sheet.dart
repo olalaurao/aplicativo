@@ -189,9 +189,17 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
                   Expanded(
                     child: _buildMiniStat(
                       context,
-                      icon: Icons.local_fire_department_rounded,
-                      label: 'Sequência',
-                      value: '${currentHabit.streak} dias',
+                      icon: currentHabit.habitMode == HabitMode.pact
+                          ? Icons.military_tech_rounded
+                          : Icons.local_fire_department_rounded,
+                      label: currentHabit.habitMode == HabitMode.pact
+                          ? 'Dia do Pacto'
+                          : 'Sequência',
+                      value: currentHabit.habitMode == HabitMode.pact
+                          ? (currentHabit.startedAt != null
+                              ? '${DateTime.now().difference(DateTime(currentHabit.startedAt!.year, currentHabit.startedAt!.month, currentHabit.startedAt!.day)).inDays + 1}'
+                              : 'Dia 1')
+                          : '${currentHabit.streak} dias',
                       color: AppColors.warning,
                     ),
                   ),
@@ -218,6 +226,82 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
                 ],
               ),
               const SizedBox(height: 24),
+
+              if (currentHabit.habitMode == HabitMode.pact) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: color.withValues(alpha: 0.15)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.shield_rounded, color: color, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'INFORMAÇÕES DO PACTO',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: color,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (currentHabit.statement?.isNotEmpty == true) ...[
+                        Text(
+                          'Declaração:',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMutedColor(context)),
+                        ),
+                        Text(
+                          currentHabit.statement!,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      if (currentHabit.curiosityQuestion?.isNotEmpty == true) ...[
+                        Text(
+                          'Pergunta de Curiosidade:',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMutedColor(context)),
+                        ),
+                        Text(
+                          currentHabit.curiosityQuestion!,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      if (currentHabit.hypothesis?.isNotEmpty == true) ...[
+                        Text(
+                          'Hipótese:',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMutedColor(context)),
+                        ),
+                        Text(
+                          currentHabit.hypothesis!,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      if (currentHabit.endsAt != null) ...[
+                        Text(
+                          'Período do Pacto:',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMutedColor(context)),
+                        ),
+                        Text(
+                          '${currentHabit.startedAt?.toIso8601String().split('T').first} até ${currentHabit.endsAt!.toIso8601String().split('T').first}',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
 
               // ─── Visual Grid Calendar (Histórico 35 Dias) ───
               Text(

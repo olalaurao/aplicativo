@@ -7,10 +7,23 @@ import '../models/people_model.dart';
 import '../providers/vault_provider.dart';
 import '../services/kpi_engine.dart';
 import '../models/goal_model.dart';
+import '../models/tracker_model.dart';
 import 'notification_service.dart';
 
 class AutomationService {
   static bool _updatingKpis = false;
+
+  static Future<void> executeHabitSlotActions(
+    Ref ref,
+    Habit habit,
+    DateTime date,
+  ) async {
+    for (final action in habit.actions) {
+      if (action.trigger == 'slot_complete') {
+        await _executeAction(ref, action, habit, date);
+      }
+    }
+  }
 
   static Future<void> executeHabitActions(
     Ref ref,
@@ -52,6 +65,19 @@ class AutomationService {
             stage: TaskStage.todo,
           ),
         );
+        break;
+
+      case 'add_tracking_record':
+        if (action.targetTracker != null) {
+          final recordsNotifier = ref.read(trackingRecordsProvider.notifier);
+          final record = TrackingRecord(
+            title: 'Auto Record: ${habit.displayTitle}',
+            trackerId: action.targetTracker!,
+            date: DateTime.now(),
+            fieldValues: {},
+          );
+          await recordsNotifier.addRecord(record);
+        }
         break;
     }
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../widgets/timeline_card.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/markdown_parser.dart';
 
@@ -766,6 +767,27 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
   }
 
   Widget _buildJournalEntryCard(BuildContext context, JournalEntry entry) {
+    if (entry.entryType == JournalEntryType.pmn) {
+      return ObjectActionWrapper(
+        object: entry,
+        child: PmnCard(
+          title: entry.title.isNotEmpty ? entry.title : 'PMN',
+          week: entry.week ?? '',
+          plusCount: entry.plus.length,
+          minusCount: entry.minus.length,
+          nextCount: entry.next.length,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UniversalDetailView(object: entry),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
     final displayDate = _journalEntryDisplayDate(entry);
     final moods = ref.watch(moodsProvider);
     final moodSlugs = _moodSlugsForEntry(entry);

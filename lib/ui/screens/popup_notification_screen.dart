@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme.dart';
 import '../../services/notification_service.dart';
 import '../../models/reminder_config.dart';
+import '../../models/reminder_model.dart';
+import '../../models/habit_model.dart';
 import '../../models/task_model.dart';
 import '../../providers/vault_provider.dart';
 
@@ -160,15 +162,21 @@ class _PopupNotificationScreenState
 
     if (widget.data.objectId != null) {
       try {
-        final allObjects =
-            ref.read(allObjectsProvider).valueOrNull ?? [];
-        final obj = allObjects.firstWhere(
+        final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+        final obj = allObjects.where(
           (o) => o.id == widget.data.objectId,
-          orElse: () => allObjects.first, // fallback
-        );
+        ).firstOrNull;
+
         if (obj is Task) {
           final updated = obj.copyWith(stage: TaskStage.finalized);
           await ref.read(tasksProvider.notifier).updateTask(updated);
+        } else if (obj is Reminder) {
+          obj.isCompleted = true;
+          await ref.read(remindersProvider.notifier).updateReminder(obj);
+        } else if (obj is Habit) {
+          await ref.read(habitsProvider.notifier).toggleHabit(obj, DateTime.now());
+        } else if (obj == null) {
+          debugPrint('PopupScreen: object ${widget.data.objectId} not found');
         }
       } catch (e) {
         debugPrint('PopupScreen: Failed to mark done: $e');
@@ -340,8 +348,9 @@ class _PopupNotificationScreenState
                                       onTap: () => _snooze(10),
                                     ),
                                     const SizedBox(width: 8),
-                                    if (widget.data.type ==
-                                        PopupScreenType.task) ...[
+                                    if (widget.data.type == PopupScreenType.task ||
+                                        widget.data.type == PopupScreenType.reminder ||
+                                        widget.data.type == PopupScreenType.habit) ...[
                                       _actionButton(
                                         'Concluído',
                                         Icons.check_rounded,

@@ -21,6 +21,7 @@ import '../models/social_post.dart';
 import '../models/people_model.dart';
 import '../models/project_model.dart';
 import '../models/snapshot_model.dart';
+import '../models/system_model.dart';
 import '../models/scheduler.dart';
 import '../models/day_theme_model.dart';
 import '../models/template_model.dart';
@@ -285,6 +286,7 @@ class HabitsNotifier extends Notifier<List<Habit>> {
         habitsMap[habit.slug] = slots;
         if (nextValue == true) {
           await _cancelHabitSlotReminderNotification(habit, slotIndex);
+          await AutomationService.executeHabitSlotActions(ref, habit, date);
         }
       } else {
         if (currentVal is bool) {
@@ -352,7 +354,7 @@ class HabitsNotifier extends Notifier<List<Habit>> {
       // Update Android Widget.
       WidgetService.updateHabits(state);
 
-      if (_isHabitValueComplete(habit, habitsMap[habit.slug])) {
+      if (!_isHabitValueComplete(habit, currentVal) && _isHabitValueComplete(habit, habitsMap[habit.slug])) {
         await AutomationService.executeHabitActions(ref, habit, date);
       }
     } catch (e, st) {
@@ -1383,6 +1385,9 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
               } else if (type == 'goal') {
                 obj = Goal.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
+              } else if (type == 'entry') {
+                obj = JournalEntry.fromMarkdown(frontmatter, body)
+                  ..obsidianPath = relativePath;
               } else if (type == 'note') {
                 obj = Note.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
@@ -1404,6 +1409,8 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
               } else if (type == 'snapshot') {
                 obj = Snapshot.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
+              } else if (type == 'system') {
+                obj = SystemDefinition.fromMarkdown(frontmatter, body, relativePath);
               } else if (type == 'time_block') {
                 obj = TimeBlock.fromMap(frontmatter, body: body)
                   ..obsidianPath = relativePath;
@@ -2025,6 +2032,8 @@ class VaultNotifier extends Notifier<void> {
       'reminder' => 'reminders',
       'event' => 'events',
       'inbox' => 'inbox',
+      'entry' => 'daily',
+      'system' => 'systems',
       _ => 'app',
     };
   }
@@ -3203,77 +3212,94 @@ class VaultNotifier extends Notifier<void> {
     );
   }
 
-  Future<void> _snoozeNotification(String objectId, String payload) async {
-    final uri = Uri.tryParse(payload);
-    final snoozeMinutes =
-        int.tryParse(uri?.queryParameters['snooze'] ?? '10') ?? 10;
 
-    final allObjects = await ref.read(allObjectsProvider.future);
-    final target = allObjects.firstWhere(
-      (o) => o.id == objectId,
-      orElse: () => throw Exception('Object not found'),
-    );
-
-    final newTime = DateTime.now().add(Duration(minutes: snoozeMinutes));
-
-    final snoozeId = _stableNotificationBaseId('${objectId}_snooze');
-    await NotificationService().cancelNotification(snoozeId);
-    await NotificationService().scheduleReminder(
-      id: snoozeId,
-      title: target.title,
-      config: ReminderConfig(
-        id: 'snooze_$objectId',
-        triggerTime: newTime,
-        type: NotificationType.alarm, // Keep same type for snooze
-      ),
-      payload: payload,
-    );
-  }
-
+  /// Extracts the object ID (uuid) from a notification payload string.
+  /// Supports both `?id=<uuid>` and `?oid=<uuid>` query params, and the
+  /// legacy format where the payload IS the object id.
   String? _objectIdFromNotificationPayload(String payload) {
+    if (payload.isEmpty) return null;
     final uri = Uri.tryParse(payload);
-    if (uri != null && uri.queryParameters['oid'] != null) {
-      return uri.queryParameters['oid'];
+    if (uri != null) {
+      final id = uri.queryParameters['oid'] ?? uri.queryParameters['id'];
+      if (id != null && id.isNotEmpty) return id;
     }
-    if (uri != null && uri.queryParameters['id'] != null) {
-      return uri.queryParameters['id'];
-    }
-    if (uri != null && uri.pathSegments.isNotEmpty) {
-      return uri.pathSegments.last;
-    }
-    return payload.split('|').first.split('?').first;
+    // Legacy: payload is plain object id
+    final clean = payload.split('?').first.split('&').first.trim();
+    return clean.isNotEmpty ? clean : null;
   }
 
+  /// Marks the notification target as done — Task → finalized,
+  /// Reminder → isCompleted, Habit → toggle for today.
   Future<void> _markNotificationTargetDone(String objectId) async {
-    final allObjects = await ref.read(allObjectsProvider.future);
-    final target = allObjects
-        .where((object) => object.id == objectId)
-        .firstOrNull;
-    if (target == null) return;
+    final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+    final target = allObjects.where((o) => o.id == objectId).firstOrNull;
+    if (target == null) {
+      debugPrint('NotificationAction done: object $objectId not found');
+      return;
+    }
 
-    if (target is Task) {
-      target.stage = TaskStage.finalized;
-      target.reflection ??= 'Completed from notification.';
-      await ref.read(tasksProvider.notifier).updateTask(target);
-      await _completeContactTaskIfNeeded(target);
-    } else if (target is Reminder) {
-      target.isCompleted = true;
-      await ref.read(remindersProvider.notifier).updateReminder(target);
-    } else if (target is Habit) {
-      await ref
-          .read(habitsProvider.notifier)
-          .toggleHabit(target, DateTime.now());
+    try {
+      if (target is Task) {
+        // Use copyWith — never mutate Task fields directly
+        final updated = target.copyWith(
+          stage: TaskStage.finalized,
+          reflection: target.reflection ?? 'Concluído via notificação.',
+        );
+        await ref.read(tasksProvider.notifier).updateTask(updated);
+        await _completeContactTaskIfNeeded(updated);
+      } else if (target is Reminder) {
+        // Reminder is a mutable model — set field then persist
+        target.isCompleted = true;
+        await ref.read(remindersProvider.notifier).updateReminder(target);
+      } else if (target is Habit) {
+        await ref
+            .read(habitsProvider.notifier)
+            .toggleHabit(target, DateTime.now());
+      }
+      debugPrint('NotificationAction done: marked $objectId as done');
+    } catch (e) {
+      debugPrint('NotificationAction done: error for $objectId: $e');
     }
   }
 
+  /// Dismisses the notification without completing the object.
+  /// Simply touches updatedAt so the object is not re-alerted.
   Future<void> _recordNotificationDismissal(String objectId) async {
-    final allObjects = await ref.read(allObjectsProvider.future);
-    final target = allObjects
-        .where((object) => object.id == objectId)
-        .firstOrNull;
-    if (target == null) return;
-    target.updatedAt = DateTime.now();
-    await updateObject(target);
+    // No-op is acceptable — cancellation already happened in notification_service.
+    // We just log it.
+    debugPrint('NotificationAction dismiss: $objectId dismissed');
+  }
+
+  /// Re-schedules a reminder for [objectId] based on the snooze duration
+  /// encoded in the payload (defaults to 10 min).
+  Future<void> _snoozeNotification(String objectId, String payload) async {
+    final snoozeMinutes = _snoozeMinutesFromPayload(payload);
+    final fireAt = DateTime.now().add(Duration(minutes: snoozeMinutes));
+
+    // Find the object to re-use its title
+    final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+    final target = allObjects.where((o) => o.id == objectId).firstOrNull;
+    final title = target?.title ?? 'Lembrete';
+
+    final notifId = DateTime.now().millisecondsSinceEpoch % 100000;
+    await NotificationService().scheduleReminder(
+      id: notifId,
+      title: title,
+      config: ReminderConfig(
+        id: '${objectId}_snooze_${notifId}',
+        triggerTime: fireAt,
+        type: NotificationType.push,
+        notificationBody: 'Adiado por ${snoozeMinutes}min',
+        snoozeMinutes: snoozeMinutes,
+      ),
+      payload: objectId,
+    );
+    debugPrint('NotificationAction snooze: $objectId snoozed for ${snoozeMinutes}min');
+  }
+
+  int _snoozeMinutesFromPayload(String payload) {
+    final match = RegExp(r'snooze=(\d+)').firstMatch(payload);
+    return int.tryParse(match?.group(1) ?? '') ?? 10;
   }
 
   Future<void> _completeContactTaskIfNeeded(Task task) async {

@@ -25,6 +25,20 @@ class HabitRow extends StatelessWidget {
         : 0;
     final daysSince = habit.daysSinceLastCompletion;
 
+    final isPact = habit.habitMode == HabitMode.pact;
+    int remainingDays = 0;
+    int dayCount = 0;
+    if (isPact && habit.startedAt != null) {
+      final now = DateTime.now();
+      final todayDate = DateTime(now.year, now.month, now.day);
+      final startedAtDate = DateTime(habit.startedAt!.year, habit.startedAt!.month, habit.startedAt!.day);
+      dayCount = todayDate.difference(startedAtDate).inDays + 1;
+      if (habit.endsAt != null) {
+        final endsAtDate = DateTime(habit.endsAt!.year, habit.endsAt!.month, habit.endsAt!.day);
+        remainingDays = endsAtDate.difference(todayDate).inDays;
+      }
+    }
+
     return InkWell(
       onTap:
           onTap ?? () => showHabitDetailSheet(context, habit, DateTime.now()),
@@ -36,13 +50,24 @@ class HabitRow extends StatelessWidget {
             // Habit name
             Expanded(
               flex: 3,
-              child: Text(
-                habit.displayTitle,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      habit.displayTitle,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (isPact) ...[
+                    const SizedBox(width: 6),
+                    _buildBadge('PACT', color),
+                  ]
+                ],
               ),
             ),
 
@@ -58,9 +83,32 @@ class HabitRow extends StatelessWidget {
               ),
             ),
 
-            // Streak badge
-            if (habit.streak > 0)
+            // Streak badge or Pact Day Count
+            if (!isPact && habit.streak > 0)
               _buildBadge('🔥 ${habit.streak}', AppColors.habitOrange),
+
+            if (isPact && dayCount > 0)
+              _buildBadge('Dia $dayCount', color),
+
+            if (isPact && habit.endsAt != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    remainingDays >= 0 ? '$remainingDays d rest.' : 'Expirou',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                ),
+              ),
 
             // Days since badge
             if (daysSince >= 0)
@@ -160,6 +208,20 @@ class HabitProgressRow extends StatelessWidget {
         : 0;
     final progress = (completedToday / habit.dailyGoal).clamp(0.0, 1.0);
 
+    final isPact = habit.habitMode == HabitMode.pact;
+    int remainingDays = 0;
+    int dayCount = 0;
+    if (isPact && habit.startedAt != null) {
+      final now = DateTime.now();
+      final todayDate = DateTime(now.year, now.month, now.day);
+      final startedAtDate = DateTime(habit.startedAt!.year, habit.startedAt!.month, habit.startedAt!.day);
+      dayCount = todayDate.difference(startedAtDate).inDays + 1;
+      if (habit.endsAt != null) {
+        final endsAtDate = DateTime(habit.endsAt!.year, habit.endsAt!.month, habit.endsAt!.day);
+        remainingDays = endsAtDate.difference(todayDate).inDays;
+      }
+    }
+
     return InkWell(
       onTap:
           onTap ?? () => showHabitDetailSheet(context, habit, DateTime.now()),
@@ -171,13 +233,38 @@ class HabitProgressRow extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    habit.displayTitle,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: color,
-                    ),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          habit.displayTitle,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: color,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isPact) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'PACT',
+                            style: TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 Text(
@@ -188,10 +275,20 @@ class HabitProgressRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  '🔥 ${habit.streak}',
-                  style: const TextStyle(fontSize: 12),
-                ),
+                if (!isPact)
+                  Text(
+                    '🔥 ${habit.streak}',
+                    style: const TextStyle(fontSize: 12),
+                  )
+                else
+                  Text(
+                    'Dia $dayCount',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 6),
@@ -204,6 +301,29 @@ class HabitProgressRow extends StatelessWidget {
                 valueColor: AlwaysStoppedAnimation<Color>(color),
               ),
             ),
+            if (isPact && habit.endsAt != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Pacto termina em: ${habit.endsAt!.toIso8601String().split('T').first}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppTheme.textMutedColor(context),
+                    ),
+                  ),
+                  Text(
+                    remainingDays >= 0 ? '$remainingDays dias restantes' : 'Expirado',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

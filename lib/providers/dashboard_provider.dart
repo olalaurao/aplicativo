@@ -222,6 +222,12 @@ class DashboardNotifier extends AsyncNotifier<List<DashboardBlock>> {
       title: 'Quote',
       order: 26,
     ),
+    DashboardBlock(
+      id: 'system-quick-run',
+      type: BlockType.systemQuickRun,
+      title: 'Systems',
+      order: 27,
+    ),
   ];
 
   Future<void> _save() async {

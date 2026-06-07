@@ -29,6 +29,7 @@ import '../forms/create_resource_form.dart';
 import '../forms/create_task_form.dart';
 import '../forms/create_tracker_form.dart';
 import '../theme.dart';
+import 'triple_check_sheet.dart';
 import 'universal_search_picker.dart';
 
 class ObjectActionWrapper extends ConsumerWidget {
@@ -144,6 +145,20 @@ Future<void> showObjectActionSheet(
                 _confirmDelete(context, ref, object);
               },
             ),
+            // Triple Check — visible only for non-finalized Tasks
+            if (object is Task && object.stage != TaskStage.finalized)
+              ListTile(
+                leading: const Icon(
+                  Icons.troubleshoot_rounded,
+                  color: AppColors.warning,
+                ),
+                title: const Text('Por que estou evitando isso?'),
+                subtitle: const Text('Triple Check'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  showTripleCheckSheet(context, ref, object);
+                },
+              ),
           ],
         ),
       ),

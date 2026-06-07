@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../forms/create_task_form.dart';
 import '../forms/create_entry_form.dart';
+import '../forms/create_pmn_form.dart';
 import '../forms/create_habit_form.dart';
 import '../forms/create_goal_form.dart';
 import '../forms/create_note_form.dart';
@@ -16,6 +17,7 @@ import '../forms/create_person_form.dart';
 import '../forms/create_resource_form.dart';
 import '../forms/create_snapshot_form.dart';
 import '../forms/create_tracker_form.dart';
+import '../forms/create_system_form.dart';
 import '../screens/pomodoro_screen.dart';
 
 class CreateMenuSheet extends StatefulWidget {
@@ -243,7 +245,15 @@ class _CreateMenuSheetState extends State<CreateMenuSheet> {
                 initialTitle: widget.initialTitle,
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 12),
+            _buildCreateCard(
+              context,
+              icon: Icons.view_week_rounded,
+              title: 'PMN',
+              subtitle: 'Plus, Minus, Next da semana',
+              color: AppColors.primary,
+              targetForm: const CreatePmnForm(),
+            ),
           ],
         ),
       ],
@@ -338,6 +348,21 @@ class _CreateMenuSheetState extends State<CreateMenuSheet> {
               color: AppColors.info,
               targetForm: CreateEventForm(initialTitle: widget.initialTitle),
             ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _buildCreateCard(
+              context,
+              icon: Icons.account_tree_rounded,
+              title: 'System',
+              subtitle: 'SOP reutilizável com steps',
+              color: AppColors.habitPurple,
+              targetForm: const CreateSystemForm(),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(child: SizedBox()),
           ],
         ),
       ],

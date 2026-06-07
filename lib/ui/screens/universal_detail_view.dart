@@ -56,6 +56,10 @@ import '../forms/create_tracker_form.dart';
 import '../forms/create_organizer_form.dart';
 import '../../services/google_auth_service.dart' as auth;
 import '../../providers/google_calendar_provider.dart';
+import '../forms/create_system_form.dart';
+import '../../models/system_model.dart';
+import 'system_detail_screen.dart';
+import '../../providers/systems_provider.dart';
 import 'social_post_detail.dart';
 
 class UniversalDetailView extends ConsumerStatefulWidget {
@@ -1237,6 +1241,17 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   ),
                   const SizedBox(height: 12),
                   _buildSubtaskList(context, ref, task.subtasks),
+                ] else ...[
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.account_tree_rounded, size: 16),
+                    label: const Text('Aplicar System (Via B)'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => _showApplySystemSheet(context, ref, task),
+                  ),
                 ],
                 // ── V2.8.3 Time Estimates vs Actuals ──
                 if (task.estimatedMinutes != null ||
@@ -1256,6 +1271,21 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           ),
         ),
       ];
+    }
+
+    if (object is SystemDefinition) {
+      // Redirect to dedicated System Detail Screen
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SystemDetailScreen(system: object as SystemDefinition),
+            ),
+          );
+        }
+      });
+      return [];
     }
 
     if (object is JournalEntry) {
@@ -2560,6 +2590,96 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     };
   }
 
+  void _showApplySystemSheet(BuildContext context, WidgetRef ref, Task task) {
+    final systems = ref.read(systemsProvider);
+    if (systems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nenhum System disponível. Crie um primeiro.')),
+      );
+      return;
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor(ctx),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.textMuted.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Aplicar System à Tarefa',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Os steps do System serão adicionados como subtasks.',
+              style: TextStyle(fontSize: 13, color: AppTheme.textMutedColor(ctx)),
+            ),
+            const SizedBox(height: 16),
+            ...systems.map((system) => ListTile(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              leading: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.account_tree_rounded, color: AppColors.primary, size: 18),
+              ),
+              title: Text(system.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              subtitle: Text('${system.steps.length} steps • ${system.estimatedMinutes > 0 ? '${system.estimatedMinutes}min' : 'sem estimativa'}',
+                style: const TextStyle(fontSize: 12)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final newSubtasks = [
+                  ...task.subtasks,
+                  ...system.steps.map((s) => Subtask(title: s.title)),
+                ];
+                final updatedTask = task.copyWith(
+                  subtasks: newSubtasks,
+                  estimatedMinutes: task.estimatedMinutes ?? (system.estimatedMinutes > 0 ? system.estimatedMinutes : null),
+                );
+                await ref.read(vaultProvider.notifier).updateObject(updatedTask);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(children: [
+                        const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text('${system.steps.length} steps de "${system.title}" aplicados.')),
+                      ]),
+                      backgroundColor: AppColors.success,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _handleAction(BuildContext context, WidgetRef ref, String action) {
     HapticFeedback.mediumImpact();
     switch (action) {
@@ -3006,6 +3126,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       formPage = CreateTrackerForm(tracker: object as TrackerDefinition);
     } else if (object is Organizer) {
       formPage = CreateOrganizerForm(organizer: object as Organizer);
+    } else if (object is SystemDefinition) {
+      formPage = CreateSystemForm(existingSystem: object as SystemDefinition);
     }
     if (formPage != null) {
       Navigator.push(context, MaterialPageRoute(builder: (_) => formPage!));
@@ -3363,6 +3485,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         return 'Nota';
       case 'tracker':
         return 'Rastreador';
+      case 'system':
+        return 'System';
       default:
         return obj.type;
     }

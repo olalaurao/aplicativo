@@ -11,6 +11,7 @@ import '../../providers/settings_provider.dart';
 import '../forms/create_habit_form.dart';
 import '../forms/create_task_form.dart';
 import '../theme.dart';
+import 'triple_check_sheet.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -399,6 +400,12 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
+                        if (item.needsTripleCheckBadge) ...[
+                          TripleCheckBadge(
+                            onTap: () => showTripleCheckSheet(context, ref, item),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                         if (item.scheduledTime != null) ...[
                           Text(
                             '${item.scheduledTime}',

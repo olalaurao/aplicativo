@@ -1,4 +1,5 @@
 // lib/models/task_model.dart
+import 'package:flutter/foundation.dart';
 import 'content_object.dart';
 import 'shared_types.dart';
 import 'scheduler.dart';
@@ -8,6 +9,79 @@ import 'package:uuid/uuid.dart';
 enum TaskStage { idea, todo, inProgress, pending, finalized }
 
 enum TaskPriority { none, low, medium, high }
+
+/// Triple Check answer for a single dimension (head/heart/hand)
+enum TripleCheckAnswer {
+  yes,     // Sim
+  unsure,  // Incerto
+  no,      // Não
+}
+
+/// Stores the result of a Triple Check diagnostic on a Task.
+class TripleCheck {
+  final TripleCheckAnswer head;    // A tarefa faz sentido agora?
+  final TripleCheckAnswer heart;   // Você está animado com isso?
+  final TripleCheckAnswer hand;    // Você tem o que precisa para começar?
+  final String diagnosis;          // Auto-generated diagnosis text
+  final DateTime checkedAt;
+
+  const TripleCheck({
+    required this.head,
+    required this.heart,
+    required this.hand,
+    required this.diagnosis,
+    required this.checkedAt,
+  });
+
+  /// Which dimensions are blocking (not `yes`)
+  List<String> get blockers {
+    final b = <String>[];
+    if (head != TripleCheckAnswer.yes) b.add('head');
+    if (heart != TripleCheckAnswer.yes) b.add('heart');
+    if (hand != TripleCheckAnswer.yes) b.add('hand');
+    return b;
+  }
+
+  Map<String, dynamic> toMap() => {
+    'head': head.name,
+    'heart': heart.name,
+    'hand': hand.name,
+    'blocker': blockers.join(','),
+    'diagnosis': diagnosis,
+    'checked_at': checkedAt.toIso8601String(),
+  };
+
+  factory TripleCheck.fromMap(Map<String, dynamic> m) {
+    TripleCheckAnswer parseAnswer(String key) {
+      final v = m[key]?.toString() ?? '';
+      return TripleCheckAnswer.values.firstWhere(
+        (e) => e.name == v,
+        orElse: () => TripleCheckAnswer.yes,
+      );
+    }
+    return TripleCheck(
+      head: parseAnswer('head'),
+      heart: parseAnswer('heart'),
+      hand: parseAnswer('hand'),
+      diagnosis: m['diagnosis']?.toString() ?? '',
+      checkedAt: DateTime.tryParse(m['checked_at']?.toString() ?? '') ?? DateTime.now(),
+    );
+  }
+
+  TripleCheck copyWith({
+    TripleCheckAnswer? head,
+    TripleCheckAnswer? heart,
+    TripleCheckAnswer? hand,
+    String? diagnosis,
+    DateTime? checkedAt,
+  }) => TripleCheck(
+    head: head ?? this.head,
+    heart: heart ?? this.heart,
+    hand: hand ?? this.hand,
+    diagnosis: diagnosis ?? this.diagnosis,
+    checkedAt: checkedAt ?? this.checkedAt,
+  );
+}
 
 class Task extends ContentObject {
   TaskStage stage;
@@ -38,6 +112,7 @@ class Task extends ContentObject {
   List<String> dependsOn;
   List<String> socialRefs;
   int? estimatedMinutes;
+  TripleCheck? tripleCheck;
 
   Task({
     super.id,
@@ -79,6 +154,7 @@ class Task extends ContentObject {
     this.dependsOn = const [],
     this.socialRefs = const [],
     this.estimatedMinutes,
+    this.tripleCheck,
     DateTime? reminderDate,
   }) {
     if (reminderDate != null) {
@@ -230,6 +306,8 @@ class Task extends ContentObject {
     if (reflection != null && reflection!.isNotEmpty) {
       frontmatter['reflection'] = reflection;
     }
+    // Triple Check block — stored inline in frontmatter, never as separate file
+    frontmatter['triple_check'] = tripleCheck?.toMap();
 
     if (scheduler != null) frontmatter['scheduler'] = scheduler!.toMap();
 
@@ -392,6 +470,16 @@ class Task extends ContentObject {
     task.estimatedMinutes = em is num
         ? em.toInt()
         : int.tryParse(em?.toString() ?? '');
+    // Parse Triple Check block
+    if (frontmatter['triple_check'] is Map) {
+      try {
+        task.tripleCheck = TripleCheck.fromMap(
+          Map<String, dynamic>.from(frontmatter['triple_check'] as Map),
+        );
+      } catch (e) {
+        debugPrint('TripleCheck parse error: $e');
+      }
+    }
     if (frontmatter['scheduler'] != null) {
       task.scheduler = Scheduler.fromMap(
         Map<String, dynamic>.from(frontmatter['scheduler'] as Map),
@@ -514,6 +602,8 @@ class Task extends ContentObject {
     List<String>? dependsOn,
     List<String>? socialRefs,
     int? estimatedMinutes,
+    TripleCheck? tripleCheck,
+    bool clearTripleCheck = false,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     List<String>? tags,
@@ -555,6 +645,7 @@ class Task extends ContentObject {
       dependsOn: dependsOn ?? this.dependsOn,
       socialRefs: socialRefs ?? this.socialRefs,
       estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
+      tripleCheck: clearTripleCheck ? null : (tripleCheck ?? this.tripleCheck),
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       tags: tags ?? this.tags,
@@ -562,5 +653,19 @@ class Task extends ContentObject {
       updatedAt: DateTime.now(),
       obsidianPath: obsidianPath,
     )..order = order ?? this.order;
+  }
+
+  /// Returns true if the task has been stuck in its current stage for 7+ days
+  /// without a Triple Check being performed (or if one was performed but had blockers).
+  bool get needsTripleCheckBadge {
+    if (stage == TaskStage.finalized || stage == TaskStage.idea) return false;
+    // Already recently checked → don't show badge
+    if (tripleCheck != null) {
+      final daysSinceCheck = DateTime.now().difference(tripleCheck!.checkedAt).inDays;
+      if (daysSinceCheck < 7) return false;
+    }
+    // Check if stuck for 7+ days (use updatedAt as proxy)
+    final daysSinceUpdate = DateTime.now().difference(updatedAt).inDays;
+    return daysSinceUpdate >= 7;
   }
 }

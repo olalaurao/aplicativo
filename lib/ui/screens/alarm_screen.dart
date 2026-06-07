@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/notification_service.dart';
 import '../../providers/vault_provider.dart';
 import '../../models/reminder_config.dart';
+import '../../models/reminder_model.dart';
+import '../../models/habit_model.dart';
 import '../../models/task_model.dart';
 
 /// The type of alarm, each with its own color/icon.
@@ -141,15 +143,21 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen>
 
     if (widget.data.objectId != null) {
       try {
-        final allObjects =
-            ref.read(allObjectsProvider).valueOrNull ?? [];
-        final obj = allObjects.firstWhere(
+        final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+        final obj = allObjects.where(
           (o) => o.id == widget.data.objectId,
-          orElse: () => allObjects.first,
-        );
+        ).firstOrNull;
+
         if (obj is Task) {
           final updated = obj.copyWith(stage: TaskStage.finalized);
           await ref.read(tasksProvider.notifier).updateTask(updated);
+        } else if (obj is Reminder) {
+          obj.isCompleted = true;
+          await ref.read(remindersProvider.notifier).updateReminder(obj);
+        } else if (obj is Habit) {
+          await ref.read(habitsProvider.notifier).toggleHabit(obj, DateTime.now());
+        } else if (obj == null) {
+          debugPrint('AlarmScreen: object ${widget.data.objectId} not found');
         }
       } catch (e) {
         debugPrint('AlarmScreen: Failed to mark done: $e');
@@ -342,8 +350,9 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen>
 
                 const Spacer(flex: 2),
 
-                // Action: Mark as done (only for tasks)
-                if (widget.data.type == AlarmType.task) ...[
+                // Action: Mark as done (for tasks, habits, and completable reminders)
+                if (widget.data.type == AlarmType.task ||
+                    widget.data.type == AlarmType.reminder) ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32),
                     child: SizedBox(

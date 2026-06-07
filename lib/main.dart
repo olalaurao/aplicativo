@@ -500,6 +500,31 @@ Future<void> _initApp(ProviderContainer container) async {
     await PermissionService.requestAllPermissions();
     await notificationService.scheduleWeeklyReviewNotifications();
 
+    // Check for expired pacts
+    try {
+      final habits = container.read(habitsProvider);
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final expiredPacts = habits.where((h) =>
+          h.habitMode == HabitMode.pact &&
+          h.status == HabitStatus.active &&
+          h.endsAt != null &&
+          h.endsAt!.isBefore(today) &&
+          h.pactOutcome == null).toList();
+
+      for (final pact in expiredPacts) {
+        debugPrint('[PactChecker] Found expired pact: ${pact.title}');
+        await notificationService.showImmediateNotification(
+          id: pact.id.hashCode,
+          title: 'Pacto Expirado: ${pact.displayTitle}',
+          body: 'Seu pacto expirou e precisa de revisão (Steering Sheet).',
+          payload: 'steering_sheet?id=${pact.id}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Startup init failed: expired_pact_checker: $e');
+    }
+
     // Reset Sleep In Tomorrow setting if the target date has arrived or passed
     try {
       final settings = container.read(settingsProvider);

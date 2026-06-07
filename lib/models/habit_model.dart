@@ -12,6 +12,63 @@ enum HabitStatus { active, paused, completed }
 
 enum HabitInputType { boolean, numeric, mood, duration }
 
+enum HabitMode { habit, pact }
+
+enum PactOutcome { persist, pause, pivot }
+
+class PactCycle {
+  final DateTime startedAt;
+  final DateTime endsAt;
+  final PactOutcome outcome;
+  final String? reflection;
+  final bool? hypothesisCorrect;
+  final String? endedReason;
+
+  PactCycle({
+    required this.startedAt,
+    required this.endsAt,
+    required this.outcome,
+    this.reflection,
+    this.hypothesisCorrect,
+    this.endedReason,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'started_at': startedAt.toIso8601String().split('T').first,
+      'ends_at': endsAt.toIso8601String().split('T').first,
+      'outcome': outcome.name,
+      if (reflection != null) 'reflection': reflection,
+      if (hypothesisCorrect != null) 'hypothesis_correct': hypothesisCorrect,
+      if (endedReason != null) 'ended_reason': endedReason,
+    };
+  }
+
+  factory PactCycle.fromMap(Map<dynamic, dynamic> map) {
+    bool? hypCorrect;
+    if (map['hypothesis_correct'] != null) {
+      if (map['hypothesis_correct'] is bool) {
+        hypCorrect = map['hypothesis_correct'] as bool;
+      } else if (map['hypothesis_correct'].toString().toLowerCase() == 'true') {
+        hypCorrect = true;
+      } else if (map['hypothesis_correct'].toString().toLowerCase() == 'false') {
+        hypCorrect = false;
+      }
+    }
+    return PactCycle(
+      startedAt: DateTime.parse(map['started_at'].toString()),
+      endsAt: DateTime.parse(map['ends_at'].toString()),
+      outcome: PactOutcome.values.firstWhere(
+        (e) => e.name == map['outcome'].toString(),
+        orElse: () => PactOutcome.persist,
+      ),
+      reflection: map['reflection']?.toString(),
+      hypothesisCorrect: hypCorrect,
+      endedReason: map['ended_reason']?.toString(),
+    );
+  }
+}
+
 class HabitSlot {
   DateTime? time;
   bool completed;
@@ -72,6 +129,16 @@ class Habit extends ContentObject {
   bool isNegative;
   HabitInputType inputType;
 
+  // Pact fields
+  HabitMode habitMode;
+  String? statement;
+  String? curiosityQuestion;
+  String? hypothesis;
+  DateTime? startedAt;
+  DateTime? endsAt;
+  PactOutcome? pactOutcome;
+  List<PactCycle> previousCycles;
+
   Scheduler? get scheduler => schedulers.isNotEmpty ? schedulers.first : null;
   set scheduler(Scheduler? s) {
     if (s == null) {
@@ -102,6 +169,14 @@ class Habit extends ContentObject {
     super.archived,
     this.isNegative = false,
     this.inputType = HabitInputType.boolean,
+    this.habitMode = HabitMode.habit,
+    this.statement,
+    this.curiosityQuestion,
+    this.hypothesis,
+    this.startedAt,
+    this.endsAt,
+    this.pactOutcome,
+    List<PactCycle>? previousCycles,
     super.organizers,
     super.categories,
     super.tags,
@@ -111,7 +186,8 @@ class Habit extends ContentObject {
   }) : slots = slots ?? [],
        schedulers = schedulers ?? [],
        completionHistory = completionHistory ?? [],
-       actions = actions ?? [];
+       actions = actions ?? [],
+       previousCycles = previousCycles ?? [];
 
   @override
   String get type => 'habit';
@@ -174,8 +250,16 @@ class Habit extends ContentObject {
     bool? isNegative,
     HabitInputType? inputType,
     int? order,
+    HabitMode? habitMode,
+    String? statement,
+    String? curiosityQuestion,
+    String? hypothesis,
+    DateTime? startedAt,
+    DateTime? endsAt,
+    PactOutcome? pactOutcome,
+    List<PactCycle>? previousCycles,
   }) {
-    return Habit(
+    final newHabit = Habit(
       id: id,
       title: title ?? this.title,
       description: description ?? this.description,
@@ -196,13 +280,23 @@ class Habit extends ContentObject {
       archived: archived ?? this.archived,
       isNegative: isNegative ?? this.isNegative,
       inputType: inputType ?? this.inputType,
+      habitMode: habitMode ?? this.habitMode,
+      statement: statement ?? this.statement,
+      curiosityQuestion: curiosityQuestion ?? this.curiosityQuestion,
+      hypothesis: hypothesis ?? this.hypothesis,
+      startedAt: startedAt ?? this.startedAt,
+      endsAt: endsAt ?? this.endsAt,
+      pactOutcome: pactOutcome ?? this.pactOutcome,
+      previousCycles: previousCycles ?? this.previousCycles,
       organizers: organizers,
       categories: categories,
       tags: tags,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
       obsidianPath: obsidianPath,
-    )..order = order ?? this.order;
+    );
+    newHabit.order = order ?? this.order;
+    return newHabit;
   }
 
   bool get isCompletedToday => daysSinceLastCompletion == 0;
@@ -319,6 +413,20 @@ class Habit extends ContentObject {
     frontmatter['is_negative'] = isNegative;
     frontmatter['input_type'] = inputType.name;
 
+    // Pact fields
+    frontmatter['habit_mode'] = habitMode.name;
+    if (statement != null) frontmatter['statement'] = statement;
+    if (curiosityQuestion != null) frontmatter['curiosity_question'] = curiosityQuestion;
+    if (hypothesis != null) frontmatter['hypothesis'] = hypothesis;
+    if (startedAt != null) frontmatter['started_at'] = startedAt!.toIso8601String().split('T').first;
+    if (endsAt != null) frontmatter['ends_at'] = endsAt!.toIso8601String().split('T').first;
+    if (pactOutcome != null) {
+      frontmatter['pact_outcome'] = pactOutcome!.name;
+    } else {
+      frontmatter['pact_outcome'] = null;
+    }
+    frontmatter['previous_cycles'] = previousCycles.map((c) => c.toMap()).toList();
+
     // Yesplification for the body: a log of completions
     final buffer = StringBuffer();
     if (description != null) {
@@ -360,8 +468,8 @@ class Habit extends ContentObject {
     final st = frontmatter['streak'];
     habit.streak = st is int ? st : int.tryParse(st?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '') ?? 0;
 
-    if (frontmatter['slots'] != null && frontmatter['slots'] is List) {
-      habit.slots = (frontmatter['slots'] as List).map((s) {
+    if (frontmatter['slots'] != null && frontmatter['slots'] is Iterable) {
+      habit.slots = (frontmatter['slots'] as Iterable).map((s) {
         if (s is Map) {
           TimeOfDay? rTime;
           if (s['reminder_time'] != null) {
@@ -397,14 +505,14 @@ class Habit extends ContentObject {
       }).toList();
     }
     if (frontmatter['schedulers'] != null &&
-        frontmatter['schedulers'] is List) {
-      habit.schedulers = (frontmatter['schedulers'] as List)
+        frontmatter['schedulers'] is Iterable) {
+      habit.schedulers = (frontmatter['schedulers'] as Iterable)
           .whereType<Map>()
           .map((s) => Scheduler.fromMap(Map<String, dynamic>.from(s)))
           .toList();
     }
-    if (frontmatter['actions'] != null && frontmatter['actions'] is List) {
-      habit.actions = (frontmatter['actions'] as List)
+    if (frontmatter['actions'] != null && frontmatter['actions'] is Iterable) {
+      habit.actions = (frontmatter['actions'] as Iterable)
           .whereType<Map>()
           .map((a) => ActionDef.fromJson(Map<String, dynamic>.from(a)))
           .toList();
@@ -432,6 +540,38 @@ class Habit extends ContentObject {
         (e) => e.name == frontmatter['input_type'],
         orElse: () => HabitInputType.boolean,
       );
+    }
+
+    // Pact fields
+    if (frontmatter['habit_mode'] != null) {
+      habit.habitMode = HabitMode.values.firstWhere(
+        (e) => e.name == frontmatter['habit_mode'].toString(),
+        orElse: () => HabitMode.habit,
+      );
+    } else {
+      habit.habitMode = HabitMode.habit;
+    }
+    habit.statement = frontmatter['statement'] as String?;
+    habit.curiosityQuestion = frontmatter['curiosity_question'] as String?;
+    habit.hypothesis = frontmatter['hypothesis'] as String?;
+    if (frontmatter['started_at'] != null) {
+      habit.startedAt = DateTime.tryParse(frontmatter['started_at'].toString());
+    }
+    if (frontmatter['ends_at'] != null) {
+      habit.endsAt = DateTime.tryParse(frontmatter['ends_at'].toString());
+    }
+    if (frontmatter['pact_outcome'] != null) {
+      final outcomeStr = frontmatter['pact_outcome'].toString();
+      final match = PactOutcome.values.where((e) => e.name == outcomeStr);
+      habit.pactOutcome = match.isNotEmpty ? match.first : null;
+    }
+    if (frontmatter['previous_cycles'] != null && frontmatter['previous_cycles'] is Iterable) {
+      habit.previousCycles = (frontmatter['previous_cycles'] as Iterable).map((item) {
+        if (item is Map) {
+          return PactCycle.fromMap(item);
+        }
+        return null;
+      }).whereType<PactCycle>().toList();
     }
 
     // Parse history

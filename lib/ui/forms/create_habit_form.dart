@@ -45,6 +45,17 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
   List<OrganizerReference> _organizers = [];
   String? _timeBlock;
 
+  // Pact fields
+  HabitMode _habitMode = HabitMode.habit;
+  late final TextEditingController _statementController;
+  late final TextEditingController _curiosityController;
+  late final TextEditingController _hypothesisController;
+  int _pactDurationDays = 30;
+  DateTime? _startedAt;
+  DateTime? _endsAt;
+  PactOutcome? _pactOutcome;
+  List<PactCycle> _previousCycles = [];
+
   static const _colorSwatches = [
     '#DC2626',
     '#F97316',
@@ -69,6 +80,18 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
       context: context,
       text: widget.existingHabit?.description ?? '',
     );
+    _statementController = WikiLinkTextController(
+      context: context,
+      text: widget.existingHabit?.statement ?? '',
+    );
+    _curiosityController = WikiLinkTextController(
+      context: context,
+      text: widget.existingHabit?.curiosityQuestion ?? '',
+    );
+    _hypothesisController = WikiLinkTextController(
+      context: context,
+      text: widget.existingHabit?.hypothesis ?? '',
+    );
 
     if (widget.existingHabit != null) {
       final habit = widget.existingHabit!;
@@ -83,6 +106,15 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
       _organizers = List.from(habit.organizers);
       _timeBlock = habit.timeBlock;
 
+      _habitMode = habit.habitMode;
+      _startedAt = habit.startedAt;
+      _endsAt = habit.endsAt;
+      _pactOutcome = habit.pactOutcome;
+      _previousCycles = List.from(habit.previousCycles);
+      if (habit.startedAt != null && habit.endsAt != null) {
+        _pactDurationDays = habit.endsAt!.difference(habit.startedAt!).inDays;
+      }
+
       for (int i = 0; i < habit.slots.length && i < _slotConfigs.length; i++) {
         _slotConfigs[i] = habit.slots[i];
       }
@@ -95,6 +127,9 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
   void dispose() {
     _titleController.dispose();
     _descController.dispose();
+    _statementController.dispose();
+    _curiosityController.dispose();
+    _hypothesisController.dispose();
     super.dispose();
   }
 
@@ -203,6 +238,143 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                   ),
 
                   const SizedBox(height: 16),
+
+                  // ─── Mode Selector (Hábito vs Pacto) ───
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _habitMode = HabitMode.habit),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _habitMode == HabitMode.habit
+                                  ? AppColors.primary
+                                  : AppTheme.cardFillColor(context),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _habitMode == HabitMode.habit
+                                    ? AppColors.primary
+                                    : AppTheme.dividerColor(context),
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Hábito',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: _habitMode == HabitMode.habit
+                                      ? Colors.white
+                                      : AppTheme.textPrimaryColor(context),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _habitMode = HabitMode.pact),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _habitMode == HabitMode.pact
+                                  ? AppColors.primary
+                                  : AppTheme.cardFillColor(context),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _habitMode == HabitMode.pact
+                                    ? AppColors.primary
+                                    : AppTheme.dividerColor(context),
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Pacto (Pact)',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: _habitMode == HabitMode.pact
+                                      ? Colors.white
+                                      : AppTheme.textPrimaryColor(context),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  if (_habitMode == HabitMode.pact) ...[
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'CAMPOS DO PACTO',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.textMutedColor(context),
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Statement
+                          TextField(
+                            controller: _statementController,
+                            decoration: const InputDecoration(
+                              labelText: 'Declaração (Ex: Escrever 100 palavras por dia)',
+                              border: OutlineInputBorder(),
+                            ),
+                            maxLines: 2,
+                          ),
+                          const SizedBox(height: 12),
+                          // Curiosity Question
+                          TextField(
+                            controller: _curiosityController,
+                            decoration: const InputDecoration(
+                              labelText: 'Pergunta de Curiosidade (Ex: O que acontece com a resistência?)',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          // Hypothesis
+                          TextField(
+                            controller: _hypothesisController,
+                            decoration: const InputDecoration(
+                              labelText: 'Hipótese (Ex: Escrita diária vai reduzir a ansiedade)',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Duration
+                          Row(
+                            children: [
+                              const Text(
+                                'Duração do Pacto (dias)',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                              ),
+                              const Spacer(),
+                              _stepper(
+                                _pactDurationDays,
+                                1,
+                                365,
+                                (v) => setState(() => _pactDurationDays = v),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
 
                   // ─── Color Swatches ───
                   SizedBox(
@@ -1193,6 +1365,20 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
       actions: _actions,
       schedulers: _schedulers,
       organizers: _organizers,
+      timeBlock: _timeBlock,
+      // Pact fields
+      habitMode: _habitMode,
+      statement: _habitMode == HabitMode.pact ? _statementController.text.trim() : null,
+      curiosityQuestion: _habitMode == HabitMode.pact ? _curiosityController.text.trim() : null,
+      hypothesis: _habitMode == HabitMode.pact ? _hypothesisController.text.trim() : null,
+      startedAt: _habitMode == HabitMode.pact
+          ? (_startedAt ?? DateTime.now())
+          : null,
+      endsAt: _habitMode == HabitMode.pact
+          ? (_startedAt ?? DateTime.now()).add(Duration(days: _pactDurationDays))
+          : null,
+      pactOutcome: _habitMode == HabitMode.pact ? _pactOutcome : null,
+      previousCycles: _previousCycles,
     );
     try {
       if (widget.existingHabit != null) {

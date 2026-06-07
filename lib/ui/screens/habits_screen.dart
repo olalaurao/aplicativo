@@ -409,25 +409,67 @@ class _TodayHabitCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      habit.displayTitle,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: _isFullyCompleted
-                            ? AppTheme.textMutedColor(context)
-                            : AppTheme.textPrimaryColor(context),
-                        decoration: _isFullyCompleted
-                            ? TextDecoration.lineThrough
-                            : null,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            habit.displayTitle,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: _isFullyCompleted
+                                  ? AppTheme.textMutedColor(context)
+                                  : AppTheme.textPrimaryColor(context),
+                              decoration: _isFullyCompleted
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (habit.habitMode == HabitMode.pact) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'PACT',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        if (habit.streak > 0) ...[
+                        if (habit.habitMode == HabitMode.pact) ...[
+                          Icon(
+                            Icons.shield_rounded,
+                            size: 13,
+                            color: color,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            habit.startedAt != null
+                                ? 'Dia ${DateTime.now().difference(DateTime(habit.startedAt!.year, habit.startedAt!.month, habit.startedAt!.day)).inDays + 1}'
+                                : 'Dia 1',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: color,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                        ] else if (habit.streak > 0) ...[
                           const Icon(
                             Icons.local_fire_department_rounded,
                             size: 13,

@@ -30,6 +30,7 @@ enum BlockType {
   organizerSummary,
   pinnedObject,
   calendar,
+  systemQuickRun,
 }
 
 class DashboardBlock {

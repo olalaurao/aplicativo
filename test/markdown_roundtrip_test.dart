@@ -224,6 +224,49 @@ Texto original.
       expect(parsed.tags, contains('health'));
     });
 
+    test('habit preserves pact fields and previous cycles', () {
+      final pact = Habit(
+        title: 'Exercise',
+        color: '#FF9500',
+        dailyGoal: 1,
+        habitMode: HabitMode.pact,
+        statement: 'I will exercise daily',
+        curiosityQuestion: 'How does it affect energy?',
+        hypothesis: 'Exercising daily improves afternoon energy levels',
+        startedAt: DateTime(2026, 6, 1),
+        endsAt: DateTime(2026, 6, 30),
+        pactOutcome: PactOutcome.persist,
+        previousCycles: [
+          PactCycle(
+            startedAt: DateTime(2026, 5, 1),
+            endsAt: DateTime(2026, 5, 31),
+            outcome: PactOutcome.persist,
+            reflection: 'Went great, learned a lot.',
+            hypothesisCorrect: true,
+            endedReason: 'goal_achieved',
+          )
+        ],
+      );
+
+      final markdown = pact.toMarkdown();
+      final parsed = Habit.fromMarkdown(
+        MarkdownParser.parseFrontmatter(markdown),
+        MarkdownParser.extractBody(markdown),
+      );
+
+      expect(parsed.habitMode, HabitMode.pact);
+      expect(parsed.statement, pact.statement);
+      expect(parsed.curiosityQuestion, pact.curiosityQuestion);
+      expect(parsed.hypothesis, pact.hypothesis);
+      expect(parsed.startedAt, pact.startedAt);
+      expect(parsed.endsAt, pact.endsAt);
+      expect(parsed.pactOutcome, PactOutcome.persist);
+      expect(parsed.previousCycles, hasLength(1));
+      expect(parsed.previousCycles.first.reflection, 'Went great, learned a lot.');
+      expect(parsed.previousCycles.first.hypothesisCorrect, isTrue);
+      expect(parsed.previousCycles.first.endedReason, 'goal_achieved');
+    });
+
     test('note preserves subtype, tags and pinned state', () {
       final note = Note(
         title: 'Reference',

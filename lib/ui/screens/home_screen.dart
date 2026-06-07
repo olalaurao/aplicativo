@@ -60,6 +60,11 @@ import '../widgets/organizer_tasks_widget.dart';
 import '../widgets/universal_search_picker.dart';
 import '../../providers/day_theme_provider.dart';
 import '../../models/day_theme_model.dart';
+import '../../models/system_model.dart';
+import '../../providers/systems_provider.dart';
+import 'system_detail_screen.dart';
+import '../widgets/steering_sheet.dart';
+
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -135,6 +140,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         _handleAction(action, payload: payload);
       }
     }
+
+    // 4. Check for expired pacts
+    _checkExpiredPacts();
+  }
+
+  void _checkExpiredPacts() {
+    final habits = ref.read(habitsProvider);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final expiredPacts = habits.where((h) =>
+        h.habitMode == HabitMode.pact &&
+        h.status == HabitStatus.active &&
+        h.endsAt != null &&
+        h.endsAt!.isBefore(today) &&
+        h.pactOutcome == null).toList();
+
+    if (expiredPacts.isNotEmpty) {
+      final pactToReview = expiredPacts.first;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          showSteeringSheet(context, pactToReview);
+        }
+      });
+    }
   }
 
   void _handleAction(String action, {String? payload}) {
@@ -148,6 +177,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       _submitQuickAdd(payload);
     } else if (action == 'quick_task_text' && payload != null) {
       _submitQuickTask(payload);
+    } else if (action == 'open' && payload != null && payload.startsWith('steering_sheet?id=')) {
+      final id = payload.replaceFirst('steering_sheet?id=', '');
+      final habits = ref.read(habitsProvider);
+      final pact = habits.where((h) => h.id == id).firstOrNull;
+      if (pact != null) {
+        showSteeringSheet(context, pact);
+      }
     }
   }
 
@@ -815,6 +851,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         );
       case BlockType.pinnedObject:
         return _buildPinnedObjectBlock(block);
+      case BlockType.systemQuickRun:
+        return _buildSystemQuickRunBlock();
     }
   }
 
@@ -826,6 +864,70 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       child: _buildTimelineList(),
     );
   }
+
+  Widget _buildSystemQuickRunBlock() {
+    final systems = ref.watch(systemsProvider);
+    return _buildCard(
+      title: 'Systems',
+      icon: Icons.account_tree_rounded,
+      onAdd: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => SystemDetailScreen(system: SystemDefinition(title: 'Novo System'))),
+      ),
+      child: systems.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Nenhum System criado ainda.',
+                style: TextStyle(color: AppTheme.textMutedColor(context), fontSize: 13),
+              ),
+            )
+          : Column(
+              children: systems.take(5).map((system) {
+                return ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.account_tree_rounded, color: AppColors.primary, size: 16),
+                  ),
+                  title: Text(
+                    system.title,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    '${system.steps.length} steps${system.estimatedMinutes > 0 ? ' · ${system.estimatedMinutes}min' : ''}${system.runCount > 0 ? ' · ${system.runCount}x executado' : ''}',
+                    style: const TextStyle(fontSize: 11),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.play_arrow_rounded, color: AppColors.primary, size: 20),
+                    tooltip: 'Executar',
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => SystemDetailScreen(system: system)),
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => SystemDetailScreen(system: system)),
+                  ),
+                );
+              }).toList(),
+            ),
+    );
+  }
+
 
   Widget _buildDailyGoalBlock() {
     final tasks = ref.watch(tasksProvider);
@@ -1864,6 +1966,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     return Column(
       children: entries.map((item) {
+        if (item.entryType == JournalEntryType.pmn) {
+          return ObjectActionWrapper(
+            object: item,
+            child: PmnCard(
+              title: item.title.isNotEmpty ? item.title : 'PMN',
+              week: item.week ?? '',
+              plusCount: item.plus.length,
+              minusCount: item.minus.length,
+              nextCount: item.next.length,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => UniversalDetailView(object: item),
+                ),
+              ),
+            ),
+          );
+        }
+
         return ObjectActionWrapper(
           object: item,
           child: JournalEntryCard(
