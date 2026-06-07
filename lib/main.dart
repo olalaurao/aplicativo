@@ -1,66 +1,68 @@
-// lib/main.dart
+import 'dart:io';
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'dart:io';
 import 'package:home_widget/home_widget.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import 'package:quick_actions/quick_actions.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_quill/flutter_quill.dart';
+
+import 'ui/theme.dart';
+import 'models/task_model.dart';
+import 'models/habit_model.dart';
+import 'models/template_model.dart';
+import 'providers/vault_provider.dart';
+import 'providers/settings_provider.dart';
+import 'providers/widget_sync_provider.dart';
+import 'services/sync_manager.dart';
+import 'services/crash_report_service.dart';
+import 'services/notification_service.dart';
+import 'services/obsidian_service.dart';
+import 'services/widget_service.dart';
+import 'services/permission_service.dart';
+import 'services/pomodoro_bg_service.dart';
 
 import 'ui/shell/app_shell.dart';
-import 'ui/theme.dart';
-import 'providers/vault_provider.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/screens/timeline_screen.dart';
+import 'ui/screens/journal_screen.dart';
 import 'ui/screens/planner_screen.dart';
+import 'ui/forms/create_entry_form.dart';
+import 'ui/forms/create_task_form.dart';
+import 'ui/forms/create_habit_form.dart';
+import 'ui/forms/create_note_form.dart';
+import 'ui/forms/create_template_form.dart';
 import 'ui/screens/organize_screen.dart';
 import 'ui/screens/more_screen.dart';
-import 'ui/screens/notes_screen.dart';
 import 'ui/screens/pomodoro_screen.dart';
 import 'ui/screens/trackers_screen.dart';
 import 'ui/screens/habits_screen.dart';
 import 'ui/screens/people_screen.dart';
 import 'ui/screens/resources_screen.dart';
+import 'ui/screens/notes_screen.dart';
 import 'ui/screens/goals_screen.dart';
 import 'ui/screens/archive_screen.dart';
+import 'ui/screens/search_screen.dart';
 import 'ui/screens/reminders_screen.dart';
 import 'ui/screens/deleted_files_screen.dart';
-import 'ui/screens/journal_screen.dart';
 import 'ui/screens/statistics_screen.dart';
 import 'ui/screens/inbox_screen.dart';
 import 'ui/screens/social_screen.dart';
-import 'ui/screens/search_screen.dart';
 import 'ui/screens/sync_conflicts_screen.dart';
-
-import 'ui/screens/organizer_detail_screen.dart';
+import 'ui/screens/day_theme_screen.dart';
 import 'ui/screens/universal_detail_view.dart';
-import 'services/widget_service.dart';
-import 'services/notification_service.dart';
-import 'services/pomodoro_bg_service.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_quill/flutter_quill.dart';
-import 'package:intl/date_symbol_data_local.dart';
-import 'services/sync_manager.dart';
-import 'services/permission_service.dart';
-import 'ui/widgets/notification_popup_overlay.dart';
-import 'ui/widgets/pomodoro_floating_clock.dart';
-import 'ui/forms/create_template_form.dart';
-import 'ui/forms/create_entry_form.dart';
-import 'ui/forms/create_habit_form.dart';
-import 'ui/forms/create_note_form.dart';
-import 'ui/forms/create_task_form.dart';
+import 'ui/screens/organizer_detail_screen.dart';
 import 'ui/forms/create_social_post_form.dart';
-import 'models/template_model.dart';
-import 'models/task_model.dart';
-import 'models/habit_model.dart';
-
-import 'package:quick_actions/quick_actions.dart';
-import 'providers/settings_provider.dart';
-import 'providers/widget_sync_provider.dart';
+import 'ui/widgets/pomodoro_floating_clock.dart';
+import 'ui/widgets/notification_popup_overlay.dart';
 
 @pragma('vm:entry-point')
 Future<void> homeWidgetInteractiveCallback(Uri? uri) async {
@@ -149,41 +151,51 @@ Future<void> _handleWidgetToggleUri(
 }
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('pt_BR');
-  if (Platform.isAndroid || Platform.isIOS) {
-    await HomeWidget.registerInteractivityCallback(
-      homeWidgetInteractiveCallback,
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    await initializeDateFormatting('pt_BR');
+    if (Platform.isAndroid || Platform.isIOS) {
+      await HomeWidget.registerInteractivityCallback(
+        homeWidgetInteractiveCallback,
+      );
+    }
+    // #region agent log
+    await _emitAgentDebugLog(
+      location: 'main.dart:main',
+      hypothesisId: 'H1',
+      message: 'main_enter',
+      data: {'platform': Platform.operatingSystem},
     );
-  }
-  // #region agent log
-  await _emitAgentDebugLog(
-    location: 'main.dart:main',
-    hypothesisId: 'H1',
-    message: 'main_enter',
-    data: {'platform': Platform.operatingSystem},
-  );
-  // #endregion
+    // #endregion
 
-  if (Platform.isWindows || Platform.isLinux) {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  }
+    if (Platform.isWindows || Platform.isLinux) {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    }
 
-  // Load SharedPreferences BEFORE runApp so SettingsNotifier has real values
-  // from the very first build — eliminates the double-build of allObjectsProvider.
-  final prefs = await SharedPreferences.getInstance();
+    // Load SharedPreferences BEFORE runApp so SettingsNotifier has real values
+    // from the very first build â€” eliminates the double-build of allObjectsProvider.
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Initialize CrashReportService
+    await CrashReportService.instance.init(vaultPath: prefs.getString('vault_path'));
 
-  final container = ProviderContainer(
-    overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-  );
+    final container = ProviderContainer(
+      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+    );
 
-  runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: BootstrapApp(container: container),
-    ),
-  );
+    runApp(
+      UncontrolledProviderScope(
+        container: container,
+        child: BootstrapApp(container: container),
+      ),
+    );
+  }, (error, stack) {
+    debugPrint('[ZonedGuarded] Unhandled error: $error');
+    CrashReportService.instance.logEvent('zone_error ${error.runtimeType}: $error');
+    // Note: PlatformDispatcher.onError handles most async errors;
+    // this catches synchronous top-level errors that slip through.
+  });
 }
 
 class BootstrapApp extends StatefulWidget {
@@ -366,8 +378,8 @@ class _BootstrapAppState extends State<BootstrapApp> {
 
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
+          theme: AppTheme.getLightTheme(AppColors.primary),
+          darkTheme: AppTheme.getDarkTheme(AppColors.primary),
           home: Scaffold(
             backgroundColor: AppColors.darkBackground,
             body: Center(
@@ -443,6 +455,18 @@ Future<void> _initApp(ProviderContainer container) async {
       timeout: const Duration(seconds: 5),
     ),
   ]);
+
+  // Update CrashReportService with the real vault path now that vault has loaded
+  try {
+    final prefs = container.read(sharedPreferencesProvider);
+    final vp = prefs.getString('vault_path') ?? '';
+    if (vp.isNotEmpty) {
+      CrashReportService.instance.setVaultPath(vp);
+      CrashReportService.instance.logEvent('vault_loaded');
+    }
+  } catch (e) {
+    debugPrint('CrashReport: could not update vault path: $e');
+  }
 
   // Register foreground task callback (sync only)
   FlutterForegroundTask.addTaskDataCallback((data) {
@@ -572,10 +596,26 @@ Future<void> _emitAgentDebugLog({
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
+/// NavigatorObserver that keeps CrashReportService updated with the current route.
+class _CrashRouteObserver extends NavigatorObserver {
+  void _track(Route<dynamic>? route) {
+    final name = route?.settings.name ?? route?.runtimeType.toString() ?? 'unknown';
+    CrashReportService.instance.setCurrentRoute(name);
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => _track(route);
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => _track(previousRoute);
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) => _track(newRoute);
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
+    observers: [_CrashRouteObserver()],
     routes: [
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
@@ -715,6 +755,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const SyncConflictsScreen(),
           ),
           GoRoute(
+            path: '/day-themes',
+            builder: (context, state) => const DayThemeScreen(),
+          ),
+          GoRoute(
             path: '/detail/:id',
             builder: (context, state) {
               final extra = state.extra as Map<String, dynamic>?;
@@ -742,6 +786,7 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final settings = ref.watch(settingsProvider);
     // Initialize widget sync listener
     ref.watch(widgetSyncProvider);
 
@@ -749,8 +794,8 @@ class MyApp extends ConsumerWidget {
       child: MaterialApp.router(
         title: 'Citrine',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
+        theme: AppTheme.getLightTheme(Color(int.parse('ff' + settings.accentColor.replaceFirst('#', ''), radix: 16))),
+        darkTheme: AppTheme.getDarkTheme(Color(int.parse('ff' + settings.accentColor.replaceFirst('#', ''), radix: 16))),
         themeMode: ThemeMode.system,
         routerConfig: router,
         localizationsDelegates: const [
