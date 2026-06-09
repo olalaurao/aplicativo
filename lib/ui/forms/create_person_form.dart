@@ -65,8 +65,8 @@ class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
         final discard = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Descartar alteraÃ§Ãµes?'),
-            content: const Text('VocÃª possui alteraÃ§Ãµes nÃ£o salvas. Deseja sair mesmo assim?'),
+            title: const Text('Descartar alterações?'),
+            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),

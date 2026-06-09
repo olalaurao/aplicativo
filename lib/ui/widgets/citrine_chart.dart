@@ -77,7 +77,33 @@ class CitrineChart extends StatelessWidget {
             color: seriesColors[idx % seriesColors.length],
             barWidth: 3,
             isStrokeCapRound: true,
-            dotData: const FlDotData(show: true),
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, barData, spotIdx) {
+                final pointIdx = spot.x.toInt();
+                final hasEmoji =
+                    pointIdx >= 0 &&
+                    pointIdx < d.length &&
+                    (d[pointIdx].emoji?.isNotEmpty ?? false);
+                if (hasEmoji) {
+                  // Usar dot maior e colorido quando há emoji
+                  return FlDotCirclePainter(
+                    radius: 6,
+                    color: seriesColors[idx % seriesColors.length],
+                    strokeColor: Colors.white,
+                    strokeWidth: 2,
+                  );
+                }
+                return FlDotCirclePainter(
+                  radius: 3,
+                  color: seriesColors[idx % seriesColors.length],
+                  strokeColor:
+                      seriesColors[idx % seriesColors.length]
+                          .withValues(alpha: 0.3),
+                  strokeWidth: 1,
+                );
+              },
+            ),
             belowBarData: BarAreaData(
               show: spots.length > 1,
               color: seriesColors[idx % seriesColors.length].withValues(
@@ -89,6 +115,22 @@ class CitrineChart extends StatelessWidget {
         .where((bar) => bar.spots.isNotEmpty)
         .toList();
 
+    // Coletar anotações de emoji nos pontos
+    final List<ShowingTooltipIndicators> emojiAnnotations = [];
+    for (var si = 0; si < series.length; si++) {
+      final d = series[si];
+      for (var xi = 0; xi < d.length; xi++) {
+        final point = d[xi];
+        if (point.value != null && (point.emoji?.isNotEmpty ?? false)) {
+          emojiAnnotations.add(
+            ShowingTooltipIndicators([
+              LineBarSpot(lineBars[si], si, FlSpot(xi.toDouble(), point.value!)),
+            ]),
+          );
+        }
+      }
+    }
+
     return LineChart(
       LineChartData(
         gridData: FlGridData(
@@ -97,6 +139,33 @@ class CitrineChart extends StatelessWidget {
           getDrawingHorizontalLine: (value) => FlLine(
             color: AppTheme.dividerColor(context).withValues(alpha: 0.1),
             strokeWidth: 1,
+          ),
+        ),
+        showingTooltipIndicators: emojiAnnotations,
+        lineTouchData: LineTouchData(
+          enabled: true,
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipItems: (touchedSpots) {
+              return touchedSpots.map((barSpot) {
+                final si = barSpot.barIndex;
+                final xi = barSpot.x.toInt();
+                final d = series[si];
+                final hasEmoji =
+                    xi >= 0 &&
+                    xi < d.length &&
+                    (d[xi].emoji?.isNotEmpty ?? false);
+                return LineTooltipItem(
+                  hasEmoji
+                      ? '${d[xi].emoji} ${barSpot.y.toStringAsFixed(1)}'
+                      : barSpot.y.toStringAsFixed(1),
+                  const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                );
+              }).toList();
+            },
           ),
         ),
         titlesData: FlTitlesData(
@@ -240,6 +309,13 @@ class ChartDataPoint {
   final String label;
   final double? value;
   final Color? color;
+  /// Emoji opcional — exibido como marcador visual no ponto do gráfico de linha
+  final String? emoji;
 
-  ChartDataPoint({required this.label, required this.value, this.color});
+  ChartDataPoint({
+    required this.label,
+    required this.value,
+    this.color,
+    this.emoji,
+  });
 }

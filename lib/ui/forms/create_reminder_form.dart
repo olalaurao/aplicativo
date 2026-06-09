@@ -61,8 +61,8 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
         final discard = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Descartar alteraÃ§Ãµes?'),
-            content: const Text('VocÃª possui alteraÃ§Ãµes nÃ£o salvas. Deseja sair mesmo assim?'),
+            title: const Text('Descartar alterações?'),
+            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -197,7 +197,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Tipo de NotificaÃƒÂ§ÃƒÂ£o',
+                          'Tipo de Notificação',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,

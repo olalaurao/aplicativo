@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'obsidian_service.dart';
 
 class BackupService {
@@ -13,8 +12,7 @@ class BackupService {
     final vaultDir = obsidianService.vaultDir;
     if (vaultDir == null) return null;
 
-    final appDocDir = await getApplicationDocumentsDirectory();
-    final backupDir = Directory(p.join(appDocDir.path, 'backups'));
+    final backupDir = Directory(p.join(vaultDir.path, '_backups'));
     if (!await backupDir.exists()) {
       await backupDir.create(recursive: true);
     }
@@ -36,7 +34,7 @@ class BackupService {
     for (final entity in files) {
       if (entity is File) {
         final relativePath = p.relative(entity.path, from: vaultDir.path);
-        // Don't backup existing backups or conflicts if they are inside vault
+        // Don't backup existing backups or conflicts
         if (!relativePath.startsWith('_backups') &&
             !relativePath.contains('.zip')) {
           encoder.addFile(entity, relativePath);
@@ -45,12 +43,14 @@ class BackupService {
     }
 
     encoder.close();
+    await cleanOldBackups();
     return backupFile;
   }
 
   Future<void> cleanOldBackups({int keepCount = 7}) async {
-    final appDocDir = await getApplicationDocumentsDirectory();
-    final backupDir = Directory(p.join(appDocDir.path, 'backups'));
+    final vaultDir = obsidianService.vaultDir;
+    if (vaultDir == null) return;
+    final backupDir = Directory(p.join(vaultDir.path, '_backups'));
     if (!await backupDir.exists()) return;
 
     final backups = backupDir.listSync().whereType<File>().toList();

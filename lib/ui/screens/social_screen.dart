@@ -796,11 +796,21 @@ class _SocialTimelineCardState extends ConsumerState<_SocialTimelineCard> {
                   color: socialPlatformColor(post.platform),
                 ),
               ),
-              title: Text(
-                _handle(post),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w800),
+              title: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      _handle(post),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  if (post.socialRefs.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    const Icon(Icons.link_rounded, size: 14, color: AppColors.textMuted),
+                  ],
+                ],
               ),
               subtitle: Text(
                 '${platformLabel(post.platform)} · ${_relativeTime(post.createdAt)}',

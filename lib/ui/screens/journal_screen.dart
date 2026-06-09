@@ -202,7 +202,11 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
 
           // Date filter
           if (_onlySelectedDate) {
-            if (!_isSameDay(_journalEntryDisplayDate(e), _selectedDate)) {
+            bool matches = _isSameDay(_journalEntryDisplayDate(e), _selectedDate);
+            if (!matches && e.entryType == JournalEntryType.pmn) {
+              matches = e.referencedDates.any((d) => _isSameDay(d, _selectedDate));
+            }
+            if (!matches) {
               return false;
             }
           }
@@ -227,9 +231,12 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
 
     final moodOverviewEntries = entries.where((entry) {
       if (_filterHasPhoto && !entry.body.contains('![[')) return false;
-      if (_onlySelectedDate &&
-          !_isSameDay(_journalEntryDisplayDate(entry), _selectedDate)) {
-        return false;
+      if (_onlySelectedDate) {
+        bool matches = _isSameDay(_journalEntryDisplayDate(entry), _selectedDate);
+        if (!matches && entry.entryType == JournalEntryType.pmn) {
+          matches = entry.referencedDates.any((d) => _isSameDay(d, _selectedDate));
+        }
+        if (!matches) return false;
       }
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
@@ -260,10 +267,21 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
         : <Reminder>[];
 
     for (final entry in filteredEntries) {
-      final dateKey = DateFormat(
-        'yyyy-MM-dd',
-      ).format(_journalEntryDisplayDate(entry));
-      groupedItems.putIfAbsent(dateKey, () => []).add(entry);
+      if (entry.entryType == JournalEntryType.pmn && entry.referencedDates.isNotEmpty) {
+        if (_onlySelectedDate) {
+          final dateKey = DateFormat('yyyy-MM-dd').format(_selectedDate);
+          groupedItems.putIfAbsent(dateKey, () => []).add(entry);
+        } else {
+          final datesToGroup = { _journalEntryDisplayDate(entry), ...entry.referencedDates };
+          for (final d in datesToGroup) {
+            final dateKey = DateFormat('yyyy-MM-dd').format(d);
+            groupedItems.putIfAbsent(dateKey, () => []).add(entry);
+          }
+        }
+      } else {
+        final dateKey = DateFormat('yyyy-MM-dd').format(_journalEntryDisplayDate(entry));
+        groupedItems.putIfAbsent(dateKey, () => []).add(entry);
+      }
     }
 
     // Only show habits if not filtering for photo or mood or actively searching

@@ -12,24 +12,24 @@ class AppColors {
   static const Color secondary = Color(0xFF0EA5E9); // Vibrant Sky Blue
   static const Color secondaryLight = Color(0xFF7DD3FC);
 
-  // Surfaces ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Light
+  // Surfaces ââââ‚¬Å¡Ã‚Â¬âââ€šÂ¬Ã‚Â Light
   static const Color background = Color(0xFFF8F9FB);
   static const Color surface = Colors.white;
   static const Color cardFill = Colors.white;
   static const Color surfaceVariant = Color(0xFFF1F3F5);
 
-  // Surfaces ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Dark
+  // Surfaces ââââ‚¬Å¡Ã‚Â¬âââ€šÂ¬Ã‚Â Dark
   static const Color darkBackground = Color(0xFF0F1117);
   static const Color darkSurface = Color(0xFF1A1C25);
   static const Color darkCardFill = Color(0xFF22252F);
 
-  // Text ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Light
+  // Text ââââ‚¬Å¡Ã‚Â¬âââ€šÂ¬Ã‚Â Light
   static const Color textPrimary = Color(0xFF1A1D26);
   static const Color textSecondary = Color(0xFF6B7280);
   static const Color textMuted = Color(0xFF9CA3AF);
   static const Color textOnPrimary = Colors.white;
 
-  // Text ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Dark
+  // Text ââââ‚¬Å¡Ã‚Â¬âââ€šÂ¬Ã‚Â Dark
   static const Color darkTextPrimary = Color(0xFFF3F4F6);
   static const Color darkTextSecondary = Color(0xFF9CA3AF);
 
@@ -66,7 +66,7 @@ class AppTheme {
     end: Alignment.bottomRight,
   );
 
-  // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Card Decoration ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
+  // ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ Card Decoration ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬
   static BoxDecoration cardDecoration(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return BoxDecoration(
@@ -102,7 +102,7 @@ class AppTheme {
     );
   }
 
-  // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Chip Style ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
+  // ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ Chip Style ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬
   static BoxDecoration chipDecoration(Color color) {
     return BoxDecoration(
       color: color.withValues(alpha: 0.1),
@@ -110,7 +110,7 @@ class AppTheme {
     );
   }
 
-  // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Badge Style ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
+  // ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ Badge Style ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬
   static BoxDecoration badgeDecoration(Color color) {
     return BoxDecoration(
       color: color.withValues(alpha: 0.12),
@@ -118,7 +118,7 @@ class AppTheme {
     );
   }
 
-  // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Section Header Style ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
+  // ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ Section Header Style ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬
   static TextStyle sectionHeaderStyle(BuildContext context) {
     return TextStyle(
       fontSize: 17,
@@ -190,7 +190,7 @@ class AppTheme {
     }
   }
 
-  // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Button Styles ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
+  // ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ Button Styles ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬
   static ButtonStyle get primaryButtonStyle {
     return ElevatedButton.styleFrom(
       backgroundColor: AppColors.accent,
@@ -213,7 +213,7 @@ class AppTheme {
     );
   }
 
-  // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Themes ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
+  // ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ Themes ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬
   static ThemeData getLightTheme(Color accentColor) {
     final base = ThemeData(brightness: Brightness.light, useMaterial3: true);
     final textTheme = GoogleFonts.interTextTheme(base.textTheme);

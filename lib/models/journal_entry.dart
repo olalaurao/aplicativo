@@ -77,7 +77,6 @@ class JournalEntry extends ContentObject {
     final frontmatter = toBaseMap();
     frontmatter['date'] = date.toIso8601String();
     if (timeOfDay != null) frontmatter['time'] = timeOfDay;
-    if (moodSlug != null) frontmatter['mood'] = moodSlug;
     if (location != null) frontmatter['location'] = location;
     if (templateId != null) frontmatter['template_id'] = templateId;
     if (photos.isNotEmpty) frontmatter['photos'] = photos;
@@ -92,9 +91,23 @@ class JournalEntry extends ContentObject {
       if (week != null) frontmatter['week'] = week;
       if (dateRangeStart != null) frontmatter['date_range_start'] = dateRangeStart?.toIso8601String().split('T').first;
       if (dateRangeEnd != null) frontmatter['date_range_end'] = dateRangeEnd?.toIso8601String().split('T').first;
+      
+      final Set<String> refDatesStr = {};
       if (referencedDates.isNotEmpty) {
-        frontmatter['referenced_dates'] = referencedDates.map((d) => d.toIso8601String().split('T').first).toList();
+        refDatesStr.addAll(referencedDates.map((d) => d.toIso8601String().split('T').first));
       }
+      if (dateRangeStart != null && dateRangeEnd != null) {
+        var curr = dateRangeStart!;
+        final end = dateRangeEnd!;
+        while (curr.isBefore(end) || curr.isAtSameMomentAs(end)) {
+          refDatesStr.add(curr.toIso8601String().split('T').first);
+          curr = curr.add(const Duration(days: 1));
+        }
+      }
+      if (refDatesStr.isNotEmpty) {
+        frontmatter['referenced_dates'] = refDatesStr.toList()..sort();
+      }
+      
       if (pactRefs.isNotEmpty) frontmatter['pact_refs'] = pactRefs;
     }
 
@@ -123,6 +136,10 @@ class JournalEntry extends ContentObject {
         buffer.writeln();
       }
       finalBody = buffer.toString().trim();
+    }
+
+    if (moodSlug != null) {
+      finalBody = finalBody.trimRight() + '\n\n' + 'mood:: [[$moodSlug]]';
     }
 
     return generateMarkdown(
@@ -155,7 +172,15 @@ class JournalEntry extends ContentObject {
     );
     entry.loadBaseMap(frontmatter);
 
-    entry.moodSlug = frontmatter['mood'] as String?;
+    final moodLineMatch = RegExp(r'^mood::\s*(.*)$', multiLine: true).firstMatch(body);
+    if (moodLineMatch != null) {
+      final val = moodLineMatch.group(1)!;
+      final wikiMatch = RegExp(r'\[\[(.*?)\]\]').allMatches(val).map((m) => m.group(1)!).toList();
+      entry.moodSlug = wikiMatch.isEmpty ? null : wikiMatch.join(', ');
+    } else {
+      entry.moodSlug = frontmatter['mood']?.toString();
+    }
+
     entry.location = frontmatter['location'] as String?;
     entry.templateId = frontmatter['template_id'] as String?;
     final rawPhotos = frontmatter['photos'];

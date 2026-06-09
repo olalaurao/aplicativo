@@ -31,6 +31,7 @@ enum BlockType {
   pinnedObject,
   calendar,
   systemQuickRun,
+  energyMap,
 }
 
 class DashboardBlock {

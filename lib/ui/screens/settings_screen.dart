@@ -150,7 +150,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ),
                         subtitle: const Text(
-                          'Seleciona uma pasta existente e indexa os arquivos compatÃƒÆ’Ã‚Â­veis.',
+                          'Seleciona uma pasta existente e indexa os arquivos compatíveis.',
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: const Icon(
@@ -201,7 +201,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         subtitle: Text(
                           settings.tiktokResolverEndpoint.isEmpty
-                              ? 'Configure uma API para extrair URL direta de vÃƒÆ’Ã‚Â­deo'
+                              ? 'Configure uma API para extrair URL direta de vídeo'
                               : settings.tiktokResolverEndpoint,
                           style: const TextStyle(fontSize: 12),
                           maxLines: 1,
@@ -430,7 +430,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     children: [
                       ListTile(
                         title: const Text(
-                          'Dormir AtÃƒÆ’Ã‚Â© Mais Tarde',
+                          'Dormir Atí© Mais Tarde',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -438,8 +438,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         subtitle: Text(
                           settings.sleepInTomorrow
-                              ? 'Ignorar alarmes de hÃƒÆ’Ã‚Â¡bitos amanhÃƒÆ’Ã‚Â£ atÃƒÆ’Ã‚Â© ${settings.sleepInUntil}'
-                              : 'Ignorar alarmes de hÃƒÆ’Ã‚Â¡bitos do dia seguinte',
+                              ? 'Ignorar alarmes de hábitos amanhã atí© ${settings.sleepInUntil}'
+                              : 'Ignorar alarmes de hábitos do dia seguinte',
                           style: const TextStyle(fontSize: 12),
                         ),
                         trailing: Switch.adaptive(
@@ -454,8 +454,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 SnackBar(
                                   content: Text(
                                     v
-                                        ? 'Modo dormir ativado: alarmes de hÃƒÆ’Ã‚Â¡bitos ignorados atÃƒÆ’Ã‚Â© ${settings.sleepInUntil} de amanhÃƒÆ’Ã‚Â£.'
-                                        : 'Alarmes de hÃƒÆ’Ã‚Â¡bitos restaurados.',
+                                        ? 'Modo dormir ativado: alarmes de hábitos ignorados atí© ${settings.sleepInUntil} de amanhã.'
+                                        : 'Alarmes de hábitos restaurados.',
                                   ),
                                 ),
                               );
@@ -468,7 +468,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         const Divider(height: 1, indent: 16),
                         ListTile(
                           title: const Text(
-                            'Silenciar alarmes atÃƒÆ’Ã‚Â©',
+                            'Silenciar alarmes atí©',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
@@ -509,7 +509,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'Alarmes de hÃƒÆ’Ã‚Â¡bitos serÃƒÆ’Ã‚Â£o silenciados atÃƒÆ’Ã‚Â© $formattedTime de amanhÃƒÆ’Ã‚Â£.',
+                                      'Alarmes de hábitos serão silenciados atí© $formattedTime de amanhã.',
                                     ),
                                   ),
                                 );
@@ -551,8 +551,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                               subtitle: Text(
                                 granted
-                                    ? 'Granted ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â alarms fire at exact times'
-                                    : 'Not granted ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â alarms may be delayed',
+                                    ? 'Granted âââ€šÂ¬ââ‚¬Â alarms fire at exact times'
+                                    : 'Not granted âââ€šÂ¬ââ‚¬Â alarms may be delayed',
                                 style: const TextStyle(fontSize: 12),
                               ),
                               trailing: granted
@@ -596,8 +596,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                               subtitle: Text(
                                 granted
-                                    ? 'Granted ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â popups show over lock screen'
-                                    : 'Not granted ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â popups may not show on lock screen',
+                                    ? 'Granted âââ€šÂ¬ââ‚¬Â popups show over lock screen'
+                                    : 'Not granted âââ€šÂ¬ââ‚¬Â popups may not show on lock screen',
                                 style: const TextStyle(fontSize: 12),
                               ),
                               trailing: granted
@@ -685,7 +685,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ),
                         subtitle: const Text(
-                          'Detectar datas, horÃƒÆ’Ã‚Â¡rios e prioridades ao digitar tarefas',
+                          'Detectar datas, horários e prioridades ao digitar tarefas',
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: Switch.adaptive(
@@ -827,7 +827,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ),
                         subtitle: Text(
-                          '${_dailyIdentifierLabel(settings.dailyNoteIdentifier)} Ãƒâ€šÃ‚Â· ${settings.dailyNoteFolder}/${_dailyPreview(settings.dailyNoteDateFormat)}',
+                          '${_dailyIdentifierLabel(settings.dailyNoteIdentifier)} · ${settings.dailyNoteFolder}/${_dailyPreview(settings.dailyNoteDateFormat)}',
                           style: const TextStyle(fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -850,7 +850,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ),
                         subtitle: const Text(
-                          'Define onde novos objetos serÃƒÆ’Ã‚Â£o salvos no vault',
+                          'Define onde novos objetos serão salvos no vault',
                           style: TextStyle(fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -873,7 +873,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ),
                         subtitle: const Text(
-                          'Aponta para uma pasta de vault e indexa os arquivos compatÃƒÆ’Ã‚Â­veis',
+                          'Aponta para uma pasta de vault e indexa os arquivos compatíveis',
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: const Icon(Icons.chevron_right_rounded),
@@ -998,14 +998,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           color: AppColors.primary,
                         ),
                         title: const Text(
-                          'RelatÃƒÆ’Ã‚Â³rios de diagnÃƒÆ’Ã‚Â³stico',
+                          'Relatórios de diagnóstico',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                         subtitle: const Text(
-                          'Exibir relatÃƒÆ’Ã‚Â³rios de erros locais e ANRs',
+                          'Exibir relatórios de erros locais e ANRs',
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: const Icon(Icons.chevron_right_rounded),
@@ -1322,7 +1322,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ),
                             subtitle: const Text(
-                              'Prompt de revisÃƒÆ’Ã‚Â£o diÃƒÆ’Ã‚Â¡ria',
+                              'Prompt de revisão diária',
                               style: TextStyle(
                                 color: AppColors.textMuted,
                                 fontSize: 12,
@@ -1384,7 +1384,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               DropdownButtonFormField<String>(
                 initialValue: identifier,
-                decoration: const InputDecoration(labelText: 'IdentificaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o'),
+                decoration: const InputDecoration(labelText: 'Identificação'),
                 items: const [
                   DropdownMenuItem(
                     value: 'filename_format',
@@ -1558,7 +1558,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Configure uma API que devolva uma URL direta de vÃƒÆ’Ã‚Â­deo. '
+                'Configure uma API que devolva uma URL direta de vídeo. '
                 'Use {url} no endpoint para inserir o link do TikTok; sem {url}, o app envia ?url=...',
               ),
               const SizedBox(height: 12),
@@ -2110,7 +2110,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: Text(
               googleUser != null
                   ? 'Conectado como ${googleUser.email}'
-                  : 'NÃƒÆ’Ã‚Â£o conectado',
+                  : 'Não conectado',
               style: const TextStyle(fontSize: 12),
             ),
             trailing: googleUser != null
@@ -2146,7 +2146,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Nenhum calendÃƒÆ’Ã‚Â¡rio encontrado.',
+                        'Nenhum calendário encontrado.',
                         style: TextStyle(
                           color: AppColors.textMuted,
                           fontSize: 12,
@@ -2176,7 +2176,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         subtitle: Text(
                           calendar.primary == true
-                              ? 'CalendÃƒÆ’Ã‚Â¡rio principal'
+                              ? 'Calendário principal'
                               : id,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -2213,7 +2213,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'NÃƒÆ’Ã‚Â£o foi possÃƒÆ’Ã‚Â­vel carregar calendÃƒÆ’Ã‚Â¡rios: $error',
+                    'Não foi possível carregar calendários: $error',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -2233,7 +2233,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final dir = Directory(path);
       if (!await dir.exists()) {
-        return 'A pasta selecionada nÃƒÆ’Ã‚Â£o existe.';
+        return 'A pasta selecionada não existe.';
       }
       final probe = File(
         '${dir.path}${Platform.pathSeparator}.citrine_write_test',
@@ -2244,7 +2244,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
       return null;
     } catch (e) {
-      return 'Sem permissÃƒÆ’Ã‚Â£o de escrita nesta pasta: $e';
+      return 'Sem permissão de escrita nesta pasta: $e';
     }
   }
 }

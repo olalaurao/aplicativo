@@ -91,8 +91,8 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
         final discard = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Descartar alteraÃ§Ãµes?'),
-            content: const Text('VocÃª possui alteraÃ§Ãµes nÃ£o salvas. Deseja sair mesmo assim?'),
+            title: const Text('Descartar alterações?'),
+            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -133,7 +133,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Title Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
+                  // âÂ”Â€âÂ”Â€âÂ”Â€ Title âÂ”Â€âÂ”Â€âÂ”Â€
                   TextField(
                     controller: _titleController,
                     onChanged: (_) => setState(() {}),
@@ -158,7 +158,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                   const SizedBox(height: 16),
 
-                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Color Swatches Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
+                  // âÂ”Â€âÂ”Â€âÂ”Â€ Color Swatches âÂ”Â€âÂ”Â€âÂ”Â€
                   SizedBox(
                     height: 44,
                     child: ListView.separated(
@@ -205,7 +205,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                   const SizedBox(height: 20),
 
-                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Status Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
+                  // âÂ”Â€âÂ”Â€âÂ”Â€ Status âÂ”Â€âÂ”Â€âÂ”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.all(16),
@@ -246,7 +246,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                   const SizedBox(height: 12),
 
-                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Goal Type Card Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
+                  // âÂ”Â€âÂ”Â€âÂ”Â€ Goal Type Card âÂ”Â€âÂ”Â€âÂ”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.all(16),
@@ -283,7 +283,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                   const SizedBox(height: 12),
 
-                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Deadline Card Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
+                  // âÂ”Â€âÂ”Â€âÂ”Â€ Deadline Card âÂ”Â€âÂ”Â€âÂ”Â€
                   GestureDetector(
                     onTap: _pickDate,
                     child: Container(
@@ -324,7 +324,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                   const SizedBox(height: 12),
 
-                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ KPIs Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
+                  // âÂ”Â€âÂ”Â€âÂ”Â€ KPIs âÂ”Â€âÂ”Â€âÂ”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.all(16),
@@ -425,7 +425,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                   const SizedBox(height: 12),
 
-                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Organizers Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
+                  // âÂ”Â€âÂ”Â€âÂ”Â€ Organizers âÂ”Â€âÂ”Â€âÂ”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.symmetric(
@@ -440,7 +440,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                   const SizedBox(height: 12),
 
-                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Description Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
+                  // âÂ”Â€âÂ”Â€âÂ”Â€ Description âÂ”Â€âÂ”Â€âÂ”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.all(16),
@@ -479,7 +479,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
         ],
       ),
 
-      // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Save Button Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
+      // âÂ”Â€âÂ”Â€âÂ”Â€ Save Button âÂ”Â€âÂ”Â€âÂ”Â€
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
@@ -600,7 +600,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
           const SizedBox(height: 8),
           OutlinedButton.icon(
             icon: const Icon(Icons.add_link_rounded),
-            label: const Text('Adicionar post de referÃƒÂªncia'),
+            label: const Text('Adicionar post de referência'),
             onPressed: _pickSocialReference,
           ),
         ],

@@ -1780,11 +1780,6 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     // Sort by time
     entries.sort((a, b) => a['time'].compareTo(b['time']));
 
-    // Update daily mood in frontmatter if provided
-    if (entry.moodSlug != null) {
-      frontmatter['mood'] = entry.moodSlug;
-    }
-
     final newBody = MarkdownParser.generateDailyNoteBody(
       entries: entries,
       tasks: tasks,
@@ -1882,9 +1877,6 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     }
 
     entries.sort((a, b) => a['time'].compareTo(b['time']));
-    if (entry.moodSlug != null) {
-      frontmatter['mood'] = entry.moodSlug;
-    }
 
     final newBody = MarkdownParser.generateDailyNoteBody(
       entries: entries,
@@ -2831,19 +2823,24 @@ class VaultNotifier extends Notifier<void> {
 
   Future<void> _purgeOldDeletedFiles() async {
     final obsidianService = ref.read(obsidianServiceProvider);
-    final files = await obsidianService.getFilesInFolder(
-      '_deleted',
-      includeDeleted: true,
-    );
+    
+    final foldersToPurge = ['_deleted', '_conflicts'];
     final now = DateTime.now();
 
-    for (final file in files) {
-      final stat = await file.stat();
-      final diff = now.difference(stat.modified);
-      if (diff.inDays > 30) {
-        await obsidianService.deleteFile(
-          obsidianService.getRelativePath(file.path),
-        );
+    for (final folder in foldersToPurge) {
+      final files = await obsidianService.getFilesInFolder(
+        folder,
+        includeDeleted: true,
+      );
+
+      for (final file in files) {
+        final stat = await file.stat();
+        final diff = now.difference(stat.modified);
+        if (diff.inDays > 30) {
+          await obsidianService.deleteFile(
+            obsidianService.getRelativePath(file.path),
+          );
+        }
       }
     }
   }

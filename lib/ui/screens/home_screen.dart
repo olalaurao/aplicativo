@@ -58,6 +58,7 @@ import '../forms/create_habit_form.dart';
 import '../widgets/pomodoro_week_overview.dart';
 import '../widgets/organizer_tasks_widget.dart';
 import '../widgets/universal_search_picker.dart';
+import '../widgets/energy_map.dart';
 import '../../providers/day_theme_provider.dart';
 import '../../models/day_theme_model.dart';
 import '../../models/system_model.dart';
@@ -210,7 +211,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         if (dashboardBlocks.isEmpty) {
           return const Center(
             child: Text(
-              'O Dashboard estÃƒÂ¡ vazio.\nAdicione blocos pelas ConfiguraÃƒÂ§ÃƒÂµes.',
+              'O Dashboard está vazio.\nAdicione blocos pelas Configurações.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textMuted),
             ),
@@ -252,7 +253,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   parent: BouncingScrollPhysics(),
                 ),
                 slivers: [
-                // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Header ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
+                // ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ Header ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
@@ -293,7 +294,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
-                              'Drag to reorder or tap Ã¢â€¹Â¯ to configure',
+                              'Drag to reorder or tap ⋯ to configure',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppColors.primary.withValues(alpha: 0.8),
@@ -306,7 +307,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ),
                 ),
 
-                // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Blocks ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
+                // ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ Blocks ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                   sliver: _isEditMode
@@ -552,6 +553,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           'type': BlockType.trackerField,
           'title': 'Last Metric',
           'icon': Icons.show_chart_rounded,
+        },
+        {
+          'type': BlockType.energyMap,
+          'title': 'Energy Map',
+          'icon': Icons.bolt_rounded,
         },
       ],
       'Content': [
@@ -853,6 +859,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         return _buildPinnedObjectBlock(block);
       case BlockType.systemQuickRun:
         return _buildSystemQuickRunBlock();
+      case BlockType.energyMap:
+        return const EnergyMap(compact: true);
     }
   }
 
@@ -1235,11 +1243,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _buildQuoteBlock() {
     const _defaultQuotes = [
-      '"The best way to predict the future is to create it." Ã¢â‚¬â€ Peter Drucker',
-      '"You do not rise to the level of your goals. You fall to the level of your systems." Ã¢â‚¬â€ James Clear',
-      '"Energy flows where attention goes." Ã¢â‚¬â€ Tony Robbins',
-      '"Small daily improvements over time lead to stunning results." Ã¢â‚¬â€ Robin Sharma',
-      '"Discipline is the bridge between goals and accomplishment." Ã¢â‚¬â€ Jim Rohn',
+      '"The best way to predict the future is to create it." ââ‚¬â€ Peter Drucker',
+      '"You do not rise to the level of your goals. You fall to the level of your systems." ââ‚¬â€ James Clear',
+      '"Energy flows where attention goes." ââ‚¬â€ Tony Robbins',
+      '"Small daily improvements over time lead to stunning results." ââ‚¬â€ Robin Sharma',
+      '"Discipline is the bridge between goals and accomplishment." ââ‚¬â€ Jim Rohn',
     ];
 
     final blocks = ref.watch(dashboardProvider).valueOrNull ?? [];
@@ -1258,7 +1266,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final todayQuote = quotes[todayIndex];
 
     // Try to split author from quote
-    final dashIdx = todayQuote.lastIndexOf('Ã¢â‚¬â€');
+    final dashIdx = todayQuote.lastIndexOf('ââ‚¬â€');
     final quoteText = dashIdx > 0
         ? todayQuote.substring(0, dashIdx).trim()
         : todayQuote.trim();
@@ -1283,7 +1291,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           if (author != null) ...[
             const SizedBox(height: 8),
             Text(
-              'Ã¢â‚¬â€ $author',
+              'ââ‚¬â€ $author',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
@@ -1321,7 +1329,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               Row(
                 children: [
                   const Expanded(
-                    child: Text('Pool de CitaÃƒÂ§ÃƒÂµes',
+                    child: Text('Pool de Citações',
                         style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                   ),
                   TextButton.icon(
@@ -1330,12 +1338,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       showDialog<void>(
                         context: ctx,
                         builder: (dialogCtx) => AlertDialog(
-                          title: const Text('Nova citaÃƒÂ§ÃƒÂ£o'),
+                          title: const Text('Nova citação'),
                           content: TextField(
                             controller: ctrl,
                             maxLines: 3,
                             decoration: const InputDecoration(
-                              hintText: '"Frase" Ã¢â‚¬â€ Autor',
+                              hintText: '"Frase" ââ‚¬â€ Autor',
                             ),
                           ),
                           actions: [
@@ -1575,17 +1583,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         .toList();
     if (habits.isEmpty) {
       return _buildCard(
-        title: 'HÃƒÂ¡bitos de hoje',
+        title: 'Hábitos de hoje',
         icon: Icons.loop_rounded,
         child: const Text(
-          'Nenhum hÃƒÂ¡bito para hoje',
+          'Nenhum hábito para hoje',
           style: TextStyle(color: AppColors.textMuted, fontSize: 13),
         ),
       );
     }
 
     return _buildCard(
-      title: 'HÃƒÂ¡bitos de hoje',
+      title: 'Hábitos de hoje',
       icon: Icons.loop_rounded,
       onAdd: () => showCreateMenu(context),
       child: SingleChildScrollView(
@@ -2013,7 +2021,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (mood != null) return mood.emoji;
 
     return switch (moodSlug) {
-      'terrible' => 'Ã°Å¸ËœÅ¾',
+      'terrible' => '😞',
       'bad' => 'Ã°Å¸Ëœâ€¢',
       'neutral' => 'Ã°Å¸ËœÂ',
       'good' => 'Ã°Å¸â„¢â€š',
@@ -2461,7 +2469,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     } else if (avgConsistency >= 0.8) {
       motivationText = 'Exceptional consistency! Keep it up Ã°Å¸â€Â¥';
     } else if (avgConsistency >= 0.5) {
-      motivationText = 'You\'re doing well Ã¢â‚¬â€ push for that 80%+ week!';
+      motivationText = 'You\'re doing well ââ‚¬â€ push for that 80%+ week!';
     } else if (completedToday == activeHabits.length) {
       motivationText = 'All habits done today! Ã°Å¸Å½â€° Great effort!';
     } else {
@@ -2904,10 +2912,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         ? Color(int.tryParse('FF${block.color!.replaceAll('#', '')}', radix: 16) ?? 0xFFFFB000)
                         : AppColors.primary;
                     final rangeText = block.timeRanges.isEmpty
-                        ? 'Sem horÃƒÂ¡rio'
+                        ? 'Sem horário'
                         : block.timeRanges
                             .map((r) =>
-                                '${r.startHour.toString().padLeft(2, '0')}:${r.startMinute.toString().padLeft(2, '0')}Ã¢â‚¬â€œ${r.endHour.toString().padLeft(2, '0')}:${r.endMinute.toString().padLeft(2, '0')}')
+                                '${r.startHour.toString().padLeft(2, '0')}:${r.startMinute.toString().padLeft(2, '0')}ââ‚¬â€œ${r.endHour.toString().padLeft(2, '0')}:${r.endMinute.toString().padLeft(2, '0')}')
                             .join(' | ');
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 10),
@@ -3011,7 +3019,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       orElse: () => null,
     );
     final content = block?.metadata['content'] as String? ??
-        '**Lembretes:**\n- Beber ÃƒÂ¡gua\n- Alongar a cada hora';
+        '**Lembretes:**\n- Beber água\n- Alongar a cada hora';
 
     return _buildCard(
       title: 'Notas Fixas',
@@ -3116,7 +3124,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             return const Padding(
               padding: EdgeInsets.symmetric(vertical: 8.0),
               child: Text(
-                'Sem compromissos no perÃƒÂ­odo',
+                'Sem compromissos no período',
                 style: TextStyle(color: AppColors.textMuted, fontSize: 13),
               ),
             );
@@ -3163,7 +3171,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              event.summary ?? 'Compromisso sem tÃƒÂ­tulo',
+                              event.summary ?? 'Compromisso sem título',
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
@@ -3173,7 +3181,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '$dateLabel  Ã¢â‚¬Â¢  $time',
+                              '$dateLabel  ââ‚¬Â¢  $time',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.textSecondaryColor(context),
@@ -3215,7 +3223,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ),
                   ),
                   title: Text(
-                    event.summary ?? 'Compromisso sem tÃƒÂ­tulo',
+                    event.summary ?? 'Compromisso sem título',
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
@@ -3236,7 +3244,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         error: (_, _) => const Padding(
           padding: EdgeInsets.symmetric(vertical: 8.0),
           child: Text(
-            'NÃƒÂ£o foi possÃƒÂ­vel carregar o Google Agenda',
+            'Não foi possível carregar o Google Agenda',
             style: TextStyle(color: AppColors.textMuted, fontSize: 13),
           ),
         ),
@@ -3298,7 +3306,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(height: 16),
 
                   const Text(
-                    'PerÃƒÂ­odo a Exibir',
+                    'Período a Exibir',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 8),
@@ -3324,7 +3332,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(height: 20),
 
                   const Text(
-                    'Formato de ExibiÃƒÂ§ÃƒÂ£o',
+                    'Formato de Exibição',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 8),
@@ -3374,7 +3382,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             .updateBlock(updated);
                         Navigator.pop(context);
                       },
-                      child: const Text('Salvar ConfiguraÃƒÂ§ÃƒÂ£o'),
+                      child: const Text('Salvar Configuração'),
                     ),
                   ),
                 ],
@@ -4110,7 +4118,7 @@ extension on _HomeScreenState {
 
   static const _filterObjectTypes = <String, String>{
     'task': 'Tarefas',
-    'habit': 'HÃƒÂ¡bitos',
+    'habit': 'Hábitos',
     'pomodoro': 'Pomodoros agendados',
     'goal': 'Goals',
     'note': 'Notas',

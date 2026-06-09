@@ -61,7 +61,15 @@ class SocialPostGridCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  SocialPlatformBadge(platform: post.platform, fontSize: 9),
+                  Row(
+                    children: [
+                      SocialPlatformBadge(platform: post.platform, fontSize: 9),
+                      if (post.socialRefs.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        const Icon(Icons.link_rounded, size: 12, color: Colors.white70),
+                      ],
+                    ],
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     _handle,

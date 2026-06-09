@@ -621,10 +621,48 @@ class _CombinedAnalysisScreenState
       final date = today.subtract(Duration(days: (days - 1) - i));
       final dateStr = DateFormat('dd/MM').format(date);
       final value = _getValueForDate(source, date);
-      points.add(ChartDataPoint(label: dateStr, value: value));
+      // Para fontes de mood, incluir o emoji do humor dominante no ponto
+      String? emoji;
+      if (source.type == MetricType.mood && value != null) {
+        emoji = _getMoodEmojiForDate(date);
+      }
+      points.add(ChartDataPoint(label: dateStr, value: value, emoji: emoji));
     }
     return points;
   }
+
+  /// Retorna o emoji do mood mais frequente (ou único) numa data
+  String? _getMoodEmojiForDate(DateTime date) {
+    final entries = ref.read(allEntriesProvider);
+    final moods = ref.read(moodsProvider);
+
+    final dayEntries = entries
+        .where(
+          (e) =>
+              e.date.year == date.year &&
+              e.date.month == date.month &&
+              e.date.day == date.day &&
+              e.moodSlug != null,
+        )
+        .toList();
+
+    if (dayEntries.isEmpty) return null;
+
+    // Pegar o mood mais frequente no dia
+    final moodCounts = <String, int>{};
+    for (final entry in dayEntries) {
+      final slug = entry.moodSlug!;
+      moodCounts[slug] = (moodCounts[slug] ?? 0) + 1;
+    }
+    final dominantSlug = moodCounts.entries
+        .reduce((a, b) => a.value >= b.value ? a : b)
+        .key;
+    return moods
+        .where((m) => m.id == dominantSlug || m.slug == dominantSlug)
+        .firstOrNull
+        ?.emoji;
+  }
+
 
   double? _getValueForDate(MetricSource source, DateTime date) {
     switch (source.type) {

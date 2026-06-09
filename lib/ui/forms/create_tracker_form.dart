@@ -69,8 +69,8 @@ class _CreateTrackerFormState extends ConsumerState<CreateTrackerForm> {
         final discard = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Descartar alteraÃ§Ãµes?'),
-            content: const Text('VocÃª possui alteraÃ§Ãµes nÃ£o salvas. Deseja sair mesmo assim?'),
+            title: const Text('Descartar alterações?'),
+            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -167,7 +167,7 @@ class _CreateTrackerFormState extends ConsumerState<CreateTrackerForm> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Description & Organizers Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
+                  // âÂ”Â€âÂ”Â€âÂ”Â€ Description & Organizers âÂ”Â€âÂ”Â€âÂ”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.all(16),
@@ -175,7 +175,7 @@ class _CreateTrackerFormState extends ConsumerState<CreateTrackerForm> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'DescriÃƒÂ§ÃƒÂ£o',
+                          'Descrição',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -188,7 +188,7 @@ class _CreateTrackerFormState extends ConsumerState<CreateTrackerForm> {
                           maxLines: 2,
                           style: const TextStyle(fontSize: 14),
                           decoration: const InputDecoration(
-                            hintText: 'O que vocÃƒÂª quer rastrear?',
+                            hintText: 'O que você quer rastrear?',
                             border: InputBorder.none,
                             filled: false,
                             contentPadding: EdgeInsets.zero,

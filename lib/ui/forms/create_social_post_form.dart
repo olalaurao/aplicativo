@@ -91,8 +91,8 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
         final discard = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Descartar alteraÃ§Ãµes?'),
-            content: const Text('VocÃª possui alteraÃ§Ãµes nÃ£o salvas. Deseja sair mesmo assim?'),
+            title: const Text('Descartar alterações?'),
+            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -243,7 +243,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
                       controller: _titleController,
                       maxLines: 1,
                       decoration: const InputDecoration(
-                        hintText: 'TÃƒÂ­tulo',
+                        hintText: 'Título',
                         border: InputBorder.none,
                       ),
                       onChanged: (_) => setState(() {}),
@@ -306,7 +306,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
             minLines: 2,
             maxLines: 6,
             decoration: const InputDecoration(
-              hintText: 'O que esse post significa pra vocÃƒÂª?',
+              hintText: 'O que esse post significa pra você?',
               border: InputBorder.none,
             ),
           ),
@@ -320,7 +320,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
       decoration: AppTheme.cardDecoration(context),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: OrganizerSelectorField(
-        label: 'ColeÃƒÂ§ÃƒÂµes',
+        label: 'Coleções',
         selectedOrganizers: _organizers,
         onChanged: (value) => setState(() => _organizers = value),
       ),
@@ -449,7 +449,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
             onChanged: _onTagChanged,
             onSubmitted: (_) => _commitTag(),
             decoration: const InputDecoration(
-              hintText: 'Digite uma tag e pressione vÃƒÂ­rgula ou enter',
+              hintText: 'Digite uma tag e pressione vírgula ou enter',
               border: InputBorder.none,
             ),
           ),
@@ -496,7 +496,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
       setState(() {
         _draft = _fallbackDraft();
         _titleController.text = _draft!.title;
-        _errorText = 'NÃƒÂ£o conseguimos buscar esse link. Preencha manualmente.';
+        _errorText = 'Não conseguimos buscar esse link. Preencha manualmente.';
       });
     } finally {
       if (mounted) setState(() => _isFetching = false);

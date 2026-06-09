@@ -27,6 +27,7 @@ import '../forms/create_task_form.dart';
 import '../forms/create_habit_form.dart';
 import '../../models/content_object.dart';
 import 'universal_detail_view.dart';
+import '../widgets/triple_check_sheet.dart';
 
 class PlannerScreen extends ConsumerStatefulWidget {
   final DateTime? initialDate;
@@ -1316,6 +1317,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                           ),
                         ),
                       ),
+                      if (task.needsTripleCheckBadge) ...[
+                        const SizedBox(width: 8),
+                        TripleCheckBadge(
+                          onTap: () => showTripleCheckSheet(context, ref, task),
+                        ),
+                      ],
                       if (task.scheduledTime != null) ...[
                         const SizedBox(width: 8),
                         Icon(

@@ -81,8 +81,8 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
         final discard = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Descartar alteraÃ§Ãµes?'),
-            content: const Text('VocÃª possui alteraÃ§Ãµes nÃ£o salvas. Deseja sair mesmo assim?'),
+            title: const Text('Descartar alterações?'),
+            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -142,7 +142,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Column(
                 children: [
-                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Type Selector Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
+                  // âÂ”Â€âÂ”Â€âÂ”Â€ Type Selector âÂ”Â€âÂ”Â€âÂ”Â€
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
@@ -172,7 +172,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
 
                   const SizedBox(height: 24),
 
-                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Title Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
+                  // âÂ”Â€âÂ”Â€âÂ”Â€ Title âÂ”Â€âÂ”Â€âÂ”Â€
                   TextField(
                     controller: _titleController,
                     onChanged: (_) => setState(() {}),
@@ -191,7 +191,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
 
                   const SizedBox(height: 12),
 
-                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Metadata Strip Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
+                  // âÂ”Â€âÂ”Â€âÂ”Â€ Metadata Strip âÂ”Â€âÂ”Â€âÂ”Â€
                   MetadataStrip(
                     chips: [
                       MetadataChip(
@@ -224,7 +224,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
 
                   const SizedBox(height: 24),
 
-                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Content Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
+                  // âÂ”Â€âÂ”Â€âÂ”Â€ Content âÂ”Â€âÂ”Â€âÂ”Â€
                   _noteType == NoteType.outline
                       ? OutlineEditor(
                           initialContent: _richContent,
@@ -307,7 +307,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
       case NoteType.text:
         return 'Start writing...';
       case NoteType.outline:
-        return 'Ã¢Â€Â¢ Use bullets for your outline...';
+        return 'âÂ€Â¢ Use bullets for your outline...';
       case NoteType.collection:
         return 'Add items to your collection...';
     }

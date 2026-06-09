@@ -228,6 +228,12 @@ class DashboardNotifier extends AsyncNotifier<List<DashboardBlock>> {
       title: 'Systems',
       order: 27,
     ),
+    DashboardBlock(
+      id: 'energy-map',
+      type: BlockType.energyMap,
+      title: 'Energy Map',
+      order: 28,
+    ),
   ];
 
   Future<void> _save() async {

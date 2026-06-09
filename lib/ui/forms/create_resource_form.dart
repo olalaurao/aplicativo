@@ -108,8 +108,8 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
         final discard = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Descartar alteraÃ§Ãµes?'),
-            content: const Text('VocÃª possui alteraÃ§Ãµes nÃ£o salvas. Deseja sair mesmo assim?'),
+            title: const Text('Descartar alterações?'),
+            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -230,7 +230,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
 
                   const SizedBox(height: 12),
 
-                  // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Organizers Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
+                  // âÂ”Â€âÂ”Â€âÂ”Â€ Organizers âÂ”Â€âÂ”Â€âÂ”Â€
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.symmetric(
@@ -484,7 +484,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
     if (coverUrl.isNotEmpty && !_isValidCoverUrl(coverUrl)) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('URL da capa invÃƒÂ¡lida')));
+      ).showSnackBar(const SnackBar(content: Text('URL da capa inválida')));
       return;
     }
 

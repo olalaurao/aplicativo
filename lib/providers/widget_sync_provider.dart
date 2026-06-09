@@ -448,7 +448,7 @@ List<Map<String, dynamic>> _dayItems(
       if (!scheduled) continue;
       final slotTimes = habit.slots
           .map((slot) => slot.reminderTime ?? _timeOfDate(slot.time))
-          .whereType<dynamic>()
+          .where((t) => t != null)
           .toList();
       if (slotTimes.isEmpty) {
         final completed = _isHabitCompletedOn(habit, date);
