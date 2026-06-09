@@ -462,9 +462,9 @@ class SyncManager {
     final zipFile = await backupService.createBackup();
     if (zipFile != null) {
       await driveSync.createBackupFromFile(zipFile);
-      await backupService.cleanOldBackups(keepCount: 2);
+      await backupService.cleanOldBackups(keepCount: 1);
     }
-    await driveSync.cleanOldRemoteBackups(keepCount: 2);
+    await driveSync.cleanOldRemoteBackups(keepCount: 1);
     _preSyncBackupCreated = true;
   }
 

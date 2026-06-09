@@ -47,7 +47,7 @@ class BackupService {
     return backupFile;
   }
 
-  Future<void> cleanOldBackups({int keepCount = 7}) async {
+  Future<void> cleanOldBackups({int keepCount = 1}) async {
     final vaultDir = obsidianService.vaultDir;
     if (vaultDir == null) return;
     final backupDir = Directory(p.join(vaultDir.path, '_backups'));

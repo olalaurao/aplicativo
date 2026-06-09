@@ -352,7 +352,7 @@ class GoogleDriveSyncService {
       uploadMedia: media,
       supportsAllDrives: true,
     );
-    await cleanOldRemoteBackups(keepCount: 2);
+    await cleanOldRemoteBackups(keepCount: 1);
   }
 
   Future<void> createBackupFromFile(File zipFile) async {
@@ -371,10 +371,10 @@ class GoogleDriveSyncService {
       uploadMedia: media,
       supportsAllDrives: true,
     );
-    await cleanOldRemoteBackups(keepCount: 2);
+    await cleanOldRemoteBackups(keepCount: 1);
   }
 
-  Future<void> cleanOldRemoteBackups({int keepCount = 2}) async {
+  Future<void> cleanOldRemoteBackups({int keepCount = 1}) async {
     if (_driveApi == null || _vaultFolderId == null) return;
 
     final backupsFolderId = await _getOrCreateFolder('_backups');

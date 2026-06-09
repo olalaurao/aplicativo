@@ -246,7 +246,7 @@ class ObsidianService {
     )) {
       if (entity is File && entity.path.endsWith('.md')) {
         final path = entity.path.replaceAll('\\', '/');
-        if (path.contains('/_attachments/') || path.contains('/_deleted/')) {
+        if (path.contains('/_attachments/') || path.contains('/_deleted/') || path.contains('/_conflicts/') || path.contains('/_backups/')) {
           continue;
         }
         files.add(entity);
