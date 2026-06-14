@@ -129,6 +129,8 @@ class MarkdownParser {
     return result;
   }
 
+
+
   static Map<String, dynamic> parseFrontmatter(String content) {
     if (!content.startsWith('---')) return {};
     final endIdx = content.indexOf('---', 3);
@@ -151,7 +153,10 @@ class MarkdownParser {
             debugPrint(
               'Repaired legacy YAML frontmatter after parse error: $e',
             );
-            return _convertNode(doc) as Map<String, dynamic>;
+            final result = _convertNode(doc) as Map<String, dynamic>;
+            // Signal to the vault loader that this file needs to be rewritten
+            result['__needs_rewrite__'] = true;
+            return result;
           }
         } catch (_) {
           // Fall through to the original error log below.

@@ -21,12 +21,21 @@ class SectionHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(left: 20, right: 20, top: 24, bottom: 12),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 20, color: iconColor ?? AppColors.primary),
           const SizedBox(width: 8),
-          Text(title, style: AppTheme.sectionHeaderStyle(context)),
-          const Spacer(),
-          ?trailing,
+          Flexible(
+            child: Text(
+              title,
+              style: AppTheme.sectionHeaderStyle(context),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            trailing!,
+          ],
         ],
       ),
     );

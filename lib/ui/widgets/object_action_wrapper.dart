@@ -35,17 +35,20 @@ import 'universal_search_picker.dart';
 class ObjectActionWrapper extends ConsumerWidget {
   final ContentObject object;
   final Widget child;
+  final VoidCallback? onTap;
 
   const ObjectActionWrapper({
     super.key,
     required this.object,
     required this.child,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
+      onTap: onTap,
       onLongPress: () => showObjectActionSheet(context, ref, object),
       child: child,
     );

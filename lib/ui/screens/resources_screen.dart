@@ -11,7 +11,6 @@ import '../forms/create_resource_form.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../widgets/rich_text_editor.dart';
-import 'universal_detail_view.dart';
 
 class ResourcesScreen extends ConsumerStatefulWidget {
   const ResourcesScreen({super.key});
@@ -543,104 +542,105 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   }
 
   Widget _buildResourceCard(BuildContext context, Resource resource) {
-    return ObjectActionWrapper(
-      object: resource,
-      child: InkWell(
-        onTap: () => context.push('/detail/${resource.id}'),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          decoration: AppTheme.cardDecoration(context),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Container(
-                  width: double.infinity,
-                  color: AppColors.surfaceVariant,
-                  child:
-                      resource.coverImage != null &&
-                          resource.coverImage!.isNotEmpty
-                      ? Image.network(
-                          resource.coverImage!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const Icon(
-                            Icons.broken_image_outlined,
-                            color: AppColors.textMuted,
-                          ),
-                        )
-                      : const Icon(
-                          Icons.local_library_rounded,
+    return GestureDetector(
+      onTap: () {
+        debugPrint('[ResourcesScreen] card tapped: ${resource.id} / ${resource.title}');
+        context.push('/detail/${resource.id}', extra: {'object': resource});
+      },
+      onLongPress: () {
+        showObjectActionSheet(context, ref, resource);
+      },
+      child: Container(
+        decoration: AppTheme.cardDecoration(context),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                color: AppColors.surfaceVariant,
+                child:
+                    resource.coverImage != null &&
+                        resource.coverImage!.isNotEmpty
+                    ? Image.network(
+                        resource.coverImage!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const Icon(
+                          Icons.broken_image_outlined,
                           color: AppColors.textMuted,
-                          size: 40,
                         ),
-                ),
+                      )
+                    : const Icon(
+                        Icons.local_library_rounded,
+                        color: AppColors.textMuted,
+                        size: 40,
+                      ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    resource.title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  if (ref
+                      .watch(settingsProvider)
+                      .visibleResourceFields
+                      .contains('author'))
                     Text(
-                      resource.title,
+                      resource.author ?? 'Unknown',
                       style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                        color: AppColors.textMuted,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                  if (ref
+                      .watch(settingsProvider)
+                      .visibleResourceFields
+                      .contains('author'))
                     const SizedBox(height: 4),
-                    const SizedBox(height: 4),
-                    if (ref
-                        .watch(settingsProvider)
-                        .visibleResourceFields
-                        .contains('author'))
-                      Text(
-                        resource.author ?? 'Unknown',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textMuted,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    if (ref
-                        .watch(settingsProvider)
-                        .visibleResourceFields
-                        .contains('author'))
-                      const SizedBox(height: 4),
-                    if (ref
-                        .watch(settingsProvider)
-                        .visibleResourceFields
-                        .contains('rating')) ...[
-                      _buildRatingRow(resource),
-                      const SizedBox(height: 6),
-                    ],
-                    if (ref
-                        .watch(settingsProvider)
-                        .visibleResourceFields
-                        .contains('type'))
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: AppTheme.badgeDecoration(AppColors.info),
-                        child: Text(
-                          resource.resourceType.toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.info,
-                          ),
-                        ),
-                      ),
+                  if (ref
+                      .watch(settingsProvider)
+                      .visibleResourceFields
+                      .contains('rating')) ...[
+                    _buildRatingRow(resource),
+                    const SizedBox(height: 6),
                   ],
-                ),
+                  if (ref
+                      .watch(settingsProvider)
+                      .visibleResourceFields
+                      .contains('type'))
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: AppTheme.badgeDecoration(AppColors.info),
+                      child: Text(
+                        resource.resourceType.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.info,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -649,15 +649,20 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   Widget _buildResourceListTile(BuildContext context, Resource resource) {
     final isExpanded = _expandedResourceId == resource.id;
 
-    return ObjectActionWrapper(
-      object: resource,
+    return GestureDetector(
+      onTap: () {
+        debugPrint('[ResourcesScreen] list tile tapped: ${resource.id} / ${resource.title}');
+        context.push('/detail/${resource.id}', extra: {'object': resource});
+      },
+      onLongPress: () {
+        showObjectActionSheet(context, ref, resource);
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: AppTheme.cardDecoration(context),
         child: Column(
           children: [
             ListTile(
-              onTap: () => context.push('/detail/${resource.id}'),
               leading: Container(
                 width: 48,
                 height: 48,

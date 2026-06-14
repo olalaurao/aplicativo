@@ -19,6 +19,7 @@ import 'ui/theme.dart';
 import 'models/task_model.dart';
 import 'models/habit_model.dart';
 import 'models/template_model.dart';
+import 'models/content_object.dart';
 import 'providers/vault_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/widget_sync_provider.dart';
@@ -792,6 +793,15 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/detail/:id',
             builder: (context, state) {
               final extra = state.extra as Map<String, dynamic>?;
+              // If object is passed directly, skip the resolver lookup
+              final directObject = extra?['object'] as ContentObject?;
+              if (directObject != null) {
+                return UniversalDetailView(
+                  object: directObject,
+                  searchQuery: extra?['searchQuery'] as String?,
+                  searchSnippet: extra?['searchSnippet'] as String?,
+                );
+              }
               return _ObjectDetailResolver(
                 id: state.pathParameters['id']!,
                 searchQuery: extra?['searchQuery'] as String?,

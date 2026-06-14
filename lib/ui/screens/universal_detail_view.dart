@@ -90,26 +90,30 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   void initState() {
     super.initState();
     object = widget.object;
+    // Push to history once on open
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(historyProvider.notifier).push(object);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     // Watch active object reactively from the provider
     final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
-    final activeObject = allObjects.cast<ContentObject?>().firstWhere(
+    final found = allObjects.cast<ContentObject?>().firstWhere(
       (o) => o != null && o.id == object.id,
       orElse: () => null,
     );
-    if (activeObject != null) {
-      object = activeObject;
+    // Use the found object if available, otherwise fall back to cached
+    final currentObject = found ?? object;
+    // Safely update the cached reference after the frame — never during build
+    if (found != null && !identical(found, object)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) object = found;
+      });
     }
 
-    // Push to history
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(historyProvider.notifier).push(object);
-    });
-
-    final mentionsAsync = ref.watch(backlinksProvider(object.id));
+    final mentionsAsync = ref.watch(backlinksProvider(currentObject.id));
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -4202,6 +4206,14 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   }
 
   Widget _buildBreadcrumbs(BuildContext context, WidgetRef ref) {
+    // Safeguard: ensure we have a valid object
+    if (object == null) {
+      return const SliverToBoxAdapter(
+        child: Center(
+          child: Text('Objeto não encontrado.', style: TextStyle(fontSize: 16)),
+        ),
+      );
+    }
     final history = ref.watch(historyProvider);
     if (history.length < 2) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());

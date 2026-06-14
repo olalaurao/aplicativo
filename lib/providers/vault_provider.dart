@@ -1482,6 +1482,21 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                 obj.title = fallbackTitle;
               }
               results.add(obj);
+              // If the YAML was repaired in memory, rewrite the file so it stays fixed
+              if (frontmatter['__needs_rewrite__'] == true) {
+                final objSnapshot = obj;
+                Future.microtask(() async {
+                  try {
+                    await service.writeFile(
+                      relativePath,
+                      objSnapshot.toMarkdown(),
+                    );
+                    debugPrint('[Vault] Rewrote repaired YAML: $relativePath');
+                  } catch (e) {
+                    debugPrint('[Vault] Failed to rewrite repaired YAML: $e');
+                  }
+                });
+              }
             }
           } catch (e, st) {
             debugPrint('Error processing file ${file.path}: $e\n$st');

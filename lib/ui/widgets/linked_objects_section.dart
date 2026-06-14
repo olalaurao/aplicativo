@@ -5,7 +5,6 @@ import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import 'universal_search_picker.dart';
 import '../screens/universal_detail_view.dart';
-import 'section_header.dart'; // Ensure _Section or SectionHeader is available, I will use SectionHeader
 
 class LinkedObjectsSection extends ConsumerWidget {
   final ContentObject owner;
@@ -35,16 +34,26 @@ class LinkedObjectsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const SectionHeader(title: 'Objetos vinculados', icon: Icons.link_rounded),
-            TextButton.icon(
-              onPressed: () => _pickObject(context),
-              icon: const Icon(Icons.add_link_rounded, size: 18),
-              label: Text(addButtonLabel ?? 'Link'),
-            ),
-          ],
+        Padding(
+          padding: const EdgeInsets.only(left: 20, right: 12, top: 24, bottom: 12),
+          child: Row(
+            children: [
+              const Icon(Icons.link_rounded, size: 20, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Objetos vinculados',
+                  style: AppTheme.sectionHeaderStyle(context),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => _pickObject(context),
+                icon: const Icon(Icons.add_link_rounded, size: 18),
+                label: Text(addButtonLabel ?? 'Link'),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         linked.isEmpty
