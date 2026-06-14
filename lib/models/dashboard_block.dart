@@ -11,6 +11,7 @@ enum BlockType {
   photos,
   kpi,
   dailyGoal,
+  shoppingList,
   mood,
   notes,
   googleCalendar,

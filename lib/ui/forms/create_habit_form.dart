@@ -1379,6 +1379,16 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
           : null,
       pactOutcome: _habitMode == HabitMode.pact ? _pactOutcome : null,
       previousCycles: _previousCycles,
+      isFlexibleFrequency: _schedulers.isNotEmpty && 
+          _schedulers.first.rules.isNotEmpty && 
+          _schedulers.first.rules.first.repeatType == RepeatType.numberOfDaysPerPeriod,
+      frequencyDays: _schedulers.isNotEmpty && 
+              _schedulers.first.rules.isNotEmpty && 
+              _schedulers.first.rules.first.repeatType == RepeatType.numberOfDaysPerPeriod
+          ? (_schedulers.first.rules.first.period == 'week' 
+              ? 7 
+              : (_schedulers.first.rules.first.period == 'month' ? 30 : 365))
+          : null,
     );
     try {
       if (widget.existingHabit != null) {

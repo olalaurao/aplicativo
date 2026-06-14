@@ -74,6 +74,8 @@ class TypeSignaturesScreen extends ConsumerWidget {
     switch (type) {
       case 'task':
         return 'Task';
+      case 'idea':
+        return 'Ideia';
       case 'habit':
         return 'Habit';
       case 'project':

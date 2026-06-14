@@ -1,6 +1,7 @@
 // lib/ui/screens/resources_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/settings_provider.dart';
@@ -545,12 +546,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     return ObjectActionWrapper(
       object: resource,
       child: InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => UniversalDetailView(object: resource),
-          ),
-        ),
+        onTap: () => context.push('/detail/${resource.id}'),
         borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: AppTheme.cardDecoration(context),
@@ -661,12 +657,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
         child: Column(
           children: [
             ListTile(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => UniversalDetailView(object: resource),
-                ),
-              ),
+              onTap: () => context.push('/detail/${resource.id}'),
               leading: Container(
                 width: 48,
                 height: 48,

@@ -12,10 +12,11 @@ class WidgetService {
   static const _androidPackage = 'com.productivity.citrine';
   static const _calendarProvider = 'CitrineCalendarWidgetReceiver';
   static const _tasksProvider = 'CitrineTasksWidgetReceiver';
-  static const _filterProvider = 'CitrineFilterWidgetProvider';
+  static const _shoppingProvider = 'CitrineShoppingWidgetProvider';
   static const _pomodoroProvider = 'CitrinePomodoroWidgetProvider';
   static const _quickAddProvider = 'CitrineQuickAddWidgetProvider';
   static const _noteProvider = 'CitrineNoteWidgetProvider';
+  static const _checklistProvider = 'CitrineChecklistWidgetProvider';
 
   static bool get _isSupportedPlatform => Platform.isAndroid || Platform.isIOS;
 
@@ -26,13 +27,13 @@ class WidgetService {
 
   static Future<void> updateDashboardWidgets({
     required Map<String, dynamic> calendar,
-    required Map<String, dynamic> filter,
+    required Map<String, dynamic> shopping,
     required Map<String, dynamic> pomodoro,
   }) async {
     try {
       await Future.wait([
         _saveJson('citrine_calendar', calendar),
-        _saveJson('citrine_filter', filter),
+        _saveJson('citrine_shopping', shopping),
         _saveJson('citrine_pomodoro', pomodoro),
       ]);
       await refreshAllWidgets();
@@ -77,6 +78,28 @@ class WidgetService {
       'linkUri': 'citrine:///detail/$slug',
     });
     await _update(_noteProvider);
+  }
+
+  static Future<void> updateChecklist({
+    required int widgetId,
+    required String title,
+    required List<Map<String, dynamic>> items,
+    required String slug,
+  }) async {
+    await _saveJson('citrine_checklist_$widgetId', {
+      'title': title,
+      'items': items,
+      'slug': slug,
+      'linkUri': 'citrine:///detail/$slug',
+    });
+    // fallback for config
+    await _saveJson('citrine_checklist', {
+      'title': title,
+      'items': items,
+      'slug': slug,
+      'linkUri': 'citrine:///detail/$slug',
+    });
+    await _update(_checklistProvider);
   }
 
   static Future<void> updateQuickAddLabels({
@@ -361,7 +384,7 @@ class WidgetService {
   }
 
   static Future<void> _updateTaskProviders() async {
-    await Future.wait([_update(_tasksProvider), _update(_filterProvider)]);
+    await Future.wait([_update(_tasksProvider), _update(_shoppingProvider)]);
   }
 
   static Future<void> _update(String provider) async {

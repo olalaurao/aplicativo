@@ -11,6 +11,7 @@ class Note extends ContentObject {
   String? parentNoteId;
   String? color;
   List<String> socialRefs;
+  bool isChecklist;
 
   Note({
     super.id,
@@ -19,6 +20,7 @@ class Note extends ContentObject {
     required this.body,
     this.parentNoteId,
     this.color,
+    this.isChecklist = false,
     List<String>? socialRefs,
     super.organizers,
     super.categories,
@@ -44,6 +46,7 @@ class Note extends ContentObject {
     if (parentNoteId != null) frontmatter['parent_note_id'] = parentNoteId;
     if (color != null) frontmatter['color'] = color;
     if (socialRefs.isNotEmpty) frontmatter['social_refs'] = socialRefs;
+    if (isChecklist) frontmatter['is_checklist'] = true;
 
     final markdownBody = subtype == NoteSubtype.text
         ? normalizeRichTextBodyForMarkdown(body)
@@ -66,6 +69,7 @@ class Note extends ContentObject {
     note.loadBaseMap(frontmatter);
     note.parentNoteId = frontmatter['parent_note_id'] as String?;
     note.color = frontmatter['color'] as String?;
+    note.isChecklist = frontmatter['is_checklist'] == true;
     if (frontmatter['social_refs'] is List) {
       note.socialRefs = (frontmatter['social_refs'] as List)
           .map((e) => e.toString())
@@ -80,6 +84,7 @@ class Note extends ContentObject {
     String? body,
     String? parentNoteId,
     String? color,
+    bool? isChecklist,
     List<String>? socialRefs,
     List<OrganizerReference>? organizers,
     List<String>? categories,
@@ -99,6 +104,7 @@ class Note extends ContentObject {
       body: body ?? this.body,
       parentNoteId: parentNoteId ?? this.parentNoteId,
       color: color ?? this.color,
+      isChecklist: isChecklist ?? this.isChecklist,
       socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,

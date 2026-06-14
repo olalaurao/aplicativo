@@ -38,6 +38,7 @@ import '../widgets/collection_view.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../widgets/social_post_grid_card.dart';
 import '../../models/note_model.dart';
+import '../widgets/checklist_view.dart';
 import '../../models/template_model.dart';
 import '../widgets/wiki_text_view.dart';
 import '../widgets/journal_body_view.dart';
@@ -61,6 +62,8 @@ import '../../models/system_model.dart';
 import 'system_detail_screen.dart';
 import '../../providers/systems_provider.dart';
 import 'social_post_detail.dart';
+import '../widgets/linked_objects_section.dart';
+import '../utils/social_ref_utils.dart';
 
 class UniversalDetailView extends ConsumerStatefulWidget {
   final ContentObject object;
@@ -371,8 +374,17 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               ),
             ),
 
-          if (_socialRefsFor(object).isNotEmpty)
-            SliverToBoxAdapter(child: _buildSocialRefsSection(ref)),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+              child: LinkedObjectsSection(
+                owner: object,
+                socialRefs: getSocialRefs(object),
+                onAdd: (selected) => addSocialRef(object, selected, ref),
+                onRemove: (slug) => removeSocialRef(object, slug, ref),
+              ),
+            ),
+          ),
 
           // ─── Type-Specific Content ───
           ..._buildTypeSpecificContent(context, ref),
@@ -663,6 +675,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       ],
       'habit': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
       'note': [
+        'convert_to_checklist',
         'edit',
         'change_type',
         'merge_note',
@@ -708,6 +721,17 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   Icon(Icons.edit_outlined, size: 18),
                   SizedBox(width: 12),
                   Text('Edit'),
+                ],
+              ),
+            );
+          case 'convert_to_checklist':
+            return PopupMenuItem(
+              value: 'convert_to_checklist',
+              child: Row(
+                children: [
+                  Icon(Icons.checklist_rtl_rounded, size: 18),
+                  const SizedBox(width: 12),
+                  Text((object as Note).isChecklist ? 'Reverter para Nota' : 'Converter para Checklist'),
                 ],
               ),
             );
@@ -847,90 +871,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
-  List<String> _socialRefsFor(ContentObject object) {
-    if (object is Goal) return object.socialRefs;
-    if (object is Task) return object.socialRefs;
-    if (object is Note) return object.socialRefs;
-    return const [];
-  }
 
-  Widget _buildSocialRefsSection(WidgetRef ref) {
-    final refs = _socialRefsFor(object);
-    final posts = ref
-        .watch(socialPostsProvider)
-        .where((post) => refs.contains('[[social/${post.socialSlug}]]'))
-        .toList();
-    if (posts.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.bookmarks_outlined,
-                size: 18,
-                color: AppColors.textSecondary,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Posts de referência',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(width: 8),
-              _badge(posts.length.toString()),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 128,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: posts.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                final post = posts[index];
-                return GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SocialPostDetail(post: post),
-                    ),
-                  ),
-                  child: SizedBox(
-                    width: 86,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          SocialPostThumbnail(
-                            post: post,
-                            borderRadius: BorderRadius.zero,
-                          ),
-                          Positioned(
-                            left: 6,
-                            right: 6,
-                            bottom: 6,
-                            child: SocialPlatformBadge(
-                              platform: post.platform,
-                              fontSize: 8,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   List<Widget> _buildTypeSpecificProperties(
     BuildContext context,
@@ -2302,7 +2243,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               padding: const EdgeInsets.all(16),
               child: _isEditing
                   ? _buildNoteEditor(context, note)
-                  : MarkdownBodyView(content: note.body),
+                  : _buildNoteViewer(context, note),
             ),
           ),
         ),
@@ -2362,6 +2303,48 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             setState(() => object = updated);
           },
         );
+    }
+  }
+
+  Widget _buildNoteViewer(BuildContext context, Note note) {
+    if (note.isChecklist && note.subtype == NoteSubtype.text) {
+      return ChecklistView(note: note);
+    }
+    switch (note.subtype) {
+      case NoteSubtype.outline:
+        return OutlineEditor(
+          initialContent: note.body,
+          onWikiLinkTap: (slug) => _navigateToSlug(context, ref, slug),
+          onChanged: (v) {
+            final updated = note.copyWith(body: v);
+            ref.read(vaultProvider.notifier).updateObject(updated);
+            setState(() => object = updated);
+          },
+        );
+      case NoteSubtype.collection:
+        return CollectionView(
+          content: note.body,
+        );
+      case NoteSubtype.text:
+      default:
+        return MarkdownBodyView(content: note.body);
+    }
+  }
+
+  void _navigateToSlug(BuildContext context, WidgetRef ref, String slug) {
+    final all = ref.read(allObjectsProvider).valueOrNull ?? [];
+    final target = all.cast<ContentObject?>().firstWhere(
+      (o) => o != null && (o.slug == slug || o.title.toLowerCase() == slug.toLowerCase()),
+      orElse: () => null,
+    );
+    if (target != null) {
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => UniversalDetailView(object: target),
+      ));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Objeto "$slug" não encontrado'))
+      );
     }
   }
 
@@ -2689,6 +2672,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       case 'edit':
         _editObject(context);
         break;
+      case 'convert_to_checklist':
+        _convertToChecklist(context, ref);
+        break;
       case 'change_type':
         _showChangeTypeSheet(context, ref);
         break;
@@ -2711,6 +2697,14 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         _exportToGoogleCalendar(context, ref);
         break;
     }
+  }
+
+  void _convertToChecklist(BuildContext context, WidgetRef ref) {
+    if (object is! Note) return;
+    final note = object as Note;
+    final updated = note.copyWith(isChecklist: !note.isChecklist);
+    ref.read(vaultProvider.notifier).updateObject(updated);
+    setState(() => object = updated);
   }
 
   Future<void> _showMergeTargetPicker(

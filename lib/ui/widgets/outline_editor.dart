@@ -1,6 +1,7 @@
 // lib/ui/widgets/outline_editor.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart';
 import '../theme.dart';
 
 class OutlineNode {
@@ -24,11 +25,13 @@ class OutlineNode {
 class OutlineEditor extends StatefulWidget {
   final String initialContent;
   final Function(String) onChanged;
+  final Function(String)? onWikiLinkTap;
 
   const OutlineEditor({
     super.key,
     required this.initialContent,
     required this.onChanged,
+    this.onWikiLinkTap,
   });
 
   @override
@@ -38,6 +41,7 @@ class OutlineEditor extends StatefulWidget {
 class _OutlineEditorState extends State<OutlineEditor> {
   late List<OutlineItem> _items;
   int? _focusIndex; // For focus mode
+  int? _editingIndex; // The currently focused textfield
 
   @override
   void initState() {
@@ -156,6 +160,10 @@ class _OutlineEditorState extends State<OutlineEditor> {
   }
 
   Widget _buildItem(int index, OutlineItem item) {
+    final isEditingItem = _editingIndex == index;
+    final wikiRegex = RegExp(r'\[\[([^\]]+)\]\]');
+    final hasWikiLink = wikiRegex.hasMatch(item.text);
+
     return Container(
       key: ValueKey(item.id),
       padding: EdgeInsets.only(left: item.level * 20.0 + 8, right: 8),
@@ -187,39 +195,62 @@ class _OutlineEditorState extends State<OutlineEditor> {
             ),
           ),
           Expanded(
-            child: KeyboardListener(
-              focusNode: FocusNode(),
-              onKeyEvent: (event) => _handleKeyEvent(event, index, item),
-              child: TextField(
-                onChanged: (v) {
-                  item.text = v;
-                  _updateContent();
-                },
-                controller: TextEditingController(text: item.text)
-                  ..selection = TextSelection.fromPosition(
-                    TextPosition(offset: item.text.length),
+            child: (!isEditingItem && hasWikiLink)
+                ? InkWell(
+                    onTap: () => setState(() => _editingIndex = index),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: _buildWikiText(item.text, item),
+                    ),
+                  )
+                : KeyboardListener(
+                    focusNode: FocusNode(),
+                    onKeyEvent: (event) => _handleKeyEvent(event, index, item),
+                    child: Focus(
+                      onFocusChange: (hasFocus) {
+                        if (hasFocus) {
+                          setState(() => _editingIndex = index);
+                        } else if (_editingIndex == index) {
+                          setState(() => _editingIndex = null);
+                        }
+                      },
+                      child: TextField(
+                        onChanged: (v) {
+                          item.text = v;
+                          _updateContent();
+                        },
+                        controller: TextEditingController(text: item.text)
+                          ..selection = TextSelection.fromPosition(
+                            TextPosition(offset: item.text.length),
+                          ),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: item.level == 0
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                          color: item.isCompleted
+                              ? AppTheme.textMutedColor(context)
+                              : AppTheme.textPrimaryColor(context),
+                          decoration: item.isCompleted
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                        onSubmitted: (_) => _addItemAfter(index),
+                      ),
+                    ),
                   ),
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
-                ),
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: item.level == 0
-                      ? FontWeight.w600
-                      : FontWeight.w400,
-                  color: item.isCompleted
-                      ? AppTheme.textMutedColor(context)
-                      : AppTheme.textPrimaryColor(context),
-                  decoration: item.isCompleted
-                      ? TextDecoration.lineThrough
-                      : null,
-                ),
-                onSubmitted: (_) => _addItemAfter(index),
-              ),
-            ),
           ),
+          if (isEditingItem)
+            IconButton(
+              icon: const Icon(Icons.link_rounded, size: 16),
+              onPressed: () => _insertWikiLink(index),
+              tooltip: 'Inserir Link',
+            ),
           if (_focusIndex == null)
             IconButton(
               icon: Icon(
@@ -285,7 +316,96 @@ class _OutlineEditorState extends State<OutlineEditor> {
     });
     _updateContent();
   }
+
+  Widget _buildWikiText(String text, OutlineItem item) {
+    final spans = <InlineSpan>[];
+    int lastEnd = 0;
+    for (final match in RegExp(r'\[\[([^\]]+)\]\]').allMatches(text)) {
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(text: text.substring(lastEnd, match.start)));
+      }
+      final slug = match.group(1)!;
+      spans.add(TextSpan(
+        text: slug,
+        style: const TextStyle(
+            color: AppColors.info, decoration: TextDecoration.underline),
+        // We use tap recognizer directly on TextSpan
+      ));
+      lastEnd = match.end;
+    }
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(text: text.substring(lastEnd)));
+    }
+    
+    // Convert tap gesture to inline spans
+    final tapSpans = spans.map((span) {
+      if (span is TextSpan && span.style?.color == AppColors.info) {
+        return TextSpan(
+          text: span.text,
+          style: span.style,
+          recognizer: _TapGestureRecognizer()
+            ..onTap = () {
+              if (widget.onWikiLinkTap != null) {
+                widget.onWikiLinkTap!(span.text!);
+              }
+            },
+        );
+      }
+      return span;
+    }).toList();
+
+    return RichText(
+      text: TextSpan(
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: item.level == 0 ? FontWeight.w600 : FontWeight.w400,
+          color: item.isCompleted
+              ? AppTheme.textMutedColor(context)
+              : AppTheme.textPrimaryColor(context),
+          decoration: item.isCompleted ? TextDecoration.lineThrough : null,
+        ),
+        children: tapSpans,
+      ),
+    );
+  }
+
+  Future<void> _insertWikiLink(int index) async {
+    // Basic stub, real implementation uses UniversalSearchPickerSheet
+    // We will just show a text dialog to get slug for now, or use UniversalSearchPickerSheet if available.
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        String slug = '';
+        return AlertDialog(
+          title: const Text('Inserir Link'),
+          content: TextField(
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Slug do objeto'),
+            onChanged: (v) => slug = v,
+            onSubmitted: (v) => Navigator.pop(ctx, v),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, slug),
+              child: const Text('Inserir'),
+            ),
+          ],
+        );
+      },
+    );
+    if (selected == null || selected.isEmpty) return;
+    setState(() {
+      _items[index].text += ' [[$selected]]';
+    });
+    _updateContent();
+  }
 }
+
+class _TapGestureRecognizer extends TapGestureRecognizer {}
 
 class OutlineItem {
   String id;

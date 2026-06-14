@@ -8,6 +8,7 @@ import '../services/markdown_parser.dart';
 import '../models/shared_types.dart';
 import '../models/content_object.dart';
 import '../models/task_model.dart';
+import '../models/shopping_item.dart';
 import '../models/journal_entry.dart';
 import '../models/habit_model.dart';
 import '../models/organizer_model.dart' as organizer_model;
@@ -25,6 +26,7 @@ import '../models/system_model.dart';
 import '../models/scheduler.dart';
 import '../models/day_theme_model.dart';
 import '../models/template_model.dart';
+import '../models/idea_model.dart';
 import '../models/inbox_model.dart';
 import '../models/event_model.dart';
 
@@ -231,6 +233,35 @@ class TasksNotifier extends Notifier<List<Task>> {
 
 final tasksProvider = NotifierProvider<TasksNotifier, List<Task>>(() {
   return TasksNotifier();
+});
+
+class ShoppingItemsNotifier extends Notifier<List<ShoppingItem>> {
+  @override
+  List<ShoppingItem> build() {
+    return ref.watch(objectsByTypeProvider('shopping_item')).cast<ShoppingItem>();
+  }
+
+  Future<void> addShoppingItem(ShoppingItem item) async {
+    state = [...state, item];
+    await ref.read(vaultProvider.notifier).createObject(item);
+  }
+
+  Future<void> updateShoppingItem(ShoppingItem item) async {
+    state = [
+      for (final t in state)
+        if (t.id == item.id) item else t,
+    ];
+    await ref.read(vaultProvider.notifier).updateObject(item);
+  }
+
+  Future<void> deleteShoppingItem(ShoppingItem item) async {
+    state = state.where((t) => t.id != item.id).toList();
+    await ref.read(vaultProvider.notifier).deleteObject(item);
+  }
+}
+
+final shoppingItemsProvider = NotifierProvider<ShoppingItemsNotifier, List<ShoppingItem>>(() {
+  return ShoppingItemsNotifier();
 });
 
 class HabitsNotifier extends Notifier<List<Habit>> {
@@ -1349,6 +1380,9 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
               if (type == 'task') {
                 obj = Task.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
+              } else if (type == 'shopping_item') {
+                obj = ShoppingItem.fromMarkdown(frontmatter, body)
+                  ..obsidianPath = relativePath;
               } else if (type == 'habit') {
                 obj = Habit.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
@@ -1391,6 +1425,8 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
               } else if (type == 'note') {
                 obj = Note.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
+              } else if (type == 'idea') {
+                obj = IdeaDefinition.fromMarkdown(frontmatter, body, relativePath);
               } else if (type == 'tracker_definition') {
                 obj = TrackerDefinition.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
@@ -2005,6 +2041,7 @@ class VaultNotifier extends Notifier<void> {
       'habit' => 'habits',
       'goal' => 'goals',
       'note' => 'notes',
+      'idea' => 'ideas',
       'resource' => 'resources',
       'social_post' => 'social',
       'person' => 'organizers/people',

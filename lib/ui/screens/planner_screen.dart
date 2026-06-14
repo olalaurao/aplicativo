@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/task_model.dart';
+import '../../models/saved_filter.dart';
+import 'matrix_screen.dart';
 import '../../models/habit_model.dart';
 import '../../services/undo_service.dart';
 import '../theme.dart';
@@ -254,6 +256,20 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             floating: true,
             pinned: true,
             actions: [
+              IconButton(
+                icon: const Icon(Icons.grid_4x4_rounded, color: AppColors.primary),
+                tooltip: 'Eisenhower Matrix',
+                onPressed: () => Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => MatrixScreen(
+                    filter: SavedFilter(
+                      id: 'eisenhower',
+                      name: 'Eisenhower',
+                      targetType: 'task',
+                      matrixConfig: MatrixConfig.eisenhower,
+                    ),
+                  ),
+                )),
+              ),
               IconButton(
                 icon: const Icon(Icons.inbox_rounded, color: AppColors.primary),
                 tooltip: 'Backlog / Sem data',

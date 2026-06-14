@@ -13,6 +13,7 @@ import 'inbox_screen.dart';
 import '../forms/create_task_form.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../../models/organizer_model.dart';
+import '../../models/social_post.dart';
 
 class SearchAction {
   final String label;
@@ -47,6 +48,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     'Study Flutter',
   ];
   String? _selectedType;
+  String? _socialPlatformFilter;
+  String? _socialCreatorFilter;
 
   final Map<String, String> _typeLabels = {
     'task': 'Tasks',
@@ -119,11 +122,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void _onSearchChanged(String query, List<ContentObject> allObjects) {
     final normalized = query.toLowerCase().trim();
     setState(() {
-      _results = _searchService.search(
+      var results = _searchService.search(
         allObjects,
         query,
         typeFilter: _selectedType,
       );
+
+      if (_selectedType == 'social_post') {
+        results = results.whereType<SocialPost>().where((post) {
+          if (_socialPlatformFilter != null && post.platform.name != _socialPlatformFilter) {
+            return false;
+          }
+          if (_socialCreatorFilter != null && post.authorHandle != _socialCreatorFilter && post.authorName != _socialCreatorFilter) {
+            return false;
+          }
+          return true;
+        }).toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      }
+
+      _results = results;
       _actionResults = _getAllActions()
           .where((a) => a.label.toLowerCase().contains(normalized))
           .toList();
@@ -237,42 +255,85 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
         ),
       ),
-      body: (_results.isEmpty && _actionResults.isEmpty)
-          ? (_searchController.text.isEmpty
-                ? _buildSearchHome()
-                : _buildEmptyState())
-          : ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                if (_actionResults.isNotEmpty) ...[
-                  const Text(
-                    'ACTIONS',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textMuted,
-                      letterSpacing: 1,
+      body: Column(
+        children: [
+          if (_selectedType == 'social_post')
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  const Text('Platform: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  const SizedBox(width: 8),
+                  ...['X', 'LinkedIn', 'Threads', 'Instagram', 'YouTube', 'TikTok'].map(
+                    (p) => Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        label: Text(p),
+                        selected: _socialPlatformFilter == p.toLowerCase(),
+                        onSelected: (val) {
+                          setState(() => _socialPlatformFilter = val ? p.toLowerCase() : null);
+                          allObjectsAsync.whenData((objects) => _onSearchChanged(_searchController.text, objects));
+                        },
+                        labelStyle: const TextStyle(fontSize: 12),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  ..._actionResults.map((a) => _buildActionTile(context, a)),
-                  const SizedBox(height: 24),
-                ],
-                if (_results.isNotEmpty) ...[
-                  const Text(
-                    'RESULTADOS',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textMuted,
-                      letterSpacing: 1,
-                    ),
+                  const SizedBox(width: 16),
+                  const Text('Creator: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  const SizedBox(width: 8),
+                  FilterChip(
+                    label: const Text('My Posts'),
+                    selected: _socialCreatorFilter == 'me',
+                    onSelected: (val) {
+                      setState(() => _socialCreatorFilter = val ? 'me' : null);
+                      allObjectsAsync.whenData((objects) => _onSearchChanged(_searchController.text, objects));
+                    },
+                    labelStyle: const TextStyle(fontSize: 12),
                   ),
-                  const SizedBox(height: 12),
-                  ..._results.map((obj) => _buildResultTile(context, obj)),
                 ],
-              ],
+              ),
             ),
+          Expanded(
+            child: (_results.isEmpty && _actionResults.isEmpty)
+                ? (_searchController.text.isEmpty
+                      ? _buildSearchHome()
+                      : _buildEmptyState())
+                : ListView(
+                    padding: const EdgeInsets.all(20),
+                    children: [
+                      if (_actionResults.isNotEmpty) ...[
+                        const Text(
+                          'ACTIONS',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textMuted,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ..._actionResults.map((a) => _buildActionTile(context, a)),
+                        const SizedBox(height: 24),
+                      ],
+                      if (_results.isNotEmpty) ...[
+                        const Text(
+                          'RESULTADOS',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textMuted,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ..._results.map((obj) => _buildResultTile(context, obj)),
+                      ],
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

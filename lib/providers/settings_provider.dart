@@ -66,6 +66,10 @@ class AppSettings {
   final String tiktokResolverEndpoint;
   final String tiktokResolverApiKey;
   final Map<String, String> folderPaths;
+  // ── Idea capture settings ──
+  final String ideaStrategy;   // 'tag' | 'folder' | 'any_note'
+  final String ideaTag;        // default: 'idea'
+  final String ideaFolder;     // default: 'notes/ideas'
 
   AppSettings({
     required this.vaultName,
@@ -103,7 +107,7 @@ class AppSettings {
     this.tiktokResolverEndpoint = '',
     this.tiktokResolverApiKey = '',
     this.folderPaths = const {},
-    this.quickAddWidgetButton1Label = 'DiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡rio',
+    this.quickAddWidgetButton1Label = 'Diário',
     this.quickAddWidgetButton1Target = 'journal',
     this.quickAddWidgetButton2Label = 'Tarefa',
     this.quickAddWidgetButton2Target = 'task',
@@ -113,6 +117,9 @@ class AppSettings {
     this.calendarWidgetShowSessions = true,
     this.habitWidgetFilterType = 'all',
     this.habitWidgetOrganizer = '',
+    this.ideaStrategy = 'tag',
+    this.ideaTag = 'idea',
+    this.ideaFolder = 'notes/ideas',
   });
 
   final String universalWidgetType;
@@ -179,6 +186,9 @@ class AppSettings {
     bool? calendarWidgetShowSessions,
     String? habitWidgetFilterType,
     String? habitWidgetOrganizer,
+    String? ideaStrategy,
+    String? ideaTag,
+    String? ideaFolder,
   }) {
     return AppSettings(
       vaultName: vaultName ?? this.vaultName,
@@ -239,6 +249,9 @@ class AppSettings {
       habitWidgetFilterType:
           habitWidgetFilterType ?? this.habitWidgetFilterType,
       habitWidgetOrganizer: habitWidgetOrganizer ?? this.habitWidgetOrganizer,
+      ideaStrategy: ideaStrategy ?? this.ideaStrategy,
+      ideaTag: ideaTag ?? this.ideaTag,
+      ideaFolder: ideaFolder ?? this.ideaFolder,
     );
   }
 }
@@ -314,7 +327,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       sleepInUntil: prefs.getString('sleepInUntil') ?? '10:00',
       sleepInDate: prefs.getString('sleepInDate') ?? '',
       reviewDailyTemplateId: prefs.getString('reviewDailyTemplateId') ?? '',
-    accentColor: prefs.getString('accentColor') ?? '#F97316',
+      accentColor: prefs.getString('accentColor') ?? '#F97316',
       nlpTaskParsingEnabled: prefs.getBool('nlpTaskParsingEnabled') ?? true,
       dailyNoteIdentifier:
           prefs.getString('dailyNoteIdentifier') ?? 'filename_format',
@@ -326,7 +339,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       tiktokResolverApiKey: prefs.getString('tiktokResolverApiKey') ?? '',
       folderPaths: folderPaths,
       quickAddWidgetButton1Label:
-          prefs.getString('quickAddWidgetButton1Label') ?? 'DiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡rio',
+          prefs.getString('quickAddWidgetButton1Label') ?? 'Diário',
       quickAddWidgetButton1Target:
           prefs.getString('quickAddWidgetButton1Target') ?? 'journal',
       quickAddWidgetButton2Label:
@@ -341,15 +354,28 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
           prefs.getBool('calendarWidgetShowSessions') ?? true,
       habitWidgetFilterType: prefs.getString('habitWidgetFilterType') ?? 'all',
       habitWidgetOrganizer: prefs.getString('habitWidgetOrganizer') ?? '',
+      ideaStrategy: prefs.getString('ideaStrategy') ?? 'tag',
+      ideaTag: prefs.getString('ideaTag') ?? 'idea',
+      ideaFolder: prefs.getString('ideaFolder') ?? 'notes/ideas',
     );
   }
 
   static Map<String, TypeSignature> _defaultSignatures() {
     return {
+      'shopping_item': TypeSignature(
+        objectType: 'shopping_item',
+        markerType: MarkerType.folder,
+        markerValue: 'shopping',
+      ),
       'task': TypeSignature(
         objectType: 'task',
         markerType: MarkerType.property,
         markerValue: 'type: task',
+      ),
+      'idea': TypeSignature(
+        objectType: 'idea',
+        markerType: MarkerType.tag,
+        markerValue: 'ideia',
       ),
       'habit': TypeSignature(
         objectType: 'habit',
@@ -749,6 +775,22 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('folderPaths', json.encode(next));
     state = state.copyWith(folderPaths: next);
+  }
+
+  Future<void> setIdeaStrategy({
+    required String strategy,
+    String? tag,
+    String? folder,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('ideaStrategy', strategy);
+    if (tag != null) await prefs.setString('ideaTag', tag);
+    if (folder != null) await prefs.setString('ideaFolder', folder);
+    state = state.copyWith(
+      ideaStrategy: strategy,
+      ideaTag: tag ?? state.ideaTag,
+      ideaFolder: folder ?? state.ideaFolder,
+    );
   }
 }
 

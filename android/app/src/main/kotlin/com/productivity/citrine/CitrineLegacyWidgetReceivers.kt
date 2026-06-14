@@ -1,4 +1,6 @@
 package com.productivity.citrine
 
-class CitrineFilterWidgetReceiver : CitrineFilterWidgetProvider()
+import android.appwidget.AppWidgetProvider
+
+class CitrineFilterWidgetReceiver : AppWidgetProvider()
 class CitrinePomodoroWidgetReceiver : CitrinePomodoroWidgetProvider()

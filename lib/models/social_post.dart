@@ -2,6 +2,7 @@
 import 'content_object.dart';
 import 'reminder_config.dart';
 import 'shared_types.dart';
+import 'place_ref.dart';
 
 enum SocialPlatform {
   tiktok,
@@ -32,6 +33,7 @@ class SocialPost extends ContentObject {
   String? personalNote;
   bool watched;
   List<String> socialRefs;
+  List<PlaceRef> places;
 
   SocialPost({
     super.id,
@@ -61,8 +63,10 @@ class SocialPost extends ContentObject {
     super.pinned,
     super.order,
     super.reminders,
+    List<PlaceRef>? places,
   }) : mediaUrls = mediaUrls ?? [],
-       socialRefs = socialRefs ?? [];
+       socialRefs = socialRefs ?? [],
+       places = places ?? [];
 
   @override
   String get type => 'social_post';
@@ -134,6 +138,9 @@ class SocialPost extends ContentObject {
     }
     frontmatter['watched'] = watched;
     frontmatter['social_refs'] = socialRefs;
+    if (places.isNotEmpty) {
+      frontmatter['places'] = places.map((p) => p.toMap()).toList();
+    }
 
     final buffer = StringBuffer();
     if (_hasText(caption)) {
@@ -207,6 +214,13 @@ class SocialPost extends ContentObject {
       _stringValue(frontmatter['posted_at']) ?? '',
     );
     post.socialRefs = _stringList(frontmatter['social_refs']);
+    
+    if (frontmatter['places'] is List) {
+      post.places = (frontmatter['places'] as List)
+          .map((p) => PlaceRef.fromMap(p as Map<String, dynamic>))
+          .toList();
+    }
+
     post.personalNote = _personalNoteFromBody(body, post.caption);
     return post;
   }
@@ -228,6 +242,7 @@ class SocialPost extends ContentObject {
     String? personalNote,
     bool? watched,
     List<String>? socialRefs,
+    List<PlaceRef>? places,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     List<String>? tags,
@@ -257,6 +272,7 @@ class SocialPost extends ContentObject {
       personalNote: personalNote ?? this.personalNote,
       watched: watched ?? this.watched,
       socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
+      places: places ?? List<PlaceRef>.from(this.places),
       organizers: organizers ?? List<OrganizerReference>.from(this.organizers),
       categories: categories ?? List<String>.from(this.categories),
       tags: tags ?? List<String>.from(this.tags),

@@ -139,6 +139,11 @@ class Habit extends ContentObject {
   PactOutcome? pactOutcome;
   List<PactCycle> previousCycles;
 
+  // New fields
+  int? frequencyDays;
+  bool isFlexibleFrequency;
+  List<String> socialRefs;
+
   Scheduler? get scheduler => schedulers.isNotEmpty ? schedulers.first : null;
   set scheduler(Scheduler? s) {
     if (s == null) {
@@ -177,6 +182,9 @@ class Habit extends ContentObject {
     this.endsAt,
     this.pactOutcome,
     List<PactCycle>? previousCycles,
+    this.frequencyDays,
+    this.isFlexibleFrequency = false,
+    List<String>? socialRefs,
     super.organizers,
     super.categories,
     super.tags,
@@ -187,7 +195,8 @@ class Habit extends ContentObject {
        schedulers = schedulers ?? [],
        completionHistory = completionHistory ?? [],
        actions = actions ?? [],
-       previousCycles = previousCycles ?? [];
+       previousCycles = previousCycles ?? [],
+       socialRefs = socialRefs ?? [];
 
   @override
   String get type => 'habit';
@@ -258,6 +267,9 @@ class Habit extends ContentObject {
     DateTime? endsAt,
     PactOutcome? pactOutcome,
     List<PactCycle>? previousCycles,
+    int? frequencyDays,
+    bool? isFlexibleFrequency,
+    List<String>? socialRefs,
   }) {
     final newHabit = Habit(
       id: id,
@@ -288,6 +300,9 @@ class Habit extends ContentObject {
       endsAt: endsAt ?? this.endsAt,
       pactOutcome: pactOutcome ?? this.pactOutcome,
       previousCycles: previousCycles ?? this.previousCycles,
+      frequencyDays: frequencyDays ?? this.frequencyDays,
+      isFlexibleFrequency: isFlexibleFrequency ?? this.isFlexibleFrequency,
+      socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
       organizers: organizers,
       categories: categories,
       tags: tags,
@@ -426,6 +441,12 @@ class Habit extends ContentObject {
       frontmatter['pact_outcome'] = null;
     }
     frontmatter['previous_cycles'] = previousCycles.map((c) => c.toMap()).toList();
+
+    if (frequencyDays != null) frontmatter['frequency_days'] = frequencyDays;
+    if (isFlexibleFrequency) frontmatter['flexible_frequency'] = true;
+    if (socialRefs.isNotEmpty) {
+      frontmatter['social_refs'] = socialRefs;
+    }
 
     // Yesplification for the body: a log of completions
     final buffer = StringBuffer();
@@ -572,6 +593,16 @@ class Habit extends ContentObject {
         }
         return null;
       }).whereType<PactCycle>().toList();
+    }
+
+    if (frontmatter['frequency_days'] != null) {
+      habit.frequencyDays = int.tryParse(frontmatter['frequency_days'].toString());
+    }
+    habit.isFlexibleFrequency = frontmatter['flexible_frequency'] == true;
+    if (frontmatter['social_refs'] != null) {
+      habit.socialRefs = (frontmatter['social_refs'] as Iterable)
+          .map((e) => e.toString())
+          .toList();
     }
 
     // Parse history

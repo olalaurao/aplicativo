@@ -59,13 +59,19 @@ class DashboardNotifier extends AsyncNotifier<List<DashboardBlock>> {
     DashboardBlock(
       id: 'home-universal',
       type: BlockType.universal,
-      title: 'Widget Inicial',
+      title: 'Hoje',
       order: 3,
       metadata: {
         'sourceBlockType': 'plannerDay',
         'size': 'large',
         'objectTypes': ['task', 'goal'],
       },
+    ),
+    DashboardBlock(
+      id: 'home-shopping',
+      type: BlockType.shoppingList,
+      title: 'Lista de Mercado',
+      order: 4,
     ),
   ];
 

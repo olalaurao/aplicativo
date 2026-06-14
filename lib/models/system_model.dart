@@ -1,5 +1,6 @@
 import 'content_object.dart';
 import 'package:uuid/uuid.dart';
+import 'scheduler.dart';
 
 class SystemStep {
   final String id;
@@ -48,6 +49,7 @@ class SystemDefinition extends ContentObject {
   int averageMinutes;
   List<SystemStep> steps;
   String description;
+  Scheduler? scheduler;
 
   SystemDefinition({
     super.id,
@@ -59,6 +61,7 @@ class SystemDefinition extends ContentObject {
     this.averageMinutes = 0,
     this.steps = const [],
     this.description = '',
+    this.scheduler,
     super.createdAt,
     super.updatedAt,
     super.archived,
@@ -80,6 +83,9 @@ class SystemDefinition extends ContentObject {
     }
     map['average_minutes'] = averageMinutes;
     map['steps'] = steps.map((s) => s.toMap()).toList();
+    if (scheduler != null) {
+      map['scheduler'] = scheduler!.toMap();
+    }
 
     return generateMarkdown(map, description);
   }
@@ -99,6 +105,10 @@ class SystemDefinition extends ContentObject {
       description: body.trim(),
       obsidianPath: filePath,
     );
+
+    if (frontmatter['scheduler'] != null && frontmatter['scheduler'] is Map) {
+      system.scheduler = Scheduler.fromMap(Map<String, dynamic>.from(frontmatter['scheduler'] as Map));
+    }
 
     system.loadBaseMap(frontmatter);
 
@@ -121,6 +131,7 @@ class SystemDefinition extends ContentObject {
     int? averageMinutes,
     List<SystemStep>? steps,
     String? description,
+    Scheduler? scheduler,
     bool? archived,
     bool? pinned,
   }) {
@@ -134,6 +145,7 @@ class SystemDefinition extends ContentObject {
       averageMinutes: averageMinutes ?? this.averageMinutes,
       steps: steps ?? this.steps,
       description: description ?? this.description,
+      scheduler: scheduler ?? this.scheduler,
       createdAt: createdAt,
       updatedAt: updatedAt,
       archived: archived ?? this.archived,

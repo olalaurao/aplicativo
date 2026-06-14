@@ -272,18 +272,7 @@ class _CollectionEditorState extends State<CollectionEditor> {
               cells: [
                 ..._schema.map(
                   (p) => DataCell(
-                    TextField(
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                      ),
-                      onChanged: (v) {
-                        item[p.id] = v;
-                        _save();
-                      },
-                      controller: TextEditingController(
-                        text: item[p.id]?.toString() ?? '',
-                      ),
-                    ),
+                    _buildCellEditor(p, item),
                   ),
                 ),
                 DataCell(
@@ -336,5 +325,54 @@ class _CollectionEditorState extends State<CollectionEditor> {
       _items.add(newItem);
     });
     _save();
+  }
+
+  Widget _buildCellEditor(PropertyDefinition p, Map<String, dynamic> item) {
+    if (p.type == PropertyType.checkbox) {
+      final value = item[p.id] == true || item[p.id] == 'true';
+      return Checkbox(
+        value: value,
+        activeColor: AppColors.primary,
+        onChanged: (v) {
+          setState(() {
+            item[p.id] = v;
+          });
+          _save();
+        },
+      );
+    } else if (p.type == PropertyType.rating) {
+      final value = int.tryParse(item[p.id]?.toString() ?? '0') ?? 0;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(5, (index) {
+          return InkWell(
+            onTap: () {
+              setState(() {
+                item[p.id] = index + 1;
+              });
+              _save();
+            },
+            child: Icon(
+              index < value ? Icons.star_rounded : Icons.star_border_rounded,
+              color: AppColors.warning,
+              size: 20,
+            ),
+          );
+        }),
+      );
+    } else {
+      return TextField(
+        decoration: const InputDecoration(
+          border: InputBorder.none,
+        ),
+        onChanged: (v) {
+          item[p.id] = v;
+          _save();
+        },
+        controller: TextEditingController(
+          text: item[p.id]?.toString() ?? '',
+        )..selection = TextSelection.collapsed(offset: (item[p.id]?.toString() ?? '').length),
+      );
+    }
   }
 }

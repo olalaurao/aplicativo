@@ -727,6 +727,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       const Divider(height: 1, indent: 16),
                       _buildDailyReviewTemplateTile(),
+                      const Divider(height: 1, indent: 16),
+                      ListTile(
+                        title: const Text(
+                          'Ideias',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Configurar estratégia de captura',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => _showIdeaSettingsDialog(context, settings, notifier),
+                      ),
                     ],
                   ),
                 ),
@@ -1602,6 +1618,89 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ).whenComplete(() {
       endpointController.dispose();
       apiKeyController.dispose();
+    });
+  }
+
+  void _showIdeaSettingsDialog(
+    BuildContext context,
+    AppSettings settings,
+    SettingsNotifier notifier,
+  ) {
+    String currentStrategy = settings.ideaStrategy;
+    final tagController = TextEditingController(text: settings.ideaTag);
+    final folderController = TextEditingController(text: settings.ideaFolder);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Configuração de Ideias'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Como o sistema deve reconhecer uma ideia?'),
+                const SizedBox(height: 12),
+                RadioListTile<String>(
+                  title: const Text('Por Tag'),
+                  value: 'tag',
+                  groupValue: currentStrategy,
+                  onChanged: (v) => setDialogState(() => currentStrategy = v!),
+                ),
+                if (currentStrategy == 'tag')
+                  Padding(
+                    padding: const EdgeInsets.only(left: 32, right: 16, bottom: 8),
+                    child: TextField(
+                      controller: tagController,
+                      decoration: const InputDecoration(labelText: 'Tag (sem #)'),
+                    ),
+                  ),
+                RadioListTile<String>(
+                  title: const Text('Por Pasta'),
+                  value: 'folder',
+                  groupValue: currentStrategy,
+                  onChanged: (v) => setDialogState(() => currentStrategy = v!),
+                ),
+                if (currentStrategy == 'folder')
+                  Padding(
+                    padding: const EdgeInsets.only(left: 32, right: 16, bottom: 8),
+                    child: TextField(
+                      controller: folderController,
+                      decoration: const InputDecoration(labelText: 'Caminho da Pasta'),
+                    ),
+                  ),
+                RadioListTile<String>(
+                  title: const Text('Toda Nota'),
+                  value: 'any_note',
+                  groupValue: currentStrategy,
+                  onChanged: (v) => setDialogState(() => currentStrategy = v!),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('CANCELAR'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await notifier.setIdeaStrategy(
+                  strategy: currentStrategy,
+                  tag: tagController.text.trim(),
+                  folder: folderController.text.trim(),
+                );
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              child: const Text('SALVAR'),
+            ),
+          ],
+        ),
+      ),
+    ).whenComplete(() {
+      tagController.dispose();
+      folderController.dispose();
     });
   }
 

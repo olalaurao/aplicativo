@@ -78,6 +78,7 @@ class ObsidianService {
         '```dataview\n'
         'TABLE day_theme FROM "daily" SORT file.name DESC\n'
         '```\n',
+        encoding: utf8,
       );
     }
   }

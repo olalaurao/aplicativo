@@ -15,6 +15,7 @@ class Resource extends ContentObject {
   int? pages;
   String? category;
   DateTime? readDate;
+  List<String> socialRefs;
 
   Resource({
     super.id,
@@ -29,13 +30,14 @@ class Resource extends ContentObject {
     this.pages,
     this.category,
     this.readDate,
+    List<String>? socialRefs,
     super.organizers,
     super.categories,
     super.createdAt,
     super.updatedAt,
     super.order,
     super.obsidianPath,
-  });
+  }) : socialRefs = socialRefs ?? [];
 
   @override
   String get type => 'resource';
@@ -53,6 +55,9 @@ class Resource extends ContentObject {
     if (category != null) frontmatter['category'] = category;
     if (readDate != null) {
       frontmatter['read'] = readDate!.toIso8601String().split('T')[0];
+    }
+    if (socialRefs.isNotEmpty) {
+      frontmatter['social_refs'] = socialRefs;
     }
 
     return generateMarkdown(frontmatter, synopsis ?? '');
@@ -83,6 +88,11 @@ class Resource extends ContentObject {
     if (frontmatter['read'] != null) {
       resource.readDate = DateTime.tryParse(frontmatter['read'].toString());
     }
+    if (frontmatter['social_refs'] != null) {
+      resource.socialRefs = (frontmatter['social_refs'] as List)
+          .map((e) => e.toString())
+          .toList();
+    }
     resource.synopsis = body;
 
     return resource;
@@ -100,6 +110,7 @@ class Resource extends ContentObject {
     int? pages,
     String? category,
     DateTime? readDate,
+    List<String>? socialRefs,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     DateTime? createdAt,
@@ -120,6 +131,7 @@ class Resource extends ContentObject {
       pages: pages ?? this.pages,
       category: category ?? this.category,
       readDate: readDate ?? this.readDate,
+      socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       createdAt: createdAt ?? this.createdAt,

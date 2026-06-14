@@ -1,3 +1,5 @@
 package com.productivity.citrine
 
-class CitrineTasksWidgetReceiver : CitrineFilterWidgetProvider()
+import android.appwidget.AppWidgetProvider
+
+class CitrineTasksWidgetReceiver : AppWidgetProvider()

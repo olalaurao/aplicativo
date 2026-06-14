@@ -260,11 +260,7 @@ class _GoalCard extends ConsumerWidget {
                 child: LinearProgressIndicator(
                   value: progress,
                   backgroundColor: AppColors.surfaceVariant,
-                  valueColor: AlwaysStoppedAnimation(
-                    goal.color != null
-                        ? Color(int.parse(goal.color!.replaceAll('#', '0xFF')))
-                        : AppColors.primary,
-                  ),
+                  valueColor: AlwaysStoppedAnimation(_goalColor(goal.color)),
                   minHeight: 6,
                 ),
               ),
@@ -290,11 +286,15 @@ class _GoalCard extends ConsumerWidget {
                 color: AppColors.textMuted,
               ),
               const SizedBox(width: 4),
-              Text(
-                'Deadline: ${DateFormat('d MMM yyyy').format(deadline)}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textMuted,
+              Flexible(
+                child: Text(
+                  'Deadline: ${DateFormat('d MMM yyyy').format(deadline)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textMuted,
+                  ),
                 ),
               ),
               if (deadline.isBefore(DateTime.now())) ...[

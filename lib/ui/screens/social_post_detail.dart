@@ -9,9 +9,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/content_object.dart';
 import '../../models/social_post.dart';
+import '../../models/place_ref.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/vault_provider.dart';
 import '../forms/create_social_post_form.dart';
+import '../forms/create_resource_form.dart';
 import '../theme.dart';
 import '../widgets/organizer_picker_modal.dart';
 import '../widgets/organizer_selector_field.dart';
@@ -19,6 +21,8 @@ import '../widgets/social_embed_view.dart';
 import '../widgets/social_post_grid_card.dart';
 import '../widgets/universal_search_picker.dart';
 import 'universal_detail_view.dart';
+import '../widgets/linked_objects_section.dart';
+import '../utils/social_ref_utils.dart';
 
 class SocialPostDetail extends ConsumerStatefulWidget {
   final SocialPost post;
@@ -119,7 +123,10 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
                   const SizedBox(height: 12),
                   _buildOrganizerSection(post),
                   const SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   _buildLinkedObjectsSection(post),
+                  const SizedBox(height: 12),
+                  _buildPlacesSection(post),
                   const SizedBox(height: 12),
                   _buildTagsSection(post),
                   backlinks.when(
@@ -256,71 +263,150 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
   }
 
   Widget _buildLinkedObjectsSection(SocialPost post) {
-    final objects = ref.watch(allObjectsProvider).valueOrNull ?? [];
-    final linked = _resolveSocialRefs(objects, post.socialRefs);
-    final grouped = <String, List<ContentObject>>{};
-    for (final object in linked) {
-      grouped.putIfAbsent(object.displayType, () => []).add(object);
-    }
-
-    return _section(
-      title: 'Objetos vinculados',
-      trailing: TextButton.icon(
-        onPressed: () => _pickLinkedObject(post),
-        icon: const Icon(Icons.add_link_rounded, size: 18),
-        label: const Text('Vincular'),
+    return Container(
+      decoration: AppTheme.cardDecoration(context),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LinkedObjectsSection(
+            owner: post,
+            socialRefs: getSocialRefs(post),
+            onAdd: (selected) => addSocialRef(post, selected, ref),
+            onRemove: (slug) => removeSocialRef(post, slug, ref),
+            addButtonLabel: 'Vincular',
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _quickCreateResource(post),
+              icon: const Icon(Icons.add_circle_outline_rounded),
+              label: const Text('Criar Livro/Recurso e Vincular'),
+            ),
+          ),
+        ],
       ),
-      child: linked.isEmpty
-          ? const Text(
-              'Nenhum objeto vinculado',
-              style: TextStyle(color: AppColors.textMuted),
-            )
+    );
+  }
+
+  Future<void> _quickCreateResource(SocialPost post) async {
+    final newResource = await Navigator.push<ContentObject>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CreateResourceForm(),
+      ),
+    );
+    if (newResource != null) {
+      await addSocialRef(post, newResource, ref);
+    }
+  }
+
+  Widget _buildPlacesSection(SocialPost post) {
+    return _section(
+      title: 'Lugares',
+      trailing: IconButton(
+        icon: const Icon(Icons.add_rounded),
+        onPressed: () => _addPlace(post),
+      ),
+      child: post.places.isEmpty
+          ? const Text('Nenhum lugar adicionado',
+              style: TextStyle(color: AppColors.textMuted))
           : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: grouped.entries.map((entry) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        entry.key,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: entry.value.map((object) {
-                          return InputChip(
-                            label: Text(
-                              object.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    UniversalDetailView(object: object),
+              children: post.places
+                  .map((place) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.place_rounded,
+                            color: AppColors.primary),
+                        title: Text(place.name,
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        subtitle: place.address != null
+                            ? Text(place.address!,
+                                maxLines: 1, overflow: TextOverflow.ellipsis)
+                            : null,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (place.lat != null && place.lng != null)
+                              IconButton(
+                                icon: const Icon(Icons.map_rounded),
+                                onPressed: () => _openInMaps(place),
                               ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline_rounded,
+                                  color: AppColors.error),
+                              onPressed: () => _removePlace(post, place.id),
                             ),
-                            onDeleted: () => _removeLinkedObject(post, object),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
+                          ],
+                        ),
+                      ))
+                  .toList(),
             ),
     );
+  }
+
+  Future<void> _addPlace(SocialPost post) async {
+    final nameController = TextEditingController();
+    final addressController = TextEditingController();
+
+    final added = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Adicionar Lugar'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Nome'),
+            ),
+            TextField(
+              controller: addressController,
+              decoration:
+                  const InputDecoration(labelText: 'Endereço (opcional)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Adicionar'),
+          ),
+        ],
+      ),
+    );
+
+    if (added == true && nameController.text.trim().isNotEmpty) {
+      final newPlace = PlaceRef(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: nameController.text.trim(),
+        address: addressController.text.trim().isEmpty
+            ? null
+            : addressController.text.trim(),
+      );
+      ref.read(socialPostsProvider.notifier).updatePost(
+            post.copyWith(places: [...post.places, newPlace]),
+          );
+    }
+  }
+
+  void _removePlace(SocialPost post, String placeId) {
+    ref.read(socialPostsProvider.notifier).updatePost(
+          post.copyWith(
+            places: post.places.where((p) => p.id != placeId).toList(),
+          ),
+        );
+  }
+
+  void _openInMaps(PlaceRef place) async {
+    if (place.lat == null || place.lng == null) return;
+    final uri = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}');
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Widget _buildTagsSection(SocialPost post) {
@@ -482,91 +568,7 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
         .updatePost(post.copyWith(tags: tags));
   }
 
-  Future<void> _pickLinkedObject(SocialPost post) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => UniversalSearchPickerSheet(
-        title: 'Vincular objeto',
-        showClear: false,
-        onSelected: (object) async {
-          Navigator.pop(sheetContext);
-          final refLink = _objectWikiLink(object);
-          final refs = <String>{...post.socialRefs, refLink}.toList();
-          await ref
-              .read(socialPostsProvider.notifier)
-              .updatePost(post.copyWith(socialRefs: refs));
-        },
-      ),
-    );
-  }
 
-  Future<void> _removeLinkedObject(
-    SocialPost post,
-    ContentObject object,
-  ) async {
-    final refs = post.socialRefs
-        .where((ref) => !_sameSocialRef(ref, object))
-        .toList();
-    await ref
-        .read(socialPostsProvider.notifier)
-        .updatePost(post.copyWith(socialRefs: refs));
-  }
-
-  List<ContentObject> _resolveSocialRefs(
-    List<ContentObject> objects,
-    List<String> refs,
-  ) {
-    return refs
-        .map((ref) => _resolveSocialRef(objects, ref))
-        .whereType<ContentObject>()
-        .toList();
-  }
-
-  ContentObject? _resolveSocialRef(List<ContentObject> objects, String ref) {
-    final key = _cleanWikiRef(ref).toLowerCase();
-    if (key.isEmpty) return null;
-    return objects.where((object) {
-      final keys = {
-        object.id,
-        object.slug,
-        object.title,
-        object.obsidianFileName,
-        if (object.obsidianPath.isNotEmpty)
-          object.obsidianPath.replaceAll(RegExp(r'\.md$'), ''),
-      }.map((value) => value.trim().toLowerCase()).toSet();
-      return keys.contains(key);
-    }).firstOrNull;
-  }
-
-  bool _sameSocialRef(String ref, ContentObject object) {
-    final key = _cleanWikiRef(ref).toLowerCase();
-    return key == object.id.toLowerCase() ||
-        key == object.slug.toLowerCase() ||
-        key == object.title.toLowerCase() ||
-        key == object.obsidianFileName.toLowerCase() ||
-        key ==
-            object.obsidianPath
-                .replaceAll(RegExp(r'\.md$'), '')
-                .trim()
-                .toLowerCase();
-  }
-
-  String _cleanWikiRef(String ref) {
-    var cleaned = ref.trim();
-    if (cleaned.startsWith('[[') && cleaned.endsWith(']]')) {
-      cleaned = cleaned.substring(2, cleaned.length - 2);
-    }
-    return cleaned.split('|').first.trim();
-  }
-
-  String _objectWikiLink(ContentObject object) {
-    final target = object.obsidianFileName.trim().isNotEmpty
-        ? object.obsidianFileName
-        : object.slug;
-    return '[[${target.isEmpty ? object.id : target}]]';
-  }
 
   Future<void> _showActionSheet(SocialPost post) async {
     await showModalBottomSheet<void>(

@@ -8,6 +8,8 @@ import '../../models/navigation_item.dart';
 import 'settings_screen.dart';
 import 'appearance_screen.dart';
 import 'category_management_screen.dart';
+import 'deleted_files_screen.dart';
+import 'shopping_list_screen.dart';
 import 'vault_files_screen.dart';
 import '../../providers/google_calendar_provider.dart';
 import '../widgets/navigation_shortcut_picker.dart';
@@ -161,6 +163,22 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                 ],
 
                 const SizedBox(height: 12),
+                _buildMenuRow(
+                  context,
+                  'Lista de Mercado',
+                  Icons.shopping_cart_outlined,
+                  AppColors.habitBlue,
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ShoppingListScreen(),
+                      ),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 8),
                 _buildMenuRow(
                   context,
                   'Vault Files',

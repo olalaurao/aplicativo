@@ -7,6 +7,8 @@ import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import '../widgets/organizer_selector_field.dart';
 import 'package:uuid/uuid.dart';
+import '../../models/scheduler.dart';
+import 'scheduler_picker.dart';
 
 class CreateSystemForm extends ConsumerStatefulWidget {
   final SystemDefinition? existingSystem;
@@ -23,6 +25,7 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
   int _estimatedMinutes = 0;
   List<SystemStep> _steps = [];
   List<OrganizerReference> _organizers = [];
+  Scheduler? _scheduler;
 
   @override
   void initState() {
@@ -34,6 +37,7 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
     _estimatedMinutes = existing?.estimatedMinutes ?? 0;
     _steps = existing != null ? List.from(existing.steps) : [];
     _organizers = existing != null ? List.from(existing.organizers) : [];
+    _scheduler = existing?.scheduler;
   }
 
   @override
@@ -154,6 +158,37 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
     }
   }
 
+  void _pickScheduler() async {
+    final result = await showModalBottomSheet<Scheduler>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      builder: (context) => SizedBox(
+        height: MediaQuery.of(context).size.height * 0.85,
+        child: SchedulerPicker(initialScheduler: _scheduler),
+      ),
+    );
+    if (result != null) setState(() => _scheduler = result);
+  }
+
+  String _getScheduleSummary(Scheduler s) {
+    if (s.rules.isEmpty) return 'Sem regras';
+    final r = s.rules.first;
+    switch (r.repeatType) {
+      case RepeatType.numberOfDays:
+        return 'A cada ${r.interval} dias';
+      case RepeatType.daysOfWeek:
+        return r.daysOfWeek?.join(', ') ?? 'Dias da semana';
+      case RepeatType.numberOfWeeks:
+        return 'A cada ${r.interval} semanas';
+      case RepeatType.numberOfMonths:
+        return 'A cada ${r.interval} meses';
+      default:
+        return 'Personalizado';
+    }
+  }
+
   Future<void> _save() async {
     if (!_hasTitle) return;
 
@@ -167,6 +202,7 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
       runCount: widget.existingSystem?.runCount ?? 0,
       lastRun: widget.existingSystem?.lastRun,
       averageMinutes: widget.existingSystem?.averageMinutes ?? 0,
+      scheduler: _scheduler,
       createdAt: widget.existingSystem?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
       obsidianPath: widget.existingSystem?.obsidianPath ?? '',
@@ -280,12 +316,12 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        // Trigger
+                        // Trigger manual / texto
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             const Text(
-                              'Trigger',
+                              'Gatilho manual',
                               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                             ),
                             const SizedBox(width: 16),
@@ -299,7 +335,7 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                                   fontWeight: FontWeight.w500,
                                 ),
                                 decoration: InputDecoration(
-                                  hintText: 'Ex: toda segunda-feira',
+                                  hintText: 'Ex: "Quando acordar"',
                                   hintStyle: TextStyle(
                                     fontSize: 13,
                                     color: AppTheme.textMutedColor(context),
@@ -312,6 +348,39 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                               ),
                             ),
                           ],
+                        ),
+                        const Divider(height: 12),
+                        // Automático / Scheduler
+                        GestureDetector(
+                          onTap: _pickScheduler,
+                          child: Row(
+                            children: [
+                              const Text(
+                                'Agendamento (Automático)',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                              ),
+                              const Spacer(),
+                              Text(
+                                _scheduler != null ? _getScheduleSummary(_scheduler!) : 'Nenhum',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: _scheduler != null ? AppColors.primary : AppColors.textMuted,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              if (_scheduler != null)
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.textMuted),
+                                  onPressed: () => setState(() => _scheduler = null),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                )
+                              else ...[
+                                const SizedBox(width: 4),
+                                const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
+                              ],
+                            ],
+                          ),
                         ),
                         const Divider(height: 24),
                         // Estimated duration

@@ -6,6 +6,8 @@ import '../widgets/create_menu_sheet.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../../providers/vault_provider.dart';
 import '../widgets/rich_text_editor.dart';
+import '../widgets/outline_editor.dart';
+import '../widgets/collection_editor.dart';
 import 'universal_detail_view.dart';
 
 class NotesScreen extends ConsumerStatefulWidget {
@@ -352,27 +354,24 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                   ),
                 ),
               ),
-              if (isExpanded && note.noteType == 'text')
+              if (isExpanded)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: Container(
-                    height: 200,
+                    height: note.noteType == 'text' ? 200 : null,
+                    constraints: note.noteType == 'text'
+                        ? null
+                        : const BoxConstraints(maxHeight: 400),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.5),
+                      color: Theme.of(context)
+                          .scaffoldBackgroundColor
+                          .withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.divider.withValues(alpha: 0.5)),
+                      border: Border.all(
+                        color: AppColors.divider.withValues(alpha: 0.5),
+                      ),
                     ),
-                    child: RichTextEditor(
-                      content: note.body,
-                      expands: true,
-                      onChanged: (newContent) {
-                        final updatedNote = note.copyWith(
-                          body: newContent,
-                          updatedAt: DateTime.now(),
-                        );
-                        ref.read(vaultProvider.notifier).updateObject(updatedNote);
-                      },
-                    ),
+                    child: _buildExpandedEditor(note),
                   ),
                 ),
             ],
@@ -385,9 +384,47 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     if (date.year == now.year && date.month == now.month && date.day == now.day) {
-      return '${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+      return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
     }
     return '${date.day}/${date.month}';
+  }
+
+  Widget _buildExpandedEditor(dynamic note) {
+    if (note.noteType == 'outline') {
+      return OutlineEditor(
+        initialContent: note.body,
+        onChanged: (newContent) {
+          final updatedNote = note.copyWith(
+            body: newContent,
+            updatedAt: DateTime.now(),
+          );
+          ref.read(vaultProvider.notifier).updateObject(updatedNote);
+        },
+      );
+    } else if (note.noteType == 'collection') {
+      return CollectionEditor(
+        initialContent: note.body,
+        onChanged: (newContent) {
+          final updatedNote = note.copyWith(
+            body: newContent,
+            updatedAt: DateTime.now(),
+          );
+          ref.read(vaultProvider.notifier).updateObject(updatedNote);
+        },
+      );
+    } else {
+      return RichTextEditor(
+        content: note.body,
+        expands: true,
+        onChanged: (newContent) {
+          final updatedNote = note.copyWith(
+            body: newContent,
+            updatedAt: DateTime.now(),
+          );
+          ref.read(vaultProvider.notifier).updateObject(updatedNote);
+        },
+      );
+    }
   }
 }
 

@@ -20,6 +20,7 @@ import '../models/pomodoro_session.dart';
 import '../models/reminder_model.dart';
 import '../models/resource_model.dart';
 import '../models/task_model.dart';
+import '../models/shopping_item.dart';
 import '../services/scheduler_service.dart';
 import '../services/widget_service.dart';
 import 'dashboard_provider.dart';
@@ -138,11 +139,11 @@ Future<void> _updateAllWidgets(
       googleEvents,
       offset,
     );
-    final filter = _buildFilterSnapshot(allObjects, dashboardBlocks, settings);
+    final shopping = _buildShoppingSnapshot(allObjects);
     final pomodoro = _buildPomodoroSnapshot(pomodoroHistory);
     await WidgetService.updateDashboardWidgets(
       calendar: calendar,
-      filter: filter,
+      shopping: shopping,
       pomodoro: pomodoro,
     );
   } catch (e, st) {
@@ -161,12 +162,10 @@ Map<String, dynamic> buildCalendarSnapshotForTest(
 }
 
 @visibleForTesting
-Map<String, dynamic> buildFilterSnapshotForTest(
+Map<String, dynamic> buildShoppingSnapshotForTest(
   List<ContentObject> allObjects,
-  List<DashboardBlock> dashboardBlocks, [
-  AppSettings? settings,
-]) {
-  return _buildFilterSnapshot(allObjects, dashboardBlocks, settings);
+) {
+  return _buildShoppingSnapshot(allObjects);
 }
 
 Map<String, dynamic> _buildCalendarSnapshot(
@@ -526,108 +525,29 @@ List<Map<String, dynamic>> _dayItems(
   return items;
 }
 
-Map<String, dynamic> _buildFilterSnapshot(
+Map<String, dynamic> _buildShoppingSnapshot(
   List<ContentObject> allObjects,
-  List<DashboardBlock> dashboardBlocks,
-  AppSettings? settings,
 ) {
-  final block = dashboardBlocks
-      .where((item) => item.id == 'home-area')
-      .firstOrNull;
-  final metadata = block?.metadata ?? {};
-  final rawTypes =
-      settings?.universalWidgetObjectTypes ??
-      metadata['filterObjectTypes'] ??
-      metadata['objectTypes'];
-  final selectedTypes = rawTypes is List
-      ? rawTypes.map((item) => item.toString()).toSet()
-      : {'task', 'habit'};
-  final organizers = [
-    ...allObjects.whereType<Organizer>().cast<ContentObject>(),
-    ...allObjects.whereType<Goal>().cast<ContentObject>(),
-  ]..sort((a, b) => a.title.compareTo(b.title));
-  final configuredOrganizer = settings?.universalWidgetOrganizer;
-  final organizerSlug =
-      configuredOrganizer != null && configuredOrganizer.isNotEmpty
-      ? configuredOrganizer
-      : metadata['organizerSlug'] as String?;
-  final organizer = organizerSlug == null
-      ? (organizers.isNotEmpty ? organizers.first : null)
-      : organizers.where((item) => item.slug == organizerSlug).firstOrNull;
+  final shoppingItems = allObjects.whereType<ShoppingItem>().where((item) => !item.isCompleted && !item.archived).toList()
+    ..sort((a, b) {
+      if (a.order != null || b.order != null) {
+        return (a.order ?? 9999).compareTo(b.order ?? 9999);
+      }
+      return b.updatedAt.compareTo(a.updatedAt);
+    });
 
-  final refs =
-      organizer == null
-            ? <ContentObject>[]
-            : allObjects.where((object) {
-                if (object.id == organizer.id) return false;
-                if (!selectedTypes.contains(object.type) &&
-                    !(selectedTypes.contains('journal_entry') &&
-                        object is JournalEntry)) {
-                  return false;
-                }
-                return object.organizers.any(
-                  (ref) => ref.matches(
-                    organizer.id,
-                    organizer.slug,
-                    organizer.title,
-                  ),
-                );
-              }).toList()
-        ..sort((a, b) {
-          final aTime = a.updatedAt;
-          final bTime = b.updatedAt;
-          return bTime.compareTo(aTime);
-        });
-
-  final tasks = refs.whereType<Task>().toList();
-  final completedTasks = tasks.where((task) => task.isCompleted).length;
-  final totalProgress = tasks.length;
-  final todayKey = _dateKey(DateTime.now());
-  final chips =
-      <Map<String, dynamic>>[
-            {'label': 'Tarefas', 'count': refs.whereType<Task>().length},
-            {'label': 'Hábitos', 'count': refs.whereType<Habit>().length},
-            {'label': 'Objetivos', 'count': refs.whereType<Goal>().length},
-            {'label': 'Notas', 'count': refs.whereType<Note>().length},
-            {'label': 'Recursos', 'count': refs.whereType<Resource>().length},
-          ]
-          .where(
-            (chip) => (chip['count'] as int) > 0 || chip['label'] == 'Tarefas',
-          )
-          .toList();
+  final items = shoppingItems.map((item) => {
+    'id': item.id,
+    'title': item.title,
+    'type': 'shopping_item',
+    'completed': false,
+    'toggleUri': 'citrine://widget-toggle?type=shopping_item&id=${Uri.encodeComponent(item.id)}',
+  }).toList();
 
   return {
-    'title': 'Filtro',
-    'organizer': organizer?.title ?? 'Sem filtro',
-    'chips': chips,
-    'progressDone': completedTasks,
-    'progressTotal': totalProgress,
-    'items': refs.take(8).map((item) {
-      final completed = item is Task
-          ? item.isCompleted
-          : item is Habit
-          ? _isHabitCompletedOn(item, DateTime.now())
-          : false;
-      final String? toggleUri = item is Task
-          ? 'citrine://widget-toggle?type=task&id=${Uri.encodeComponent(item.id)}&date=$todayKey'
-          : item is Habit
-          ? 'citrine://widget-toggle?type=habit&id=${Uri.encodeComponent(item.id)}&date=$todayKey'
-          : null;
-      final row = {
-        'id': item.id,
-        'title': _displayTitle(item),
-        'type': _displayType(item),
-        'subtitle': item.organizers.isEmpty
-            ? item.displayType
-            : _organizerLabel(item),
-        'completed': completed,
-        'linkUri': 'citrine:///detail/${item.id}',
-      };
-      if (toggleUri != null) {
-        row['toggleUri'] = toggleUri;
-      }
-      return row;
-    }).toList(),
+    'title': 'Lista de Mercado',
+    'subtitle': '${items.length} pendentes',
+    'items': items.take(15).toList(),
   };
 }
 

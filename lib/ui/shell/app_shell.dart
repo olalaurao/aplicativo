@@ -192,7 +192,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                   key: _scaffoldKey,
                   drawer: _buildHistoryDrawer(context, ref),
                   body: _withCommandCenterOverscroll(context, widget.child),
-                  floatingActionButton: GestureDetector(
+                  floatingActionButton: location.startsWith('/shopping') ? null : GestureDetector(
                     onLongPress: () => _openCommandCenter(context),
                     child: FloatingActionButton(
                       onPressed: () => showCreateMenu(context),

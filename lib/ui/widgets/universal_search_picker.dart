@@ -457,7 +457,7 @@ class _UniversalSearchPickerSheetState
                     title: Text(t['label'] as String),
                     onTap: () async {
                       Navigator.pop(sheetContext); // Close type sheet
-                      Navigator.pop(context); // Close search picker sheet
+                      // Don't close the search picker sheet here, let _createNewObject do it
                       await _createNewObject(t['type'] as String, newTitle);
                     },
                   );

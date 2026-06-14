@@ -18,7 +18,15 @@ enum NoteType { text, outline, collection }
 class CreateNoteForm extends ConsumerStatefulWidget {
   final String? initialTitle;
   final Note? existingNote;
-  const CreateNoteForm({super.key, this.initialTitle, this.existingNote});
+  final List<String>? initialTags;
+  final String? initialFolder;
+  const CreateNoteForm({
+    super.key,
+    this.initialTitle,
+    this.existingNote,
+    this.initialTags,
+    this.initialFolder,
+  });
 
   @override
   ConsumerState<CreateNoteForm> createState() => _CreateNoteFormState();
@@ -31,6 +39,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
   List<OrganizerReference> _organizers = [];
   List<String> _tags = [];
   bool _pinned = false;
+  bool _isChecklist = false;
   DateTime _createdAt = DateTime.now();
 
   @override
@@ -41,12 +50,17 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
       text: widget.existingNote?.title ?? widget.initialTitle ?? '',
     );
 
+    if (widget.initialTags != null) {
+      _tags.addAll(widget.initialTags!);
+    }
+
     if (widget.existingNote != null) {
       final note = widget.existingNote!;
       _richContent = note.body;
       _organizers = List.of(note.organizers);
       _tags = List.of(note.tags);
       _pinned = note.pinned;
+      _isChecklist = note.isChecklist;
       _createdAt = note.createdAt;
       switch (note.subtype) {
         case NoteSubtype.text:
@@ -214,6 +228,13 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
                         onTap: () => setState(() => _pinned = !_pinned),
                       ),
                       MetadataChip(
+                        icon: _isChecklist
+                            ? Icons.checklist_rtl_rounded
+                            : Icons.check_box_outline_blank_rounded,
+                        label: 'Checklist',
+                        onTap: () => setState(() => _isChecklist = !_isChecklist),
+                      ),
+                      MetadataChip(
                         icon: Icons.calendar_today_outlined,
                         label:
                             '${_createdAt.year}-${_createdAt.month.toString().padLeft(2, '0')}-${_createdAt.day.toString().padLeft(2, '0')}',
@@ -314,12 +335,16 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
   }
 
   void _saveNote() {
+    final defaultPath = widget.initialFolder != null 
+        ? '${widget.initialFolder}/' 
+        : '';
+        
     final note = Note(
       id:
           widget.existingNote?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
       createdAt: _createdAt,
-      obsidianPath: widget.existingNote?.obsidianPath ?? '',
+      obsidianPath: widget.existingNote?.obsidianPath ?? defaultPath,
       updatedAt: DateTime.now(),
       title: _titleController.text.trim(),
       subtype: _mapNoteTypeToSubtype(_noteType),
@@ -327,6 +352,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
       organizers: _organizers,
       tags: _tags,
       pinned: _pinned,
+      isChecklist: _isChecklist,
     );
 
     if (widget.existingNote != null) {

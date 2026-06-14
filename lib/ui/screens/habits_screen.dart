@@ -252,16 +252,20 @@ class _TodayView extends ConsumerWidget {
         // Summary chips
         Row(
           children: [
-            _SummaryChip(
-              icon: Icons.trending_up_rounded,
-              label: '$completedCount / ${habits.length} completos',
-              color: AppColors.habitGreen,
+            Flexible(
+              child: _SummaryChip(
+                icon: Icons.trending_up_rounded,
+                label: '$completedCount / ${habits.length} completos',
+                color: AppColors.habitGreen,
+              ),
             ),
             const SizedBox(width: 8),
-            _SummaryChip(
-              icon: Icons.local_fire_department_rounded,
-              label: '$streakDays dias completando tudo',
-              color: AppColors.warning,
+            Flexible(
+              child: _SummaryChip(
+                icon: Icons.local_fire_department_rounded,
+                label: '$streakDays dias completando tudo',
+                color: AppColors.warning,
+              ),
             ),
           ],
         ),
@@ -401,7 +405,10 @@ class _TodayHabitCard extends ConsumerWidget {
           child: Row(
             children: [
               // Check box / completion indicator
-              _buildCheckbox(context, ref, color, slots),
+              if (habit.isFlexibleFrequency)
+                _buildFlexibleCheckbox(context, ref, color)
+              else
+                _buildCheckbox(context, ref, color, slots),
               const SizedBox(width: 14),
 
               // Content
@@ -513,6 +520,81 @@ class _TodayHabitCard extends ConsumerWidget {
               if (slots.length > 1)
                 _buildMultiSlotDots(context, ref, color, slots),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  int get _completionsInCurrentPeriod {
+    DateTime now = DateTime.now();
+    DateTime start;
+    if (habit.frequencyDays == 7) {
+      start = now.subtract(Duration(days: (now.weekday - 1) % 7));
+    } else if (habit.frequencyDays == 30) {
+      start = DateTime(now.year, now.month, 1);
+    } else {
+      start = now.subtract(Duration(days: habit.frequencyDays ?? 7));
+    }
+    start = DateTime(start.year, start.month, start.day);
+
+    int count = 0;
+    for (var record in habit.completionHistory) {
+      if (!record.date.isBefore(start) && record.successful) {
+        count++;
+      }
+    }
+    // Also consider today's optimistic state
+    if (currentVal == true || (currentVal is num && currentVal > 0)) {
+      // Check if today is already in history to avoid double counting
+      final todayStr = now.toIso8601String().split('T').first;
+      final alreadyInHistory = habit.completionHistory.any((r) => r.date.toIso8601String().split('T').first == todayStr && r.successful);
+      if (!alreadyInHistory) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  Widget _buildFlexibleCheckbox(
+    BuildContext context,
+    WidgetRef ref,
+    Color color,
+  ) {
+    int target = 1;
+    if (habit.scheduler != null && habit.scheduler!.rules.isNotEmpty) {
+      target = habit.scheduler!.rules.first.countPerPeriod ?? 1;
+    }
+    int current = _completionsInCurrentPeriod;
+    bool goalReached = current >= target;
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        ref.read(habitsProvider.notifier).toggleHabit(
+              habit,
+              date,
+            );
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: goalReached ? color : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: goalReached ? color : color.withValues(alpha: 0.4),
+            width: 2,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          '$current/$target',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: goalReached ? Colors.white : color,
           ),
         ),
       ),
@@ -632,8 +714,8 @@ class _WeekView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final now = DateTime.now();
-    // Start of week (Sunday)
-    final weekStart = now.subtract(Duration(days: now.weekday % 7));
+    // Start of week (Monday)
+    final weekStart = now.subtract(Duration(days: (now.weekday - 1) % 7));
     final weekDays = List.generate(7, (i) => weekStart.add(Duration(days: i)));
 
     // Compute overall week completions

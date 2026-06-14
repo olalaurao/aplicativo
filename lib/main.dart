@@ -38,6 +38,7 @@ import 'ui/screens/planner_screen.dart';
 import 'ui/forms/create_entry_form.dart';
 import 'ui/forms/create_task_form.dart';
 import 'ui/forms/create_habit_form.dart';
+import 'ui/screens/shopping_list_screen.dart';
 import 'ui/forms/create_note_form.dart';
 import 'ui/forms/create_template_form.dart';
 import 'ui/screens/organize_screen.dart';
@@ -649,6 +650,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
         routes: [
           GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+          GoRoute(
+            path: '/shopping',
+            builder: (context, state) => const ShoppingListScreen(),
+          ),
           GoRoute(
             path: '/timeline',
             builder: (context, state) => const TimelineScreen(),
