@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../models/content_object.dart';
 import '../../services/search_service.dart';
 import '../theme.dart';
@@ -42,11 +43,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _searchService = SearchService();
   List<ContentObject> _results = [];
   List<SearchAction> _actionResults = [];
-  List<String> _recentSearches = [
-    'Planning 2026',
-    'Coffee with Maria',
-    'Study Flutter',
-  ];
   String? _selectedType;
   String? _socialPlatformFilter;
   String? _socialCreatorFilter;
@@ -56,6 +52,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     'habit': 'Habits',
     'journal_entry': 'Journal',
     'note': 'Notes',
+    'idea': 'Ideias',
     'goal': 'Goals',
     'project': 'Projects',
     'person': 'People',
@@ -130,15 +127,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
       if (_selectedType == 'social_post') {
         results = results.whereType<SocialPost>().where((post) {
-          if (_socialPlatformFilter != null && post.platform.name != _socialPlatformFilter) {
+          if (_socialPlatformFilter != null &&
+              post.platform.name != _socialPlatformFilter) {
             return false;
           }
-          if (_socialCreatorFilter != null && post.authorHandle != _socialCreatorFilter && post.authorName != _socialCreatorFilter) {
+          if (_socialCreatorFilter != null &&
+              post.authorHandle != _socialCreatorFilter &&
+              post.authorName != _socialCreatorFilter) {
             return false;
           }
           return true;
-        }).toList()
-          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+        }).toList()..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       }
 
       _results = results;
@@ -263,31 +262,62 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  const Text('Platform: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  const Text(
+                    'Platform: ',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                   const SizedBox(width: 8),
-                  ...['X', 'LinkedIn', 'Threads', 'Instagram', 'YouTube', 'TikTok'].map(
+                  ...[
+                    'X',
+                    'LinkedIn',
+                    'Threads',
+                    'Instagram',
+                    'YouTube',
+                    'TikTok',
+                  ].map(
                     (p) => Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: FilterChip(
                         label: Text(p),
                         selected: _socialPlatformFilter == p.toLowerCase(),
                         onSelected: (val) {
-                          setState(() => _socialPlatformFilter = val ? p.toLowerCase() : null);
-                          allObjectsAsync.whenData((objects) => _onSearchChanged(_searchController.text, objects));
+                          setState(
+                            () => _socialPlatformFilter = val
+                                ? p.toLowerCase()
+                                : null,
+                          );
+                          allObjectsAsync.whenData(
+                            (objects) => _onSearchChanged(
+                              _searchController.text,
+                              objects,
+                            ),
+                          );
                         },
                         labelStyle: const TextStyle(fontSize: 12),
                       ),
                     ),
                   ),
                   const SizedBox(width: 16),
-                  const Text('Creator: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  const Text(
+                    'Creator: ',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                   const SizedBox(width: 8),
                   FilterChip(
                     label: const Text('My Posts'),
                     selected: _socialCreatorFilter == 'me',
                     onSelected: (val) {
                       setState(() => _socialCreatorFilter = val ? 'me' : null);
-                      allObjectsAsync.whenData((objects) => _onSearchChanged(_searchController.text, objects));
+                      allObjectsAsync.whenData(
+                        (objects) =>
+                            _onSearchChanged(_searchController.text, objects),
+                      );
                     },
                     labelStyle: const TextStyle(fontSize: 12),
                   ),
@@ -302,6 +332,62 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 : ListView(
                     padding: const EdgeInsets.all(20),
                     children: [
+                      if (_searchController.text.isNotEmpty &&
+                          _selectedType != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.12,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _typeLabels[_selectedType] ??
+                                          _selectedType!,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    GestureDetector(
+                                      onTap: () {
+                                        setState(() => _selectedType = null);
+                                        final objects =
+                                            ref
+                                                .read(allObjectsProvider)
+                                                .valueOrNull ??
+                                            [];
+                                        _onSearchChanged(
+                                          _searchController.text,
+                                          objects,
+                                        );
+                                      },
+                                      child: const Icon(
+                                        Icons.close_rounded,
+                                        size: 14,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Spacer(),
+                            ],
+                          ),
+                        ),
                       if (_actionResults.isNotEmpty) ...[
                         const Text(
                           'ACTIONS',
@@ -313,7 +399,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        ..._actionResults.map((a) => _buildActionTile(context, a)),
+                        ..._actionResults.map(
+                          (a) => _buildActionTile(context, a),
+                        ),
                         const SizedBox(height: 24),
                       ],
                       if (_results.isNotEmpty) ...[
@@ -327,7 +415,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        ..._results.map((obj) => _buildResultTile(context, obj)),
+                        ..._results.map(
+                          (obj) => _buildResultTile(context, obj),
+                        ),
                       ],
                     ],
                   ),
@@ -366,20 +456,36 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Widget _buildSearchHome() {
+    final recentSearches = ref.watch(
+      settingsProvider.select((s) => s.recentSearches),
+    );
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (recentSearches.isNotEmpty) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Buscas Recentes',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                TextButton(
+                  onPressed: () =>
+                      ref.read(settingsProvider.notifier).clearRecentSearches(),
+                  child: const Text('Limpar', style: TextStyle(fontSize: 13)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ...recentSearches.map((s) => _buildRecentItem(s)),
+            const SizedBox(height: 32),
+          ],
           const Text(
-            'Recent Searches',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 16),
-          ..._recentSearches.map((s) => _buildRecentItem(s)),
-          const SizedBox(height: 32),
-          const Text(
-            'Explore by Type',
+            'Explore por Tipo',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 16),
@@ -489,10 +595,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         object: obj,
         child: InkWell(
           onTap: () {
-            if (query.isNotEmpty && !_recentSearches.contains(query)) {
-              setState(() {
-                _recentSearches = [query, ..._recentSearches].take(5).toList();
-              });
+            if (query.isNotEmpty) {
+              ref.read(settingsProvider.notifier).addRecentSearch(query);
             }
             context.push(
               '/detail/${Uri.encodeComponent(obj.id)}',
@@ -586,6 +690,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         return Icons.auto_stories_rounded;
       case 'note':
         return Icons.sticky_note_2_rounded;
+      case 'idea':
+        return Icons.lightbulb_outline_rounded;
       default:
         return Icons.article_outlined;
     }
@@ -617,6 +723,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         return 'Objetivo';
       case 'note':
         return 'Nota';
+      case 'idea':
+        return 'Ideia';
       case 'resource':
         return 'Recurso';
       case 'person':
@@ -636,6 +744,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         return AppColors.habitOrange;
       case 'project':
         return AppColors.primary;
+      case 'idea':
+        return AppColors.warning;
       case 'person':
         return AppColors.info;
       case 'resource':

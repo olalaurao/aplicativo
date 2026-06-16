@@ -10,6 +10,7 @@ import '../theme.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/habit_detail_sheet.dart';
 import '../forms/create_habit_form.dart';
+import '../widgets/health_alerts_strip.dart';
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen>
         .where((h) => h.status == HabitStatus.active && !h.archived)
         .toList();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final regularHabits = activeHabits.where((h) => !h.isQuitting).toList();
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor(context),
@@ -80,8 +82,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen>
                       controller: _tabController,
                       children: [
                         _TodayView(habits: activeHabits),
-                        _WeekView(habits: activeHabits),
-                        _MonthView(habits: activeHabits),
+                        _WeekView(habits: regularHabits),
+                        _MonthView(habits: regularHabits),
                       ],
                     ),
             ),
@@ -209,17 +211,27 @@ class _TodayView extends ConsumerWidget {
     final dailyData = ref.watch(dailyNoteDataProvider(dateStr));
     final habitsMap = dailyData['habits'] as Map? ?? {};
 
-    // Compute summary stats
-    int completedCount = 0;
-    int streakDays = 0; // days all habits completed consecutively
+    // Split quitting vs regular habits
+    final regularHabits = habits.where((h) => !h.isQuitting).toList();
+    final flexibleHabits = regularHabits
+        .where((h) => h.isFlexibleFrequency)
+        .toList();
+    final dailyHabits = regularHabits
+        .where((h) => !h.isFlexibleFrequency)
+        .toList();
+    final quittingHabits = habits.where((h) => h.isQuitting).toList();
 
-    for (final habit in habits) {
+    // Compute summary stats (only regular habits)
+    int completedCount = 0;
+    int streakDays = 0;
+
+    for (final habit in regularHabits) {
       final val = habitsMap[habit.slug];
       if (_isCompleted(val, habit)) completedCount++;
     }
 
-    // Count consecutive days where all habits were completed
-    streakDays = _computeAllCompleteStreak(habits);
+    // Count consecutive days where all regular habits were completed
+    streakDays = _computeAllCompleteStreak(regularHabits);
 
     final weekday = DateFormat('EEEE', 'pt_BR').format(now);
     final dateLabel =
@@ -228,6 +240,8 @@ class _TodayView extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       children: [
+        const HealthAlertsStrip(compact: false),
+        const SizedBox(height: 16),
         // Date label
         Row(
           children: [
@@ -249,13 +263,13 @@ class _TodayView extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
 
-        // Summary chips
+        // Summary chips (regular habits only)
         Row(
           children: [
             Flexible(
               child: _SummaryChip(
                 icon: Icons.trending_up_rounded,
-                label: '$completedCount / ${habits.length} completos',
+                label: '$completedCount / ${regularHabits.length} completos',
                 color: AppColors.habitGreen,
               ),
             ),
@@ -271,14 +285,100 @@ class _TodayView extends ConsumerWidget {
         ),
         const SizedBox(height: 20),
 
-        // Habit list
-        ...habits.map((habit) {
+        // Regular scheduled habit list
+        ...dailyHabits.where((h) => h.schedulers.isNotEmpty).map((habit) {
           final val = habitsMap[habit.slug];
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: _TodayHabitCard(habit: habit, currentVal: val, date: now),
           );
         }),
+
+        if (flexibleHabits.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          const _HabitSectionLabel(label: 'Periódicos', color: AppColors.info),
+          const SizedBox(height: 8),
+          ...flexibleHabits.map((habit) {
+            final val = habitsMap[habit.slug];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _FlexHabitCard(habit: habit, currentVal: val, date: now),
+            );
+          }),
+        ],
+
+        Builder(
+          builder: (context) {
+            final unscheduled = dailyHabits
+                .where((h) => h.schedulers.isEmpty)
+                .toList();
+            if (unscheduled.isEmpty) return const SizedBox.shrink();
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 20),
+                _HabitSectionLabel(
+                  label: 'Sem agendamento',
+                  color: AppTheme.textMutedColor(context),
+                ),
+                const SizedBox(height: 8),
+                ...unscheduled.map((h) {
+                  final val = habitsMap[h.slug];
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    child: Opacity(
+                      opacity: 0.65,
+                      child: _TodayHabitCard(
+                        habit: h,
+                        currentVal: val,
+                        date: now,
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            );
+          },
+        ),
+
+        // ─── Evitando (quitting habits) section ────────────────────────────────
+        if (quittingHabits.isNotEmpty) ...[
+          const SizedBox(height: 28),
+          Row(
+            children: [
+              Container(
+                width: 3,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: AppColors.error,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Evitando',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.error,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...quittingHabits.map(
+            (habit) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _QuittingHabitCard(
+                habit: habit,
+                habitsMap: habitsMap,
+                date: now,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -313,6 +413,58 @@ class _TodayView extends ConsumerWidget {
       }
     }
     return streak;
+  }
+}
+
+class _HabitSectionLabel extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _HabitSectionLabel({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 3,
+          height: 14,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: color,
+            letterSpacing: 0.08,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FlexHabitCard extends StatelessWidget {
+  final Habit habit;
+  final dynamic currentVal;
+  final DateTime date;
+
+  const _FlexHabitCard({
+    required this.habit,
+    required this.currentVal,
+    required this.date,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _TodayHabitCard(habit: habit, currentVal: currentVal, date: date);
   }
 }
 
@@ -438,7 +590,10 @@ class _TodayHabitCard extends ConsumerWidget {
                         if (habit.habitMode == HabitMode.pact) ...[
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: color,
                               borderRadius: BorderRadius.circular(6),
@@ -459,11 +614,7 @@ class _TodayHabitCard extends ConsumerWidget {
                     Row(
                       children: [
                         if (habit.habitMode == HabitMode.pact) ...[
-                          Icon(
-                            Icons.shield_rounded,
-                            size: 13,
-                            color: color,
-                          ),
+                          Icon(Icons.shield_rounded, size: 13, color: color),
                           const SizedBox(width: 2),
                           Text(
                             habit.startedAt != null
@@ -548,7 +699,11 @@ class _TodayHabitCard extends ConsumerWidget {
     if (currentVal == true || (currentVal is num && currentVal > 0)) {
       // Check if today is already in history to avoid double counting
       final todayStr = now.toIso8601String().split('T').first;
-      final alreadyInHistory = habit.completionHistory.any((r) => r.date.toIso8601String().split('T').first == todayStr && r.successful);
+      final alreadyInHistory = habit.completionHistory.any(
+        (r) =>
+            r.date.toIso8601String().split('T').first == todayStr &&
+            r.successful,
+      );
       if (!alreadyInHistory) {
         count++;
       }
@@ -571,10 +726,7 @@ class _TodayHabitCard extends ConsumerWidget {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        ref.read(habitsProvider.notifier).toggleHabit(
-              habit,
-              date,
-            );
+        ref.read(habitsProvider.notifier).toggleHabit(habit, date);
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -705,6 +857,182 @@ class _TodayHabitCard extends ConsumerWidget {
   }
 }
 
+// ─── Quitting Habit Card ──────────────────────────────────────────────────────
+
+class _QuittingHabitCard extends ConsumerWidget {
+  final Habit habit;
+  final Map habitsMap;
+  final DateTime date;
+
+  const _QuittingHabitCard({
+    required this.habit,
+    required this.habitsMap,
+    required this.date,
+  });
+
+  /// Days since the habit was last marked (=relapsed).
+  /// Returns the streak of clean days (days without marking).
+  int _cleanDays() {
+    if (habit.completionHistory.isEmpty) {
+      // No relapses recorded — count from createdAt
+      return DateTime.now().difference(habit.createdAt).inDays;
+    }
+    // Find the most recent relapse
+    final sorted = [...habit.completionHistory]
+      ..sort((a, b) => b.date.compareTo(a.date));
+    final lastRelapse = sorted.first.date;
+    return DateTime.now().difference(lastRelapse).inDays;
+  }
+
+  bool _relapsedToday() {
+    final today = DateTime.now();
+    final todayStr = today.toIso8601String().split('T').first;
+    return habit.completionHistory.any((r) {
+      return r.date.toIso8601String().split('T').first == todayStr &&
+          r.successful;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cleanDays = _cleanDays();
+    final relapsedToday = _relapsedToday();
+
+    // Semaphore color
+    final Color statusColor;
+    final String statusLabel;
+    final IconData statusIcon;
+    if (relapsedToday) {
+      statusColor = AppColors.error;
+      statusLabel = 'Recaída hoje 💥';
+      statusIcon = Icons.warning_amber_rounded;
+    } else if (cleanDays >= 3) {
+      statusColor = AppColors.habitGreen;
+      statusLabel = '$cleanDays dias limpos ✨';
+      statusIcon = Icons.verified_rounded;
+    } else if (cleanDays >= 1) {
+      statusColor = AppColors.warning;
+      statusLabel = '$cleanDays ${cleanDays == 1 ? "dia" : "dias"} limpo ⚠️';
+      statusIcon = Icons.schedule_rounded;
+    } else {
+      statusColor = AppColors.error;
+      statusLabel = 'Começando hoje';
+      statusIcon = Icons.flag_rounded;
+    }
+
+    return GestureDetector(
+      onTap: () => showHabitDetailSheet(context, habit, date),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: AppTheme.cardDecoration(context),
+        child: Row(
+          children: [
+            // Left color bar
+            Container(
+              width: 4,
+              height: 44,
+              decoration: BoxDecoration(
+                color: statusColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    habit.displayTitle,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimaryColor(context),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(statusIcon, size: 13, color: statusColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        statusLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Relapse button (only if not already relapsed today)
+            if (!relapsedToday)
+              GestureDetector(
+                onTap: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text('Registrar recaída?'),
+                      content: Text(
+                        'Isso vai marcar que você fez "${habit.displayTitle}" hoje e reiniciar o contador.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancelar'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                          ),
+                          child: const Text('Registrar recaída'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    HapticFeedback.mediumImpact();
+                    await ref
+                        .read(habitsProvider.notifier)
+                        .toggleHabit(habit, date);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.error.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: const Text(
+                    'Recaída',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.error,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Week View ────────────────────────────────────────────────────────────────
 
 class _WeekView extends ConsumerWidget {
@@ -715,7 +1043,7 @@ class _WeekView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final now = DateTime.now();
     // Start of week (Monday)
-    final weekStart = now.subtract(Duration(days: (now.weekday - 1) % 7));
+    final weekStart = now.subtract(Duration(days: now.weekday - 1));
     final weekDays = List.generate(7, (i) => weekStart.add(Duration(days: i)));
 
     // Compute overall week completions
@@ -1519,12 +1847,16 @@ class _SummaryChip extends StatelessWidget {
         children: [
           Icon(icon, size: 13, color: color),
           const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: color,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
             ),
           ),
         ],

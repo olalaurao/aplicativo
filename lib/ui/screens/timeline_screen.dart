@@ -27,8 +27,30 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
   String _searchQuery = '';
   String _activeFilter = 'All';
 
+  int _currentPage = 1;
+  static const _pageSize = 50;
+  final _scrollController = ScrollController();
+
   @override
-  Widget build(BuildContext context) {
+  void initState() {
+    super.initState();
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 200) {
+        if (_currentPage * _pageSize < _getFilteredItems().length) {
+          setState(() => _currentPage++);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  List<ContentObject> _getFilteredItems() {
     final entries = ref.watch(allEntriesProvider);
     final tasks = ref.watch(tasksProvider);
     final habits = ref.watch(habitsProvider);
@@ -42,7 +64,7 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
       return bTime.compareTo(aTime);
     });
 
-    final filteredItems = allItems.where((item) {
+    return allItems.where((item) {
       final matchesSearch = item.title.toLowerCase().contains(
         _searchQuery.toLowerCase(),
       );
@@ -53,16 +75,23 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
           (_activeFilter == 'Habits' && item is Habit);
       return matchesSearch && matchesFilter;
     }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredItems = _getFilteredItems();
+    final paginatedItems = filteredItems.take(_pageSize * _currentPage).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Journal'),
+        title: const Text('Timeline'),
         centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: Colors.transparent,
       ),
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           // ─── Header ───
           SliverToBoxAdapter(
@@ -80,20 +109,20 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
           ),
 
           // ─── Timeline Feed ───
-          if (filteredItems.isEmpty)
+          if (paginatedItems.isEmpty)
             _buildEmptyState()
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate((context, index) {
-                  final item = filteredItems[index];
+                  final item = paginatedItems[index];
                   final itemDate = _timelineDate(item);
                   final showDate =
                       index == 0 ||
                       !_isSameDay(
                         itemDate,
-                        _timelineDate(filteredItems[index - 1]),
+                        _timelineDate(paginatedItems[index - 1]),
                       );
 
                   return Column(
@@ -103,7 +132,7 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
                       _buildTimelineItem(context, item),
                     ],
                   );
-                }, childCount: filteredItems.length),
+                }, childCount: paginatedItems.length),
               ),
             ),
 

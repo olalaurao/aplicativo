@@ -37,7 +37,9 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     if (title.isEmpty) return;
 
     final items = ref.read(shoppingItemsProvider);
-    final existing = items.where((item) => item.title.toLowerCase() == title.toLowerCase()).firstOrNull;
+    final existing = items
+        .where((item) => item.title.toLowerCase() == title.toLowerCase())
+        .firstOrNull;
 
     if (existing != null) {
       if (existing.isCompleted) {
@@ -62,25 +64,42 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   @override
   Widget build(BuildContext context) {
     final items = ref.watch(shoppingItemsProvider);
-    
-    final pendingMercado = items.where((item) => !item.isCompleted && !item.archived && !item.categories.contains('outros')).toList()
-      ..sort((a, b) {
-        if (a.order != null || b.order != null) {
-          return (a.order ?? 9999).compareTo(b.order ?? 9999);
-        }
-        return b.updatedAt.compareTo(a.updatedAt);
-      });
-      
-    final pendingOutros = items.where((item) => !item.isCompleted && !item.archived && item.categories.contains('outros')).toList()
-      ..sort((a, b) {
-        if (a.order != null || b.order != null) {
-          return (a.order ?? 9999).compareTo(b.order ?? 9999);
-        }
-        return b.updatedAt.compareTo(a.updatedAt);
-      });
-      
-    final completed = items.where((item) => item.isCompleted && !item.archived).toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    final pendingMercado =
+        items
+            .where(
+              (item) =>
+                  !item.isCompleted &&
+                  !item.archived &&
+                  !item.categories.contains('outros'),
+            )
+            .toList()
+          ..sort((a, b) {
+            if (a.order != null || b.order != null) {
+              return (a.order ?? 9999).compareTo(b.order ?? 9999);
+            }
+            return b.updatedAt.compareTo(a.updatedAt);
+          });
+
+    final pendingOutros =
+        items
+            .where(
+              (item) =>
+                  !item.isCompleted &&
+                  !item.archived &&
+                  item.categories.contains('outros'),
+            )
+            .toList()
+          ..sort((a, b) {
+            if (a.order != null || b.order != null) {
+              return (a.order ?? 9999).compareTo(b.order ?? 9999);
+            }
+            return b.updatedAt.compareTo(a.updatedAt);
+          });
+
+    final completed =
+        items.where((item) => item.isCompleted && !item.archived).toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor(context),
@@ -100,23 +119,27 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
           children: [
             Expanded(
               child: items.isEmpty
-                  ? EmptyState(
+                  ? const EmptyState(
                       icon: Icons.shopping_cart_rounded,
                       headline: 'Lista vazia',
                       subtext: 'Adicione itens abaixo para começar sua lista.',
                     )
                   : ListView(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       children: [
                         if (pendingMercado.isNotEmpty) ...[
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Text(
                               'Mercado',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                color: AppTheme.textMutedColor(context),
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    color: AppTheme.textMutedColor(context),
+                                    fontWeight: FontWeight.w600,
+                                  ),
                             ),
                           ),
                           ReorderableListView(
@@ -124,18 +147,29 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                             physics: const NeverScrollableScrollPhysics(),
                             onReorder: (oldIndex, newIndex) {
                               if (newIndex > oldIndex) newIndex -= 1;
-                              final list = List<ShoppingItem>.from(pendingMercado);
+                              final list = List<ShoppingItem>.from(
+                                pendingMercado,
+                              );
                               final item = list.removeAt(oldIndex);
                               list.insert(newIndex, item);
                               for (int i = 0; i < list.length; i++) {
                                 if (list[i].order != i) {
-                                  ref.read(shoppingItemsProvider.notifier).updateShoppingItem(
-                                    list[i].copyWith(order: i)
-                                  );
+                                  ref
+                                      .read(shoppingItemsProvider.notifier)
+                                      .updateShoppingItem(
+                                        list[i].copyWith(order: i),
+                                      );
                                 }
                               }
                             },
-                            children: pendingMercado.map((item) => _buildItemRow(item, key: ValueKey(item.id))).toList(),
+                            children: pendingMercado
+                                .map(
+                                  (item) => _buildItemRow(
+                                    item,
+                                    key: ValueKey(item.id),
+                                  ),
+                                )
+                                .toList(),
                           ),
                         ],
                         if (pendingOutros.isNotEmpty) ...[
@@ -143,10 +177,11 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                             padding: const EdgeInsets.only(top: 16, bottom: 8),
                             child: Text(
                               'Outros',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                color: AppTheme.textMutedColor(context),
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    color: AppTheme.textMutedColor(context),
+                                    fontWeight: FontWeight.w600,
+                                  ),
                             ),
                           ),
                           ReorderableListView(
@@ -154,18 +189,29 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                             physics: const NeverScrollableScrollPhysics(),
                             onReorder: (oldIndex, newIndex) {
                               if (newIndex > oldIndex) newIndex -= 1;
-                              final list = List<ShoppingItem>.from(pendingOutros);
+                              final list = List<ShoppingItem>.from(
+                                pendingOutros,
+                              );
                               final item = list.removeAt(oldIndex);
                               list.insert(newIndex, item);
                               for (int i = 0; i < list.length; i++) {
                                 if (list[i].order != i) {
-                                  ref.read(shoppingItemsProvider.notifier).updateShoppingItem(
-                                    list[i].copyWith(order: i)
-                                  );
+                                  ref
+                                      .read(shoppingItemsProvider.notifier)
+                                      .updateShoppingItem(
+                                        list[i].copyWith(order: i),
+                                      );
                                 }
                               }
                             },
-                            children: pendingOutros.map((item) => _buildItemRow(item, key: ValueKey(item.id))).toList(),
+                            children: pendingOutros
+                                .map(
+                                  (item) => _buildItemRow(
+                                    item,
+                                    key: ValueKey(item.id),
+                                  ),
+                                )
+                                .toList(),
                           ),
                         ],
                         if (completed.isNotEmpty) ...[
@@ -173,10 +219,11 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                             padding: const EdgeInsets.only(top: 24, bottom: 8),
                             child: Text(
                               'Concluídos',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                color: AppTheme.textMutedColor(context),
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    color: AppTheme.textMutedColor(context),
+                                    fontWeight: FontWeight.w600,
+                                  ),
                             ),
                           ),
                           ...completed.map((item) => _buildItemRow(item)),
@@ -194,7 +241,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   Widget _buildItemRow(ShoppingItem item, {Key? key}) {
     final isOutros = item.categories.contains('outros');
     final activeColor = isOutros ? AppColors.secondary : AppColors.accent;
-    
+
     return Container(
       key: key,
       margin: const EdgeInsets.only(bottom: 8),
@@ -202,16 +249,18 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
         color: AppTheme.surfaceColor(context),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Theme.of(context).dividerColor.withOpacity(0.1),
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
         ),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: InkWell(
           onTap: () {
-            ref.read(shoppingItemsProvider.notifier).updateShoppingItem(
-              item.copyWith(isCompleted: !item.isCompleted),
-            );
+            ref
+                .read(shoppingItemsProvider.notifier)
+                .updateShoppingItem(
+                  item.copyWith(isCompleted: !item.isCompleted),
+                );
           },
           child: Container(
             width: 24,
@@ -219,7 +268,9 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: item.isCompleted ? activeColor : Theme.of(context).dividerColor,
+                color: item.isCompleted
+                    ? activeColor
+                    : Theme.of(context).dividerColor,
                 width: 2,
               ),
               color: item.isCompleted ? activeColor : Colors.transparent,
@@ -234,11 +285,16 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
           style: TextStyle(
             fontSize: 16,
             decoration: item.isCompleted ? TextDecoration.lineThrough : null,
-            color: item.isCompleted ? AppTheme.textMutedColor(context) : AppTheme.textPrimaryColor(context),
+            color: item.isCompleted
+                ? AppTheme.textMutedColor(context)
+                : AppTheme.textPrimaryColor(context),
           ),
         ),
         trailing: IconButton(
-          icon: Icon(Icons.delete_outline, color: AppTheme.textMutedColor(context)),
+          icon: Icon(
+            Icons.delete_outline,
+            color: AppTheme.textMutedColor(context),
+          ),
           onPressed: () {
             ref.read(shoppingItemsProvider.notifier).deleteShoppingItem(item);
             ScaffoldMessenger.of(context).showSnackBar(
@@ -252,7 +308,9 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                     final originalPath = item.obsidianPath.isNotEmpty
                         ? item.obsidianPath
                         : 'shopping/${item.slug}.md';
-                    ref.read(vaultProvider.notifier).restoreObject(item, originalPath);
+                    ref
+                        .read(vaultProvider.notifier)
+                        .restoreObject(item, originalPath);
                   },
                 ),
               ),
@@ -270,7 +328,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
         color: AppTheme.surfaceColor(context),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -284,9 +342,11 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
               ChoiceChip(
                 label: const Text('🛒 Mercado'),
                 selected: !_isOutros,
-                selectedColor: AppColors.accent.withOpacity(0.2),
+                selectedColor: AppColors.accent.withValues(alpha: 0.2),
                 labelStyle: TextStyle(
-                  color: !_isOutros ? AppColors.accent : AppTheme.textMutedColor(context),
+                  color: !_isOutros
+                      ? AppColors.accent
+                      : AppTheme.textMutedColor(context),
                   fontWeight: !_isOutros ? FontWeight.bold : FontWeight.normal,
                 ),
                 onSelected: (val) {
@@ -300,9 +360,11 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
               ChoiceChip(
                 label: const Text('🏷️ Outros'),
                 selected: _isOutros,
-                selectedColor: AppColors.secondary.withOpacity(0.2),
+                selectedColor: AppColors.secondary.withValues(alpha: 0.2),
                 labelStyle: TextStyle(
-                  color: _isOutros ? AppColors.secondary : AppTheme.textMutedColor(context),
+                  color: _isOutros
+                      ? AppColors.secondary
+                      : AppTheme.textMutedColor(context),
                   fontWeight: _isOutros ? FontWeight.bold : FontWeight.normal,
                 ),
                 onSelected: (val) {
@@ -321,7 +383,9 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
             textInputAction: TextInputAction.done,
             onSubmitted: _submitItem,
             decoration: InputDecoration(
-              hintText: _isOutros ? 'Adicionar a Outros...' : 'Adicionar ao Mercado...',
+              hintText: _isOutros
+                  ? 'Adicionar a Outros...'
+                  : 'Adicionar ao Mercado...',
               hintStyle: TextStyle(color: AppTheme.textMutedColor(context)),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -329,9 +393,15 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
               ),
               filled: true,
               fillColor: Theme.of(context).scaffoldBackgroundColor,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
               suffixIcon: IconButton(
-                icon: Icon(Icons.arrow_upward_rounded, color: _isOutros ? AppColors.secondary : AppColors.accent),
+                icon: Icon(
+                  Icons.arrow_upward_rounded,
+                  color: _isOutros ? AppColors.secondary : AppColors.accent,
+                ),
                 onPressed: () => _submitItem(_textController.text),
               ),
             ),

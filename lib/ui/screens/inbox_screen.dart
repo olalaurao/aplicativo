@@ -20,7 +20,12 @@ class InboxScreen extends ConsumerStatefulWidget {
 class _InboxScreenState extends ConsumerState<InboxScreen> {
   final TextEditingController _captureController = TextEditingController();
   final FocusNode _captureFocus = FocusNode();
-  bool _isCapturing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _captureFocus.requestFocus());
+  }
 
   @override
   void dispose() {
@@ -35,8 +40,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     HapticFeedback.lightImpact();
     await ref.read(inboxProvider.notifier).addItem(text);
     _captureController.clear();
-    setState(() => _isCapturing = false);
-    _captureFocus.unfocus();
   }
 
   void _showTriageSheet(BuildContext ctx, InboxItem item) {
@@ -80,81 +83,32 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        actions: [
-          TextButton.icon(
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Capturar'),
-            onPressed: () {
-              setState(() => _isCapturing = true);
-              Future.delayed(
-                const Duration(milliseconds: 100),
-                () => _captureFocus.requestFocus(),
-              );
-            },
-          ),
-        ],
       ),
       body: Column(
         children: [
-          // Quick capture bar
-          AnimatedCrossFade(
-            duration: const Duration(milliseconds: 200),
-            crossFadeState: _isCapturing
-                ? CrossFadeState.showFirst
-                : CrossFadeState.showSecond,
-            firstChild: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppTheme.cardFillColor(context),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.primary, width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.12),
-                      blurRadius: 12,
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _captureController,
-                        focusNode: _captureFocus,
-                        decoration: const InputDecoration(
-                          hintText: 'O que está na sua cabeça?',
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                        ),
-                        style: const TextStyle(fontSize: 16),
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _capture(),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _capture,
-                      icon: const Icon(
-                        Icons.send_rounded,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () {
-                        setState(() => _isCapturing = false);
-                        _captureFocus.unfocus();
-                      },
-                      icon: const Icon(Icons.close_rounded, size: 20),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            secondChild: const SizedBox.shrink(),
-          ),
+          // Campo fixo no topo do body:
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            decoration: BoxDecoration(
+              color: AppTheme.cardFillColor(context),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.primary, width: 1.5),
+              boxShadow: [BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.10), blurRadius: 12)]),
+            child: Row(children: [
+              Expanded(child: TextField(
+                controller: _captureController,
+                focusNode: _captureFocus,
+                decoration: const InputDecoration(
+                  hintText: 'O que está na sua cabeça?',
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14)),
+                style: const TextStyle(fontSize: 16),
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _capture())),
+              IconButton(onPressed: _capture,
+                icon: const Icon(Icons.send_rounded, color: AppColors.primary)),
+            ])),
 
           // List
           Expanded(
@@ -164,13 +118,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               data: (items) {
                 if (items.isEmpty) {
                   return _EmptyInboxState(
-                    onCapture: () {
-                      setState(() => _isCapturing = true);
-                      Future.delayed(
-                        const Duration(milliseconds: 100),
-                        () => _captureFocus.requestFocus(),
-                      );
-                    },
+                    onCapture: () => _captureFocus.requestFocus(),
                   );
                 }
                 return ListView.separated(
@@ -185,22 +133,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                     return _InboxItemCard(
                       item: item,
                       onTriage: () => _showTriageSheet(ctx, item),
-                      onDelete: () async {
-                        HapticFeedback.mediumImpact();
-                        await ref.read(inboxProvider.notifier).deleteItem(item);
-                        if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            SnackBar(
-                              content: const Text('Item removido do Inbox'),
-                              action: SnackBarAction(
-                                label: 'OK',
-                                textColor: AppColors.primary,
-                                onPressed: () {},
-                              ),
-                            ),
-                          );
-                        }
-                      },
                     );
                   },
                 );
@@ -263,15 +195,13 @@ class _EmptyInboxState extends StatelessWidget {
 }
 
 // ─── Item Card ────────────────────────────────────────────────────────────────
-class _InboxItemCard extends StatelessWidget {
+class _InboxItemCard extends ConsumerWidget {
   final InboxItem item;
   final VoidCallback onTriage;
-  final VoidCallback onDelete;
 
   const _InboxItemCard({
     required this.item,
     required this.onTriage,
-    required this.onDelete,
   });
 
   String _formatDate(DateTime dt) {
@@ -285,20 +215,26 @@ class _InboxItemCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Dismissible(
       key: ValueKey(item.id),
-      direction: DismissDirection.endToStart,
       background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        decoration: BoxDecoration(
-          color: AppColors.error.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Icon(Icons.delete_rounded, color: AppColors.error),
-      ),
-      onDismissed: (_) => onDelete(),
+        alignment: Alignment.centerLeft, padding: const EdgeInsets.only(left: 20),
+        color: AppColors.habitGreen,
+        child: const Icon(Icons.archive_rounded, color: Colors.white)),
+      secondaryBackground: Container(
+        alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20),
+        color: AppColors.info,
+        child: const Icon(Icons.check_circle_outline_rounded, color: Colors.white)),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          await ref.read(inboxProvider.notifier).deleteItem(item);
+          return true;
+        } else {
+          onTriage();
+          return false;
+        }
+      },
       child: Material(
         color: AppTheme.cardFillColor(context),
         borderRadius: BorderRadius.circular(16),

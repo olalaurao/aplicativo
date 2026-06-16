@@ -3,7 +3,7 @@ import 'content_object.dart';
 import 'shared_types.dart';
 import 'reminder_config.dart';
 
-enum NoteSubtype { text, outline, collection }
+enum NoteSubtype { text, outline, collection, routine }
 
 class Note extends ContentObject {
   final NoteSubtype subtype;
@@ -12,6 +12,8 @@ class Note extends ContentObject {
   String? color;
   List<String> socialRefs;
   bool isChecklist;
+  String? schedulerSlug;
+  bool showInPlanner;
 
   Note({
     super.id,
@@ -21,6 +23,8 @@ class Note extends ContentObject {
     this.parentNoteId,
     this.color,
     this.isChecklist = false,
+    this.schedulerSlug,
+    this.showInPlanner = false,
     List<String>? socialRefs,
     super.organizers,
     super.categories,
@@ -47,6 +51,8 @@ class Note extends ContentObject {
     if (color != null) frontmatter['color'] = color;
     if (socialRefs.isNotEmpty) frontmatter['social_refs'] = socialRefs;
     if (isChecklist) frontmatter['is_checklist'] = true;
+    if (schedulerSlug != null) frontmatter['scheduler_slug'] = schedulerSlug;
+    if (showInPlanner) frontmatter['show_in_planner'] = true;
 
     final markdownBody = subtype == NoteSubtype.text
         ? normalizeRichTextBodyForMarkdown(body)
@@ -70,6 +76,8 @@ class Note extends ContentObject {
     note.parentNoteId = frontmatter['parent_note_id'] as String?;
     note.color = frontmatter['color'] as String?;
     note.isChecklist = frontmatter['is_checklist'] == true;
+    note.schedulerSlug = frontmatter['scheduler_slug']?.toString();
+    note.showInPlanner = frontmatter['show_in_planner'] == true;
     if (frontmatter['social_refs'] is List) {
       note.socialRefs = (frontmatter['social_refs'] as List)
           .map((e) => e.toString())
@@ -85,6 +93,8 @@ class Note extends ContentObject {
     String? parentNoteId,
     String? color,
     bool? isChecklist,
+    String? schedulerSlug,
+    bool? showInPlanner,
     List<String>? socialRefs,
     List<OrganizerReference>? organizers,
     List<String>? categories,
@@ -105,6 +115,8 @@ class Note extends ContentObject {
       parentNoteId: parentNoteId ?? this.parentNoteId,
       color: color ?? this.color,
       isChecklist: isChecklist ?? this.isChecklist,
+      schedulerSlug: schedulerSlug ?? this.schedulerSlug,
+      showInPlanner: showInPlanner ?? this.showInPlanner,
       socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,

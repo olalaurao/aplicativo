@@ -129,6 +129,7 @@ class WidgetService {
     await Future.wait([
       _updateCalendarProviders(),
       _updateTaskProviders(),
+      _update(_shoppingProvider),
       _update(_pomodoroProvider),
       _update(_quickAddProvider),
       _update(_noteProvider),

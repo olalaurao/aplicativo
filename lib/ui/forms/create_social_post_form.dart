@@ -3,10 +3,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../models/shared_types.dart';
 import '../../models/social_post.dart';
 import '../../models/content_object.dart';
+import '../../models/task_model.dart';
+import '../../models/project_model.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/oembed_service.dart';
@@ -14,6 +17,10 @@ import '../theme.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../widgets/social_post_grid_card.dart';
 import '../widgets/universal_search_picker.dart';
+
+enum _DuplicateAction { edit, doNothing, saveAnyway }
+
+enum _LinkAction { createTask, createProject, linkExisting, skip }
 
 class CreateSocialPostForm extends ConsumerStatefulWidget {
   final String? initialUrl;
@@ -82,7 +89,9 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
   Widget build(BuildContext context) {
     final canSave = _urlController.text.trim().isNotEmpty && !_isFetching;
 
-    final isDirty = _urlController.text.trim().isNotEmpty || _noteController.text.trim().isNotEmpty;
+    final isDirty =
+        _urlController.text.trim().isNotEmpty ||
+        _noteController.text.trim().isNotEmpty;
 
     return PopScope(
       canPop: !isDirty,
@@ -92,7 +101,9 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Descartar alterações?'),
-            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
+            content: const Text(
+              'Você possui alterações não salvas. Deseja sair mesmo assim?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -110,51 +121,52 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
           Navigator.pop(context, result);
         }
       },
-      child:  Scaffold(
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        leading: IconButton(
-          tooltip: 'Fechar',
-          icon: const Icon(Icons.close_rounded),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          widget.existingPost == null ? 'Novo post social' : 'Editar post',
-        ),
-        actions: [
-          TextButton(
-            onPressed: canSave ? _save : null,
-            child: const Text('Salvar'),
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(
+          leading: IconButton(
+            tooltip: 'Fechar',
+            icon: const Icon(Icons.close_rounded),
+            onPressed: () => Navigator.pop(context),
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildUrlSection(),
-              const SizedBox(height: 16),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: _draft == null && _errorText == null
-                    ? const SizedBox.shrink()
-                    : _buildPreviewSection(),
-              ),
-              const SizedBox(height: 16),
-              _buildNoteSection(),
-              const SizedBox(height: 16),
-              _buildOrganizerSection(),
-              const SizedBox(height: 16),
-              _buildLinkedObjectsSection(),
-              const SizedBox(height: 16),
-              _buildTagsSection(),
-            ],
+          title: Text(
+            widget.existingPost == null ? 'Novo post social' : 'Editar post',
+          ),
+          actions: [
+            TextButton(
+              onPressed: canSave ? _save : null,
+              child: const Text('Salvar'),
+            ),
+          ],
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildUrlSection(),
+                const SizedBox(height: 16),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: _draft == null && _errorText == null
+                      ? const SizedBox.shrink()
+                      : _buildPreviewSection(),
+                ),
+                const SizedBox(height: 16),
+                _buildNoteSection(),
+                const SizedBox(height: 16),
+                _buildOrganizerSection(),
+                const SizedBox(height: 16),
+                _buildLinkedObjectsSection(),
+                const SizedBox(height: 16),
+                _buildTagsSection(),
+              ],
+            ),
           ),
         ),
       ),
-    ));
+    );
   }
 
   Widget _buildUrlSection() {
@@ -528,17 +540,80 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
 
   Future<void> _save() async {
     _commitTag();
-    final post = _buildPostForSave();
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
+
+    if (widget.existingPost == null) {
+      final url = _urlController.text.trim();
+      final existing = ref
+          .read(socialPostsProvider)
+          .where((p) => p.url.trim() == url)
+          .toList();
+      if (existing.isNotEmpty) {
+        final existingPost = existing.first;
+        final action = await showDialog<_DuplicateAction>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Link já salvo'),
+            content: Text(
+              'Este link já foi salvo em ${_formatDate(existingPost.createdAt)}. O que deseja fazer?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, _DuplicateAction.doNothing),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, _DuplicateAction.edit),
+                child: const Text('Editar existente'),
+              ),
+              TextButton(
+                onPressed: () =>
+                    Navigator.pop(ctx, _DuplicateAction.saveAnyway),
+                child: const Text('Salvar novo'),
+              ),
+            ],
+          ),
+        );
+        if (action == null || action == _DuplicateAction.doNothing) return;
+        if (action == _DuplicateAction.edit) {
+          if (!mounted) return;
+          navigator.pop();
+          navigator.push(
+            MaterialPageRoute(
+              builder: (_) => CreateSocialPostForm(existingPost: existingPost),
+            ),
+          );
+          return;
+        }
+      }
+    }
+
+    final post = _buildPostForSave();
     if (widget.existingPost == null) {
       await ref.read(socialPostsProvider.notifier).addPost(post);
     } else {
       await ref.read(socialPostsProvider.notifier).updatePost(post);
     }
     if (!mounted) return;
+
+    final linkAction = await _showLinkOfferSheet(post);
+    if (!mounted) return;
+    if (linkAction == _LinkAction.createTask) {
+      await _createAndLinkTask(post);
+    } else if (linkAction == _LinkAction.createProject) {
+      await _createAndLinkProject(post);
+    } else if (linkAction == _LinkAction.linkExisting) {
+      await _linkExistingObject(post);
+    }
+
+    if (!mounted) return;
     navigator.pop();
     messenger.showSnackBar(const SnackBar(content: Text('Post salvo')));
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} às ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
   SocialPost _buildPostForSave() {
@@ -594,6 +669,157 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
         },
       ),
     );
+  }
+
+  Future<_LinkAction?> _showLinkOfferSheet(SocialPost post) {
+    return showModalBottomSheet<_LinkAction>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: AppTheme.sheetDecoration(context),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.dividerColor(context),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Vincular este post?',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                post.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textMutedColor(context),
+                ),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.add_task_rounded),
+                title: const Text('Criar tarefa relacionada'),
+                onTap: () => Navigator.pop(ctx, _LinkAction.createTask),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.folder_outlined),
+                title: const Text('Criar projeto relacionado'),
+                onTap: () => Navigator.pop(ctx, _LinkAction.createProject),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.link_rounded),
+                title: const Text('Vincular a existente'),
+                onTap: () => Navigator.pop(ctx, _LinkAction.linkExisting),
+              ),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx, _LinkAction.skip),
+                  child: const Text('Pular'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createAndLinkTask(SocialPost post) async {
+    final postRef = _objectWikiLink(post);
+    final task = Task(
+      id: const Uuid().v4(),
+      title: post.title,
+      stage: TaskStage.todo,
+      notes: [
+        if (post.personalNote?.trim().isNotEmpty == true)
+          post.personalNote!.trim(),
+        if (post.caption?.trim().isNotEmpty == true) post.caption!.trim(),
+        post.url,
+      ],
+      socialRefs: [postRef],
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    await ref.read(tasksProvider.notifier).addTask(task);
+    await _appendSocialRef(post, _objectWikiLink(task));
+  }
+
+  Future<void> _createAndLinkProject(SocialPost post) async {
+    final postRef = _objectWikiLink(post);
+    final project = Project(
+      id: const Uuid().v4(),
+      title: post.title,
+      description: post.personalNote ?? post.caption,
+      quickAccessLinks: [postRef],
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    await ref.read(projectsProvider.notifier).addProject(project);
+    await _appendSocialRef(post, _objectWikiLink(project));
+  }
+
+  Future<void> _linkExistingObject(SocialPost post) async {
+    ContentObject? selected;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => UniversalSearchPickerSheet(
+        title: 'Vincular objeto',
+        showClear: false,
+        onSelected: (object) {
+          selected = object;
+          Navigator.pop(sheetContext);
+        },
+      ),
+    );
+    final object = selected;
+    if (object == null) return;
+
+    await _appendSocialRef(post, _objectWikiLink(object));
+
+    final postRef = _objectWikiLink(post);
+    if (object is Task && !object.socialRefs.contains(postRef)) {
+      await ref
+          .read(tasksProvider.notifier)
+          .updateTask(
+            object.copyWith(socialRefs: [...object.socialRefs, postRef]),
+          );
+    } else if (object is Project &&
+        !object.quickAccessLinks.contains(postRef)) {
+      object.quickAccessLinks = [...object.quickAccessLinks, postRef];
+      object.updatedAt = DateTime.now();
+      await ref.read(projectsProvider.notifier).updateProject(object);
+    }
+  }
+
+  Future<void> _appendSocialRef(SocialPost post, String refLink) async {
+    if (post.socialRefs.any((ref) => _sameRef(ref, refLink, post))) return;
+    final updatedPost = post.copyWith(
+      socialRefs: [...post.socialRefs, refLink],
+      updatedAt: DateTime.now(),
+    );
+    await ref.read(socialPostsProvider.notifier).updatePost(updatedPost);
   }
 
   List<ContentObject> _resolveRefs(

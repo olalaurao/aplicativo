@@ -368,9 +368,13 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                 if (moodOverviewEntries.isNotEmpty)
                   _buildMoodOverview(moodOverviewEntries, moods),
                 const Divider(height: 1),
+                // Active filter banner
+                if (_filterMood != null || _filterHasPhoto || _onlySelectedDate)
+                  _buildActiveFilterBanner(moods),
               ],
             ),
           ),
+
           if (pendingReminders.isNotEmpty)
             SliverToBoxAdapter(
               child: _buildPendingRemindersSummary(pendingReminders),
@@ -660,6 +664,59 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  String _resolveMoodLabel(WidgetRef ref, String moodId) {
+    final moods = ref.read(moodsProvider);
+    final mood = moods.where((m) => m.id == moodId || m.slug == moodId).firstOrNull;
+    return mood != null ? '${mood.emoji} ${mood.title}' : moodId;
+  }
+
+  Widget _activeFilterChip(String label, VoidCallback onRemove) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: AppColors.primary.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(20)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Text(label, style: const TextStyle(
+        fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600)),
+      const SizedBox(width: 4),
+      GestureDetector(onTap: onRemove,
+        child: const Icon(Icons.close_rounded, size: 12, color: AppColors.primary)),
+    ]));
+
+  Widget _buildActiveFilterBanner(List<MoodDefinition> moods) {
+    return Container(
+      color: AppColors.primary.withValues(alpha: 0.06),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+      child: Row(children: [
+        const Icon(Icons.filter_list_rounded, size: 14, color: AppColors.primary),
+        const SizedBox(width: 6),
+        if (_filterMood != null) ...[
+          _activeFilterChip(
+            _resolveMoodLabel(ref, _filterMood!),
+            () => setState(() => _filterMood = null)),
+          const SizedBox(width: 6),
+        ],
+        if (_filterHasPhoto) ...[
+          _activeFilterChip('📷 Com foto', () => setState(() => _filterHasPhoto = false)),
+          const SizedBox(width: 6),
+        ],
+        if (_onlySelectedDate)
+          _activeFilterChip(
+            DateFormat('d MMM', 'pt_BR').format(_selectedDate),
+            () => setState(() => _onlySelectedDate = false)),
+        const Spacer(),
+        GestureDetector(
+          onTap: () => setState(() {
+            _filterMood = null;
+            _filterHasPhoto = false;
+            _onlySelectedDate = false;
+          }),
+          child: const Text('Limpar', style: TextStyle(
+            fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600))),
+      ]),
     );
   }
 

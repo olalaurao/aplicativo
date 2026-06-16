@@ -1,6 +1,7 @@
 // lib/ui/screens/people_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/vault_provider.dart';
 import '../../models/people_model.dart';
 import '../theme.dart';
@@ -9,13 +10,34 @@ import '../widgets/empty_state.dart';
 import '../widgets/object_action_wrapper.dart';
 import 'universal_detail_view.dart';
 
-class PeopleScreen extends ConsumerWidget {
+class PeopleScreen extends ConsumerStatefulWidget {
   const PeopleScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PeopleScreen> createState() => _PeopleScreenState();
+}
+
+class _PeopleScreenState extends ConsumerState<PeopleScreen> {
+  bool _isListView = false;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final allPeople = ref.watch(peopleProvider);
-    final sortedPeople = allPeople.toList()
+    final filtered = allPeople.where((p) {
+      if (_searchQuery.isEmpty) return true;
+      final q = _searchQuery.toLowerCase();
+      return p.title.toLowerCase().contains(q) ||
+          (p.email?.toLowerCase().contains(q) ?? false) ||
+          (p.phone?.toLowerCase().contains(q) ?? false);
+    }).toList()
       ..sort((a, b) {
         final aDue = a.isDueForContact;
         final bDue = b.isDueForContact;
@@ -25,35 +47,78 @@ class PeopleScreen extends ConsumerWidget {
       });
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: AppTheme.backgroundColor(context),
       body: CustomScrollView(
         key: const PageStorageKey('people-scroll'),
         slivers: [
           SliverAppBar(
-            title: const Text('People & Contacts'),
+            title: const Text('Pessoas & Contatos'),
             floating: true,
             pinned: true,
             actions: [
+              IconButton(
+                icon: Icon(_isListView
+                    ? Icons.grid_view_rounded
+                    : Icons.list_rounded),
+                tooltip: _isListView ? 'Grade' : 'Lista',
+                onPressed: () => setState(() => _isListView = !_isListView),
+              ),
               IconButton(
                 icon: const Icon(Icons.person_add_rounded),
                 onPressed: () => _openCreatePerson(context),
               ),
             ],
           ),
-          if (sortedPeople.isEmpty)
+          // Search field
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceVariantColor(context),
+                  borderRadius: BorderRadius.circular(14)),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar pessoas…',
+                    hintStyle: TextStyle(color: AppTheme.textMutedColor(context)),
+                    prefixIcon: Icon(Icons.search_rounded,
+                        color: AppTheme.textMutedColor(context)),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            })
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12)),
+                ),
+              ),
+            ),
+          ),
+          if (filtered.isEmpty)
             SliverFillRemaining(
               child: EmptyState(
                 icon: Icons.people_rounded,
-                headline: 'No contacts yet',
-                subtext:
-                    'Add important people to keep your network active and healthy.',
-                ctaLabel: 'Add Person',
+                headline: 'Nenhum contato ainda',
+                subtext: 'Adicione pessoas importantes para manter sua rede ativa.',
+                ctaLabel: 'Adicionar Pessoa',
                 onCta: () => _openCreatePerson(context),
+              ),
+            )
+          else if (_isListView)
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (ctx, i) => _buildPersonListTile(ctx, filtered[i]),
+                childCount: filtered.length,
               ),
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               sliver: SliverGrid(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
@@ -62,171 +127,181 @@ class PeopleScreen extends ConsumerWidget {
                   childAspectRatio: 0.62,
                 ),
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) =>
-                      _buildPersonCard(context, ref, sortedPeople[index]),
-                  childCount: sortedPeople.length,
+                  (ctx, i) => _buildPersonCard(ctx, filtered[i]),
+                  childCount: filtered.length,
                 ),
               ),
             ),
+          const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
       ),
     );
   }
 
-  Widget _buildPersonCard(BuildContext context, WidgetRef ref, Person person) {
-    final daysSince = person.lastContactDate != null
-        ? DateTime.now().difference(person.lastContactDate!).inDays
-        : null;
+  Widget _buildPersonListTile(BuildContext context, Person person) {
+    final urgencyColor = _urgencyColor(person);
+    return ObjectActionWrapper(
+      object: person,
+      child: ListTile(
+        leading: Stack(children: [
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: AppColors.surfaceVariant,
+            backgroundImage: person.photo != null ? NetworkImage(person.photo!) : null,
+            child: person.photo == null
+                ? const Icon(Icons.person, size: 22, color: AppColors.textMuted)
+                : null,
+          ),
+          if (person.isDueForContact)
+            Positioned(top: 0, right: 0,
+              child: Container(width: 10, height: 10,
+                decoration: BoxDecoration(color: AppColors.error,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Theme.of(context).scaffoldBackgroundColor, width: 1.5)))),
+        ]),
+        title: Text(person.title,
+          maxLines: 1, overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+        subtitle: Text(_urgencyLabel(person),
+          style: TextStyle(fontSize: 12, color: urgencyColor, fontWeight: FontWeight.w600)),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          _contactActionWidget(person, Icons.chat_bubble_outline_rounded,
+              AppColors.primary, _ContactType.sms),
+          const SizedBox(width: 6),
+          _contactActionWidget(person, Icons.call_outlined,
+              AppColors.habitGreen, _ContactType.call),
+        ]),
+        onTap: () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) => UniversalDetailView(object: person))),
+      ),
+    );
+  }
 
-    final frequencyDays = person.contactFrequency?.inDays;
-    
-    double urgencyRatio = 0.0;
-    if (frequencyDays != null && frequencyDays > 0) {
-      urgencyRatio = (daysSince ?? (frequencyDays + 1)) / frequencyDays;
-    } else if (daysSince != null) {
-      urgencyRatio = daysSince > 30 ? 1.2 : 0.4;
-    } else {
-      urgencyRatio = 1.2; // Never contacted, default to overdue/high urgency
-    }
-
-    Color urgencyColor;
-    String urgencyLabel;
-
-    if (urgencyRatio > 1.0) {
-      urgencyColor = AppColors.error;
-      urgencyLabel = daysSince != null ? 'Atrasado ($daysSince dias)' : 'Nunca contatado';
-    } else if (urgencyRatio > 0.7) {
-      urgencyColor = AppColors.warning;
-      urgencyLabel = daysSince != null ? 'Próximo ($daysSince dias)' : 'Próximo';
-    } else {
-      urgencyColor = AppColors.habitGreen;
-      urgencyLabel = daysSince != null ? 'OK ($daysSince dias)' : 'OK';
-    }
+  Widget _buildPersonCard(BuildContext context, Person person) {
+    final urgencyColor = _urgencyColor(person);
+    final urgencyLabel = _urgencyLabel(person);
 
     return ObjectActionWrapper(
       object: person,
       child: InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => UniversalDetailView(object: person),
-          ),
-        ),
+        onTap: () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) => UniversalDetailView(object: person))),
         borderRadius: BorderRadius.circular(20),
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: AppTheme.cardDecoration(context),
-          child: Column(
-            children: [
-              Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: AppColors.surfaceVariant,
-                    backgroundImage: person.photo != null
-                        ? NetworkImage(person.photo!)
-                        : null,
-                    child: person.photo == null
-                        ? const Icon(
-                            Icons.person,
-                            size: 30,
-                            color: AppColors.textMuted,
-                          )
-                        : null,
-                  ),
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: urgencyColor,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        urgencyRatio > 1.0
-                            ? Icons.priority_high_rounded
-                            : (urgencyRatio > 0.7
-                                ? Icons.warning_amber_rounded
-                                : Icons.check_rounded),
-                        size: 10,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
+          child: Column(children: [
+            Stack(children: [
+              CircleAvatar(
+                radius: 30,
+                backgroundColor: AppColors.surfaceVariant,
+                backgroundImage: person.photo != null ? NetworkImage(person.photo!) : null,
+                child: person.photo == null
+                    ? const Icon(Icons.person, size: 30, color: AppColors.textMuted)
+                    : null,
               ),
-              const SizedBox(height: 10),
-              Text(
-                person.title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              Text(
-                urgencyLabel,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: urgencyColor,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              if (person.contactFrequency != null)
-                Text(
-                  'A cada ${person.contactFrequency!.inDays} dias',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: AppTheme.textMutedColor(context),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _contactAction(
-                    Icons.chat_bubble_outline_rounded,
-                    AppColors.primary,
-                    () {},
-                  ),
-                  const SizedBox(width: 8),
-                  _contactAction(
-                    Icons.call_outlined,
-                    AppColors.habitGreen,
-                    () {},
-                  ),
-                ],
-              ),
-            ],
-          ),
+              if (person.isDueForContact)
+                Positioned(top: 0, right: 0,
+                  child: Container(width: 10, height: 10,
+                    decoration: BoxDecoration(color: AppColors.error,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Theme.of(context).scaffoldBackgroundColor, width: 1.5)))),
+            ]),
+            const SizedBox(height: 10),
+            Text(person.title,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+              textAlign: TextAlign.center,
+              maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(urgencyLabel,
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: urgencyColor),
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 4),
+            if (person.contactFrequency != null)
+              Text('A cada ${person.contactFrequency!.inDays} dias',
+                style: TextStyle(fontSize: 10, color: AppTheme.textMutedColor(context)),
+                maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 10),
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              _contactActionWidget(person, Icons.chat_bubble_outline_rounded,
+                  AppColors.primary, _ContactType.sms),
+              const SizedBox(width: 8),
+              _contactActionWidget(person, Icons.call_outlined,
+                  AppColors.habitGreen, _ContactType.call),
+            ]),
+          ]),
         ),
       ),
     );
   }
 
-  Widget _contactAction(IconData icon, Color color, VoidCallback onTap) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Icon(icon, size: 18, color: color),
+  Color _urgencyColor(Person person) {
+    final daysSince = person.lastContactDate != null
+        ? DateTime.now().difference(person.lastContactDate!).inDays
+        : null;
+    final freqDays = person.contactFrequency?.inDays;
+    double ratio = 0.0;
+    if (freqDays != null && freqDays > 0) {
+      ratio = (daysSince ?? (freqDays + 1)) / freqDays;
+    } else if (daysSince != null) {
+      ratio = daysSince > 30 ? 1.2 : 0.4;
+    } else {
+      ratio = 1.2;
+    }
+    if (ratio > 1.0) return AppColors.error;
+    if (ratio > 0.7) return AppColors.warning;
+    return AppColors.habitGreen;
+  }
+
+  String _urgencyLabel(Person person) {
+    final daysSince = person.lastContactDate != null
+        ? DateTime.now().difference(person.lastContactDate!).inDays
+        : null;
+    final freqDays = person.contactFrequency?.inDays;
+    double ratio = 0.0;
+    if (freqDays != null && freqDays > 0) {
+      ratio = (daysSince ?? (freqDays + 1)) / freqDays;
+    } else if (daysSince != null) {
+      ratio = daysSince > 30 ? 1.2 : 0.4;
+    } else {
+      ratio = 1.2;
+    }
+    if (ratio > 1.0) return daysSince != null ? 'Atrasado ($daysSince dias)' : 'Nunca contatado';
+    if (ratio > 0.7) return daysSince != null ? 'Próximo ($daysSince dias)' : 'Próximo';
+    return daysSince != null ? 'OK ($daysSince dias)' : 'OK';
+  }
+
+  Widget _contactActionWidget(
+      Person person, IconData icon, Color color, _ContactType type) {
+    return GestureDetector(
+      onTap: () async {
+        if (person.phone == null || person.phone!.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Nenhum telefone cadastrado')));
+          }
+          return;
+        }
+        final uri = type == _ContactType.sms
+            ? Uri.parse('sms:${person.phone}')
+            : Uri.parse('tel:${person.phone}');
+        if (await canLaunchUrl(uri)) await launchUrl(uri);
+      },
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(10)),
+        child: Icon(icon, color: color, size: 18)),
     );
   }
 
   void _openCreatePerson(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const CreatePersonForm()),
-    );
+    Navigator.push(context,
+      MaterialPageRoute(builder: (_) => const CreatePersonForm()));
   }
 }
+
+enum _ContactType { sms, call }
+

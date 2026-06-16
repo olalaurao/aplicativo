@@ -758,6 +758,12 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                   left: 0,
                   right: 0,
                   child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onVerticalDragStart: (_) {
+                      setState(() {
+                        _localDurations[task.id] = task.duration;
+                      });
+                    },
                     onVerticalDragUpdate: (details) {
                       final newHeight = height + details.delta.dy;
                       const hourHeight = 80.0;
@@ -774,7 +780,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                       widget.onDurationChange?.call(task, finalDuration);
                     },
                     child: Container(
-                      height: isTiny ? 8 : 16,
+                      height: isTiny ? 12 : 24,
                       color: Colors.transparent,
                       child: Center(
                         child: Container(

@@ -1,16 +1,18 @@
-// lib/ui/screens/resources_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../models/resource_model.dart';
+import '../../models/saved_filter.dart';
+import '../../services/markdown_parser.dart';
 import '../theme.dart';
 import '../forms/create_resource_form.dart';
 import '../widgets/empty_state.dart';
-import '../widgets/object_action_wrapper.dart';
-import '../widgets/rich_text_editor.dart';
+import '../widgets/filter_sort_sheet.dart';
+import 'universal_detail_view.dart';
+
+enum ResourceViewMode { shelfHighlights, listHighlights }
 
 class ResourcesScreen extends ConsumerStatefulWidget {
   const ResourcesScreen({super.key});
@@ -20,15 +22,20 @@ class ResourcesScreen extends ConsumerStatefulWidget {
 }
 
 class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
-  bool _isGridView = true;
+  ResourceViewMode _resourceViewMode = ResourceViewMode.shelfHighlights;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  final Set<String> _selectedTypes = {};
-  final Set<ResourceStatus> _selectedStatuses = {};
-  final Set<String> _selectedCategories = {};
-  String _sortBy = 'manual'; // manual, title, rating, modified
-  bool _sortAscending = true;
-  String? _expandedResourceId;
+  
+  SavedFilter? _activeFilter;
+  List<SavedFilter> _savedFilters = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(() => _savedFilters = ref.read(settingsProvider).filtersFor('resource'));
+    });
+  }
 
   @override
   void dispose() {
@@ -36,73 +43,55 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     super.dispose();
   }
 
+  List<T> _applyFilterAndSort<T>(List<T> all) {
+    var result = (_activeFilter?.apply(all) ?? all).where((item) {
+      if (_searchQuery.isEmpty) return true;
+      final res = item as Resource;
+      final haystack = [
+        res.title, res.author, res.category, res.resourceType,
+        res.synopsis, ...res.tags, ...res.aliases,
+      ].whereType<String>().join(' ').toLowerCase();
+      return haystack.contains(_searchQuery.toLowerCase());
+    }).toList();
+
+    final sort = _activeFilter?.sortBy ?? SortField.modified;
+    final asc  = _activeFilter?.sortAscending ?? false;
+    result.sort((a, b) {
+      final cmp = switch (sort) {
+        SortField.title    => (a as dynamic).title.compareTo((b as dynamic).title),
+        SortField.created  => ((a as dynamic).createdAt ?? DateTime(0))
+                                .compareTo((b as dynamic).createdAt ?? DateTime(0)),
+        SortField.modified => ((a as dynamic).updatedAt ?? DateTime(0))
+                                .compareTo((b as dynamic).updatedAt ?? DateTime(0)),
+        SortField.manual   => ((a as dynamic).order ?? 0).compareTo((b as dynamic).order ?? 0),
+        SortField.rating   => ((a as dynamic).rating ?? 0).compareTo((b as dynamic).rating ?? 0),
+        SortField.status   => ((a as dynamic).status?.name ?? '').compareTo((b as dynamic).status?.name ?? ''),
+        SortField.type     => ((a as dynamic).resourceType ?? '').compareTo((b as dynamic).resourceType ?? ''),
+        _ => 0,
+      };
+      return asc ? cmp : -cmp;
+    });
+    return result;
+  }
+
+  void _openFilterSheet() => FilterSortSheet.show(
+    context: context, ref: ref,
+    targetType: 'resource',
+    currentFilter: _activeFilter,
+    availableProperties: ResourceFilterProperties.all,
+    onApply: (f) => setState(() {
+      _activeFilter = f;
+      _savedFilters = ref.read(settingsProvider).filtersFor('resource');
+      if (f != null) {
+        if (f.viewMode == ViewMode.grid) _resourceViewMode = ResourceViewMode.shelfHighlights;
+        else _resourceViewMode = ResourceViewMode.listHighlights;
+      }
+    }));
+
   @override
   Widget build(BuildContext context) {
     final resources = ref.watch(resourcesProvider);
-    final settings = ref.watch(settingsProvider);
-
-    final categories =
-        resources
-            .map((resource) => resource.category?.trim())
-            .whereType<String>()
-            .where((category) => category.isNotEmpty)
-            .toSet()
-            .toList()
-          ..sort();
-
-    List<Resource> filtered = resources.where((resource) {
-      if (_selectedTypes.isNotEmpty &&
-          !_selectedTypes.contains(resource.resourceType)) {
-        return false;
-      }
-      if (_selectedStatuses.isNotEmpty &&
-          !_selectedStatuses.contains(resource.status)) {
-        return false;
-      }
-      if (_selectedCategories.isNotEmpty &&
-          !_selectedCategories.contains(resource.category?.trim())) {
-        return false;
-      }
-      if (_searchQuery.trim().isNotEmpty) {
-        final query = _searchQuery.toLowerCase().trim();
-        final haystack = [
-          resource.title,
-          resource.author,
-          resource.category,
-          resource.resourceType,
-          resource.synopsis,
-          ...resource.tags,
-          ...resource.aliases,
-        ].whereType<String>().join(' ').toLowerCase();
-        if (!haystack.contains(query)) return false;
-      }
-      return true;
-    }).toList();
-
-    // Sorting
-    filtered.sort((a, b) {
-      final result = switch (_sortBy) {
-        'manual' => (a.order ?? 0).compareTo(b.order ?? 0),
-        'title' => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
-        'status' => a.status.name.compareTo(b.status.name),
-        'type' => a.resourceType.toLowerCase().compareTo(
-          b.resourceType.toLowerCase(),
-        ),
-        'category' => (a.category ?? '').toLowerCase().compareTo(
-          (b.category ?? '').toLowerCase(),
-        ),
-        'rating' => a.rating.compareTo(b.rating),
-        'modified' || _ => a.updatedAt.compareTo(b.updatedAt),
-      };
-      return _sortAscending ? result : -result;
-    });
-
-    final types =
-        settings.resourceTypeFilters
-            .where((t) => t.trim().isNotEmpty)
-            .toSet()
-            .toList()
-          ..sort();
+    final filtered = _applyFilterAndSort(resources).cast<Resource>();
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -114,20 +103,21 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
             floating: true,
             pinned: true,
             actions: [
-              _buildDisplaySettingsButton(),
-              _buildSortButton(),
               IconButton(
                 icon: const Icon(Icons.tune_rounded),
-                tooltip: 'Editar filtros',
-                onPressed: () => _showFilterEditor(types),
+                onPressed: _openFilterSheet,
               ),
               IconButton(
                 icon: Icon(
-                  _isGridView
+                  _resourceViewMode == ResourceViewMode.listHighlights
                       ? Icons.view_list_rounded
                       : Icons.grid_view_rounded,
                 ),
-                onPressed: () => setState(() => _isGridView = !_isGridView),
+                onPressed: () => setState(() {
+                  _resourceViewMode = _resourceViewMode == ResourceViewMode.shelfHighlights
+                      ? ResourceViewMode.listHighlights
+                      : ResourceViewMode.shelfHighlights;
+                }),
               ),
               IconButton(
                 icon: const Icon(Icons.add_link_rounded),
@@ -142,40 +132,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Row(
                 children: [
-                  _clearFilterChip(),
-                  ...types.map(
-                    (type) => _filterChip(
-                      type,
-                      _selectedTypes.contains(type),
-                      () => setState(() {
-                        if (!_selectedTypes.add(type)) {
-                          _selectedTypes.remove(type);
-                        }
-                      }),
-                    ),
-                  ),
-                  ...ResourceStatus.values.map(
-                    (status) => _filterChip(
-                      _statusLabel(status),
-                      _selectedStatuses.contains(status),
-                      () => setState(() {
-                        if (!_selectedStatuses.add(status)) {
-                          _selectedStatuses.remove(status);
-                        }
-                      }),
-                    ),
-                  ),
-                  ...categories.map(
-                    (category) => _filterChip(
-                      category,
-                      _selectedCategories.contains(category),
-                      () => setState(() {
-                        if (!_selectedCategories.add(category)) {
-                          _selectedCategories.remove(category);
-                        }
-                      }),
-                    ),
-                  ),
+                  _chip('Todos', _activeFilter == null, () => setState(() => _activeFilter = null)),
+                  ..._savedFilters.map((f) => _chip(f.name, _activeFilter?.id == f.id,
+                    () => setState(() => _activeFilter = f))),
                 ],
               ),
             ),
@@ -191,37 +150,21 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                 onCta: _openCreateResource,
               ),
             )
-          else if (_isGridView)
+          else if (_resourceViewMode == ResourceViewMode.shelfHighlights) ...[
+            SliverToBoxAdapter(child: _buildShelf(filtered)),
+            SliverToBoxAdapter(child: _buildHighlightsFeed(filtered)),
+          ] else
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 0.65,
-                ),
+              sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) =>
-                      _buildResourceCard(context, filtered[index]),
+                  (context, index) => Padding(
+                    key: ValueKey(filtered[index].id),
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildResourceListTile(context, filtered[index]),
+                  ),
                   childCount: filtered.length,
                 ),
-              ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              sliver: SliverReorderableList(
-                itemBuilder: (context, index) => Padding(
-                  key: ValueKey(filtered[index].id),
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _buildResourceListTile(context, filtered[index]),
-                ),
-                itemCount: filtered.length,
-                onReorder: (oldIndex, newIndex) {
-                  if (_sortBy != 'manual') return;
-                  _onReorder(filtered, oldIndex, newIndex);
-                },
               ),
             ),
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
@@ -229,6 +172,18 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
       ),
     );
   }
+
+  Widget _chip(String label, bool selected, VoidCallback onTap) => GestureDetector(
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: selected ? AppColors.primary : AppTheme.surfaceVariantColor(context),
+        borderRadius: BorderRadius.circular(20)),
+      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+        color: selected ? Colors.black : AppTheme.textSecondaryColor(context)))));
 
   Widget _buildSearchField() {
     return Padding(
@@ -255,520 +210,148 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     );
   }
 
-  Widget _buildSortButton() {
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.sort_rounded),
-      onSelected: (val) => setState(() {
-        if (val == 'direction') {
-          _sortAscending = !_sortAscending;
-        } else {
-          _sortBy = val;
-        }
-      }),
-      itemBuilder: (ctx) => [
-        const PopupMenuItem(value: 'manual', child: Text('Sort Manually')),
-        const PopupMenuItem(value: 'modified', child: Text('Sort by Modified')),
-        const PopupMenuItem(value: 'rating', child: Text('Sort by Rating')),
-        const PopupMenuItem(value: 'title', child: Text('Sort by Title')),
-        const PopupMenuItem(value: 'status', child: Text('Sort by Status')),
-        const PopupMenuItem(value: 'type', child: Text('Sort by Type')),
-        const PopupMenuItem(value: 'category', child: Text('Sort by Category')),
-        PopupMenuItem(
-          value: 'direction',
-          child: Text(_sortAscending ? 'Direction: Asc' : 'Direction: Desc'),
-        ),
-      ],
-    );
-  }
+  Widget _buildShelf(List<Resource> resources) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(padding: const EdgeInsets.fromLTRB(16,12,16,6),
+        child: Text('RECENTES', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+          letterSpacing: 0.10, color: AppTheme.textMutedColor(context)))),
+      SizedBox(height: 108, child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: resources.take(8).length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (ctx, i) => _buildShelfItem(ctx, resources.take(8).toList()[i]))),
+    ]);
 
-  Widget _buildDisplaySettingsButton() {
-    final settings = ref.watch(settingsProvider);
-    final visibleFields = settings.visibleResourceFields;
+  Widget _buildShelfItem(BuildContext context, Resource resource) =>
+    GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(
+        builder: (_) => UniversalDetailView(object: resource))),
+      child: SizedBox(width: 72, child: Column(children: [
+        Container(
+          width: 72, height: 72, clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(10),
+            color: AppColors.surfaceVariant),
+          child: resource.coverImage?.isNotEmpty == true
+            ? Image.network(resource.coverImage!, fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _fallbackIcon(resource))
+            : _fallbackIcon(resource)),
+        const SizedBox(height: 4),
+        Text(resource.title, maxLines: 1, overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700)),
+        Text(resource.author ?? '', maxLines: 1, overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 8, color: AppTheme.textMutedColor(context))),
+      ])));
 
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.settings_display_rounded),
-      tooltip: 'Display Settings',
-      onSelected: (val) {
-        final newFields = List<String>.from(visibleFields);
-        if (newFields.contains(val)) {
-          newFields.remove(val);
-        } else {
-          newFields.add(val);
-        }
-        ref
-            .read(settingsProvider.notifier)
-            .updateVisibleResourceFields(newFields);
-      },
-      itemBuilder: (ctx) => [
-        CheckedPopupMenuItem(
-          value: 'author',
-          checked: visibleFields.contains('author'),
-          child: const Text('Show Author'),
-        ),
-        CheckedPopupMenuItem(
-          value: 'rating',
-          checked: visibleFields.contains('rating'),
-          child: const Text('Show Rating'),
-        ),
-        CheckedPopupMenuItem(
-          value: 'type',
-          checked: visibleFields.contains('type'),
-          child: const Text('Show Type'),
-        ),
-      ],
-    );
-  }
-
-  void _onReorder(List<Resource> list, int oldIndex, int newIndex) {
-    setState(() {
-      if (newIndex > oldIndex) newIndex -= 1;
-      final item = list.removeAt(oldIndex);
-      list.insert(newIndex, item);
-
-      // Update order field for all items in the list to persist
-      for (int i = 0; i < list.length; i++) {
-        final current = list[i];
-        if (current.order != i) {
-          final updated = current.copyWith(order: i);
-          ref.read(vaultProvider.notifier).updateObject(updated);
-        }
-      }
-    });
-  }
-
-  Widget _clearFilterChip() {
-    final selected =
-        _selectedTypes.isEmpty &&
-        _selectedStatuses.isEmpty &&
-        _selectedCategories.isEmpty;
-    return _filterChip('Todos', selected, () {
-      setState(() {
-        _selectedTypes.clear();
-        _selectedStatuses.clear();
-        _selectedCategories.clear();
-      });
-    });
-  }
-
-  Widget _filterChip(String label, bool selected, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.primary
-              : AppTheme.surfaceVariantColor(context),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: selected
-                ? Colors.white
-                : AppTheme.textSecondaryColor(context),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showFilterEditor(List<String> currentTypes) {
-    final controller = TextEditingController();
-    final filters = List<String>.from(currentTypes);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          void addFilter() {
-            final value = controller.text.trim();
-            if (value.isEmpty || filters.contains(value)) return;
-            setSheetState(() {
-              filters.add(value);
-              filters.sort();
-              controller.clear();
-            });
-          }
-
-          return SafeArea(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                16,
-                20,
-                16 + MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Text(
-                        'Filtros de recursos',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: controller,
-                          textInputAction: TextInputAction.done,
-                          onSubmitted: (_) => addFilter(),
-                          decoration: const InputDecoration(
-                            hintText: 'Novo filtro',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton.filled(
-                        icon: const Icon(Icons.add_rounded),
-                        onPressed: addFilter,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: filters.length,
-                      itemBuilder: (context, index) {
-                        final filter = filters[index];
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            filter,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.edit_outlined),
-                            onPressed: () async {
-                              final updated = await _editFilterName(filter);
-                              if (updated == null || updated.isEmpty) return;
-                              setSheetState(() => filters[index] = updated);
-                            },
-                          ),
-                          leading: IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded),
-                            color: AppColors.error,
-                            onPressed: () => setSheetState(() {
-                              _selectedTypes.remove(filter);
-                              filters.removeAt(index);
-                            }),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: () {
-                        ref
-                            .read(settingsProvider.notifier)
-                            .updateResourceTypeFilters(filters);
-                        Navigator.pop(context);
-                        setState(() {});
-                      },
-                      child: const Text('Salvar filtros'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    ).whenComplete(controller.dispose);
-  }
-
-  String _statusLabel(ResourceStatus status) {
-    return switch (status) {
-      ResourceStatus.toConsume => 'Para ler',
-      ResourceStatus.inProgress => 'Lendo',
-      ResourceStatus.completed => 'Concluído',
-      ResourceStatus.dropped => 'Abandonado',
+  Widget _fallbackIcon(Resource r) {
+    final emoji = switch (r.resourceType.toLowerCase()) {
+      'book' || 'livro' => '📗', 'podcast' => '🎙️',
+      'movie' || 'filme' => '🎬', 'article' => '📄', _ => '📚',
     };
+    return Container(color: AppColors.surfaceVariant,
+      child: Center(child: Text(emoji, style: const TextStyle(fontSize: 28))));
   }
 
-  Future<String?> _editFilterName(String current) async {
-    final controller = TextEditingController(text: current);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Editar filtro'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Nome do filtro'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    return result;
+  Widget _buildHighlightsFeed(List<Resource> resources) {
+    final highlights = <({Resource r, String text, String? tag})>[];
+    for (final r in resources) {
+      if (r.synopsis == null || r.synopsis!.isEmpty) continue;
+      final hls = MarkdownParser.extractHighlights(r.synopsis!);
+      highlights.addAll(hls.take(2).map((h) => (r: r, text: h.text, tag: h.tag)));
+    }
+    if (highlights.isEmpty) return const SizedBox.shrink();
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(padding: const EdgeInsets.fromLTRB(16,16,16,8),
+        child: Text('✨ HIGHLIGHTS RECENTES', style: TextStyle(fontSize: 10,
+          fontWeight: FontWeight.w700, letterSpacing: 0.10,
+          color: AppTheme.textMutedColor(context)))),
+      ...highlights.map((hl) => Padding(
+        padding: const EdgeInsets.fromLTRB(16,0,16,8),
+        child: GestureDetector(
+          onTap: () => Navigator.push(context, MaterialPageRoute(
+            builder: (_) => UniversalDetailView(object: hl.r))),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: _resourceColor(hl.r).withOpacity(0.08),
+              border: Border(left: BorderSide(color: _resourceColor(hl.r), width: 2)),
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(8), bottomRight: Radius.circular(8))),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${_resourceEmoji(hl.r)} ${hl.r.title}${hl.tag != null ? " · #${hl.tag}" : ""}',
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700,
+                  color: _resourceColor(hl.r))),
+              const SizedBox(height: 3),
+              Text('"${hl.text}"', style: TextStyle(fontSize: 10,
+                color: AppTheme.textSecondaryColor(context),
+                height: 1.55, fontStyle: FontStyle.italic)),
+            ]))))),
+    ]);
   }
 
-  Widget _buildResourceCard(BuildContext context, Resource resource) {
-    return GestureDetector(
-      onTap: () {
-        debugPrint('[ResourcesScreen] card tapped: ${resource.id} / ${resource.title}');
-        context.push('/detail/${resource.id}', extra: {'object': resource});
-      },
-      onLongPress: () {
-        showObjectActionSheet(context, ref, resource);
-      },
-      child: Container(
-        decoration: AppTheme.cardDecoration(context),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                color: AppColors.surfaceVariant,
-                child:
-                    resource.coverImage != null &&
-                        resource.coverImage!.isNotEmpty
-                    ? Image.network(
-                        resource.coverImage!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const Icon(
-                          Icons.broken_image_outlined,
-                          color: AppColors.textMuted,
-                        ),
-                      )
-                    : const Icon(
-                        Icons.local_library_rounded,
-                        color: AppColors.textMuted,
-                        size: 40,
-                      ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    resource.title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  if (ref
-                      .watch(settingsProvider)
-                      .visibleResourceFields
-                      .contains('author'))
-                    Text(
-                      resource.author ?? 'Unknown',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textMuted,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  if (ref
-                      .watch(settingsProvider)
-                      .visibleResourceFields
-                      .contains('author'))
-                    const SizedBox(height: 4),
-                  if (ref
-                      .watch(settingsProvider)
-                      .visibleResourceFields
-                      .contains('rating')) ...[
-                    _buildRatingRow(resource),
-                    const SizedBox(height: 6),
-                  ],
-                  if (ref
-                      .watch(settingsProvider)
-                      .visibleResourceFields
-                      .contains('type'))
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: AppTheme.badgeDecoration(AppColors.info),
-                      child: Text(
-                        resource.resourceType.toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.info,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Color _resourceColor(Resource r) => switch (r.resourceType.toLowerCase()) {
+    'podcast' => AppColors.info, 'book' || 'livro' => AppColors.primary,
+    _ => AppColors.habitPurple };
+
+  String _resourceEmoji(Resource r) => switch (r.resourceType.toLowerCase()) {
+    'book' || 'livro' => '📗', 'podcast' => '🎙️',
+    'movie' || 'filme' => '🎬', 'article' => '📄', _ => '📚',
+  };
 
   Widget _buildResourceListTile(BuildContext context, Resource resource) {
-    final isExpanded = _expandedResourceId == resource.id;
-
     return GestureDetector(
       onTap: () {
-        debugPrint('[ResourcesScreen] list tile tapped: ${resource.id} / ${resource.title}');
         context.push('/detail/${resource.id}', extra: {'object': resource});
-      },
-      onLongPress: () {
-        showObjectActionSheet(context, ref, resource);
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: AppTheme.cardDecoration(context),
-        child: Column(
-          children: [
-            ListTile(
-              leading: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(8),
-                  image:
-                      resource.coverImage != null &&
-                          resource.coverImage!.isNotEmpty
-                      ? DecorationImage(
-                          image: NetworkImage(resource.coverImage!),
-                          fit: BoxFit.cover,
-                          onError: (_, _) {},
-                        )
-                      : null,
-                ),
-                child:
-                    resource.coverImage == null || resource.coverImage!.isEmpty
-                    ? const Icon(
-                        Icons.local_library_rounded,
-                        color: AppColors.textMuted,
-                      )
-                    : null,
-              ),
-              title: Text(
-                resource.title,
-                style: const TextStyle(fontWeight: FontWeight.w700),
+        child: ListTile(
+          leading: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(8),
+              image:
+                  resource.coverImage != null &&
+                      resource.coverImage!.isNotEmpty
+                  ? DecorationImage(
+                      image: NetworkImage(resource.coverImage!),
+                      fit: BoxFit.cover,
+                      onError: (_, _) {},
+                    )
+                  : null,
+            ),
+            child:
+                resource.coverImage == null || resource.coverImage!.isEmpty
+                ? _fallbackIcon(resource)
+                : null,
+          ),
+          title: Text(
+            resource.title,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                resource.author ?? 'Unknown',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (ref
-                      .watch(settingsProvider)
-                      .visibleResourceFields
-                      .contains('author'))
-                    Text(
-                      resource.author ?? 'Unknown',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  if (ref
-                      .watch(settingsProvider)
-                      .visibleResourceFields
-                      .contains('rating')) ...[
-                    const SizedBox(height: 2),
-                    _buildRatingRow(resource),
-                  ],
-                ],
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      isExpanded
-                          ? Icons.expand_less_rounded
-                          : Icons.expand_more_rounded,
-                      size: 20,
-                    ),
-                    onPressed: () => setState(() {
-                      _expandedResourceId = isExpanded ? null : resource.id;
-                    }),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.open_in_new_rounded, size: 20),
-                    tooltip: 'Open in Obsidian',
-                    onPressed: () => _openInObsidian(resource),
-                  ),
-                ],
-              ),
-            ),
-            if (isExpanded)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: Container(
-                  height: 150,
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).scaffoldBackgroundColor.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.divider.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  child: RichTextEditor(
-                    content: resource.synopsis ?? '',
-                    expands: true,
-                    placeholder: 'Add your thoughts about this resource...',
-                    onChanged: (newContent) {
-                      final updated = resource.copyWith(
-                        synopsis: newContent,
-                        updatedAt: DateTime.now(),
-                      );
-                      ref.read(vaultProvider.notifier).updateObject(updated);
-                    },
-                  ),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
                 ),
               ),
-          ],
+              const SizedBox(height: 2),
+              _buildRatingRow(resource),
+            ],
+          ),
+          trailing: const Icon(Icons.chevron_right_rounded, size: 20),
         ),
       ),
     );
@@ -778,18 +361,12 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     return Row(
       children: List.generate(
         5,
-        (i) => GestureDetector(
-          onTap: () {
-            final newResource = resource.copyWith(rating: i + 1);
-            ref.read(vaultProvider.notifier).updateObject(newResource);
-          },
-          child: Icon(
-            Icons.star_rounded,
-            size: 16,
-            color: i < resource.rating
-                ? AppColors.warning
-                : AppColors.textMuted.withValues(alpha: 0.2),
-          ),
+        (i) => Icon(
+          Icons.star_rounded,
+          size: 16,
+          color: i < resource.rating
+              ? AppColors.warning
+              : AppColors.textMuted.withOpacity(0.2),
         ),
       ),
     );
@@ -800,26 +377,5 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
       context,
       MaterialPageRoute(builder: (_) => const CreateResourceForm()),
     );
-  }
-
-  Future<void> _openInObsidian(Resource resource) async {
-    if (resource.obsidianPath.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This resource has not been saved yet.')),
-      );
-      return;
-    }
-
-    final settings = ref.read(settingsProvider);
-    final uri = Uri.parse(
-      'obsidian://open?vault=${Uri.encodeComponent(settings.vaultName)}&file=${Uri.encodeComponent(resource.obsidianPath)}',
-    );
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
-        mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open in Obsidian.')),
-      );
-    }
   }
 }

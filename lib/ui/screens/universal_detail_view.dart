@@ -36,7 +36,6 @@ import '../widgets/rich_text_editor.dart';
 import '../widgets/outline_editor.dart';
 import '../widgets/collection_view.dart';
 import '../widgets/object_action_wrapper.dart';
-import '../widgets/social_post_grid_card.dart';
 import '../../models/note_model.dart';
 import '../widgets/checklist_view.dart';
 import '../../models/template_model.dart';
@@ -61,7 +60,6 @@ import '../forms/create_system_form.dart';
 import '../../models/system_model.dart';
 import 'system_detail_screen.dart';
 import '../../providers/systems_provider.dart';
-import 'social_post_detail.dart';
 import '../widgets/linked_objects_section.dart';
 import '../utils/social_ref_utils.dart';
 
@@ -114,6 +112,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
 
     final mentionsAsync = ref.watch(backlinksProvider(currentObject.id));
+    final conflictGroup = _conflictGroupFor(
+      currentObject,
+      ref.watch(conflictingObjectsProvider),
+    );
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -186,6 +188,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     ),
                   ),
                   if (object is Project) _buildProjectProgress(context, ref),
+                  if (conflictGroup.length > 1)
+                    _buildObjectConflictBanner(context, conflictGroup),
                   if (widget.searchSnippet != null &&
                       widget.searchSnippet!.trim().isNotEmpty)
                     Padding(
@@ -665,6 +669,76 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
+  List<ContentObject> _conflictGroupFor(
+    ContentObject current,
+    Map<String, List<ContentObject>> conflicts,
+  ) {
+    for (final group in conflicts.values) {
+      if (group.any((object) => object.id == current.id)) return group;
+    }
+    return const [];
+  }
+
+  Widget _buildObjectConflictBanner(
+    BuildContext context,
+    List<ContentObject> group,
+  ) {
+    final labels = group
+        .map((object) => '${_typeLabel(object)}: ${object.displayTitle}')
+        .join(' • ');
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.warning.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: AppColors.warning,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Possível conflito de tipo',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.warning,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    labels,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondaryColor(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildOverflowMenu(BuildContext context, WidgetRef ref) {
     final Map<String, List<String>> typeActions = {
       'task': [
@@ -733,9 +807,13 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               value: 'convert_to_checklist',
               child: Row(
                 children: [
-                  Icon(Icons.checklist_rtl_rounded, size: 18),
+                  const Icon(Icons.checklist_rtl_rounded, size: 18),
                   const SizedBox(width: 12),
-                  Text((object as Note).isChecklist ? 'Reverter para Nota' : 'Converter para Checklist'),
+                  Text(
+                    (object as Note).isChecklist
+                        ? 'Reverter para Nota'
+                        : 'Converter para Checklist',
+                  ),
                 ],
               ),
             );
@@ -874,8 +952,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       ),
     );
   }
-
-
 
   List<Widget> _buildTypeSpecificProperties(
     BuildContext context,
@@ -1192,8 +1268,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     label: const Text('Aplicar System (Via B)'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
-                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      side: BorderSide(
+                        color: AppColors.primary.withValues(alpha: 0.4),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     onPressed: () => _showApplySystemSheet(context, ref, task),
                   ),
@@ -1225,7 +1305,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => SystemDetailScreen(system: object as SystemDefinition),
+              builder: (_) =>
+                  SystemDetailScreen(system: object as SystemDefinition),
             ),
           );
         }
@@ -1574,6 +1655,36 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 ),
               ],
             ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: LinkedObjectsSection(
+            owner: resource,
+            socialRefs: resource.socialRefs,
+            onAdd: (selected) async {
+              final ref = '[[${selected.slug}]]';
+              if (resource.socialRefs.contains(ref)) return;
+              final updated = resource.copyWith(
+                socialRefs: [...resource.socialRefs, ref],
+                updatedAt: DateTime.now(),
+              );
+              await this.ref
+                  .read(resourcesProvider.notifier)
+                  .updateResource(updated);
+              if (mounted) setState(() => object = updated);
+            },
+            onRemove: (slug) async {
+              final updated = resource.copyWith(
+                socialRefs: resource.socialRefs
+                    .where((r) => r != slug)
+                    .toList(),
+                updatedAt: DateTime.now(),
+              );
+              await this.ref
+                  .read(resourcesProvider.notifier)
+                  .updateResource(updated);
+              if (mounted) setState(() => object = updated);
+            },
           ),
         ),
       ];
@@ -2307,6 +2418,17 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             setState(() => object = updated);
           },
         );
+      case NoteSubtype.routine:
+        // Treat routine as text editor
+        return RichTextEditor(
+          content: note.body,
+          expands: false,
+          onChanged: (v) {
+            final updated = note.copyWith(body: v);
+            ref.read(vaultProvider.notifier).updateObject(updated);
+            setState(() => object = updated);
+          },
+        );
     }
   }
 
@@ -2326,11 +2448,11 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           },
         );
       case NoteSubtype.collection:
-        return CollectionView(
-          content: note.body,
-        );
+        return CollectionView(content: note.body);
+      case NoteSubtype.routine:
+        // Treat routine as text view
+        return MarkdownBodyView(content: note.body);
       case NoteSubtype.text:
-      default:
         return MarkdownBodyView(content: note.body);
     }
   }
@@ -2338,17 +2460,20 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   void _navigateToSlug(BuildContext context, WidgetRef ref, String slug) {
     final all = ref.read(allObjectsProvider).valueOrNull ?? [];
     final target = all.cast<ContentObject?>().firstWhere(
-      (o) => o != null && (o.slug == slug || o.title.toLowerCase() == slug.toLowerCase()),
+      (o) =>
+          o != null &&
+          (o.slug == slug || o.title.toLowerCase() == slug.toLowerCase()),
       orElse: () => null,
     );
     if (target != null) {
-      Navigator.push(context, MaterialPageRoute(
-        builder: (_) => UniversalDetailView(object: target),
-      ));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Objeto "$slug" não encontrado'))
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => UniversalDetailView(object: target)),
       );
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Objeto "$slug" não encontrado')));
     }
   }
 
@@ -2581,7 +2706,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final systems = ref.read(systemsProvider);
     if (systems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nenhum System disponível. Crie um primeiro.')),
+        const SnackBar(
+          content: Text('Nenhum System disponível. Crie um primeiro.'),
+        ),
       );
       return;
     }
@@ -2618,49 +2745,84 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             const SizedBox(height: 4),
             Text(
               'Os steps do System serão adicionados como subtasks.',
-              style: TextStyle(fontSize: 13, color: AppTheme.textMutedColor(ctx)),
+              style: TextStyle(
+                fontSize: 13,
+                color: AppTheme.textMutedColor(ctx),
+              ),
             ),
             const SizedBox(height: 16),
-            ...systems.map((system) => ListTile(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              leading: Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+            ...systems.map(
+              (system) => ListTile(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.account_tree_rounded, color: AppColors.primary, size: 18),
-              ),
-              title: Text(system.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-              subtitle: Text('${system.steps.length} steps • ${system.estimatedMinutes > 0 ? '${system.estimatedMinutes}min' : 'sem estimativa'}',
-                style: const TextStyle(fontSize: 12)),
-              onTap: () async {
-                Navigator.pop(ctx);
-                final newSubtasks = [
-                  ...task.subtasks,
-                  ...system.steps.map((s) => Subtask(title: s.title)),
-                ];
-                final updatedTask = task.copyWith(
-                  subtasks: newSubtasks,
-                  estimatedMinutes: task.estimatedMinutes ?? (system.estimatedMinutes > 0 ? system.estimatedMinutes : null),
-                );
-                await ref.read(vaultProvider.notifier).updateObject(updatedTask);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(children: [
-                        const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text('${system.steps.length} steps de "${system.title}" aplicados.')),
-                      ]),
-                      backgroundColor: AppColors.success,
-                      behavior: SnackBarBehavior.floating,
-                    ),
+                leading: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.account_tree_rounded,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                ),
+                title: Text(
+                  system.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                subtitle: Text(
+                  '${system.steps.length} steps • ${system.estimatedMinutes > 0 ? '${system.estimatedMinutes}min' : 'sem estimativa'}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final newSubtasks = [
+                    ...task.subtasks,
+                    ...system.steps.map((s) => Subtask(title: s.title)),
+                  ];
+                  final updatedTask = task.copyWith(
+                    subtasks: newSubtasks,
+                    estimatedMinutes:
+                        task.estimatedMinutes ??
+                        (system.estimatedMinutes > 0
+                            ? system.estimatedMinutes
+                            : null),
                   );
-                }
-              },
-            )),
+                  await ref
+                      .read(vaultProvider.notifier)
+                      .updateObject(updatedTask);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '${system.steps.length} steps de "${system.title}" aplicados.',
+                              ),
+                            ),
+                          ],
+                        ),
+                        backgroundColor: AppColors.success,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
           ],
         ),
       ),
@@ -4086,7 +4248,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         final person = object as Person;
         String? url;
         if (label == 'WhatsApp') {
-          url = 'https://wa.me/${person.phone?.replaceAll(RegExp(r"[^\d+]"), "") ?? ""}';
+          url =
+              'https://wa.me/${person.phone?.replaceAll(RegExp(r"[^\d+]"), "") ?? ""}';
         } else if (label == 'Message') {
           // Try WhatsApp or SMS
           url = 'sms:${person.phone ?? ""}';
@@ -4206,14 +4369,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   }
 
   Widget _buildBreadcrumbs(BuildContext context, WidgetRef ref) {
-    // Safeguard: ensure we have a valid object
-    if (object == null) {
-      return const SliverToBoxAdapter(
-        child: Center(
-          child: Text('Objeto não encontrado.', style: TextStyle(fontSize: 16)),
-        ),
-      );
-    }
+    // Removed object == null check because object is late and it causes dead code compiler crash
     final history = ref.watch(historyProvider);
     if (history.length < 2) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
@@ -4385,7 +4541,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   ) {
     String formatFieldValue(dynamic val, InputField field) {
       if (val == null) return 'Não preenchido';
-      
+
       switch (field.type) {
         case InputFieldType.checkbox:
           return (val == true || val == 'true') ? 'Sim' : 'Não';
@@ -4415,6 +4571,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           return val.toString();
       }
     }
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,

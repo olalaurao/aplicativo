@@ -724,6 +724,39 @@ AndroidNotificationDetails(channelId: 'alarm_channel_v4')
 ```
 🚨 Alerta: notificação vai para canal inexistente — não dispara, sem crash, bug silencioso total.
 
+## Crash Reporting Logs
+
+The application automatically records crash reports via **CrashReportService** (`lib/services/crash_report_service.dart`).
+
+- **Internal storage** – located in the app's documents directory under:
+  ```
+  <app_documents_directory>/diagnostics/crash_reports
+  ```
+  You can retrieve the list programmatically with:
+  ```dart
+  final reports = await CrashReportService.instance.getInternalReports();
+  ```
+  Each file is a markdown (`.md`) document containing front‑matter, error details, stack trace and recent app events.
+
+- **Vault storage** – if a vault path is configured (`prefs.getString('vault_path')`), a copy is written to:
+  ```
+  <vault_path>/_diagnostics/crash_reports
+  ```
+  This keeps a permanent record synced with Google Drive.
+
+### How to access the logs
+1. **From code** – call `CrashReportService.instance.getInternalReports()` or `CrashReportService.instance._writeReport(...)` for custom handling.
+2. **From the device** – use a file explorer or `adb pull` to copy the directory:
+   ```
+   adb pull "$(adb shell "echo $HOME")/files/diagnostics/crash_reports" ./crash_reports
+   ```
+3. **From the vault** – navigate to the `_diagnostics/crash_reports` folder inside your Obsidian vault.
+
+### Guidelines
+- Never delete these files manually; use `CrashReportService` methods to clear them.
+- Ensure the vault path is set in **Settings → Vault Path** so the dual‑write works.
+- The service is initialized in `main.dart` (see lines 182‑185) and is active in both debug and release builds.
+
 ---
 
 ## FORMATO DE REPORTE OBRIGATÓRIO

@@ -142,6 +142,7 @@ class Habit extends ContentObject {
   // New fields
   int? frequencyDays;
   bool isFlexibleFrequency;
+  bool isQuitting; // A6.1: if true, goal is NOT to do this habit
   List<String> socialRefs;
 
   Scheduler? get scheduler => schedulers.isNotEmpty ? schedulers.first : null;
@@ -184,6 +185,7 @@ class Habit extends ContentObject {
     List<PactCycle>? previousCycles,
     this.frequencyDays,
     this.isFlexibleFrequency = false,
+    this.isQuitting = false,
     List<String>? socialRefs,
     super.organizers,
     super.categories,
@@ -269,6 +271,7 @@ class Habit extends ContentObject {
     List<PactCycle>? previousCycles,
     int? frequencyDays,
     bool? isFlexibleFrequency,
+    bool? isQuitting,
     List<String>? socialRefs,
   }) {
     final newHabit = Habit(
@@ -302,6 +305,7 @@ class Habit extends ContentObject {
       previousCycles: previousCycles ?? this.previousCycles,
       frequencyDays: frequencyDays ?? this.frequencyDays,
       isFlexibleFrequency: isFlexibleFrequency ?? this.isFlexibleFrequency,
+      isQuitting: isQuitting ?? this.isQuitting,
       socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
       organizers: organizers,
       categories: categories,
@@ -444,6 +448,7 @@ class Habit extends ContentObject {
 
     if (frequencyDays != null) frontmatter['frequency_days'] = frequencyDays;
     if (isFlexibleFrequency) frontmatter['flexible_frequency'] = true;
+    if (isQuitting) frontmatter['is_quitting'] = true;
     if (socialRefs.isNotEmpty) {
       frontmatter['social_refs'] = socialRefs;
     }
@@ -599,6 +604,7 @@ class Habit extends ContentObject {
       habit.frequencyDays = int.tryParse(frontmatter['frequency_days'].toString());
     }
     habit.isFlexibleFrequency = frontmatter['flexible_frequency'] == true;
+    habit.isQuitting = frontmatter['is_quitting'] as bool? ?? false;
     if (frontmatter['social_refs'] != null) {
       habit.socialRefs = (frontmatter['social_refs'] as Iterable)
           .map((e) => e.toString())

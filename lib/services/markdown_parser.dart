@@ -5,6 +5,19 @@ import 'package:flutter/foundation.dart';
 import '../models/shared_types.dart';
 import '../models/content_object.dart';
 
+
+// ---------------------------------------------------------------------------
+// A3 — HighlightItem: represents a single blockquote/highlight extracted
+//       from a Resource synopsis or Note body.
+// ---------------------------------------------------------------------------
+class HighlightItem {
+  final String text;
+  final String? tag;   // extracted from '#word' at end of line
+  final String? date;  // extracted from 'YYYY-MM-DD' if present
+
+  const HighlightItem({required this.text, this.tag, this.date});
+}
+
 class MarkdownParser {
   static bool matchesSignature(
     Map<String, dynamic> frontmatter,
@@ -307,6 +320,67 @@ class MarkdownParser {
 
   static List<String> extractWikiLinks(String text) {
     return _wikiLinkRegex.allMatches(text).map((m) => m.group(1)!).toList();
+  }
+
+  // ---------------------------------------------------------------------------
+  // A3 — extractHighlights
+  // ---------------------------------------------------------------------------
+
+  /// Extracts highlighted / quoted passages from markdown or Quill Delta body.
+  static List<HighlightItem> extractHighlights(String markdown) {
+    if (markdown.isEmpty) return [];
+    final highlights = <HighlightItem>[];
+
+    // Try Quill Delta first (blockquote attribute)
+    final ops = tryParseDeltaOps(markdown);
+    if (ops != null) {
+      for (final op in ops) {
+        final insert = op['insert'];
+        final attrs  = op['attributes'];
+        if (insert is String &&
+            attrs is Map &&
+            (attrs['blockquote'] == true || attrs['quote'] == true)) {
+          final text = insert.trim();
+          if (text.isNotEmpty) highlights.add(HighlightItem(text: text));
+        }
+      }
+      return highlights;
+    }
+
+    // Plain markdown: lines starting with '>'
+    final lines = markdown.split('\n');
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (!line.startsWith('>')) continue;
+
+      var text = line.replaceFirst(RegExp(r'^>\s*(\[!\w+\]\s*)?'), '').trim();
+      if (text.isEmpty) continue;
+
+      // Extract inline tag: '…texto #tag' → tag separated
+      String? tag;
+      final tagMatch = RegExp(r'#(\w+)\s*$').firstMatch(text);
+      if (tagMatch != null) {
+        tag  = tagMatch.group(1);
+        text = text.substring(0, tagMatch.start).trim();
+      }
+
+      // Extract YYYY-MM-DD date if present
+      String? date;
+      final dateMatch = RegExp(r'\d{4}-\d{2}-\d{2}').firstMatch(text);
+      if (dateMatch != null) date = dateMatch.group(0);
+
+      // Multi-line blockquote continuation
+      while (i + 1 < lines.length && lines[i + 1].trim().startsWith('>')) {
+        i++;
+        final cont = lines[i].trim().replaceFirst(RegExp(r'^>\s*'), '').trim();
+        if (cont.isNotEmpty) text += ' $cont';
+      }
+
+      if (text.length > 5) {
+        highlights.add(HighlightItem(text: text, tag: tag, date: date));
+      }
+    }
+    return highlights;
   }
 
   static List<String> extractTags(String text) {
@@ -718,4 +792,5 @@ class MarkdownParser {
 
     return buffer.toString().trim();
   }
+
 }

@@ -30,7 +30,7 @@ List<String> getSocialRefs(ContentObject obj) {
   if (obj is Resource)   return obj.socialRefs;
   if (obj is Goal)       return obj.socialRefs;
   if (obj is Task)       return obj.socialRefs;
-  if (obj is Habit)      return obj.socialRefs ?? [];
+  if (obj is Habit)      return obj.socialRefs;
   return [];
 }
 

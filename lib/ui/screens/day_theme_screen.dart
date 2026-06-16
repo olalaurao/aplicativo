@@ -57,14 +57,22 @@ class DayThemeScreen extends ConsumerWidget {
                     }
                   },
                   children: blocks
-                      .map(
-                        (b) => Container(
-                          key: ValueKey(b.id),
-                          child: _buildBlockTile(context, ref, b),
+                      .asMap().entries.map(
+                        (entry) => Container(
+                          key: ValueKey(entry.value.id),
+                          child: _buildBlockTile(context, ref, entry.value, entry.key),
                         ),
                       )
                       .toList(),
                 ),
+          const SizedBox(height: 12),
+          SizedBox(width: double.infinity, child: OutlinedButton.icon(
+            icon: const Icon(Icons.add_rounded, size: 16),
+            label: const Text('Novo Bloco de Tempo'),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+              foregroundColor: AppColors.primary),
+            onPressed: () => _showBlockDialog(context, ref))),
           const SizedBox(height: 32),
           _section('Temas do Dia'),
           const SizedBox(height: 12),
@@ -75,6 +83,14 @@ class DayThemeScreen extends ConsumerWidget {
                       .map((t) => _buildThemeTile(context, ref, t, blocks))
                       .toList(),
                 ),
+          const SizedBox(height: 12),
+          SizedBox(width: double.infinity, child: OutlinedButton.icon(
+            icon: const Icon(Icons.add_rounded, size: 16),
+            label: const Text('Novo Tema do Dia'),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+              foregroundColor: AppColors.primary),
+            onPressed: () => _showThemeDialog(context, ref))),
         ],
       ),
     );
@@ -107,8 +123,8 @@ class DayThemeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildBlockTile(BuildContext context, WidgetRef ref, TimeBlock block) {
-    final blockColor = AppColorPicker.parseHex(
+  Widget _buildBlockTile(BuildContext context, WidgetRef ref, TimeBlock block, int reorderIndex) {
+    final color = AppColorPicker.parseHex(
       block.color ?? '#FFB000',
       fallback: AppColors.accent,
     );
@@ -120,40 +136,63 @@ class DayThemeScreen extends ConsumerWidget {
                     '${_formatRangeTime(range.startHour, range.startMinute)}-${_formatRangeTime(range.endHour, range.endMinute)}',
               )
               .join(' | ');
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: AppTheme.cardDecoration(context),
       child: ListTile(
-        onTap: () => _showBlockDialog(context, ref, block: block),
-        leading: Container(
-          width: 12,
-          height: 44,
-          decoration: BoxDecoration(
-            color: blockColor,
-            borderRadius: BorderRadius.circular(6),
-          ),
-        ),
-        title: Text(block.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(rangeText, maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) async {
-            if (value == 'edit') _showBlockDialog(context, ref, block: block);
-            if (value == 'delete') {
-              final confirmed = await _confirmDelete(context, 'Excluir bloco?');
-              if (confirmed) {
-                await ref
-                    .read(timeBlocksProvider.notifier)
-                    .deleteTimeBlock(block);
+        contentPadding: const EdgeInsets.fromLTRB(0, 4, 8, 4),
+        leading: Container(width: 4, height: 48,
+          decoration: BoxDecoration(color: color,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20), bottomLeft: Radius.circular(20)))),
+        title: Text(block.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(rangeText,
+          style: TextStyle(fontSize: 11, color: AppTheme.textMutedColor(context))),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          _buildTimeBar(block, color),
+          const SizedBox(width: 8),
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'edit') _showBlockDialog(context, ref, block: block);
+              if (value == 'delete') {
+                final confirmed = await _confirmDelete(context, 'Excluir bloco?');
+                if (confirmed) {
+                  await ref
+                      .read(timeBlocksProvider.notifier)
+                      .deleteTimeBlock(block);
+                }
               }
-            }
-          },
-          itemBuilder: (context) => const [
-            PopupMenuItem(value: 'edit', child: Text('Editar')),
-            PopupMenuItem(value: 'delete', child: Text('Excluir')),
-          ],
-        ),
-      ),
-    );
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'edit', child: Text('Editar')),
+              PopupMenuItem(value: 'delete', child: Text('Excluir')),
+            ],
+          ),
+          const SizedBox(width: 4),
+          ReorderableDragStartListener(index: reorderIndex,
+            child: const Icon(Icons.drag_handle_rounded, color: AppColors.textMuted)),
+        ]),
+        onTap: () => _showBlockDialog(context, ref, block: block)));
+  }
+
+  Widget _buildTimeBar(TimeBlock block, Color color) {
+    if (block.timeRanges.isEmpty) return const SizedBox();
+    
+    final range = block.timeRanges.first;
+    final s = range.startHour * 60 + range.startMinute;
+    final e = range.endHour * 60 + range.endMinute;
+    
+    final total = (e > s ? e - s : (24 * 60 - s) + e).clamp(0, 24 * 60);
+    final flex = (total / (24 * 60) * 60).clamp(4.0, 60.0);
+    return Container(width: 60, height: 6,
+      decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(3)),
+      child: Stack(children: [
+        Positioned(
+          left: (s / (24 * 60) * 60).clamp(0.0, 56.0),
+          child: Container(width: flex, height: 6,
+            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))))
+      ]));
   }
 
   Widget _buildThemeTile(

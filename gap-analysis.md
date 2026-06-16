@@ -1,3 +1,4 @@
+# 14-06-26
 CITRINE — ESPECIFICAÇÕES TÉCNICAS COMPLETAS
 > Documento único de referência para implementação.
 > Cobre gaps do código atual + 4 features novas.
@@ -1651,7 +1652,7 @@ Color _resourceColor(Resource r) => switch (r.resourceType.toLowerCase()) {
   _ => AppColors.habitPurple };
 ```
 ---
-C3 — Home Screen
+C3 — Home Screen [DONE]
 O que é: Dashboard principal. Hoje o header é só botões de sync e edição sem contexto — nenhuma saudação, nenhuma data. A quote do dia é hardcoded ("Peter Drucker"). O pull-to-search dispara com -80px e não tem debounce, causando abertura acidental frequente.
 Melhorias:
 3a. Saudação contextual: Adicionar antes dos botões de ação no header:
@@ -1726,7 +1727,7 @@ onNotification: (notification) {
 },
 ```
 ---
-C4 — Planner Screen
+C4 — Planner Screen [DONE]
 O que é: Tela de planejamento diário com timeline, lista de tarefas, hábitos e eventos. Tem vários bugs confirmados no código.
 Bugs a corrigir:
 4a. `timeBlocks:` não passado ao `TimeLineDayView` — bug de 1 linha que faz as faixas coloridas de bloco de tempo nunca aparecerem:
@@ -1796,7 +1797,7 @@ Consumer(builder: (ctx, ref, _) {
 })
 ```
 ---
-C5 — Goals Screen
+C5 — Goals Screen [DONE]
 O que é: Tela de metas. É `ConsumerWidget` (stateless), o que impede filtros dinâmicos e estado local. Tem crash potencial em cores inválidas (`int.parse` sem try-catch) e usa `IntrinsicHeight` em listas longas, causando lentidão.
 Bugs a corrigir + melhorias:
 5a. Converter para ConsumerStatefulWidget:
@@ -1887,7 +1888,7 @@ Color _parseGoalColor(String? hex) {
 }
 ```
 ---
-C6 — Habits Screen
+C6 — Habits Screen [DONE]
 O que é: Tela de hábitos com abas Hoje/Semana/Mês. Tem bug de locale: a semana começa no domingo americano em vez de segunda-feira.
 Bugs + melhorias:
 6a. Fix semana começando na segunda-feira:
@@ -1939,7 +1940,7 @@ Row(children: [
 ])
 ```
 ---
-C7 — Inbox Screen
+C7 — Inbox Screen [DONE]
 O que é: Tela de captura GTD. Hoje o campo de captura só aparece depois de tocar num botão "Capturar" na AppBar — o usuário tem que fazer 2 toques para começar a digitar. O campo some depois de usar.
 UX nova: Campo sempre visível no topo da tela com borda dourada, auto-focus ao abrir, Enter submete e limpa o campo imediatamente (sem fechar o teclado) para a próxima captura. Swipe → direita arquiva, swipe ← esquerda abre tela de triagem.
 ```dart
@@ -1995,7 +1996,7 @@ Dismissible(
   child: _buildInboxItemTile(item))
 ```
 ---
-C8 — Settings Screen
+C8 — Settings Screen [DONE]
 O que é: Tela de configurações. Hoje é uma lista plana sem hierarquia visual — todos os itens no mesmo nível, difícil de navegar. Campo de nome do usuário não existe.
 UX nova: 4 grupos em cards com divisórias internas (Perfil / Preferências / Integrações / Avançado). Seção Avançado colapsada por padrão.
 ```dart
@@ -2042,7 +2043,7 @@ void _editUserName() async {
 }
 ```
 ---
-C9 — Appearance Screen
+C9 — Appearance Screen [DONE]
 O que é: Tela de aparência. Os swatches de cor existem visualmente mas não são interativos — tocar não faz nada. A cor de destaque do app é hardcoded em `AppColors.primary`.
 Como implementar:
 ```dart
@@ -2073,7 +2074,7 @@ Wrap(spacing: 10, runSpacing: 10, children: _presets.map((color) {
 }).toList())
 ```
 ---
-C10 — Journal Screen
+C10 — Journal Screen [DONE]
 O que é: Tela do diário. Quando há filtros ativos (por mood, por foto, por data), o usuário não tem feedback visual de que está filtrando — a lista simplesmente mostra menos itens sem explicação. O campo de busca existe no estado mas nunca é exibido na UI.
 10a. Banner de filtros ativos:
 ```dart
@@ -2149,7 +2150,7 @@ AnimatedContainer(
   : const SizedBox.shrink()),
 ```
 ---
-C11 — People Screen
+C11 — People Screen [DONE]
 O que é: Tela de pessoas/contatos. Hoje não tem campo de busca e os botões de ligar/SMS não fazem nada (callbacks vazios `() {}`).
 11a. Converter para ConsumerStatefulWidget + busca + toggle grid/lista — mesmo padrão do C5a. Adicionar:
 ```dart
@@ -2193,7 +2194,7 @@ if (person.isDueForContact)
         border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 1.5))))
 ```
 ---
-C12 — Trackers Screen
+C12 — Trackers Screen [DONE]
 O que é: Tela de trackers. Os cards não mostram o último valor registrado, forçando o usuário a abrir cada tracker para ver o dado mais recente. Não tem atalho de registro rápido.
 12a. Último valor no card:
 ```dart
@@ -2240,7 +2241,7 @@ Positioned(bottom: 10, right: 10,
 ```
 12c. Remover botão duplicado de Analysis — localizar `IconButton` com `Icons.auto_graph_rounded` ou similar no header e deletar.
 ---
-C13 — Timeline Screen
+C13 — Timeline Screen [DONE]
 O que é: Tela de histórico cronológico de todos os eventos. Hoje o título ainda está como "Journal" (ou equivalente). Sem paginação, o que pode travar com muitos itens.
 13a. Fix título: `AppBar(title: const Text('Timeline'), centerTitle: true)`
 13b. Paginação por scroll infinito:
@@ -2265,7 +2266,7 @@ void initState() {
 final paginatedItems = _filteredItems.take(_pageSize * _currentPage).toList();
 ```
 ---
-C14 — Organizer Detail Screen
+C14 — Organizer Detail Screen [DONE]
 O que é: Tela de detalhe de um Organizer. As tabs (Tarefas/Notas/Outros) não mostram contagem de itens. O único botão de ação abre o `UniversalDetailView` mas não o form de edição diretamente.
 14a. Contagem nas tabs:
 ```dart
@@ -2293,7 +2294,7 @@ IconButton(
     builder: (_) => UniversalDetailView(object: widget.organizer)))),
 ```
 ---
-C15 — Day Theme Screen
+C15 — Day Theme Screen [DONE]
 O que é: Tela de configuração de blocos de tempo e temas do dia. Hoje a única forma de criar é via `PopupMenuButton` na AppBar — não óbvio. Os tiles de bloco de tempo não têm preview visual do horário.
 15a. Botões explícitos no final de cada seção:
 ```dart
@@ -3799,53 +3800,53 @@ _captureItem(icon: '🛒', label: 'Mercado', subtitle: 'Adicionar à lista de co
 CHECKLIST COMPLETO DE IMPLEMENTAÇÃO
 ---
 🔴 CRÍTICO — quebra dados ou funcionalidade central
-[ ] `obsidian_service.dart` — `encoding: utf8` em read/write (A4)
-[ ] `google_drive_sync_service.dart` — encoding utf8 (A4)
-[ ] `backup_service.dart` — encoding utf8 (A4)
-[ ] Strings `Ã§`, `Ã£`, `Ã©` em todo codebase → corrigir para UTF-8 real (A4)
-[ ] `planner_screen.dart` — passar `timeBlocks:` ao `TimeLineDayView` — 1 linha (C4a)
-[ ] `notes_screen.dart` — expandir Outline/Collection mostra editor correto (C1)
-[ ] `goals_screen.dart` — `_parseGoalColor` com try-catch (C5e)
-[ ] `universal_detail_view.dart` — callback de vincular objeto em Resource salva de volta ao resource
+[x] `obsidian_service.dart` — `encoding: utf8` em read/write (A4)
+[x] `google_drive_sync_service.dart` — encoding utf8 (A4)
+[x] `backup_service.dart` — encoding utf8 (A4)
+[x] Strings corrompidas `Ã§`, `Ã£`, emojis em `home_screen.dart` → corrigidos para UTF-8 real (A4d) ✅ 14-06-26
+[x] `planner_screen.dart` — `timeBlocks:` já passado ao `TimeLineDayView` (C4a) ✅ já estava OK
+[x] `notes_screen.dart` — `_formatDate` null-safe + zero-pad; expand Outline/Collection já correto (C1-expand) ✅ 14-06-26
+[x] `goals_screen.dart` — `_goalColor` com try-catch (C5e) ✅ 14-06-26
+[x] `universal_detail_view.dart` — `LinkedObjectsSection` adicionada ao Resource com callbacks onAdd/onRemove persistindo via `resourcesProvider` (E7) ✅ 14-06-26
 ---
 🟠 ALTA — base compartilhada (desbloqueia várias telas)
-[ ] `lib/models/saved_filter.dart` — criar arquivo novo (A1)
-[ ] `lib/providers/settings_provider.dart` — `userName`, `accentColor`, `savedFiltersRaw`, métodos (A2)
-[ ] `lib/services/markdown_parser.dart` — `HighlightItem` + `extractHighlights` (A3)
-[ ] `lib/ui/widgets/filter_sort_sheet.dart` — criar arquivo novo (B1)
+[x] `lib/models/saved_filter.dart` — criar arquivo novo (A1)
+[x] `lib/providers/settings_provider.dart` — `userName`, `accentColor`, `savedFiltersRaw`, métodos (A2)
+[x] `lib/services/markdown_parser.dart` — `HighlightItem` + `extractHighlights` (A3)
+[x] `lib/ui/widgets/filter_sort_sheet.dart` — criar arquivo novo (B1)
 ---
 🟡 ALTA — telas principais com bugs ou UX quebrada
-[ ] `notes_screen.dart` — grid view, chips dinâmicos, fix `_formatDate` zero-pad (C1)
-[ ] `resources_screen.dart` — shelf + highlights feed (C2)
-[ ] `home_screen.dart` — saudação, quote com highlights, fix pull-to-search debounce (C3)
-[ ] `planner_screen.dart` — toggle timeline/lista, setas de navegação, fix moodSlug, fix tracker (C4)
-[ ] `goals_screen.dart` — ConsumerStatefulWidget, barra global, +10% inline, sem IntrinsicHeight (C5)
-[ ] `habits_screen.dart` — fix semana na segunda, seção sem agendamento, fix _SummaryChip (C6)
-[ ] `inbox_screen.dart` — campo sempre visível, swipe triagem (C7)
-[ ] `settings_screen.dart` — grupos visuais, campo de nome (C8)
-[ ] `social_screen.dart` — SortMode enum, overlay multi-select, arquivar com undo (C18)
-[ ] `object_action_wrapper.dart` — fix overflow popup (C18d)
-[ ] `create_social_post_form.dart` — detecção duplicata, título editável (C19)
+[x] `notes_screen.dart` — grid view, chips dinâmicos, fix `_formatDate` zero-pad (C1) ✅
+[x] `resources_screen.dart` — shelf + highlights feed (C2) ✅
+[x] `home_screen.dart` — saudação, quote com highlights, fix pull-to-search debounce (C3) ✅
+[x] `planner_screen.dart` — toggle timeline/lista, setas de navegação, fix moodSlug, fix tracker (C4) ✅
+[x] `goals_screen.dart` — ConsumerStatefulWidget, barra global, +10% inline, sem IntrinsicHeight (C5) ✅
+[x] `habits_screen.dart` — fix semana na segunda, seção sem agendamento, fix _SummaryChip (C6) ✅
+[x] `inbox_screen.dart` — campo sempre visível, swipe triagem (C7) ✅
+[x] `settings_screen.dart` — grupos visuais, campo de nome (C8) ✅
+[x] `social_screen.dart` — SortMode enum, overlay multi-select, arquivar com undo (C18) ✅
+[x] `object_action_wrapper.dart` — fix overflow popup (C18d) ✅
+[x] `create_social_post_form.dart` — detecção duplicata, título editável (C19) ✅
 ---
 🟢 MÉDIA — qualidade de vida e features novas
-[ ] `appearance_screen.dart` — swatches interativos + persistência (C9)
-[ ] `journal_screen.dart` — banner filtros ativos, busca expansível (C10)
-[ ] `people_screen.dart` — busca, toggle lista/grid, ações contato, badge pendente (C11)
-[ ] `trackers_screen.dart` — último valor no card, botão +, remover Analysis duplicado (C12)
-[ ] `timeline_screen.dart` — fix título, paginação (C13)
-[ ] `organizer_detail_screen.dart` — contagem nas tabs, botões separados (C14)
-[ ] `day_theme_screen.dart` — botões explícitos, preview visual de blocos (C15)
-[ ] `search_screen.dart` — recentes persistidos, chip de tipo ativo, actions contextuais (C16)
-[ ] Fixes globais de overflow: VENCIDA badge, editModeHint, SummaryChip, resize handle (C20)
-[ ] Feature Quitting Habits — modelo, formulário, card, integração (D1)
-[ ] Feature Tracker de Saúde — `lib/models/tracker_model.dart`, `create_tracker_form.dart`, `health_alerts_provider.dart`, `health_alerts_strip.dart`, `notification_service.dart` (D2)
+[x] `appearance_screen.dart` — swatches interativos + persistência (C9) ✅
+[x] `journal_screen.dart` — banner filtros ativos, busca expansível (C10) ✅
+[x] `people_screen.dart` — busca, toggle lista/grid, ações contato, badge pendente (C11) ✅
+[x] `trackers_screen.dart` — último valor no card, botão +, remover Analysis duplicado (C12) ✅
+[x] `timeline_screen.dart` — fix título, paginação (C13) ✅
+[x] `organizer_detail_screen.dart` — contagem nas tabs, botões separados (C14) ✅
+[x] `day_theme_screen.dart` — botões explícitos, preview visual de blocos (C15) ✅
+[x] `search_screen.dart` — recentes persistidos, chip de tipo ativo, actions contextuais (C16) ✅
+[x] Fixes globais de overflow: VENCIDA badge, editModeHint, SummaryChip, resize handle (C20) ✅
+[x] Feature Quitting Habits — card Evitando, sem checkbox, botão Recaída, filtros planner/calendar (D1) ✅
+[x] Feature Tracker de Saúde — `lib/models/tracker_model.dart`, `create_tracker_form.dart`, `health_alerts_provider.dart`, `health_alerts_strip.dart`, `notification_service.dart` (D2) ✅ 16-06-26
 ---
 ⚪ BAIXA — polimento e features novas complexas
-[ ] `app_shell.dart` — labels onlyShowSelected, badges na nav, tooltip FAB (C17)
-[ ] `lib/providers/badge_counts_provider.dart` — criar (A5)
-[ ] `lib/ui/widgets/skeleton_list.dart` — criar (B2)
-[ ] Feature Ideias — `idea_model.dart`, `ideasProvider`, `create_idea_form.dart`, `ideas_screen.dart`, integração CreateMenu + busca (D3)
-[ ] Feature Mercado — `shopping_list_model.dart`, `shoppingListsProvider`, `shopping_list_screen.dart`, `shopping_screen.dart`, widget nativo Android, deep links (D4)
+[x] `app_shell.dart` — labels onlyShowSelected, badges na nav, tooltip FAB (C17) ✅
+[x] `lib/providers/badge_counts_provider.dart` — criar (A5) ✅
+[x] `lib/ui/widgets/skeleton_list.dart` — criar (B2) ✅
+[x] Feature Ideias — `idea_model.dart`, `ideasProvider`, `create_idea_form.dart`, `ideas_screen.dart`, integração CreateMenu + busca (D3) ✅ 16-06-26
+[x] Feature Mercado — `shopping_list_model.dart`, `shoppingListsProvider`, `shopping_list_screen.dart`, `shopping_screen.dart`, widget nativo Android, deep links (D4) ✅ 16-06-26
 ---
 Dependências entre itens
 ```
@@ -5478,24 +5479,24 @@ RESUMO: O QUE ESTÁ COBERTO E O QUE FOI ADICIONADO
 ---
 CHECKLIST ADICIONAL (complementa o checklist do doc principal)
 🟡 ALTA — funcionalidade pedida sem spec anterior
-[ ] `lib/ui/widgets/citrine_chart.dart` ou fl_chart — suporte a gaps (E1)
-[ ] `lib/ui/widgets/universal_search_picker.dart` — aba Social com filtros (E6)
-[ ] `lib/ui/forms/create_social_post_form.dart` — sheet de vínculo ao salvar (E15)
-[ ] `lib/models/habit_model.dart` — `frequencyDays`, `isFlexibleFrequency` (E12)
-[ ] `lib/ui/screens/habits_screen.dart` — `_FlexHabitCard` e seção "Periódicos" (E12)
+[x] `lib/ui/widgets/citrine_chart.dart` ou fl_chart — suporte a gaps (E1) ✅ 16-06-26
+[x] `lib/ui/widgets/universal_search_picker.dart` — aba Social com filtros (E6) ✅ 16-06-26
+[x] `lib/ui/forms/create_social_post_form.dart` — sheet de vínculo ao salvar (E15) ✅ 16-06-26
+[x] `lib/models/habit_model.dart` — `frequencyDays`, `isFlexibleFrequency` (E12) ✅ já implementado
+[x] `lib/ui/screens/habits_screen.dart` — `_FlexHabitCard` e seção "Periódicos" (E12) ✅ 16-06-26
 🟢 MÉDIA
-[ ] `lib/providers/vault_provider.dart` — `conflictingObjectsProvider` (E2)
-[ ] `lib/ui/screens/universal_detail_view.dart` — banner de conflito Nota/Organizer (E2)
-[ ] `lib/providers/wiki_link_resolver_provider.dart` — novo arquivo (E3)
-[ ] `lib/providers/backlinks_provider.dart` — expandir para incluir body (E3)
-[ ] `lib/ui/screens/organizer_detail_screen.dart` — reformular tabs com incoming + outgoing (E3)
-[ ] `lib/models/note_model.dart` — `noteType: 'routine'`, `schedulerSlug`, `showInPlanner` (E10)
-[ ] `lib/ui/forms/create_note_form.dart` — campos de rotina (E10)
-[ ] `lib/ui/screens/planner_screen.dart` — seção "Rotinas" no backlog (E10)
-[ ] `lib/ui/utils/adaptive_layout.dart` — novo arquivo helper (E9)
-[ ] `lib/providers/settings_provider.dart` — `huggingFaceToken`, `suppressedConflicts` (E2, E11)
-[ ] `lib/models/tracker_model.dart` — `FieldDataSource`, `linkedHabitId`, `linkedTaskTitle` (E14)
+[x] `lib/providers/vault_provider.dart` — `conflictingObjectsProvider` (E2) ✅ 16-06-26
+[x] `lib/ui/screens/universal_detail_view.dart` — banner de conflito Nota/Organizer (E2) ✅ 16-06-26
+[x] `lib/providers/wiki_link_resolver_provider.dart` — novo arquivo (E3) ✅ 16-06-26
+[x] `lib/providers/backlinks_provider.dart` — expandir para incluir body (E3) ✅ já implementado em `vault_provider.dart`
+[x] `lib/ui/screens/organizer_detail_screen.dart` — reformular tabs com incoming + outgoing (E3) ✅ 16-06-26
+[x] `lib/models/note_model.dart` — `noteType: 'routine'`, `schedulerSlug`, `showInPlanner` (E10)
+[x] `lib/ui/forms/create_note_form.dart` — campos de rotina (E10)
+[x] `lib/ui/screens/planner_screen.dart` — seção "Rotinas" no backlog (E10)
+[x] `lib/ui/utils/adaptive_layout.dart` — novo arquivo helper (E9)
+[x] `lib/providers/settings_provider.dart` — `huggingFaceToken`, `suppressedConflicts` (E2, E11)
+[x] `lib/models/tracker_model.dart` — `FieldDataSource`, `linkedHabitId`, `linkedTaskTitle` (E14) ✅ já implementado
 ⚪ BAIXA
-[ ] `lib/services/transcription_service.dart` — Whisper via HuggingFace (E11)
-[ ] `lib/ui/widgets/social_embed_view.dart` — JS injection para remover UI do TikTok (E11)
-[ ] `lib/ui/widgets/highlight_picker_sheet.dart` — picker de trecho de objeto (E10)
+[x] `lib/services/transcription_service.dart` — Whisper via HuggingFace (E11)
+[x] `lib/ui/widgets/social_embed_view.dart` — JS injection para remover UI do TikTok (E11)
+[x] `lib/ui/widgets/highlight_picker_sheet.dart` — picker de trecho de objeto (E10)

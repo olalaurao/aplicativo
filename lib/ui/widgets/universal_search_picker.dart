@@ -10,6 +10,7 @@ import '../../models/organizer_model.dart';
 import '../../models/people_model.dart';
 import '../../models/resource_model.dart';
 import '../../models/project_model.dart';
+import '../../models/social_post.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/search_service.dart';
 import '../theme.dart';
@@ -40,6 +41,8 @@ class _UniversalSearchPickerSheetState
   late TextEditingController _searchController;
   final SearchService _searchService = SearchService();
   late String _selectedFilter;
+  SocialPlatform? _socialPlatformFilter;
+  String? _socialCreatorFilter;
 
   @override
   void initState() {
@@ -122,6 +125,7 @@ class _UniversalSearchPickerSheetState
                 _filterChip('project', 'Projetos'),
                 _filterChip('area', 'Áreas'),
                 _filterChip('note', 'Notas'),
+                _filterChip('idea', 'Ideias'),
                 _filterChip('resource', 'Recursos'),
                 _filterChip('social_post', 'Posts'),
                 _filterChip('person', 'Pessoas'),
@@ -155,6 +159,20 @@ class _UniversalSearchPickerSheetState
                   }
                   return true;
                 }).toList();
+
+                if (_selectedFilter == 'social_post') {
+                  filtered = filtered.where((obj) {
+                    if (obj is! SocialPost) return false;
+                    final matchesPlatform =
+                        _socialPlatformFilter == null ||
+                        obj.platform == _socialPlatformFilter;
+                    final creator = _creatorLabel(obj).toLowerCase();
+                    final matchesCreator =
+                        _socialCreatorFilter == null ||
+                        creator == _socialCreatorFilter!.toLowerCase();
+                    return matchesPlatform && matchesCreator;
+                  }).toList();
+                }
 
                 // Apply query search
                 final query = _searchController.text.trim();
@@ -199,6 +217,11 @@ class _UniversalSearchPickerSheetState
               error: (e, _) => Center(child: Text('Erro: $e')),
             ),
           ),
+          if (_selectedFilter == 'social_post')
+            _buildSocialFilters(
+              allObjectsAsync.valueOrNull?.whereType<SocialPost>().toList() ??
+                  const [],
+            ),
           const SizedBox(height: 16),
 
           // Bottom Action: Criar Novo Objeto
@@ -263,10 +286,89 @@ class _UniversalSearchPickerSheetState
             ? const BorderSide(color: AppColors.primary)
             : BorderSide(color: AppColors.textMuted.withValues(alpha: 0.3)),
         onSelected: (val) {
-          if (val) setState(() => _selectedFilter = filter);
+          if (!val) return;
+          setState(() {
+            _selectedFilter = filter;
+            if (filter != 'social_post') {
+              _socialPlatformFilter = null;
+              _socialCreatorFilter = null;
+            }
+          });
         },
       ),
     );
+  }
+
+  Widget _buildSocialFilters(List<SocialPost> posts) {
+    final creators =
+        posts
+            .map(_creatorLabel)
+            .where((creator) => creator.trim().isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _socialPlatformChip(null, 'Todas'),
+              ...SocialPlatform.values.map(
+                (platform) => _socialPlatformChip(platform, platform.name),
+              ),
+            ],
+          ),
+        ),
+        if (creators.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _socialCreatorChip(null, 'Todos criadores'),
+                ...creators
+                    .take(12)
+                    .map((creator) => _socialCreatorChip(creator, creator)),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _socialPlatformChip(SocialPlatform? platform, String label) {
+    final selected = _socialPlatformFilter == platform;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        selected: selected,
+        onSelected: (_) => setState(() => _socialPlatformFilter = platform),
+      ),
+    );
+  }
+
+  Widget _socialCreatorChip(String? creator, String label) {
+    final selected = _socialCreatorFilter == creator;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        selected: selected,
+        onSelected: (_) => setState(() => _socialCreatorFilter = creator),
+      ),
+    );
+  }
+
+  String _creatorLabel(SocialPost post) {
+    return post.authorHandle?.trim().isNotEmpty == true
+        ? post.authorHandle!.trim()
+        : (post.authorName ?? '').trim();
   }
 
   Widget _buildEmptyState(BuildContext context) {
@@ -329,6 +431,10 @@ class _UniversalSearchPickerSheetState
           icon = Icons.article_outlined;
           color = AppColors.primary;
           break;
+        case 'idea':
+          icon = Icons.lightbulb_outline_rounded;
+          color = AppColors.warning;
+          break;
         case 'resource':
           icon = Icons.menu_book_outlined;
           color = AppColors.primary;
@@ -375,6 +481,8 @@ class _UniversalSearchPickerSheetState
         return 'Objetivo';
       case 'note':
         return 'Nota';
+      case 'idea':
+        return 'Ideia';
       case 'resource':
         return 'Recurso';
       case 'social_post':

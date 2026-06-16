@@ -11,11 +11,7 @@ class CreateIdeaForm extends ConsumerStatefulWidget {
   final String? initialTitle;
   final IdeaDefinition? existingIdea;
 
-  const CreateIdeaForm({
-    super.key,
-    this.initialTitle,
-    this.existingIdea,
-  });
+  const CreateIdeaForm({super.key, this.initialTitle, this.existingIdea});
 
   @override
   ConsumerState<CreateIdeaForm> createState() => _CreateIdeaFormState();
@@ -48,20 +44,25 @@ class _CreateIdeaFormState extends ConsumerState<CreateIdeaForm> {
     final title = _titleController.text.trim();
     if (title.isEmpty) return;
 
-    final idea = IdeaDefinition(
-      id: widget.existingIdea?.id ?? const Uuid().v4(),
-      title: title,
-      body: _richContent,
-      linkedTaskIds: _linkedTaskIds,
-      createdAt: widget.existingIdea?.createdAt ?? DateTime.now(),
-      updatedAt: DateTime.now(),
-      obsidianPath: widget.existingIdea?.obsidianPath ?? '',
-    );
-
-    if (widget.existingIdea != null) {
-      await ref.read(vaultProvider.notifier).updateObject(idea);
+    final existing = widget.existingIdea;
+    if (existing != null) {
+      final idea = existing.copyWith(
+        title: title,
+        body: _richContent,
+        linkedTaskIds: _linkedTaskIds,
+        updatedAt: DateTime.now(),
+      );
+      await ref.read(ideasProvider.notifier).updateIdea(idea);
     } else {
-      await ref.read(vaultProvider.notifier).createObject(idea);
+      final idea = IdeaDefinition(
+        id: const Uuid().v4(),
+        title: title,
+        body: _richContent,
+        linkedTaskIds: _linkedTaskIds,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      await ref.read(ideasProvider.notifier).addIdea(idea);
     }
 
     if (mounted) {
@@ -70,8 +71,9 @@ class _CreateIdeaFormState extends ConsumerState<CreateIdeaForm> {
   }
 
   void _pickTasks() async {
-    final allTasks = ref.read(allObjectsProvider).value?.whereType<Task>().toList() ?? [];
-    
+    final allTasks =
+        ref.read(allObjectsProvider).value?.whereType<Task>().toList() ?? [];
+
     // Simple bottom sheet to pick multiple tasks
     final result = await showModalBottomSheet<List<String>>(
       context: context,
@@ -145,7 +147,7 @@ class _CreateIdeaFormState extends ConsumerState<CreateIdeaForm> {
               ),
             ),
             const SizedBox(height: 20),
-            
+
             // Linked Tasks
             GestureDetector(
               onTap: _pickTasks,
@@ -157,21 +159,31 @@ class _CreateIdeaFormState extends ConsumerState<CreateIdeaForm> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.task_alt_rounded, size: 20, color: AppColors.primary),
+                    const Icon(
+                      Icons.task_alt_rounded,
+                      size: 20,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        _linkedTaskIds.isEmpty 
-                          ? 'Vincular Tasks...' 
-                          : '${_linkedTaskIds.length} tasks vinculadas',
+                        _linkedTaskIds.isEmpty
+                            ? 'Vincular Tasks...'
+                            : '${_linkedTaskIds.length} tasks vinculadas',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
-                          color: _linkedTaskIds.isEmpty ? AppColors.textMuted : AppColors.textPrimary,
+                          color: _linkedTaskIds.isEmpty
+                              ? AppColors.textMuted
+                              : AppColors.textPrimary,
                         ),
                       ),
                     ),
-                    const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: AppColors.textMuted,
+                    ),
                   ],
                 ),
               ),
@@ -289,11 +301,16 @@ class _TaskPickerSheetState extends State<_TaskPickerSheet> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               onPressed: () => Navigator.pop(context, _selectedIds.toList()),
-              child: const Text('Confirmar', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+              child: const Text(
+                'Confirmar',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+              ),
             ),
           ),
         ],

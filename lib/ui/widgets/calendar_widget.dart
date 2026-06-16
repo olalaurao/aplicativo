@@ -30,7 +30,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
   @override
   Widget build(BuildContext context) {
     final allTasks = ref.watch(tasksProvider);
-    final habits = ref.watch(habitsProvider);
+    final habits = ref.watch(habitsProvider).where((h) => !h.isQuitting).toList();
     final reminders = ref.watch(remindersProvider);
     final organizerObjects =
         ref

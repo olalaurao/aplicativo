@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/task_model.dart';
+import '../../models/note_model.dart';
 import '../../models/saved_filter.dart';
 import 'matrix_screen.dart';
 import '../../models/habit_model.dart';
@@ -75,7 +76,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   @override
   Widget build(BuildContext context) {
     final tasks = ref.watch(tasksProvider);
-    final habits = ref.watch(habitsProvider);
+    final habits = ref
+        .watch(habitsProvider)
+        .where((h) => !h.isQuitting)
+        .toList();
     final people = ref.watch(peopleProvider);
     final dayThemes = ref.watch(dayThemesProvider);
     final timeBlocks = ref.watch(timeBlocksProvider);
@@ -257,18 +261,24 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             pinned: true,
             actions: [
               IconButton(
-                icon: const Icon(Icons.grid_4x4_rounded, color: AppColors.primary),
+                icon: const Icon(
+                  Icons.grid_4x4_rounded,
+                  color: AppColors.primary,
+                ),
                 tooltip: 'Eisenhower Matrix',
-                onPressed: () => Navigator.push(context, MaterialPageRoute(
-                  builder: (_) => MatrixScreen(
-                    filter: SavedFilter(
-                      id: 'eisenhower',
-                      name: 'Eisenhower',
-                      targetType: 'task',
-                      matrixConfig: MatrixConfig.eisenhower,
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const MatrixScreen(
+                      filter: SavedFilter(
+                        id: 'eisenhower',
+                        name: 'Eisenhower',
+                        targetType: 'task',
+                        matrixConfig: MatrixConfig.eisenhower,
+                      ),
                     ),
                   ),
-                )),
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.inbox_rounded, color: AppColors.primary),
@@ -279,10 +289,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 IconButton(
                   icon: Icon(
                     _isTimeline
-                        ? Icons.view_agenda_outlined
-                        : Icons.access_time_rounded,
-                    color: AppColors.primary,
+                        ? Icons.view_list_rounded
+                        : Icons.view_timeline_rounded,
+                    size: 22,
+                    color: AppTheme.textMutedColor(context),
                   ),
+                  tooltip: _isTimeline ? 'Ver como lista' : 'Ver como timeline',
                   onPressed: () => setState(() => _isTimeline = !_isTimeline),
                 ),
               IconButton(
@@ -530,66 +542,65 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     }
   }
 
-  Widget _buildDateStrip() {
-    return SizedBox(
-      height: 70,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: 14, // 2 weeks
-        itemBuilder: (context, index) {
-          final date = DateTime.now()
-              .subtract(Duration(days: DateTime.now().weekday - 1))
-              .add(Duration(days: index));
-          final isSelected = _isSameDay(date, _selectedDate);
+  Future<void> _pickCustomDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (date != null) {
+      setState(() => _selectedDate = date);
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _scrollToNow(animate: true),
+      );
+    }
+  }
 
-          return GestureDetector(
-            onTap: () => setState(() => _selectedDate = date),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 50,
-              margin: const EdgeInsets.only(right: 12),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(14),
-                border: !isSelected
-                    ? Border.all(
-                        color: AppTheme.dividerColor(
-                          context,
-                        ).withValues(alpha: 0.5),
-                        width: 1,
-                      )
-                    : null,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    DateFormat('E').format(date).substring(0, 1).toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: isSelected
-                          ? Colors.white.withValues(alpha: 0.8)
-                          : AppTheme.textMutedColor(context),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    date.day.toString(),
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: isSelected
-                          ? Colors.white
-                          : AppTheme.textPrimaryColor(context),
-                    ),
-                  ),
-                ],
+  Widget _buildDateStrip() {
+    return Row(
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chevron_left_rounded),
+          onPressed: () => setState(
+            () =>
+                _selectedDate = _selectedDate.subtract(const Duration(days: 1)),
+          ),
+        ),
+        Expanded(
+          child: GestureDetector(
+            onTap: _pickCustomDate,
+            child: Text(
+              DateFormat("EEEE, d 'de' MMMM", 'pt_BR').format(_selectedDate),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.chevron_right_rounded),
+          onPressed: () => setState(
+            () => _selectedDate = _selectedDate.add(const Duration(days: 1)),
+          ),
+        ),
+        if (!_isSameDay(_selectedDate, DateTime.now()))
+          TextButton(
+            onPressed: () {
+              setState(() => _selectedDate = DateTime.now());
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => _scrollToNow(animate: true),
+              );
+            },
+            child: const Text(
+              'Hoje',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
               ),
             ),
-          );
-        },
-      ),
+          ),
+      ],
     );
   }
 
@@ -872,9 +883,23 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Tracker Record',
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                    Consumer(
+                      builder: (ctx, ref, _) {
+                        final trackers = ref.watch(trackersProvider);
+                        final tracker = trackers.cast<dynamic>().firstWhere(
+                          (t) => t.id == record.trackerId,
+                          orElse: () => null,
+                        );
+                        return Text(
+                          tracker?.title ?? 'Registro',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        );
+                      },
                     ),
                     Text(
                       '${record.fieldValues.length} fields filled',
@@ -1606,6 +1631,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
 
   void _showBacklogSheet() {
     final tasks = ref.read(tasksProvider);
+    final routines = ref
+        .read(notesProvider)
+        .where(
+          (note) => note.subtype == NoteSubtype.routine && note.showInPlanner,
+        )
+        .toList();
     final backlog = tasks
         .where(
           (t) =>
@@ -1643,7 +1674,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              if (backlog.isEmpty)
+              if (backlog.isEmpty && routines.isEmpty)
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(40),
@@ -1655,15 +1686,63 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 )
               else
                 Expanded(
-                  child: ListView.builder(
-                    itemCount: backlog.length,
-                    itemBuilder: (context, index) {
-                      return _buildTaskItem(backlog[index]);
-                    },
+                  child: ListView(
+                    children: [
+                      if (routines.isNotEmpty) ...[
+                        _buildBacklogSectionTitle('Rotinas'),
+                        ...routines.map(_buildRoutineItem),
+                        const SizedBox(height: 12),
+                      ],
+                      if (backlog.isNotEmpty) ...[
+                        _buildBacklogSectionTitle('Tarefas'),
+                        ...backlog.map(_buildTaskItem),
+                      ],
+                    ],
                   ),
                 ),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBacklogSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+      child: Text(
+        title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textMuted,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoutineItem(Note note) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+      leading: const Icon(Icons.repeat_rounded, color: AppColors.info),
+      title: Text(
+        note.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      subtitle: const Text(
+        'Rotina',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      onTap: () {
+        Navigator.pop(context);
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => UniversalDetailView(object: note)),
         );
       },
     );

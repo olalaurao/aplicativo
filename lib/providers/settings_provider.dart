@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/shared_types.dart';
+import '../models/saved_filter.dart';
 
 /// Loaded once in main() before runApp and overridden into the ProviderContainer.
 /// This ensures SettingsNotifier has real prefs from the very first build,
@@ -71,6 +72,21 @@ class AppSettings {
   final String ideaTag;        // default: 'idea'
   final String ideaFolder;     // default: 'notes/ideas'
 
+  // ── User identity ──
+  final String? userName;     // displayed in greeting on Home screen
+
+  // ── Saved filters ──
+  final List<Map<String, dynamic>> savedFiltersRaw; // persisted as JSON list
+
+  // ── Integrations ──
+  final String? huggingFaceToken;  // Whisper / HuggingFace API token (E11)
+
+  // ── Conflict suppression ──
+  final Map<String, DateTime> suppressedConflicts; // slug → suppressed date (E2)
+
+  // ── Recent Searches ──
+  final List<String> recentSearches;
+
   AppSettings({
     required this.vaultName,
     this.vaultPath = '',
@@ -120,7 +136,21 @@ class AppSettings {
     this.ideaStrategy = 'tag',
     this.ideaTag = 'idea',
     this.ideaFolder = 'notes/ideas',
+    this.userName,
+    this.savedFiltersRaw = const [],
+    this.huggingFaceToken,
+    this.suppressedConflicts = const {},
+    this.recentSearches = const [],
   });
+
+  /// All saved filters deserialized.
+  List<SavedFilter> get savedFilters =>
+      savedFiltersRaw.map((j) => SavedFilter.fromJson(j)).toList();
+
+  /// Filters that target this type (or the wildcard '*').
+  List<SavedFilter> filtersFor(String targetType) => savedFilters
+      .where((f) => f.targetType == targetType || f.targetType == '*')
+      .toList();
 
   final String universalWidgetType;
   final String universalWidgetOrganizer;
@@ -189,6 +219,11 @@ class AppSettings {
     String? ideaStrategy,
     String? ideaTag,
     String? ideaFolder,
+    String? userName,
+    List<Map<String, dynamic>>? savedFiltersRaw,
+    String? huggingFaceToken,
+    Map<String, DateTime>? suppressedConflicts,
+    List<String>? recentSearches,
   }) {
     return AppSettings(
       vaultName: vaultName ?? this.vaultName,
@@ -252,6 +287,11 @@ class AppSettings {
       ideaStrategy: ideaStrategy ?? this.ideaStrategy,
       ideaTag: ideaTag ?? this.ideaTag,
       ideaFolder: ideaFolder ?? this.ideaFolder,
+      userName: userName ?? this.userName,
+      savedFiltersRaw: savedFiltersRaw ?? this.savedFiltersRaw,
+      huggingFaceToken: huggingFaceToken ?? this.huggingFaceToken,
+      suppressedConflicts: suppressedConflicts ?? this.suppressedConflicts,
+      recentSearches: recentSearches ?? this.recentSearches,
     );
   }
 }
@@ -357,6 +397,30 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       ideaStrategy: prefs.getString('ideaStrategy') ?? 'tag',
       ideaTag: prefs.getString('ideaTag') ?? 'idea',
       ideaFolder: prefs.getString('ideaFolder') ?? 'notes/ideas',
+      userName: prefs.getString('userName'),
+      savedFiltersRaw: () {
+        final raw = prefs.getString('savedFiltersRaw');
+        if (raw == null) return const <Map<String, dynamic>>[];
+        try {
+          return (json.decode(raw) as List)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+        } catch (_) {
+          return const <Map<String, dynamic>>[];
+        }
+      }(),
+      huggingFaceToken: prefs.getString('huggingFaceToken'),
+      suppressedConflicts: () {
+        final raw = prefs.getString('suppressedConflicts');
+        if (raw == null) return const <String, DateTime>{};
+        try {
+          return (json.decode(raw) as Map<String, dynamic>).map(
+            (k, v) => MapEntry(k, DateTime.parse(v as String)));
+        } catch (_) {
+          return const <String, DateTime>{};
+        }
+      }(),
+      recentSearches: prefs.getStringList('recentSearches') ?? const [],
     );
   }
 
@@ -777,6 +841,54 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     state = state.copyWith(folderPaths: next);
   }
 
+  // ── A2: User identity ──
+  Future<void> setUserName(String name) async {
+    final trimmed = name.trim();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('userName', trimmed);
+    state = state.copyWith(userName: trimmed);
+  }
+
+  // ── A2: Saved filters ──
+  Future<void> upsertSavedFilter(SavedFilter filter) async {
+    final list = state.savedFilters.toList();
+    final idx = list.indexWhere((f) => f.id == filter.id);
+    if (idx >= 0) {
+      list[idx] = filter;
+    } else {
+      list.add(filter);
+    }
+    final raw = list.map((f) => f.toJson()).toList();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('savedFiltersRaw', json.encode(raw));
+    state = state.copyWith(savedFiltersRaw: raw);
+  }
+
+  Future<void> deleteSavedFilter(String filterId) async {
+    final list = state.savedFilters.where((f) => f.id != filterId).toList();
+    final raw = list.map((f) => f.toJson()).toList();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('savedFiltersRaw', json.encode(raw));
+    state = state.copyWith(savedFiltersRaw: raw);
+  }
+
+  // ── E11: HuggingFace token ──
+  Future<void> setHuggingFaceToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('huggingFaceToken', token.trim());
+    state = state.copyWith(huggingFaceToken: token.trim());
+  }
+
+  // ── E2: Suppress conflict warnings ──
+  Future<void> suppressConflict(String slug) async {
+    final next = Map<String, DateTime>.from(state.suppressedConflicts)
+      ..[slug] = DateTime.now();
+    final encoded = json.encode(next.map((k, v) => MapEntry(k, v.toIso8601String())));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('suppressedConflicts', encoded);
+    state = state.copyWith(suppressedConflicts: next);
+  }
+
   Future<void> setIdeaStrategy({
     required String strategy,
     String? tag,
@@ -791,6 +903,24 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       ideaTag: tag ?? state.ideaTag,
       ideaFolder: folder ?? state.ideaFolder,
     );
+  }
+
+  Future<void> addRecentSearch(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return;
+    var next = List<String>.from(state.recentSearches);
+    next.remove(trimmed);
+    next.insert(0, trimmed);
+    if (next.length > 5) next = next.sublist(0, 5);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('recentSearches', next);
+    state = state.copyWith(recentSearches: next);
+  }
+
+  Future<void> clearRecentSearches() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('recentSearches');
+    state = state.copyWith(recentSearches: const []);
   }
 }
 

@@ -13,7 +13,7 @@ import '../widgets/metadata_strip.dart';
 import '../widgets/organizer_picker_modal.dart';
 import 'package:go_router/go_router.dart';
 
-enum NoteType { text, outline, collection }
+enum NoteType { text, outline, collection, routine }
 
 class CreateNoteForm extends ConsumerStatefulWidget {
   final String? initialTitle;
@@ -40,6 +40,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
   List<String> _tags = [];
   bool _pinned = false;
   bool _isChecklist = false;
+  bool _showInPlanner = false;
   DateTime _createdAt = DateTime.now();
 
   @override
@@ -61,6 +62,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
       _tags = List.of(note.tags);
       _pinned = note.pinned;
       _isChecklist = note.isChecklist;
+      _showInPlanner = note.showInPlanner;
       _createdAt = note.createdAt;
       switch (note.subtype) {
         case NoteSubtype.text:
@@ -71,6 +73,9 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
           break;
         case NoteSubtype.collection:
           _noteType = NoteType.collection;
+          break;
+        case NoteSubtype.routine:
+          _noteType = NoteType.routine;
           break;
       }
     }
@@ -96,7 +101,9 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Descartar alterações?'),
-            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
+            content: const Text(
+              'Você possui alterações não salvas. Deseja sair mesmo assim?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -114,163 +121,180 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
           Navigator.pop(context, result);
         }
       },
-      child:  Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            pinned: true,
-            leading: IconButton(
-              icon: const Icon(Icons.close_rounded),
-              onPressed: () => Navigator.pop(context),
-            ),
-            title: const Text(
-              'New Note',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-            ),
-            centerTitle: true,
-            actions: [
-              IconButton(
-                icon: const Icon(
-                  Icons.copy_all_rounded,
-                  color: AppColors.primary,
-                ),
-                tooltip: 'Usar Template',
-                onPressed: _showTemplatePicker,
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              pinned: true,
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.pop(context),
               ),
-              TextButton(
-                onPressed: hasTitle ? _saveNote : null,
-                child: Text(
-                  'Save',
-                  style: TextStyle(
-                    color: hasTitle ? AppColors.primary : AppColors.textMuted,
-                    fontWeight: FontWeight.w700,
+              title: const Text(
+                'New Note',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
+              centerTitle: true,
+              actions: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.copy_all_rounded,
+                    color: AppColors.primary,
+                  ),
+                  tooltip: 'Usar Template',
+                  onPressed: _showTemplatePicker,
+                ),
+                TextButton(
+                  onPressed: hasTitle ? _saveNote : null,
+                  child: Text(
+                    'Save',
+                    style: TextStyle(
+                      color: hasTitle ? AppColors.primary : AppColors.textMuted,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
 
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: Column(
-                children: [
-                  // âÂ”Â€âÂ”Â€âÂ”Â€ Type Selector âÂ”Â€âÂ”Â€âÂ”Â€
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceVariant,
-                      borderRadius: BorderRadius.circular(12),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: Column(
+                  children: [
+                    // Type selector
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          _typeSelector(
+                            NoteType.text,
+                            'Text',
+                            Icons.description_outlined,
+                          ),
+                          _typeSelector(
+                            NoteType.outline,
+                            'Outline',
+                            Icons.account_tree_outlined,
+                          ),
+                          _typeSelector(
+                            NoteType.collection,
+                            'Collection',
+                            Icons.grid_view_rounded,
+                          ),
+                          _typeSelector(
+                            NoteType.routine,
+                            'Rotina',
+                            Icons.repeat_rounded,
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Row(
-                      children: [
-                        _typeSelector(
-                          NoteType.text,
-                          'Text',
-                          Icons.description_outlined,
+
+                    const SizedBox(height: 24),
+
+                    // Title
+                    TextField(
+                      controller: _titleController,
+                      onChanged: (_) => setState(() {}),
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      decoration: const InputDecoration(
+                        hintText: 'Title',
+                        hintStyle: TextStyle(color: AppColors.textMuted),
+                        border: InputBorder.none,
+                        filled: false,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // âÂ”Â€âÂ”Â€âÂ”Â€ Metadata Strip âÂ”Â€âÂ”Â€âÂ”Â€
+                    MetadataStrip(
+                      chips: [
+                        MetadataChip(
+                          icon: Icons.layers_outlined,
+                          label: _organizers.isEmpty
+                              ? 'Organizers'
+                              : '${_organizers.length} organizers',
+                          onTap: _pickOrganizer,
                         ),
-                        _typeSelector(
-                          NoteType.outline,
-                          'Outline',
-                          Icons.account_tree_outlined,
+                        MetadataChip(
+                          icon: Icons.tag_rounded,
+                          label: _tags.isEmpty ? 'Tags' : _tags.join(', '),
+                          onTap: _editTags,
                         ),
-                        _typeSelector(
-                          NoteType.collection,
-                          'Collection',
-                          Icons.grid_view_rounded,
+                        MetadataChip(
+                          icon: _pinned
+                              ? Icons.push_pin_rounded
+                              : Icons.push_pin_outlined,
+                          label: _pinned ? 'Pinned' : 'Pin',
+                          onTap: () => setState(() => _pinned = !_pinned),
+                        ),
+                        MetadataChip(
+                          icon: _isChecklist
+                              ? Icons.checklist_rtl_rounded
+                              : Icons.check_box_outline_blank_rounded,
+                          label: 'Checklist',
+                          onTap: () =>
+                              setState(() => _isChecklist = !_isChecklist),
+                        ),
+                        if (_noteType == NoteType.routine)
+                          MetadataChip(
+                            icon: _showInPlanner
+                                ? Icons.event_available_rounded
+                                : Icons.event_note_outlined,
+                            label: _showInPlanner ? 'No Planner' : 'Ocultar',
+                            onTap: () => setState(
+                              () => _showInPlanner = !_showInPlanner,
+                            ),
+                          ),
+                        MetadataChip(
+                          icon: Icons.calendar_today_outlined,
+                          label:
+                              '${_createdAt.year}-${_createdAt.month.toString().padLeft(2, '0')}-${_createdAt.day.toString().padLeft(2, '0')}',
+                          onTap: _pickDate,
                         ),
                       ],
                     ),
-                  ),
 
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-                  // âÂ”Â€âÂ”Â€âÂ”Â€ Title âÂ”Â€âÂ”Â€âÂ”Â€
-                  TextField(
-                    controller: _titleController,
-                    onChanged: (_) => setState(() {}),
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: 'Title',
-                      hintStyle: TextStyle(color: AppColors.textMuted),
-                      border: InputBorder.none,
-                      filled: false,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // âÂ”Â€âÂ”Â€âÂ”Â€ Metadata Strip âÂ”Â€âÂ”Â€âÂ”Â€
-                  MetadataStrip(
-                    chips: [
-                      MetadataChip(
-                        icon: Icons.layers_outlined,
-                        label: _organizers.isEmpty
-                            ? 'Organizers'
-                            : '${_organizers.length} organizers',
-                        onTap: _pickOrganizer,
-                      ),
-                      MetadataChip(
-                        icon: Icons.tag_rounded,
-                        label: _tags.isEmpty ? 'Tags' : _tags.join(', '),
-                        onTap: _editTags,
-                      ),
-                      MetadataChip(
-                        icon: _pinned
-                            ? Icons.push_pin_rounded
-                            : Icons.push_pin_outlined,
-                        label: _pinned ? 'Pinned' : 'Pin',
-                        onTap: () => setState(() => _pinned = !_pinned),
-                      ),
-                      MetadataChip(
-                        icon: _isChecklist
-                            ? Icons.checklist_rtl_rounded
-                            : Icons.check_box_outline_blank_rounded,
-                        label: 'Checklist',
-                        onTap: () => setState(() => _isChecklist = !_isChecklist),
-                      ),
-                      MetadataChip(
-                        icon: Icons.calendar_today_outlined,
-                        label:
-                            '${_createdAt.year}-${_createdAt.month.toString().padLeft(2, '0')}-${_createdAt.day.toString().padLeft(2, '0')}',
-                        onTap: _pickDate,
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // âÂ”Â€âÂ”Â€âÂ”Â€ Content âÂ”Â€âÂ”Â€âÂ”Â€
-                  _noteType == NoteType.outline
-                      ? OutlineEditor(
-                          initialContent: _richContent,
-                          onChanged: (v) => _richContent = v,
-                        )
-                      : _noteType == NoteType.collection
-                      ? CollectionEditor(
-                          initialContent: _richContent,
-                          onChanged: (v) => _richContent = v,
-                        )
-                      : SizedBox(
-                          height: 500,
-                          child: RichTextEditor(
-                            content: _richContent,
-                            placeholder: _hintForType(),
+                    // Content
+                    _noteType == NoteType.outline
+                        ? OutlineEditor(
+                            initialContent: _richContent,
                             onChanged: (v) => _richContent = v,
+                          )
+                        : _noteType == NoteType.collection
+                        ? CollectionEditor(
+                            initialContent: _richContent,
+                            onChanged: (v) => _richContent = v,
+                          )
+                        : SizedBox(
+                            height: 500,
+                            child: RichTextEditor(
+                              content: _richContent,
+                              placeholder: _hintForType(),
+                              onChanged: (v) => _richContent = v,
+                            ),
                           ),
-                        ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ));
+    );
   }
 
   Widget _typeSelector(NoteType type, String label, IconData icon) {
@@ -328,17 +352,19 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
       case NoteType.text:
         return 'Start writing...';
       case NoteType.outline:
-        return 'âÂ€Â¢ Use bullets for your outline...';
+        return 'Use bullets for your outline...';
       case NoteType.collection:
         return 'Add items to your collection...';
+      case NoteType.routine:
+        return 'Descreva os passos da rotina...';
     }
   }
 
   void _saveNote() {
-    final defaultPath = widget.initialFolder != null 
-        ? '${widget.initialFolder}/' 
+    final defaultPath = widget.initialFolder != null
+        ? '${widget.initialFolder}/'
         : '';
-        
+
     final note = Note(
       id:
           widget.existingNote?.id ??
@@ -353,6 +379,8 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
       tags: _tags,
       pinned: _pinned,
       isChecklist: _isChecklist,
+      showInPlanner: _noteType == NoteType.routine && _showInPlanner,
+      schedulerSlug: widget.existingNote?.schedulerSlug,
     );
 
     if (widget.existingNote != null) {
@@ -380,6 +408,8 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
         return NoteSubtype.outline;
       case NoteType.collection:
         return NoteSubtype.collection;
+      case NoteType.routine:
+        return NoteSubtype.routine;
     }
   }
 

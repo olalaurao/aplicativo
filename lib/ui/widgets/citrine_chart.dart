@@ -59,20 +59,35 @@ class CitrineChart extends StatelessWidget {
   Widget _buildLineChart(BuildContext context) {
     final series = multiData ?? [data];
     final seriesColors = colors ?? [color ?? AppColors.primary];
-    final lineBars = series
-        .asMap()
-        .entries
-        .map((entry) {
-          final idx = entry.key;
-          final d = entry.value;
-          final spots = d
-              .asMap()
-              .entries
-              .where((e) => e.value.value != null)
-              .map((e) => FlSpot(e.key.toDouble(), e.value.value!))
-              .toList();
+    final segments = <_LineSeriesSegment>[];
+    for (final entry in series.asMap().entries) {
+      final idx = entry.key;
+      final d = entry.value;
+      var current = <FlSpot>[];
+
+      for (final pointEntry in d.asMap().entries) {
+        final value = pointEntry.value.value;
+        if (value == null) {
+          if (current.isNotEmpty) {
+            segments.add(_LineSeriesSegment(idx, current));
+            current = <FlSpot>[];
+          }
+          continue;
+        }
+        current.add(FlSpot(pointEntry.key.toDouble(), value));
+      }
+
+      if (current.isNotEmpty) {
+        segments.add(_LineSeriesSegment(idx, current));
+      }
+    }
+
+    final lineBars = segments
+        .map((segment) {
+          final idx = segment.seriesIndex;
+          final d = series[idx];
           return LineChartBarData(
-            spots: spots,
+            spots: segment.spots,
             isCurved: true,
             color: seriesColors[idx % seriesColors.length],
             barWidth: 3,
@@ -97,15 +112,14 @@ class CitrineChart extends StatelessWidget {
                 return FlDotCirclePainter(
                   radius: 3,
                   color: seriesColors[idx % seriesColors.length],
-                  strokeColor:
-                      seriesColors[idx % seriesColors.length]
-                          .withValues(alpha: 0.3),
+                  strokeColor: seriesColors[idx % seriesColors.length]
+                      .withValues(alpha: 0.3),
                   strokeWidth: 1,
                 );
               },
             ),
             belowBarData: BarAreaData(
-              show: spots.length > 1,
+              show: segment.spots.length > 1,
               color: seriesColors[idx % seriesColors.length].withValues(
                 alpha: 0.1,
               ),
@@ -117,14 +131,16 @@ class CitrineChart extends StatelessWidget {
 
     // Coletar anotações de emoji nos pontos
     final List<ShowingTooltipIndicators> emojiAnnotations = [];
-    for (var si = 0; si < series.length; si++) {
-      final d = series[si];
-      for (var xi = 0; xi < d.length; xi++) {
+    for (var barIndex = 0; barIndex < segments.length; barIndex++) {
+      final segment = segments[barIndex];
+      final d = series[segment.seriesIndex];
+      for (final spot in segment.spots) {
+        final xi = spot.x.toInt();
         final point = d[xi];
         if (point.value != null && (point.emoji?.isNotEmpty ?? false)) {
           emojiAnnotations.add(
             ShowingTooltipIndicators([
-              LineBarSpot(lineBars[si], si, FlSpot(xi.toDouble(), point.value!)),
+              LineBarSpot(lineBars[barIndex], barIndex, spot),
             ]),
           );
         }
@@ -149,7 +165,8 @@ class CitrineChart extends StatelessWidget {
               return touchedSpots.map((barSpot) {
                 final si = barSpot.barIndex;
                 final xi = barSpot.x.toInt();
-                final d = series[si];
+                if (si < 0 || si >= segments.length) return null;
+                final d = series[segments[si].seriesIndex];
                 final hasEmoji =
                     xi >= 0 &&
                     xi < d.length &&
@@ -309,6 +326,7 @@ class ChartDataPoint {
   final String label;
   final double? value;
   final Color? color;
+
   /// Emoji opcional — exibido como marcador visual no ponto do gráfico de linha
   final String? emoji;
 
@@ -318,4 +336,11 @@ class ChartDataPoint {
     this.color,
     this.emoji,
   });
+}
+
+class _LineSeriesSegment {
+  final int seriesIndex;
+  final List<FlSpot> spots;
+
+  const _LineSeriesSegment(this.seriesIndex, this.spots);
 }

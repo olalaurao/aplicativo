@@ -67,6 +67,8 @@ import '../../models/system_model.dart';
 import '../../providers/systems_provider.dart';
 import 'system_detail_screen.dart';
 import '../widgets/steering_sheet.dart';
+import '../../services/markdown_parser.dart';
+import '../../providers/settings_provider.dart';
 
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -231,18 +233,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
           body: NotificationListener<ScrollNotification>(
             onNotification: (notification) {
-              if (notification is ScrollUpdateNotification) {
-                if (notification.metrics.pixels < -140 &&
-                    notification.dragDetails != null) {
-                  // Throttle this so it doesn't open multiple times
-                  if (!_commandCenterOpenedThisScroll &&
-                      ModalRoute.of(context)?.isCurrent == true) {
-                    _commandCenterOpenedThisScroll = true;
-                    showCommandCenter(context);
-                  }
-                }
-              } else if (notification is ScrollEndNotification) {
-                _commandCenterOpenedThisScroll = false;
+              if (notification.metrics.pixels >= 0) _commandCenterOpenedThisScroll = false;
+              if (notification.metrics.pixels < -140 &&
+                  notification is ScrollUpdateNotification && notification.dragDetails != null &&
+                  !_commandCenterOpenedThisScroll &&
+                  ModalRoute.of(context)?.isCurrent == true) {
+                _commandCenterOpenedThisScroll = true;
+                showCommandCenter(context);
               }
               return false;
             },
@@ -262,41 +259,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
+                        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Expanded(child: _buildGreeting(context, ref)),
+                          Row(mainAxisSize: MainAxisSize.min, children: [
                             _buildSyncIndicator(ref),
-                            if (_isEditMode)
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.add_box_rounded,
-                                  color: AppColors.primary,
-                                ),
-                                tooltip: 'Add widget',
-                                onPressed: () => _showAddWidgetSheet(context),
-                              ),
-                            IconButton(
-                              icon: Icon(
-                                _isEditMode
-                                    ? Icons.check_rounded
-                                    : Icons.tune_rounded,
-                                color: _isEditMode
-                                    ? AppColors.primary
-                                    : AppColors.textMuted,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _isEditMode = !_isEditMode;
-                                });
-                              },
-                            ),
-                          ],
-                        ),
+                            if (_isEditMode) IconButton(icon: const Icon(Icons.add_box_rounded, color: AppColors.primary), tooltip: 'Add widget', onPressed: () => _showAddWidgetSheet(context)),
+                            IconButton(icon: Icon(_isEditMode ? Icons.check_rounded : Icons.tune_rounded, color: _isEditMode ? AppColors.primary : AppColors.textMuted), onPressed: () => setState(() => _isEditMode = !_isEditMode)),
+                          ]),
+                        ]),
                         if (_isEditMode)
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
                               'Drag to reorder or tap ⋯ to configure',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppColors.primary.withValues(alpha: 0.8),
@@ -406,6 +383,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       error: (e, s) =>
           Scaffold(body: Center(child: Text('Error loading dashboard: $e'))),
     );
+  }
+
+  Widget _buildGreeting(BuildContext context, WidgetRef ref) {
+    final hour     = DateTime.now().hour;
+    final greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+    final name     = ref.watch(settingsProvider).userName ?? '';
+    final dateStr  = DateFormat("EEEE, d 'de' MMMM", 'pt_BR').format(DateTime.now());
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('$greeting${name.isNotEmpty ? ", $name" : ""}',
+        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800,
+          color: AppTheme.textPrimaryColor(context))),
+      const SizedBox(height: 2),
+      Text(dateStr, style: TextStyle(fontSize: 13,
+        color: AppTheme.textMutedColor(context), fontWeight: FontWeight.w500)),
+    ]);
   }
 
   Widget _buildDashboardSkeleton() {
@@ -1246,45 +1239,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildQuoteBlock() {
-    const _defaultQuotes = [
-      '"The best way to predict the future is to create it." ââ‚¬â€ Peter Drucker',
-      '"You do not rise to the level of your goals. You fall to the level of your systems." ââ‚¬â€ James Clear',
-      '"Energy flows where attention goes." ââ‚¬â€ Tony Robbins',
-      '"Small daily improvements over time lead to stunning results." ââ‚¬â€ Robin Sharma',
-      '"Discipline is the bridge between goals and accomplishment." ââ‚¬â€ Jim Rohn',
-    ];
-
-    final blocks = ref.watch(dashboardProvider).valueOrNull ?? [];
-    final block = blocks.cast<DashboardBlock?>().firstWhere(
-      (b) => b?.type == BlockType.quotes,
-      orElse: () => null,
-    );
-    final rawQuotes = block?.metadata['quotes'] as List?;
-    final quotes = rawQuotes != null
-        ? rawQuotes.cast<String>().toList()
-        : _defaultQuotes;
-
-    final now = DateTime.now();
-    final dayOfYear = now.difference(DateTime(now.year, 1, 1)).inDays;
-    final todayIndex = dayOfYear % quotes.length;
-    final todayQuote = quotes[todayIndex];
-
-    // Try to split author from quote
-    final dashIdx = todayQuote.lastIndexOf('ââ‚¬â€');
-    final quoteText = dashIdx > 0
-        ? todayQuote.substring(0, dashIdx).trim()
-        : todayQuote.trim();
-    final author = dashIdx > 0 ? todayQuote.substring(dashIdx + 1).trim() : null;
+    final resources = ref.watch(resourcesProvider);
+    final allHighlights = <({String text, String source})>[];
+    for (final r in resources) {
+      final hls = MarkdownParser.extractHighlights(r.synopsis ?? '');
+      allHighlights.addAll(hls.map((h) => (text: h.text, source: r.title)));
+    }
+    final today = DateTime.now();
+    final dayIndex = today.day + today.month * 31;
+    final quote = allHighlights.isEmpty
+        ? (text: 'The best way to predict the future is to create it.', source: 'Peter Drucker')
+        : allHighlights[dayIndex % allHighlights.length];
 
     return _buildCard(
-      title: 'Quote of the Day',
+      title: 'Destaque do dia',
       icon: Icons.format_quote_rounded,
-      onConfigure: _isEditMode ? () => _showQuotePoolEditor(block, quotes) : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            quoteText,
+            '"${quote.text}"',
             style: const TextStyle(
               fontSize: 15,
               fontStyle: FontStyle.italic,
@@ -1292,15 +1266,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               height: 1.5,
             ),
           ),
-          if (author != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              'ââ‚¬â€ $author',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-            ),
-          ],
+          const SizedBox(height: 8),
+          Text(
+            '— ${quote.source}',
+            style: TextStyle(fontSize: 12, color: AppTheme.textMutedColor(context)),
+          ),
         ],
       ),
     );
@@ -2026,11 +1996,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     return switch (moodSlug) {
       'terrible' => '😞',
-      'bad' => 'Ã°Å¸Ëœâ€¢',
-      'neutral' => 'Ã°Å¸ËœÂ',
-      'good' => 'Ã°Å¸â„¢â€š',
-      'great' => 'Ã°Å¸Ëœâ€ž',
-      _ => 'Ã°Å¸ËœÂ',
+      'bad' => '😢',
+      'neutral' => '😐',
+      'good' => '🙂',
+      'great' => '😄',
+      _ => '😐',
     };
   }
 
@@ -2471,11 +2441,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (activeHabits.isEmpty) {
       motivationText = 'Add habits to track your consistency!';
     } else if (avgConsistency >= 0.8) {
-      motivationText = 'Exceptional consistency! Keep it up Ã°Å¸â€Â¥';
+      motivationText = 'Exceptional consistency! Keep it up 🔥';
     } else if (avgConsistency >= 0.5) {
-      motivationText = 'You\'re doing well ââ‚¬â€ push for that 80%+ week!';
+      motivationText = 'You\'re doing well — push for that 80%+ week!';
     } else if (completedToday == activeHabits.length) {
-      motivationText = 'All habits done today! Ã°Å¸Å½â€° Great effort!';
+      motivationText = 'All habits done today! 🏆 Great effort!';
     } else {
       motivationText = 'You\'ve got $completedToday/${activeHabits.length} habits done today.';
     }
@@ -2521,7 +2491,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Ã°Å¸Ââ€  Best streak: $bestHabitTitle ($bestStreak days)',
+                      '🏅 Best streak: $bestHabitTitle ($bestStreak days)',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -2612,7 +2582,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Last 28 days Ã‚Â· ${activeHabits.length} active habits',
+            'Last 28 days · ${activeHabits.length} active habits',
             style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
           ),
           const SizedBox(height: 12),
@@ -4214,7 +4184,7 @@ extension on _HomeScreenState {
                                 value: organizer.slug,
                                 child: Text(
                                   organizer is Goal
-                                      ? 'Goal Ã‚Â· ${organizer.title}'
+                                      ? 'Goal · ${organizer.title}'
                                       : organizer.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,

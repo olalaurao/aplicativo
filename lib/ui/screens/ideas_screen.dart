@@ -10,8 +10,6 @@ class IdeasScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final allObjects = ref.watch(allObjectsProvider);
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -30,67 +28,86 @@ class IdeasScreen extends ConsumerWidget {
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add_rounded, color: Colors.white),
       ),
-      body: allObjects.when(
-        data: (objects) {
-          final ideas = objects.whereType<IdeaDefinition>().toList()
-            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      body: _IdeasList(ideas: ref.watch(ideasProvider)),
+    );
+  }
+}
 
-          if (ideas.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.lightbulb_outline_rounded, size: 64, color: AppColors.textMuted.withValues(alpha: 0.5)),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Nenhuma ideia capturada',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textMutedColor(context),
-                    ),
-                  ),
-                ],
+class _IdeasList extends StatelessWidget {
+  final List<IdeaDefinition> ideas;
+
+  const _IdeasList({required this.ideas});
+
+  @override
+  Widget build(BuildContext context) {
+    final sortedIdeas = [...ideas]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    if (sortedIdeas.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.lightbulb_outline_rounded,
+              size: 64,
+              color: AppColors.textMuted.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Nenhuma ideia capturada',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textMutedColor(context),
               ),
-            );
-          }
+            ),
+          ],
+        ),
+      );
+    }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: ideas.length,
-            itemBuilder: (context, index) {
-              final idea = ideas[index];
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: AppTheme.cardDecoration(context),
-                child: ListTile(
-                  title: Text(
-                    idea.title,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: idea.linkedTaskIds.isNotEmpty
-                      ? Text(
-                          '${idea.linkedTaskIds.length} tasks vinculadas',
-                          style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-                        )
-                      : null,
-                  trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CreateIdeaForm(existingIdea: idea),
-                      ),
-                    );
-                  },
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: sortedIdeas.length,
+      itemBuilder: (context, index) {
+        final idea = sortedIdeas[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: AppTheme.cardDecoration(context),
+          child: ListTile(
+            title: Text(
+              idea.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: idea.linkedTaskIds.isNotEmpty
+                ? Text(
+                    '${idea.linkedTaskIds.length} tasks vinculadas',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 13,
+                    ),
+                  )
+                : null,
+            trailing: const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textMuted,
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CreateIdeaForm(existingIdea: idea),
                 ),
               );
             },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Erro: $err')),
-      ),
+          ),
+        );
+      },
     );
   }
 }

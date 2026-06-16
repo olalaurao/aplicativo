@@ -1,14 +1,18 @@
-// lib/ui/screens/notes_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme.dart';
 import '../widgets/create_menu_sheet.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/settings_provider.dart';
+import '../../models/saved_filter.dart';
 import '../widgets/rich_text_editor.dart';
 import '../widgets/outline_editor.dart';
 import '../widgets/collection_editor.dart';
+import '../widgets/filter_sort_sheet.dart';
 import 'universal_detail_view.dart';
+
+enum NoteViewMode { grid, grouped, list }
 
 class NotesScreen extends ConsumerStatefulWidget {
   const NotesScreen({super.key});
@@ -18,45 +22,73 @@ class NotesScreen extends ConsumerStatefulWidget {
 }
 
 class _NotesScreenState extends ConsumerState<NotesScreen> {
-  int _filterIndex = 0;
   String _searchQuery = '';
-  String _sortBy = 'manual'; // manual, modified, created, title
+  
+  SavedFilter? _activeFilter;
+  List<SavedFilter> _savedFilters = [];
+  NoteViewMode _viewMode = NoteViewMode.grid;
   String? _expandedNoteId;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(() => _savedFilters = ref.read(settingsProvider).filtersFor('note'));
+    });
+  }
+
+  List<T> _applyFilterAndSort<T>(List<T> all) {
+    var result = (_activeFilter?.apply(all) ?? all).where((item) =>
+      _searchQuery.isEmpty ||
+      (item as dynamic).title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    final sort = _activeFilter?.sortBy ?? SortField.modified;
+    final asc  = _activeFilter?.sortAscending ?? false;
+    result.sort((a, b) {
+      final cmp = switch (sort) {
+        SortField.title    => (a as dynamic).title.compareTo((b as dynamic).title),
+        SortField.created  => ((a as dynamic).createdAt ?? DateTime(0))
+                                .compareTo((b as dynamic).createdAt ?? DateTime(0)),
+        SortField.modified => ((a as dynamic).updatedAt ?? DateTime(0))
+                                .compareTo((b as dynamic).updatedAt ?? DateTime(0)),
+        SortField.manual   => ((a as dynamic).order ?? 0).compareTo((b as dynamic).order ?? 0),
+        SortField.priority => ((a as dynamic).priority?.index ?? 0)
+                                .compareTo((b as dynamic).priority?.index ?? 0),
+        SortField.rating   => ((a as dynamic).rating ?? 0).compareTo((b as dynamic).rating ?? 0),
+        _ => 0,
+      };
+      return asc ? cmp : -cmp;
+    });
+    return result;
+  }
+
+  void _openFilterSheet() => FilterSortSheet.show(
+    context: context, ref: ref,
+    targetType: 'note',
+    currentFilter: _activeFilter,
+    availableProperties: NoteFilterProperties.all,
+    onApply: (f) => setState(() {
+      _activeFilter = f;
+      _savedFilters = ref.read(settingsProvider).filtersFor('note');
+      if (f != null) {
+        if (f.viewMode == ViewMode.grid) _viewMode = NoteViewMode.grid;
+        else if (f.viewMode == ViewMode.grouped) _viewMode = NoteViewMode.grouped;
+        else _viewMode = NoteViewMode.list;
+      }
+    }));
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return '—';
+    final now = DateTime.now();
+    if (date.year == now.year && date.month == now.month && date.day == now.day) {
+      return '${date.hour.toString().padLeft(2,'0')}:${date.minute.toString().padLeft(2,'0')}';
+    }
+    return '${date.day.toString().padLeft(2,'0')}/${date.month.toString().padLeft(2,'0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
     final allNotes = ref.watch(notesProvider);
-    
-    // Filtering
-    List<dynamic> filteredNotes = allNotes.where((n) {
-      final matchesSearch = n.title.toLowerCase().contains(
-        _searchQuery.toLowerCase(),
-      );
-      if (_filterIndex == 0) return matchesSearch;
-      if (_filterIndex == 1) return matchesSearch && n.noteType == 'text';
-      if (_filterIndex == 2) return matchesSearch && n.noteType == 'outline';
-      if (_filterIndex == 3) return matchesSearch && n.noteType == 'collection';
-      return matchesSearch;
-    }).toList();
-
-    // Sorting
-    filteredNotes.sort((a, b) {
-      switch (_sortBy) {
-        case 'manual':
-          return (a.order ?? 0).compareTo(b.order ?? 0);
-        case 'title':
-          return a.title.toLowerCase().compareTo(b.title.toLowerCase());
-        case 'created':
-          final aTime = a.createdAt ?? DateTime(0);
-          final bTime = b.createdAt ?? DateTime(0);
-          return bTime.compareTo(aTime);
-        case 'modified':
-        default:
-          final aTime = a.updatedAt ?? a.createdAt ?? DateTime(0);
-          final bTime = b.updatedAt ?? b.createdAt ?? DateTime(0);
-          return bTime.compareTo(aTime);
-      }
-    });
+    final filteredNotes = _applyFilterAndSort(allNotes);
 
     return Scaffold(
       appBar: AppBar(
@@ -78,14 +110,25 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        _buildSortButton(),
+                        IconButton(
+                          icon: Icon(
+                            _viewMode == NoteViewMode.grid ? Icons.grid_view_rounded : Icons.view_list_rounded,
+                            size: 22, color: AppColors.textSecondary),
+                          onPressed: () => setState(() {
+                            _viewMode = _viewMode == NoteViewMode.grid ? NoteViewMode.list : NoteViewMode.grid;
+                          }),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.tune_rounded, size: 22, color: AppColors.textSecondary),
+                          onPressed: _openFilterSheet,
+                        ),
                         const SizedBox(width: 8),
                         IconButton(
                           icon: Container(
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
+                              color: AppColors.primary.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Icon(
@@ -122,21 +165,32 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
 
           // ─── Notes List ───
           if (filteredNotes.isNotEmpty)
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              sliver: SliverReorderableList(
-                itemBuilder: (context, index) => Padding(
-                  key: ValueKey(filteredNotes[index].id),
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _buildNoteItem(context, filteredNotes[index]),
+            if (_viewMode == NoteViewMode.grid)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2, crossAxisSpacing: 10,
+                    mainAxisSpacing: 10, childAspectRatio: 1.05),
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, i) => _buildGridCard(ctx, filteredNotes[i]),
+                    childCount: filteredNotes.length)))
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                sliver: SliverReorderableList(
+                  itemBuilder: (context, index) => Padding(
+                    key: ValueKey((filteredNotes[index] as dynamic).id),
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildNoteItem(context, filteredNotes[index]),
+                  ),
+                  itemCount: filteredNotes.length,
+                  onReorder: (oldIndex, newIndex) {
+                    if (_activeFilter?.sortBy != SortField.manual) return;
+                    _onReorder(filteredNotes, oldIndex, newIndex);
+                  },
                 ),
-                itemCount: filteredNotes.length,
-                onReorder: (oldIndex, newIndex) {
-                  if (_sortBy != 'manual') return;
-                  _onReorder(filteredNotes, oldIndex, newIndex);
-                },
-              ),
-            )
+              )
           else
             // ─── Empty State ───
             SliverFillRemaining(
@@ -148,7 +202,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     Icon(
                       Icons.sticky_note_2_outlined,
                       size: 56,
-                      color: AppColors.primary.withValues(alpha: 0.3),
+                      color: AppColors.primary.withOpacity(0.3),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -180,19 +234,6 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     );
   }
 
-  Widget _buildSortButton() {
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.sort_rounded, size: 22, color: AppColors.textSecondary),
-      onSelected: (val) => setState(() => _sortBy = val),
-      itemBuilder: (ctx) => [
-        const PopupMenuItem(value: 'manual', child: Text('Sort Manually')),
-        const PopupMenuItem(value: 'modified', child: Text('Sort by Modified')),
-        const PopupMenuItem(value: 'created', child: Text('Sort by Created')),
-        const PopupMenuItem(value: 'title', child: Text('Sort by Title')),
-      ],
-    );
-  }
-
   void _onReorder(List<dynamic> list, int oldIndex, int newIndex) {
     setState(() {
       if (newIndex > oldIndex) newIndex -= 1;
@@ -210,59 +251,80 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     });
   }
 
-  Widget _buildFilterChips() {
-    final labels = ['All', 'Text', 'Outline', 'Collection'];
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: List.generate(labels.length, (i) {
-          final selected = _filterIndex == i;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: GestureDetector(
-              onTap: () => setState(() => _filterIndex = i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? AppColors.primary
-                      : AppTheme.surfaceVariantColor(context),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  labels[i],
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: selected
-                        ? Colors.white
-                        : AppTheme.textSecondaryColor(context),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
+  Widget _buildFilterChips() => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    child: Row(children: [
+      _chip('Todos', _activeFilter == null, () => setState(() => _activeFilter = null)),
+      ..._savedFilters.map((f) => _chip(f.name, _activeFilter?.id == f.id,
+        () => setState(() => _activeFilter = f))),
+      GestureDetector(
+        onTap: _openFilterSheet,
+        child: Container(
+          margin: const EdgeInsets.only(right: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: AppColors.info.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(20)),
+          child: const Text('+ filtro', style: TextStyle(
+            fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.info)))),
+    ]));
+
+  Widget _chip(String label, bool selected, VoidCallback onTap) => GestureDetector(
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: selected ? AppColors.primary : AppTheme.surfaceVariantColor(context),
+        borderRadius: BorderRadius.circular(20)),
+      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+        color: selected ? Colors.black : AppTheme.textSecondaryColor(context)))));
+
+  Widget _buildGridCard(BuildContext context, dynamic note) {
+    final (_, color, label) = _noteTypeAssets(note);
+    return ObjectActionWrapper(object: note,
+      child: InkWell(
+        onTap: () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) => UniversalDetailView(object: note))),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: AppTheme.cardDecoration(context),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(_noteEmoji(note), style: const TextStyle(fontSize: 20)),
+            const SizedBox(height: 8),
+            Text(note.title, maxLines: 2, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            const Spacer(),
+            Row(children: [
+              _typeBadge(label, color),
+              const Spacer(),
+              Text(_formatDate(note.updatedAt ?? note.createdAt),
+                style: TextStyle(fontSize: 9, color: AppTheme.textMutedColor(context))),
+            ]),
+          ]))));
   }
+
+  String _noteEmoji(dynamic note) => switch (note.noteType) {
+    'outline' => '🌿', 'collection' => '🔮', _ => '📝' };
+
+  (IconData, Color, String) _noteTypeAssets(dynamic note) => switch (note.noteType) {
+    'outline'    => (Icons.account_tree_outlined, AppColors.habitGreen, 'Outline'),
+    'collection' => (Icons.grid_view_rounded, AppColors.habitPurple, 'Collection'),
+    _            => (Icons.description_outlined, AppColors.info, 'Text'),
+  };
+
+  Widget _typeBadge(String label, Color color) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+    child: Text(label, style: TextStyle(
+      fontSize: 9, fontWeight: FontWeight.w700, color: color)));
 
   Widget _buildNoteItem(BuildContext context, dynamic note) {
     final isExpanded = _expandedNoteId == note.id;
-    IconData icon = Icons.description_outlined;
-    Color color = AppColors.info;
-    String typeLabel = 'Text';
-
-    if (note.noteType == 'outline') {
-      icon = Icons.account_tree_outlined;
-      color = AppColors.habitGreen;
-      typeLabel = 'Outline';
-    } else if (note.noteType == 'collection') {
-      icon = Icons.grid_view_rounded;
-      color = AppColors.habitPurple;
-      typeLabel = 'Collection';
-    }
+    final (icon, color, typeLabel) = _noteTypeAssets(note);
 
     return ObjectActionWrapper(
       object: note,
@@ -286,7 +348,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.1),
+                          color: color.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(icon, size: 20, color: color),
@@ -326,7 +388,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                                 const SizedBox(width: 8),
                                 Flexible(
                                   child: Text(
-                                    'Modified ${_formatDate(note.updatedAt)}',
+                                    'Modified ${_formatDate(note.updatedAt ?? note.createdAt)}',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -365,10 +427,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     decoration: BoxDecoration(
                       color: Theme.of(context)
                           .scaffoldBackgroundColor
-                          .withValues(alpha: 0.5),
+                          .withOpacity(0.5),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: AppColors.divider.withValues(alpha: 0.5),
+                        color: AppColors.divider.withOpacity(0.5),
                       ),
                     ),
                     child: _buildExpandedEditor(note),
@@ -381,21 +443,13 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     );
   }
 
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    if (date.year == now.year && date.month == now.month && date.day == now.day) {
-      return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-    }
-    return '${date.day}/${date.month}';
-  }
-
   Widget _buildExpandedEditor(dynamic note) {
     if (note.noteType == 'outline') {
       return OutlineEditor(
         initialContent: note.body,
-        onChanged: (newContent) {
+        onChanged: (content) {
           final updatedNote = note.copyWith(
-            body: newContent,
+            body: content,
             updatedAt: DateTime.now(),
           );
           ref.read(vaultProvider.notifier).updateObject(updatedNote);
@@ -404,9 +458,9 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     } else if (note.noteType == 'collection') {
       return CollectionEditor(
         initialContent: note.body,
-        onChanged: (newContent) {
+        onChanged: (content) {
           final updatedNote = note.copyWith(
-            body: newContent,
+            body: content,
             updatedAt: DateTime.now(),
           );
           ref.read(vaultProvider.notifier).updateObject(updatedNote);
@@ -427,4 +481,3 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     }
   }
 }
-

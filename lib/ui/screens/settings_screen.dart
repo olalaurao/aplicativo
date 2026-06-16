@@ -75,6 +75,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             padding: const EdgeInsets.all(20),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                // ─── PERFIL ───
+                _section('Perfil'),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  margin: const EdgeInsets.only(bottom: 24),
+                  child: ListTile(
+                    leading: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(8)),
+                      child: const Icon(Icons.person_outline_rounded, size: 18, color: AppColors.primary)),
+                    title: const Text('Seu nome',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    subtitle: Text(
+                      settings.userName?.isNotEmpty == true
+                          ? settings.userName!
+                          : 'Como posso te chamar?',
+                      style: const TextStyle(fontSize: 12)),
+                    trailing: const Icon(Icons.edit_rounded, size: 16, color: AppColors.textMuted),
+                    onTap: () => _editUserName(context, settings, notifier),
+                  ),
+                ),
+
                 _section('Obsidian Link'),
                 const SizedBox(height: 12),
                 Container(
@@ -1042,6 +1068,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _editUserName(
+    BuildContext context,
+    AppSettings settings,
+    SettingsNotifier notifier,
+  ) async {
+    final ctrl = TextEditingController(text: settings.userName ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Seu nome'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Como posso te chamar?'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+    if (result != null) await notifier.setUserName(result);
   }
 
   Future<void> _regenerateDataview(BuildContext context) async {

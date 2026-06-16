@@ -21,6 +21,8 @@ import '../widgets/universal_search_picker.dart';
 import 'search_screen.dart';
 import 'social_post_detail.dart';
 
+enum SocialSortMode { savedDesc, savedAsc, postedDesc, unwatchedFirst }
+
 class SocialScreen extends ConsumerStatefulWidget {
   const SocialScreen({super.key});
 
@@ -30,7 +32,7 @@ class SocialScreen extends ConsumerStatefulWidget {
 
 class _SocialScreenState extends ConsumerState<SocialScreen> {
   SocialPlatform? _selectedPlatform;
-  String _sortMode = 'saved_desc';
+  SocialSortMode _sortMode = SocialSortMode.savedDesc;
   bool _showUnwatchedOnly = false;
   bool _isMultiSelectMode = false;
   String? _selectedOrganizerFilter;
@@ -223,12 +225,12 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
 
     filtered.sort((a, b) {
       return switch (_sortMode) {
-        'saved_asc' => a.createdAt.compareTo(b.createdAt),
-        'posted_desc' => (b.postedAt ?? b.createdAt).compareTo(
+        SocialSortMode.savedAsc => a.createdAt.compareTo(b.createdAt),
+        SocialSortMode.postedDesc => (b.postedAt ?? b.createdAt).compareTo(
           a.postedAt ?? a.createdAt,
         ),
-        'unwatched' => _watchedRank(a).compareTo(_watchedRank(b)),
-        _ => b.createdAt.compareTo(a.createdAt),
+        SocialSortMode.unwatchedFirst => _watchedRank(a).compareTo(_watchedRank(b)),
+        SocialSortMode.savedDesc => b.createdAt.compareTo(a.createdAt),
       };
     });
     return filtered;
@@ -356,28 +358,28 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
                     ),
                   ),
                   _sortTile(
-                    value: 'saved_desc',
+                    value: SocialSortMode.savedDesc,
                     groupValue: localSort,
                     label: 'Salvo (mais recente)',
                     onChanged: (value) =>
                         setSheetState(() => localSort = value),
                   ),
                   _sortTile(
-                    value: 'saved_asc',
+                    value: SocialSortMode.savedAsc,
                     groupValue: localSort,
                     label: 'Salvo (mais antigo)',
                     onChanged: (value) =>
                         setSheetState(() => localSort = value),
                   ),
                   _sortTile(
-                    value: 'posted_desc',
+                    value: SocialSortMode.postedDesc,
                     groupValue: localSort,
                     label: 'Data do post (mais recente)',
                     onChanged: (value) =>
                         setSheetState(() => localSort = value),
                   ),
                   _sortTile(
-                    value: 'unwatched',
+                    value: SocialSortMode.unwatchedFirst,
                     groupValue: localSort,
                     label: 'Não vistos primeiro',
                     onChanged: (value) =>
@@ -391,7 +393,7 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
                           onPressed: () {
                             Navigator.pop(sheetContext);
                             setState(() {
-                              _sortMode = 'saved_desc';
+                              _sortMode = SocialSortMode.savedDesc;
                               _selectedPlatform = null;
                               _showUnwatchedOnly = false;
                               _selectedOrganizerFilter = null;
@@ -423,10 +425,10 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
   }
 
   Widget _sortTile({
-    required String value,
-    required String groupValue,
+    required SocialSortMode value,
+    required SocialSortMode groupValue,
     required String label,
-    required ValueChanged<String> onChanged,
+    required ValueChanged<SocialSortMode> onChanged,
   }) {
     final selected = value == groupValue;
     return ListTile(

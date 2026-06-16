@@ -3,6 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import '../theme.dart';
+import '../../models/content_object.dart';
+import '../../services/markdown_parser.dart';
+import 'universal_search_picker.dart';
+import 'highlight_picker_sheet.dart';
+
 
 class OutlineNode {
   String id;
@@ -245,12 +250,18 @@ class _OutlineEditorState extends State<OutlineEditor> {
                     ),
                   ),
           ),
-          if (isEditingItem)
+          if (isEditingItem) ...[
             IconButton(
               icon: const Icon(Icons.link_rounded, size: 16),
               onPressed: () => _insertWikiLink(index),
               tooltip: 'Inserir Link',
             ),
+            IconButton(
+              icon: const Icon(Icons.format_quote_rounded, size: 16),
+              onPressed: () => _insertHighlight(index),
+              tooltip: 'Citar Trecho',
+            ),
+          ],
           if (_focusIndex == null)
             IconButton(
               icon: Icon(
@@ -370,36 +381,72 @@ class _OutlineEditorState extends State<OutlineEditor> {
   }
 
   Future<void> _insertWikiLink(int index) async {
-    // Basic stub, real implementation uses UniversalSearchPickerSheet
-    // We will just show a text dialog to get slug for now, or use UniversalSearchPickerSheet if available.
-    final selected = await showDialog<String>(
+    ContentObject? selected;
+    await showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) {
-        String slug = '';
-        return AlertDialog(
-          title: const Text('Inserir Link'),
-          content: TextField(
-            autofocus: true,
-            decoration: const InputDecoration(hintText: 'Slug do objeto'),
-            onChanged: (v) => slug = v,
-            onSubmitted: (v) => Navigator.pop(ctx, v),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, slug),
-              child: const Text('Inserir'),
-            ),
-          ],
-        );
-      },
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => UniversalSearchPickerSheet(
+        title: 'Vincular objeto',
+        showClear: false,
+        onSelected: (object) {
+          selected = object;
+          Navigator.pop(sheetContext);
+        },
+      ),
     );
-    if (selected == null || selected.isEmpty) return;
+    if (selected == null) return;
     setState(() {
-      _items[index].text += ' [[$selected]]';
+      _items[index].text += ' [[${selected!.slug}]]';
+    });
+    _updateContent();
+  }
+
+  Future<void> _insertHighlight(int index) async {
+    ContentObject? selected;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => UniversalSearchPickerSheet(
+        title: 'Escolher objeto para citar',
+        showClear: false,
+        onSelected: (object) {
+          selected = object;
+          Navigator.pop(sheetContext);
+        },
+      ),
+    );
+    if (selected == null) return;
+
+    final body = (selected as dynamic).body ?? (selected as dynamic).synopsis ?? '';
+    final highlights = MarkdownParser.extractHighlights(body);
+    if (highlights.isEmpty) {
+      setState(() {
+        _items[index].text += ' [[${selected!.slug}]]';
+      });
+      _updateContent();
+      return;
+    }
+
+    final hlSelected = await showModalBottomSheet<HighlightItem>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, ctrl) => HighlightPickerSheet(
+          objectTitle: selected!.title,
+          highlights: highlights,
+        ),
+      ),
+    );
+    if (hlSelected == null) return;
+
+    setState(() {
+      _items[index].text += ' > "${hlSelected.text}" — [[${selected!.slug}]]';
     });
     _updateContent();
   }

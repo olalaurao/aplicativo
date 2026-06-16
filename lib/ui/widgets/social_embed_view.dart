@@ -82,6 +82,9 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
             if (widget.post.platform == SocialPlatform.substack) {
               _controller.runJavaScript(_substackCleanupScript);
             }
+            if (widget.post.platform == SocialPlatform.tiktok) {
+              _controller.runJavaScript(_tiktokCleanupScript);
+            }
             if (mounted) setState(() => _isLoaded = true);
           },
           onWebResourceError: (error) {
@@ -375,5 +378,21 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
     document.body.style.maxWidth = '100%';
     document.body.style.fontSize = '16px';
     document.body.style.lineHeight = '1.7';
+  ''';
+
+  String get _tiktokCleanupScript => '''
+    const selectors = [
+      '.tiktok-header', '.author-uniqueId', '.video-meta-share',
+      '.action-bar', '.tiktok-footer', '[class*="DivRecommentContainer"]',
+      '[data-e2e="related-video"]'
+    ];
+    selectors.forEach(sel => {
+      document.querySelectorAll(sel).forEach(el => el.remove());
+    });
+
+    const video = document.querySelector('video');
+    if (video) {
+      video.style.cssText = "width:100%!important;height:100%!important;object-fit:contain";
+    }
   ''';
 }

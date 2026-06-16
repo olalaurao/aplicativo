@@ -6,11 +6,13 @@ import '../../models/organizer_model.dart';
 import '../../models/content_object.dart';
 import '../../models/social_post.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/wiki_link_resolver_provider.dart';
 import '../theme.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../widgets/social_post_grid_card.dart';
 import 'social_post_detail.dart';
 import 'universal_detail_view.dart';
+import '../forms/create_organizer_form.dart';
 
 class OrganizerDetailScreen extends ConsumerStatefulWidget {
   final Organizer organizer;
@@ -67,7 +69,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -85,6 +87,17 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         ? _parseColor(widget.organizer.color!)
         : AppColors.primary;
 
+    final allItems = associatedItemsAsync.valueOrNull ?? [];
+    final outgoingItems = ref.watch(
+      wikiLinksForObjectProvider(widget.organizer),
+    );
+    final timelineCount = allItems.length;
+    final itemsCount = allItems.where((i) => i.type != 'social_post').length;
+    final allOrganizers = ref.watch(organizersProvider);
+    final childrenCount = allOrganizers
+        .where((o) => o.parentId == widget.organizer.id)
+        .length;
+
     return Scaffold(
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
@@ -96,7 +109,21 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.more_horiz_rounded),
+                tooltip: 'Editar',
+                icon: const Icon(Icons.edit_outlined, size: 20),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          CreateOrganizerForm(organizer: widget.organizer),
+                    ),
+                  );
+                },
+              ),
+              IconButton(
+                tooltip: 'Ver detalhes',
+                icon: const Icon(Icons.info_outline_rounded, size: 20),
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -241,10 +268,20 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
-                tabs: const [
-                  Tab(text: 'Timeline'),
-                  Tab(text: 'Items'),
-                  Tab(text: 'Children'),
+                tabs: [
+                  Tab(
+                    text:
+                        'Timeline${timelineCount > 0 ? " ($timelineCount)" : ""}',
+                  ),
+                  Tab(text: 'Items${itemsCount > 0 ? " ($itemsCount)" : ""}'),
+                  Tab(
+                    text:
+                        'Outgoing${outgoingItems.isNotEmpty ? " (${outgoingItems.length})" : ""}',
+                  ),
+                  Tab(
+                    text:
+                        'Children${childrenCount > 0 ? " ($childrenCount)" : ""}',
+                  ),
                 ],
               ),
             ),
@@ -255,6 +292,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
           children: [
             _buildTimeline(context, associatedItemsAsync),
             _buildItemsList(context, associatedItemsAsync),
+            _buildOutgoingList(context, outgoingItems),
             _buildChildrenList(context),
           ],
         ),
@@ -448,6 +486,68 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, s) => Center(child: Text('Error: $e')),
+    );
+  }
+
+  Widget _buildOutgoingList(BuildContext context, List<ContentObject> items) {
+    if (items.isEmpty) {
+      return _buildEmptyState(
+        'No outgoing links',
+        'Wiki-links in this organizer body will appear here',
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: ObjectActionWrapper(
+            object: item,
+            child: InkWell(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => UniversalDetailView(object: item),
+                ),
+              ),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                decoration: AppTheme.cardDecorationFlat(context),
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Icon(
+                      _objectTypeIcon(_getObjectCategory(item)),
+                      size: 20,
+                      color: _objectTypeColor(_getObjectCategory(item)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: AppColors.textMuted,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

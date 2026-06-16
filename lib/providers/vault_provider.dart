@@ -9,6 +9,7 @@ import '../models/shared_types.dart';
 import '../models/content_object.dart';
 import '../models/task_model.dart';
 import '../models/shopping_item.dart';
+import '../models/shopping_list_model.dart' as shopping_list_model;
 import '../models/journal_entry.dart';
 import '../models/habit_model.dart';
 import '../models/organizer_model.dart' as organizer_model;
@@ -127,6 +128,37 @@ final objectsByTypeProvider = Provider.family<List<ContentObject>, String>((
   return grouped[type] ?? [];
 });
 
+final conflictingObjectsProvider = Provider<Map<String, List<ContentObject>>>((
+  ref,
+) {
+  final objects = ref.watch(allObjectsProvider).valueOrNull ?? [];
+  final byKey = <String, List<ContentObject>>{};
+
+  for (final object in objects) {
+    if (object.archived) continue;
+    if (object is! Note && object is! organizer_model.Organizer) continue;
+
+    final keys = {
+      object.slug,
+      object.title.trim().toLowerCase(),
+      object.obsidianFileName.trim().toLowerCase(),
+    }.where((key) => key.isNotEmpty);
+
+    for (final key in keys) {
+      byKey.putIfAbsent(key, () => []).add(object);
+    }
+  }
+
+  return Map.fromEntries(
+    byKey.entries.where((entry) {
+      final types = entry.value.map((object) => object.type).toSet();
+      return entry.value.length > 1 &&
+          types.contains('note') &&
+          entry.value.any((object) => object is organizer_model.Organizer);
+    }),
+  );
+});
+
 Future<void> _cancelHabitSlotReminderNotification(
   Habit habit,
   int slotIndex,
@@ -238,7 +270,9 @@ final tasksProvider = NotifierProvider<TasksNotifier, List<Task>>(() {
 class ShoppingItemsNotifier extends Notifier<List<ShoppingItem>> {
   @override
   List<ShoppingItem> build() {
-    return ref.watch(objectsByTypeProvider('shopping_item')).cast<ShoppingItem>();
+    return ref
+        .watch(objectsByTypeProvider('shopping_item'))
+        .cast<ShoppingItem>();
   }
 
   Future<void> addShoppingItem(ShoppingItem item) async {
@@ -260,9 +294,52 @@ class ShoppingItemsNotifier extends Notifier<List<ShoppingItem>> {
   }
 }
 
-final shoppingItemsProvider = NotifierProvider<ShoppingItemsNotifier, List<ShoppingItem>>(() {
-  return ShoppingItemsNotifier();
-});
+final shoppingItemsProvider =
+    NotifierProvider<ShoppingItemsNotifier, List<ShoppingItem>>(() {
+      return ShoppingItemsNotifier();
+    });
+
+class ShoppingListsNotifier
+    extends Notifier<List<shopping_list_model.ShoppingList>> {
+  @override
+  List<shopping_list_model.ShoppingList> build() {
+    return ref
+        .watch(objectsByTypeProvider('shopping_list'))
+        .cast<shopping_list_model.ShoppingList>();
+  }
+
+  Future<void> addShoppingList(
+    shopping_list_model.ShoppingList shoppingList,
+  ) async {
+    state = [...state, shoppingList];
+    await ref.read(vaultProvider.notifier).createObject(shoppingList);
+  }
+
+  Future<void> updateShoppingList(
+    shopping_list_model.ShoppingList shoppingList,
+  ) async {
+    state = [
+      for (final item in state)
+        if (item.id == shoppingList.id) shoppingList else item,
+    ];
+    await ref.read(vaultProvider.notifier).updateObject(shoppingList);
+  }
+
+  Future<void> deleteShoppingList(
+    shopping_list_model.ShoppingList shoppingList,
+  ) async {
+    state = state.where((item) => item.id != shoppingList.id).toList();
+    await ref.read(vaultProvider.notifier).deleteObject(shoppingList);
+  }
+}
+
+final shoppingListsProvider =
+    NotifierProvider<
+      ShoppingListsNotifier,
+      List<shopping_list_model.ShoppingList>
+    >(() {
+      return ShoppingListsNotifier();
+    });
 
 class HabitsNotifier extends Notifier<List<Habit>> {
   @override
@@ -385,7 +462,8 @@ class HabitsNotifier extends Notifier<List<Habit>> {
       // Update Android Widget.
       WidgetService.updateHabits(state);
 
-      if (!_isHabitValueComplete(habit, currentVal) && _isHabitValueComplete(habit, habitsMap[habit.slug])) {
+      if (!_isHabitValueComplete(habit, currentVal) &&
+          _isHabitValueComplete(habit, habitsMap[habit.slug])) {
         await AutomationService.executeHabitActions(ref, habit, date);
       }
     } catch (e, st) {
@@ -867,6 +945,35 @@ class NotesNotifier extends Notifier<List<Note>> {
 
 final notesProvider = NotifierProvider<NotesNotifier, List<Note>>(() {
   return NotesNotifier();
+});
+
+class IdeasNotifier extends Notifier<List<IdeaDefinition>> {
+  @override
+  List<IdeaDefinition> build() {
+    return ref.watch(objectsByTypeProvider('idea')).cast<IdeaDefinition>();
+  }
+
+  Future<void> addIdea(IdeaDefinition idea) async {
+    state = [...state, idea];
+    await ref.read(vaultProvider.notifier).createObject(idea);
+  }
+
+  Future<void> updateIdea(IdeaDefinition idea) async {
+    state = [
+      for (final item in state)
+        if (item.id == idea.id) idea else item,
+    ];
+    await ref.read(vaultProvider.notifier).updateObject(idea);
+  }
+
+  Future<void> deleteIdea(IdeaDefinition idea) async {
+    state = state.where((item) => item.id != idea.id).toList();
+    await ref.read(vaultProvider.notifier).deleteObject(idea);
+  }
+}
+
+final ideasProvider = NotifierProvider<IdeasNotifier, List<IdeaDefinition>>(() {
+  return IdeasNotifier();
 });
 
 class RemindersNotifier extends Notifier<List<Reminder>> {
@@ -1383,6 +1490,11 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
               } else if (type == 'shopping_item') {
                 obj = ShoppingItem.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
+              } else if (type == 'shopping_list') {
+                obj = shopping_list_model.ShoppingList.fromMarkdown(
+                  frontmatter,
+                  body,
+                )..obsidianPath = relativePath;
               } else if (type == 'habit') {
                 obj = Habit.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
@@ -1426,7 +1538,11 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                 obj = Note.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
               } else if (type == 'idea') {
-                obj = IdeaDefinition.fromMarkdown(frontmatter, body, relativePath);
+                obj = IdeaDefinition.fromMarkdown(
+                  frontmatter,
+                  body,
+                  relativePath,
+                );
               } else if (type == 'tracker_definition') {
                 obj = TrackerDefinition.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
@@ -1446,7 +1562,11 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                 obj = Snapshot.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
               } else if (type == 'system') {
-                obj = SystemDefinition.fromMarkdown(frontmatter, body, relativePath);
+                obj = SystemDefinition.fromMarkdown(
+                  frontmatter,
+                  body,
+                  relativePath,
+                );
               } else if (type == 'time_block') {
                 obj = TimeBlock.fromMap(frontmatter, body: body)
                   ..obsidianPath = relativePath;
@@ -2875,7 +2995,7 @@ class VaultNotifier extends Notifier<void> {
 
   Future<void> _purgeOldDeletedFiles() async {
     final obsidianService = ref.read(obsidianServiceProvider);
-    
+
     final foldersToPurge = ['_deleted', '_conflicts'];
     final now = DateTime.now();
 
@@ -3261,7 +3381,6 @@ class VaultNotifier extends Notifier<void> {
     );
   }
 
-
   /// Extracts the object ID (uuid) from a notification payload string.
   /// Supports both `?id=<uuid>` and `?oid=<uuid>` query params, and the
   /// legacy format where the payload IS the object id.
@@ -3335,7 +3454,7 @@ class VaultNotifier extends Notifier<void> {
       id: notifId,
       title: title,
       config: ReminderConfig(
-        id: '${objectId}_snooze_${notifId}',
+        id: '${objectId}_snooze_$notifId',
         triggerTime: fireAt,
         type: NotificationType.push,
         notificationBody: 'Adiado por ${snoozeMinutes}min',
@@ -3343,7 +3462,9 @@ class VaultNotifier extends Notifier<void> {
       ),
       payload: objectId,
     );
-    debugPrint('NotificationAction snooze: $objectId snoozed for ${snoozeMinutes}min');
+    debugPrint(
+      'NotificationAction snooze: $objectId snoozed for ${snoozeMinutes}min',
+    );
   }
 
   int _snoozeMinutesFromPayload(String payload) {

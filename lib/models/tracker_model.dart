@@ -3,6 +3,12 @@ import 'content_object.dart';
 import 'shared_types.dart';
 import 'package:flutter/foundation.dart';
 
+// A6.2 — Alert levels for health tracker fields
+enum FieldAlertLevel { none, info, warning, critical }
+
+// E14 — Data source types for health alerts
+enum FieldDataSource { tracker, habit, recurringTask }
+
 enum InputFieldType {
   text,
   selection,
@@ -28,6 +34,17 @@ class InputField {
   double? max; // for range
   List<String>? options; // for selection/checklist
 
+  // A6.2 — Health alert fields
+  FieldAlertLevel alertLevel;
+  double? alertThreshold; // triggers alert when value <= threshold
+  String? alertNote; // explanatory context (e.g. "depends on medication")
+  bool alwaysAlert; // true = any record triggers alert (e.g. hair loss patch)
+
+  // E14 — Alternative data sources
+  FieldDataSource dataSource;
+  String? linkedHabitId; // if dataSource == habit
+  String? linkedTaskTitle; // if dataSource == recurringTask
+
   InputField({
     required this.id,
     required this.title,
@@ -38,6 +55,13 @@ class InputField {
     this.min,
     this.max,
     this.options,
+    this.alertLevel = FieldAlertLevel.none,
+    this.alertThreshold,
+    this.alertNote,
+    this.alwaysAlert = false,
+    this.dataSource = FieldDataSource.tracker,
+    this.linkedHabitId,
+    this.linkedTaskTitle,
   }) : organizers = organizers ?? [];
 
   Map<String, dynamic> toMap() {
@@ -51,6 +75,15 @@ class InputField {
       'max': max,
       'options': options,
       'organizers': organizers.map((e) => e.toWikiLink()).toList(),
+      // A6.2 alert fields
+      'alert_level': alertLevel.name,
+      if (alertThreshold != null) 'alert_threshold': alertThreshold,
+      if (alertNote != null) 'alert_note': alertNote,
+      if (alwaysAlert) 'always_alert': true,
+      // E14 data source
+      'data_source': dataSource.name,
+      if (linkedHabitId != null) 'linked_habit_id': linkedHabitId,
+      if (linkedTaskTitle != null) 'linked_task_title': linkedTaskTitle,
     };
   }
 
@@ -73,6 +106,19 @@ class InputField {
       organizers: (map['organizers'] as List? ?? [])
           .map((e) => OrganizerReference.fromWikiLink(e.toString()))
           .toList(),
+      // A6.2 alert fields
+      alertLevel: FieldAlertLevel.values.firstWhere(
+        (e) => e.name == map['alert_level']?.toString(),
+        orElse: () => FieldAlertLevel.none),
+      alertThreshold: (map['alert_threshold'] as num?)?.toDouble(),
+      alertNote: map['alert_note']?.toString(),
+      alwaysAlert: map['always_alert'] as bool? ?? false,
+      // E14 data source
+      dataSource: FieldDataSource.values.firstWhere(
+        (e) => e.name == map['data_source']?.toString(),
+        orElse: () => FieldDataSource.tracker),
+      linkedHabitId: map['linked_habit_id']?.toString(),
+      linkedTaskTitle: map['linked_task_title']?.toString(),
     );
   }
 }
@@ -109,6 +155,7 @@ class TrackerDefinition extends ContentObject {
   String? icon;
   String? description;
   List<TrackerSection> sections;
+  bool isHealthTracker; // A6.3
 
   TrackerDefinition({
     super.id,
@@ -117,6 +164,7 @@ class TrackerDefinition extends ContentObject {
     this.icon,
     this.description,
     this.sections = const [],
+    this.isHealthTracker = false,
     super.organizers,
     super.categories,
     super.tags,
@@ -135,6 +183,7 @@ class TrackerDefinition extends ContentObject {
     frontmatter['icon'] = icon;
     frontmatter['description'] = description;
     frontmatter['sections'] = sections.map((e) => e.toMap()).toList();
+    if (isHealthTracker) frontmatter['is_health_tracker'] = true;
     
     final buffer = StringBuffer();
     if (description != null && description!.isNotEmpty) {
@@ -176,6 +225,7 @@ class TrackerDefinition extends ContentObject {
     tracker.icon = frontmatter['icon'] as String?;
     tracker.description = frontmatter['description'] as String?;
     tracker.sections = _parseSections(frontmatter['sections'], body);
+    tracker.isHealthTracker = frontmatter['is_health_tracker'] as bool? ?? false;
     debugPrint('Tracker sections: ${tracker.sections.length}');
     return tracker;
   }

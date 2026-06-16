@@ -60,28 +60,6 @@ class TrackersScreen extends ConsumerWidget {
                           );
                         },
                       ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: AppColors.habitPurple.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.auto_graph_rounded,
-                            size: 20,
-                            color: AppColors.habitPurple,
-                          ),
-                        ),
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const CombinedAnalysisScreen(),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -213,122 +191,115 @@ class TrackersScreen extends ConsumerWidget {
     final daysSince = trackerRecords.isEmpty
         ? null
         : DateTime.now().difference(trackerRecords.first.date).inDays;
+    final last = trackerRecords.isNotEmpty ? trackerRecords.first : null;
+    final firstField = last?.fieldValues.entries.firstOrNull;
 
     return ObjectActionWrapper(
       object: tracker,
-      child: Container(
-        decoration: AppTheme.cardDecoration(context),
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: InkWell(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => UniversalDetailView(object: tracker),
-                  ),
-                ),
-                borderRadius: BorderRadius.circular(14),
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+      child: Stack(
+        children: [
+          Container(
+            decoration: AppTheme.cardDecoration(context),
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => UniversalDetailView(object: tracker),
+                      ),
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              Icons.analytics_outlined,
-                              color: color,
-                              size: 20,
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  Icons.analytics_outlined,
+                                  color: color,
+                                  size: 20,
+                                ),
+                              ),
+                              const Spacer(),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                color: AppTheme.textMutedColor(context),
+                                size: 20,
+                              ),
+                            ],
                           ),
-                          const Spacer(),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: AppTheme.textMutedColor(context),
-                            size: 20,
+                          const SizedBox(height: 12),
+                          Text(
+                            tracker.title,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
+                          const SizedBox(height: 4),
+                          Text(
+                            tracker.description?.toString() ?? '',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textMutedColor(context),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (firstField != null) ...[
+                            const Spacer(),
+                            const Divider(height: 16),
+                            Row(children: [
+                              Expanded(child: Text(firstField.key, style: TextStyle(
+                                fontSize: 10, color: AppTheme.textMutedColor(context)), maxLines: 1,
+                                overflow: TextOverflow.ellipsis)),
+                              Text(firstField.value.toString(),
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
+                                  color: AppColors.primary)),
+                              const SizedBox(width: 6),
+                              Text(DateFormat('d/M').format(last!.date),
+                                style: TextStyle(fontSize: 10, color: AppTheme.textMutedColor(context))),
+                            ]),
+                          ] else ...[
+                            const Spacer(),
+                            const Divider(height: 16),
+                            Text('Sem registros', style: TextStyle(fontSize: 10, color: AppTheme.textMutedColor(context))),
+                          ],
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        tracker.title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        tracker.description?.toString() ?? '',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textMutedColor(context),
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (daysSince != null) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          daysSince == 0
-                              ? 'Registrado hoje'
-                              : '$daysSince dias desde o último registro',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textMutedColor(context),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              height: 36,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => CreateRecordForm(tracker: tracker),
                     ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: color.withValues(alpha: 0.1),
-                  foregroundColor: color,
-                  elevation: 0,
-                  padding: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text(
-                  'Log',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+          Positioned(bottom: 10, right: 10,
+            child: GestureDetector(
+              onTap: () => showModalBottomSheet(
+                context: context, isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => CreateRecordForm(tracker: tracker)),
+              child: Container(width: 32, height: 32,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: color.withValues(alpha: 0.35),
+                    blurRadius: 8, offset: const Offset(0, 3))]),
+                child: const Icon(Icons.add_rounded, color: Colors.white, size: 18)))),
+        ],
       ),
     );
   }

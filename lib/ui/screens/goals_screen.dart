@@ -10,11 +10,32 @@ import '../widgets/object_action_wrapper.dart';
 import '../forms/create_goal_form.dart';
 import 'universal_detail_view.dart';
 
-class GoalsScreen extends ConsumerWidget {
+import 'package:flutter/services.dart';
+import '../../models/saved_filter.dart';
+import '../../providers/settings_provider.dart';
+
+class GoalsScreen extends ConsumerStatefulWidget {
   const GoalsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GoalsScreen> createState() => _GoalsScreenState();
+}
+
+class _GoalsScreenState extends ConsumerState<GoalsScreen> {
+  SavedFilter? _activeFilter;
+  List<SavedFilter> _savedFilters = [];
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(() => _savedFilters = ref.read(settingsProvider).filtersFor('goal'));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final goals = ref.watch(goalsProvider);
     final activeGoals = goals
         .where((g) => g.state == GoalStatus.active)
@@ -39,6 +60,27 @@ class GoalsScreen extends ConsumerWidget {
             floating: true,
             pinned: true,
           ),
+          SliverToBoxAdapter(child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Expanded(child: Text('Metas',
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800))),
+                Text('${completedGoals.length}/${goals.length}',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                    color: AppColors.primary)),
+              ]),
+              const SizedBox(height: 10),
+              ClipRRect(borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: goals.isEmpty ? 0 : completedGoals.length / goals.length,
+                  minHeight: 6,
+                  backgroundColor: AppTheme.surfaceVariantColor(context),
+                  valueColor: const AlwaysStoppedAnimation(AppColors.primary))),
+              const SizedBox(height: 4),
+              Text('${activeGoals.length} em andamento · ${onHoldGoals.length} pausadas',
+                style: TextStyle(fontSize: 11, color: AppTheme.textMutedColor(context))),
+            ]))),
           if (goals.isEmpty)
             SliverFillRemaining(
               child: _buildEmptyState(context),
@@ -128,8 +170,14 @@ class _GoalCard extends ConsumerWidget {
 
   Color _goalColor(String? rawColor) {
     if (rawColor == null || rawColor.trim().isEmpty) return AppColors.primary;
-    final normalized = rawColor.trim().replaceFirst('#', '0xFF');
-    return Color(int.tryParse(normalized) ?? AppColors.primary.toARGB32());
+    try {
+      final normalized = rawColor.trim().replaceFirst('#', '0xFF');
+      final parsed = int.tryParse(normalized);
+      if (parsed == null) return AppColors.primary;
+      return Color(parsed);
+    } catch (_) {
+      return AppColors.primary;
+    }
   }
 
   @override
@@ -148,12 +196,17 @@ class _GoalCard extends ConsumerWidget {
           decoration: AppTheme.cardDecoration(context),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
-            child: IntrinsicHeight(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 80),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
+                   Container(
                     width: 6,
-                    color: isCompleted ? AppColors.textMuted : color,
+                    decoration: BoxDecoration(
+                      color: isCompleted ? AppColors.textMuted : color,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(20), bottomLeft: Radius.circular(20))),
                   ),
                   Expanded(
                     child: Padding(
@@ -274,6 +327,7 @@ class _GoalCard extends ConsumerWidget {
                 color: AppColors.textSecondary,
               ),
             ),
+
           ],
         ),
         if (deadline != null) ...[
@@ -363,7 +417,7 @@ class _GoalCard extends ConsumerWidget {
 
   /// Calculate live progress using KPIEngine for real-time values.
   double _calculateLiveProgress(WidgetRef ref) {
-    if (goal.kpis.isEmpty && goal.subtasks.isEmpty) return 0;
+    if (goal.kpis.isEmpty && goal.subtasks.isEmpty) return goal.progress;
 
     final habits = ref.watch(habitsProvider);
     final trackerRecords = ref.watch(trackingRecordsProvider);
