@@ -45,9 +45,12 @@ import 'settings_provider.dart';
 import '../services/google_drive_sync_service.dart';
 
 final obsidianServiceProvider = Provider<ObsidianService>((ref) {
+  // 1.2 — Only recreate when vaultName or vaultPath change, not on every
+  // settings mutation (accent colour, widget prefs, etc.).
+  final vaultName = ref.watch(settingsProvider.select((s) => s.vaultName));
+  final vaultPath = ref.watch(settingsProvider.select((s) => s.vaultPath));
   final service = ObsidianService();
-  final settings = ref.watch(settingsProvider);
-  service.initVault(settings.vaultName, customPath: settings.vaultPath);
+  service.initVault(vaultName, customPath: vaultPath);
   return service;
 });
 
@@ -760,15 +763,16 @@ final projectsProvider = NotifierProvider<ProjectsNotifier, List<Project>>(
 class PeopleNotifier extends Notifier<List<Person>> {
   @override
   List<Person> build() {
-    final people = ref.watch(objectsByTypeProvider('person')).cast<Person>();
+    // 1.4 — Side-effect removed from build(); contact check is now triggered
+    // from the AppLifecycleListener.onResume in main.dart.
+    return ref.watch(objectsByTypeProvider('person')).cast<Person>();
+  }
 
-    if (people.isNotEmpty) {
-      Future.microtask(
-        () => AutomationService.checkPersonContacts(ref, people),
-      );
-    }
-
-    return people;
+  /// Trigger contact birthday/anniversary check. Called from lifecycle events.
+  Future<void> checkPersonContactsNow() {
+    final people = state;
+    if (people.isEmpty) return Future.value();
+    return AutomationService.checkPersonContacts(ref, people);
   }
 
   Future<void> addPerson(Person person) async {
@@ -1212,12 +1216,16 @@ final dayThemesProvider = NotifierProvider<DayThemesNotifier, List<DayTheme>>(
 );
 
 class TemplatesNotifier extends Notifier<List<TemplateDefinition>> {
+  // 2.4 — guard flag: seed only once per app session.
+  bool _seeded = false;
+
   @override
   List<TemplateDefinition> build() {
     final list = ref
         .watch(objectsByTypeProvider('template'))
         .cast<TemplateDefinition>();
-    if (list.isEmpty) {
+    if (list.isEmpty && !_seeded) {
+      _seeded = true;
       Future.microtask(() => _seedDefaultTemplates());
     }
     return list;
@@ -2151,6 +2159,10 @@ final todayJournalProvider =
     });
 
 class VaultNotifier extends Notifier<void> {
+  // 3.2 — Debounce rapid KPI recalculations (e.g. completing multiple habits
+  // quickly triggers a single update 3 s after the last write).
+  Timer? _kpiDebounce;
+
   @override
   void build() {
     _purgeOldDeletedFiles();
@@ -2436,7 +2448,8 @@ class VaultNotifier extends Notifier<void> {
     _invalidateObjectProviders(object);
 
     if (_shouldUpdateKpisAfterWrite(object)) {
-      Future.microtask(() async {
+      _kpiDebounce?.cancel();
+      _kpiDebounce = Timer(const Duration(seconds: 3), () async {
         try {
           await AutomationService.updateAllKPIs(ref);
         } catch (e, st) {

@@ -6,7 +6,6 @@ import '../../models/system_model.dart';
 import '../../models/task_model.dart';
 import '../../models/shared_types.dart';
 import '../../providers/systems_provider.dart';
-import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import '../forms/create_system_form.dart';
 import '../forms/create_task_form.dart';

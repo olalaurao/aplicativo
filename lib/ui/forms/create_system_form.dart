@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/system_model.dart';
 import '../../models/shared_types.dart';
 import '../../providers/systems_provider.dart';
-import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import '../widgets/organizer_selector_field.dart';
 import 'package:uuid/uuid.dart';

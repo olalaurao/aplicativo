@@ -297,7 +297,10 @@ class AppSettings {
 }
 
 class SettingsNotifier extends StateNotifier<AppSettings> {
-  SettingsNotifier(SharedPreferences prefs) : super(_buildFromPrefs(prefs));
+  final SharedPreferences _prefs;
+  SettingsNotifier(SharedPreferences prefs)
+      : _prefs = prefs,
+        super(_buildFromPrefs(prefs));
 
   static AppSettings _buildFromPrefs(SharedPreferences prefs) {
     final rulesJson = prefs.getString('autoCategoryRules');
@@ -507,8 +510,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> updateTypeSignature(String objectType, TypeSignature sig) async {
     final sigs = Map<String, TypeSignature>.from(state.typeSignatures);
     sigs[objectType] = sig;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
+    await _prefs.setString(
       'typeSignatures',
       json.encode(sigs.map((k, v) => MapEntry(k, v.toMap()))),
     );
@@ -516,14 +518,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   }
 
   Future<void> updateVaultName(String name) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('vaultName', name);
+    await _prefs.setString('vaultName', name);
     state = state.copyWith(vaultName: name);
   }
 
   Future<void> updateVaultPath(String path) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('vaultPath', path);
+    await _prefs.setString('vaultPath', path);
     state = state.copyWith(vaultPath: path);
   }
 
@@ -531,10 +531,9 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     int? startOfWeek,
     String? defaultView,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (startOfWeek != null) await prefs.setInt('startOfWeek', startOfWeek);
+    if (startOfWeek != null) await _prefs.setInt('startOfWeek', startOfWeek);
     if (defaultView != null) {
-      await prefs.setString('defaultPlannerView', defaultView);
+      await _prefs.setString('defaultPlannerView', defaultView);
     }
     state = state.copyWith(
       startOfWeek: startOfWeek,
@@ -545,15 +544,13 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> updateCategoryColor(String category, String colorHex) async {
     final colors = Map<String, String>.from(state.categoryColors);
     colors[category] = colorHex;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('categoryColors', json.encode(colors));
+    await _prefs.setString('categoryColors', json.encode(colors));
     state = state.copyWith(categoryColors: colors);
   }
 
   Future<void> addAutoCategoryRule(AutoCategoryRule rule) async {
     final rules = [...state.autoCategoryRules, rule];
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
+    await _prefs.setString(
       'autoCategoryRules',
       json.encode(rules.map((r) => r.toMap()).toList()),
     );
@@ -561,52 +558,44 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   }
 
   Future<void> updateAccentColor(String value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('accentColor', value);
+    await _prefs.setString('accentColor', value);
     state = state.copyWith(accentColor: value);
   }
 
   Future<void> updateAutoSync(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('autoSync', value);
+    await _prefs.setBool('autoSync', value);
     state = state.copyWith(autoSync: value);
   }
 
   Future<void> updateConflictResolution(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('conflictKeepNewest', value);
+    await _prefs.setBool('conflictKeepNewest', value);
     state = state.copyWith(conflictKeepNewest: value);
   }
 
   Future<void> updateHabitReminders(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('habitReminders', value);
+    await _prefs.setBool('habitReminders', value);
     state = state.copyWith(habitReminders: value);
   }
 
   Future<void> updatePomodoroSounds(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('pomodoroSounds', value);
+    await _prefs.setBool('pomodoroSounds', value);
     state = state.copyWith(pomodoroSounds: value);
   }
 
   Future<void> updatePlannerColorMode(String mode) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('plannerColorMode', mode);
+    await _prefs.setString('plannerColorMode', mode);
     state = state.copyWith(plannerColorMode: mode);
   }
 
   Future<void> updateBiometrics(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('biometricsEnabled', value);
+    await _prefs.setBool('biometricsEnabled', value);
     state = state.copyWith(biometricsEnabled: value);
   }
 
   Future<void> updateDriveSyncFolder(String folder) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('driveSyncFolder', folder);
-    await prefs.remove('driveSyncFolderId');
-    await prefs.remove('driveSyncFolderPath');
+    await _prefs.setString('driveSyncFolder', folder);
+    await _prefs.remove('driveSyncFolderId');
+    await _prefs.remove('driveSyncFolderPath');
     state = state.copyWith(
       driveSyncFolder: folder,
       driveSyncFolderId: '',
@@ -619,10 +608,9 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     required String name,
     required String path,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('driveSyncFolder', name);
-    await prefs.setString('driveSyncFolderId', id);
-    await prefs.setString('driveSyncFolderPath', path);
+    await _prefs.setString('driveSyncFolder', name);
+    await _prefs.setString('driveSyncFolderId', id);
+    await _prefs.setString('driveSyncFolderPath', path);
     state = state.copyWith(
       driveSyncFolder: name,
       driveSyncFolderId: id,
@@ -636,14 +624,13 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     String? size,
     List<String>? objectTypes,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (type != null) await prefs.setString('universalWidgetType', type);
+    if (type != null) await _prefs.setString('universalWidgetType', type);
     if (organizer != null) {
-      await prefs.setString('universalWidgetOrganizer', organizer);
+      await _prefs.setString('universalWidgetOrganizer', organizer);
     }
-    if (size != null) await prefs.setString('universalWidgetSize', size);
+    if (size != null) await _prefs.setString('universalWidgetSize', size);
     if (objectTypes != null) {
-      await prefs.setStringList('universalWidgetObjectTypes', objectTypes);
+      await _prefs.setStringList('universalWidgetObjectTypes', objectTypes);
     }
     state = state.copyWith(
       universalWidgetType: type,
@@ -654,8 +641,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   }
 
   Future<void> updateVisibleResourceFields(List<String> fields) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('visibleResourceFields', fields);
+    await _prefs.setStringList('visibleResourceFields', fields);
     state = state.copyWith(visibleResourceFields: fields);
   }
 
@@ -667,43 +653,38 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
             .toSet()
             .toList()
           ..sort();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('resourceTypeFilters', cleaned);
+    await _prefs.setStringList('resourceTypeFilters', cleaned);
     state = state.copyWith(resourceTypeFilters: cleaned);
   }
 
   Future<void> updateSleepInTomorrow(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('sleepInTomorrow', value);
+    await _prefs.setBool('sleepInTomorrow', value);
     if (value) {
       final tomorrowStr = DateTime.now()
           .add(const Duration(days: 1))
           .toIso8601String()
           .split('T')
           .first;
-      await prefs.setString('sleepInDate', tomorrowStr);
+      await _prefs.setString('sleepInDate', tomorrowStr);
       state = state.copyWith(sleepInTomorrow: true, sleepInDate: tomorrowStr);
     } else {
-      await prefs.setString('sleepInDate', '');
+      await _prefs.setString('sleepInDate', '');
       state = state.copyWith(sleepInTomorrow: false, sleepInDate: '');
     }
   }
 
   Future<void> updateSleepInUntil(String value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('sleepInUntil', value);
+    await _prefs.setString('sleepInUntil', value);
     state = state.copyWith(sleepInUntil: value);
   }
 
   Future<void> updateSleepInDate(String value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('sleepInDate', value);
+    await _prefs.setString('sleepInDate', value);
     state = state.copyWith(sleepInDate: value);
   }
 
   Future<void> updateReviewDailyTemplateId(String value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('reviewDailyTemplateId', value);
+    await _prefs.setString('reviewDailyTemplateId', value);
     state = state.copyWith(reviewDailyTemplateId: value);
   }
 
@@ -713,18 +694,17 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     String? btn2Label,
     String? btn2Target,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
     if (btn1Label != null) {
-      await prefs.setString('quickAddWidgetButton1Label', btn1Label);
+      await _prefs.setString('quickAddWidgetButton1Label', btn1Label);
     }
     if (btn1Target != null) {
-      await prefs.setString('quickAddWidgetButton1Target', btn1Target);
+      await _prefs.setString('quickAddWidgetButton1Target', btn1Target);
     }
     if (btn2Label != null) {
-      await prefs.setString('quickAddWidgetButton2Label', btn2Label);
+      await _prefs.setString('quickAddWidgetButton2Label', btn2Label);
     }
     if (btn2Target != null) {
-      await prefs.setString('quickAddWidgetButton2Target', btn2Target);
+      await _prefs.setString('quickAddWidgetButton2Target', btn2Target);
     }
     state = state.copyWith(
       quickAddWidgetButton1Label: btn1Label,
@@ -740,16 +720,15 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     bool? showHabits,
     bool? showSessions,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (type != null) await prefs.setString('calendarWidgetType', type);
+    if (type != null) await _prefs.setString('calendarWidgetType', type);
     if (showTasks != null) {
-      await prefs.setBool('calendarWidgetShowTasks', showTasks);
+      await _prefs.setBool('calendarWidgetShowTasks', showTasks);
     }
     if (showHabits != null) {
-      await prefs.setBool('calendarWidgetShowHabits', showHabits);
+      await _prefs.setBool('calendarWidgetShowHabits', showHabits);
     }
     if (showSessions != null) {
-      await prefs.setBool('calendarWidgetShowSessions', showSessions);
+      await _prefs.setBool('calendarWidgetShowSessions', showSessions);
     }
     state = state.copyWith(
       calendarWidgetType: type,
@@ -763,12 +742,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     String? filterType,
     String? organizer,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
     if (filterType != null) {
-      await prefs.setString('habitWidgetFilterType', filterType);
+      await _prefs.setString('habitWidgetFilterType', filterType);
     }
     if (organizer != null) {
-      await prefs.setString('habitWidgetOrganizer', organizer);
+      await _prefs.setString('habitWidgetOrganizer', organizer);
     }
     state = state.copyWith(
       habitWidgetFilterType: filterType,
@@ -777,8 +755,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   }
 
   Future<void> updateNlpTaskParsingEnabled(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('nlpTaskParsingEnabled', value);
+    await _prefs.setBool('nlpTaskParsingEnabled', value);
     state = state.copyWith(nlpTaskParsingEnabled: value);
   }
 
@@ -787,15 +764,14 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     String? dateFormat,
     String? folder,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
     if (identifier != null) {
-      await prefs.setString('dailyNoteIdentifier', identifier);
+      await _prefs.setString('dailyNoteIdentifier', identifier);
     }
     if (dateFormat != null) {
-      await prefs.setString('dailyNoteDateFormat', dateFormat);
+      await _prefs.setString('dailyNoteDateFormat', dateFormat);
     }
     if (folder != null) {
-      await prefs.setString('dailyNoteFolder', folder);
+      await _prefs.setString('dailyNoteFolder', folder);
     }
     state = state.copyWith(
       dailyNoteIdentifier: identifier,
@@ -806,8 +782,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
 
   Future<void> updateSocialViewMode(String mode) async {
     final normalized = mode == 'timeline' ? 'timeline' : 'grid';
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('socialViewMode', normalized);
+    await _prefs.setString('socialViewMode', normalized);
     state = state.copyWith(socialViewMode: normalized);
   }
 
@@ -815,12 +790,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     String? endpoint,
     String? apiKey,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
     if (endpoint != null) {
-      await prefs.setString('tiktokResolverEndpoint', endpoint.trim());
+      await _prefs.setString('tiktokResolverEndpoint', endpoint.trim());
     }
     if (apiKey != null) {
-      await prefs.setString('tiktokResolverApiKey', apiKey.trim());
+      await _prefs.setString('tiktokResolverApiKey', apiKey.trim());
     }
     state = state.copyWith(
       tiktokResolverEndpoint: endpoint,
@@ -836,16 +810,14 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
         .replaceAll(RegExp(r'^/+|/+$'), '');
     if (key.isEmpty || value.isEmpty) return;
     final next = Map<String, String>.from(state.folderPaths)..[key] = value;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('folderPaths', json.encode(next));
+    await _prefs.setString('folderPaths', json.encode(next));
     state = state.copyWith(folderPaths: next);
   }
 
   // ── A2: User identity ──
   Future<void> setUserName(String name) async {
     final trimmed = name.trim();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('userName', trimmed);
+    await _prefs.setString('userName', trimmed);
     state = state.copyWith(userName: trimmed);
   }
 
@@ -859,23 +831,20 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       list.add(filter);
     }
     final raw = list.map((f) => f.toJson()).toList();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('savedFiltersRaw', json.encode(raw));
+    await _prefs.setString('savedFiltersRaw', json.encode(raw));
     state = state.copyWith(savedFiltersRaw: raw);
   }
 
   Future<void> deleteSavedFilter(String filterId) async {
     final list = state.savedFilters.where((f) => f.id != filterId).toList();
     final raw = list.map((f) => f.toJson()).toList();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('savedFiltersRaw', json.encode(raw));
+    await _prefs.setString('savedFiltersRaw', json.encode(raw));
     state = state.copyWith(savedFiltersRaw: raw);
   }
 
   // ── E11: HuggingFace token ──
   Future<void> setHuggingFaceToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('huggingFaceToken', token.trim());
+    await _prefs.setString('huggingFaceToken', token.trim());
     state = state.copyWith(huggingFaceToken: token.trim());
   }
 
@@ -884,8 +853,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     final next = Map<String, DateTime>.from(state.suppressedConflicts)
       ..[slug] = DateTime.now();
     final encoded = json.encode(next.map((k, v) => MapEntry(k, v.toIso8601String())));
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('suppressedConflicts', encoded);
+    await _prefs.setString('suppressedConflicts', encoded);
     state = state.copyWith(suppressedConflicts: next);
   }
 
@@ -894,10 +862,9 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     String? tag,
     String? folder,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('ideaStrategy', strategy);
-    if (tag != null) await prefs.setString('ideaTag', tag);
-    if (folder != null) await prefs.setString('ideaFolder', folder);
+    await _prefs.setString('ideaStrategy', strategy);
+    if (tag != null) await _prefs.setString('ideaTag', tag);
+    if (folder != null) await _prefs.setString('ideaFolder', folder);
     state = state.copyWith(
       ideaStrategy: strategy,
       ideaTag: tag ?? state.ideaTag,
@@ -912,14 +879,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     next.remove(trimmed);
     next.insert(0, trimmed);
     if (next.length > 5) next = next.sublist(0, 5);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('recentSearches', next);
+    await _prefs.setStringList('recentSearches', next);
     state = state.copyWith(recentSearches: next);
   }
 
   Future<void> clearRecentSearches() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('recentSearches');
+    await _prefs.remove('recentSearches');
     state = state.copyWith(recentSearches: const []);
   }
 }

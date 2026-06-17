@@ -14,7 +14,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/journal_entry.dart';
-import '../../models/mood_model.dart';
 import '../../models/note_model.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';

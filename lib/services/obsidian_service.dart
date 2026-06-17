@@ -187,7 +187,7 @@ class ObsidianService {
 
     final files = <File>[];
     await for (final entity in dir.list(recursive: true, followLinks: false)) {
-      if (entity is File) {
+      if (entity is File && entity.path.endsWith('.md')) {
         final path = entity.path.replaceAll('\\', '/');
         if (path.contains('/_attachments/') ||
             (!includeDeleted && path.contains('/_deleted/'))) {

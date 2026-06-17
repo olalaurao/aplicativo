@@ -26,7 +26,6 @@ import 'providers/widget_sync_provider.dart';
 import 'services/sync_manager.dart';
 import 'services/crash_report_service.dart';
 import 'services/notification_service.dart';
-import 'services/obsidian_service.dart';
 import 'services/widget_service.dart';
 import 'services/permission_service.dart';
 import 'services/pomodoro_bg_service.dart';
@@ -226,6 +225,10 @@ class _BootstrapAppState extends State<BootstrapApp> {
         widget.container.read(syncManagerProvider).performSync();
         unawaited(_checkPendingSharedTextFromNative());
         unawaited(_checkPendingWidgetUriFromNative());
+        // 1.4 — check person contacts on resume (moved out of PeopleNotifier.build)
+        unawaited(
+          widget.container.read(peopleProvider.notifier).checkPersonContactsNow(),
+        );
       },
     );
     _initShareIntentHandling();
@@ -434,15 +437,11 @@ Future<void> _initApp(ProviderContainer container) async {
 
   // Critical path: only what's needed before the UI can appear.
   // Permissions are NOT blocking — they'll be requested after the app renders.
+  // vault_load removed — vault now loads in background after UI appears.
   await Future.wait([
     step(
       'sync_queue_init',
       () => container.read(syncQueueServiceProvider).init(),
-    ),
-    step(
-      'vault_load',
-      () => container.read(allObjectsProvider.future),
-      timeout: const Duration(seconds: 30),
     ),
     step('notifications_init', () async {
       final service = NotificationService();
@@ -457,6 +456,9 @@ Future<void> _initApp(ProviderContainer container) async {
       timeout: const Duration(seconds: 5),
     ),
   ]);
+
+  // Kick off vault load in background; HomeScreen handles AsyncValue loading state.
+  unawaited(container.read(allObjectsProvider.future));
 
   // Update CrashReportService with the real vault path now that vault has loaded
   try {
@@ -826,7 +828,11 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
-    final settings = ref.watch(settingsProvider);
+    // 2.3 — only rebuild when accentColor changes, not on any settings update
+    final accentHex = ref.watch(settingsProvider.select((s) => s.accentColor));
+    final accentColor = Color(
+      int.parse('ff${accentHex.replaceFirst('#', '')}', radix: 16),
+    );
     // Initialize widget sync listener
     ref.watch(widgetSyncProvider);
 
@@ -834,8 +840,8 @@ class MyApp extends ConsumerWidget {
       child: MaterialApp.router(
         title: 'Citrine',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.getLightTheme(Color(int.parse('ff' + settings.accentColor.replaceFirst('#', ''), radix: 16))),
-        darkTheme: AppTheme.getDarkTheme(Color(int.parse('ff' + settings.accentColor.replaceFirst('#', ''), radix: 16))),
+        theme: AppTheme.getLightTheme(accentColor),
+        darkTheme: AppTheme.getDarkTheme(accentColor),
         themeMode: ThemeMode.system,
         routerConfig: router,
         localizationsDelegates: const [

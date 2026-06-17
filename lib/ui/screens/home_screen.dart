@@ -57,7 +57,6 @@ import '../forms/create_task_form.dart';
 import '../forms/create_habit_form.dart';
 import '../widgets/pomodoro_week_overview.dart';
 import '../widgets/organizer_tasks_widget.dart';
-import '../widgets/dashboard/pomodoro_summary_block.dart';
 import '../widgets/dashboard/shopping_list_block.dart';
 import '../widgets/universal_search_picker.dart';
 import '../widgets/energy_map.dart';

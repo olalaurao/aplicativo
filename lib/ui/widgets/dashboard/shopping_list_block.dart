@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/vault_provider.dart';
 import '../../../models/dashboard_block.dart';
-import '../../../models/shopping_item.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme.dart';
-import '../../screens/shopping_list_screen.dart';
 
 class ShoppingListBlockWidget extends ConsumerWidget {
   final DashboardBlock block;

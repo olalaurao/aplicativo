@@ -77,13 +77,7 @@ class _CreateEventFormState extends ConsumerState<CreateEventForm> {
 
   @override
   Widget build(BuildContext context) {
-    final people =
-        ref
-            .watch(allObjectsProvider)
-            .valueOrNull
-            ?.whereType<Person>()
-            .toList() ??
-        [];
+    final people = ref.watch(peopleProvider);
     final canSave = _titleController.text.trim().isNotEmpty && !_saving;
 
     return Scaffold(

@@ -19,7 +19,6 @@ import '../widgets/organizer_picker_modal.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../widgets/social_embed_view.dart';
 import '../widgets/social_post_grid_card.dart';
-import '../widgets/universal_search_picker.dart';
 import 'universal_detail_view.dart';
 import '../widgets/linked_objects_section.dart';
 import '../utils/social_ref_utils.dart';
