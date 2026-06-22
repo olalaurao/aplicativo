@@ -289,11 +289,11 @@ class AppTheme {
         backgroundColor: AppColors.surface,
         selectedItemColor: accentColor,
         unselectedItemColor: AppColors.navInactive,
-        selectedLabelStyle: TextStyle(
+        selectedLabelStyle: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
-        unselectedLabelStyle: TextStyle(
+        unselectedLabelStyle: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w500,
         ),
@@ -419,11 +419,11 @@ class AppTheme {
         backgroundColor: AppColors.darkSurface,
         selectedItemColor: AppColors.accent,
         unselectedItemColor: AppColors.navInactive,
-        selectedLabelStyle: TextStyle(
+        selectedLabelStyle: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
-        unselectedLabelStyle: TextStyle(
+        unselectedLabelStyle: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w500,
         ),

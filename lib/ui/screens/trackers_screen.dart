@@ -188,9 +188,6 @@ class TrackersScreen extends ConsumerWidget {
             )
             .toList()
           ..sort((a, b) => b.date.compareTo(a.date));
-    final daysSince = trackerRecords.isEmpty
-        ? null
-        : DateTime.now().difference(trackerRecords.first.date).inDays;
     final last = trackerRecords.isNotEmpty ? trackerRecords.first : null;
     final firstField = last?.fieldValues.entries.firstOrNull;
 

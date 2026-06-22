@@ -557,12 +557,12 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
     final Map<int, double> weeklyMinutes = {};
 
     for (final session in sessions) {
-      final difference = now.difference(session.startTime);
+      final difference = now.difference(session.date);
       final weeksAgo = (difference.inDays / 7).floor();
       if (weeksAgo < 4) {
         weeklyMinutes[weeksAgo] =
             (weeklyMinutes[weeksAgo] ?? 0.0) +
-            (session.duration.inMinutes.toDouble());
+            (session.minutesWorked.toDouble());
       }
     }
 
@@ -1033,22 +1033,22 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
 
     // 4. Pomodoro weekly total & projects
     final weekPomodoros = pomodoroHistory
-        .where((p) => p.startTime.isAfter(sevenDaysAgo))
+        .where((p) => p.date.isAfter(sevenDaysAgo))
         .toList();
     final double pomodoroMinutesTotal = weekPomodoros.fold(
       0.0,
-      (sum, p) => sum + p.duration.inMinutes.toDouble(),
+      (sum, p) => sum + p.minutesWorked.toDouble(),
     );
     final double pomodoroHoursTotal = pomodoroMinutesTotal / 60.0;
 
     final Map<String, double> pomodoroByProject = {};
     for (final session in weekPomodoros) {
-      final projKey = session.taskTitle.isNotEmpty == true
-          ? session.taskTitle
+      final projKey = session.title.isNotEmpty == true
+          ? session.title
           : 'Outros';
       pomodoroByProject[projKey] =
           (pomodoroByProject[projKey] ?? 0.0) +
-          (session.duration.inMinutes.toDouble() / 60.0);
+          (session.minutesWorked.toDouble() / 60.0);
     }
     final sortedProjects = pomodoroByProject.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));

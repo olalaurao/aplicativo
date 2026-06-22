@@ -2,6 +2,7 @@
 import 'content_object.dart';
 import 'organizer_model.dart';
 import 'task_model.dart'; // For TaskPriority
+import 'shared_types.dart';
 
 class Person extends Organizer {
   String? photo;
@@ -86,15 +87,28 @@ class Person extends Organizer {
     return person;
   }
 
+  @override
   Person copyWith({
     String? title,
+    OrganizerType? organizerType,
+    String? parentId,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? color,
+    String? icon,
+    String? state,
+    String? priority,
+    List<OrganizerReference>? organizers,
+    List<String>? categories,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? obsidianPath,
     String? photo,
     String? phone,
     String? email,
     DateTime? lastContactDate,
     Duration? contactFrequency,
     TaskPriority? contactPriority,
-    String? obsidianPath,
   }) {
     final p = Person(
       id: id,
@@ -105,10 +119,15 @@ class Person extends Organizer {
       lastContactDate: lastContactDate ?? this.lastContactDate,
       contactFrequency: contactFrequency ?? this.contactFrequency,
       contactPriority: contactPriority ?? this.contactPriority,
-      organizers: organizers,
-      categories: categories,
-      createdAt: createdAt,
-      updatedAt: updatedAt,
+      parentId: parentId ?? this.parentId,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      color: color ?? this.color,
+      icon: icon ?? this.icon,
+      organizers: organizers ?? this.organizers,
+      categories: categories ?? this.categories,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       obsidianPath: obsidianPath ?? this.obsidianPath,
     );
     return p;

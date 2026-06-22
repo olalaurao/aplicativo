@@ -762,9 +762,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        subtitle: Text(
+                        subtitle: const Text(
                           'Configurar estratégia de captura',
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: 12),
                         ),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () => _showIdeaSettingsDialog(context, settings, notifier),
@@ -2037,7 +2037,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           'task',
                           'habit',
                           'note',
-                          'journal_entry',
+                          'entry',
                           'project',
                           'resource',
                         ]

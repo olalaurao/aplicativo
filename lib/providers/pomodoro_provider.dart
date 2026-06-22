@@ -79,7 +79,19 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
         PomodoroBackgroundService.stop();
       }
     });
-    return PomodoroState();
+
+    ref.listen<AsyncValue<List<ContentObject>>>(allObjectsProvider, (prev, next) {
+      final list = next.value ?? const [];
+      final history = list.whereType<PomodoroSession>().toList()
+        ..sort((a, b) => b.date.compareTo(a.date));
+      state = state.copyWith(history: history);
+      _updateWeeklyWidget();
+    });
+
+    final initialList = ref.read(allObjectsProvider).value ?? const [];
+    final history = initialList.whereType<PomodoroSession>().toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    return PomodoroState(history: history);
   }
 
   Future<void> _loadState() async {
@@ -114,23 +126,23 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     final rawSessions = fm['sessions'] as List? ?? const [];
     final history = rawSessions.whereType<Map>().map((raw) {
       final map = Map<String, dynamic>.from(raw);
-      final startTime =
-          DateTime.tryParse(map['start_time']?.toString() ?? '') ??
-          DateTime.now();
-      final durationSeconds = (map['duration_seconds'] as num?)?.toInt() ?? 0;
-      final pomodoroTypeName = map['pomodoro_type']?.toString() ?? 'work';
+      final date = DateTime.tryParse(map['date']?.toString() ?? map['start_time']?.toString() ?? '') ?? DateTime.now();
+      final blocksCompleted = (map['blocks_completed'] as num?)?.toInt() ?? (map['completed'] == true ? 1 : 0);
+      final minutesWorked = (map['minutes_worked'] as num?)?.toInt() ?? ((map['duration_seconds'] as num?)?.toInt() ?? 0) ~/ 60;
+      final minutesBreak = (map['minutes_break'] as num?)?.toInt() ?? 0;
+      final stateStr = map['state']?.toString() ?? 'completed';
+      final stateVal = PomodoroSessionState.values.firstWhere((s) => s.name == stateStr, orElse: () => PomodoroSessionState.completed);
       return PomodoroSession(
         id: map['id']?.toString(),
-        taskTitle: map['task_title']?.toString() ?? 'Focus Session',
-        startTime: startTime,
-        duration: Duration(seconds: durationSeconds),
-        pomodoroType: PomodoroType.values.firstWhere(
-          (type) => type.name == pomodoroTypeName,
-          orElse: () => PomodoroType.work,
-        ),
-        completed: map['completed'] as bool? ?? false,
+        taskTitle: map['task_title']?.toString() ?? map['title']?.toString() ?? 'Focus Session',
+        date: date,
+        linkedItemSlug: map['linked_item_slug'],
+        blocksCompleted: blocksCompleted,
+        minutesWorked: minutesWorked,
+        minutesBreak: minutesBreak,
+        state: stateVal,
       );
-    }).toList()..sort((a, b) => b.startTime.compareTo(a.startTime));
+    }).toList()..sort((a, b) => b.date.compareTo(a.date));
     state = state.copyWith(history: history);
     _updateWeeklyWidget();
   }
@@ -161,11 +173,13 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
           .map(
             (session) => {
               'id': session.id,
-              'task_title': session.taskTitle,
-              'start_time': session.startTime.toIso8601String(),
-              'duration_seconds': session.duration.inSeconds,
-              'pomodoro_type': session.pomodoroType.name,
-              'completed': session.completed,
+              'task_title': session.title,
+              'date': session.date.toIso8601String(),
+              'linked_item_slug': session.linkedItemSlug,
+              'blocks_completed': session.blocksCompleted,
+              'minutes_worked': session.minutesWorked,
+              'minutes_break': session.minutesBreak,
+              'state': session.state.name,
             },
           )
           .toList(),
@@ -370,21 +384,24 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
   Future<void> _completeSession({bool forceSave = false}) async {
     final now = DateTime.now();
     final elapsedSeconds = state.totalSeconds - state.remainingSeconds;
+    final elapsedMinutes = elapsedSeconds ~/ 60;
 
     final session = PomodoroSession(
       id: now.millisecondsSinceEpoch.toString(),
       taskTitle: state.currentItemTitle ?? 'Focus em projeto',
-      startTime: now.subtract(Duration(seconds: elapsedSeconds)),
-      duration: Duration(seconds: elapsedSeconds),
-      pomodoroType: state.currentType,
-      completed: state.remainingSeconds == 0,
+      date: now.subtract(Duration(seconds: elapsedSeconds)),
+      linkedItemSlug: state.currentItemId,
+      blocksCompleted: state.currentType == PomodoroType.work && state.remainingSeconds == 0 ? 1 : 0,
+      minutesWorked: state.currentType == PomodoroType.work ? elapsedMinutes : 0,
+      minutesBreak: state.currentType != PomodoroType.work ? elapsedMinutes : 0,
+      state: state.remainingSeconds == 0 ? PomodoroSessionState.completed : PomodoroSessionState.cancelled,
     );
     state = state.copyWith(history: [session, ...state.history]);
     await _persistHistory();
     _updateWeeklyWidget();
 
     // Save to Vault (Daily Note)
-    if (session.completed || (forceSave && elapsedSeconds > 60)) {
+    if (state.remainingSeconds == 0 || (forceSave && elapsedSeconds > 60)) {
       await _saveToDailyNote(session);
       await _updateLinkedObjectMetrics(session);
     }
@@ -394,23 +411,23 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     if (state.currentItemId == null) return;
 
     final allObjects = await ref.read(allObjectsProvider.future);
-    final matches = allObjects.where((obj) => obj.id == state.currentItemId);
+    final matches = allObjects.where((obj) => obj.id == state.currentItemId || obj.slug == state.currentItemId);
     final target = matches.isNotEmpty ? matches.first : null;
     if (target is Task) {
       final updatedTask = target.copyWith(
-        timerSessions: target.timerSessions + session.duration.inMinutes,
+        timerSessions: target.timerSessions + session.minutesWorked,
       );
       await ref.read(tasksProvider.notifier).updateTask(updatedTask);
     } else if (target is Goal) {
       for (final kpi in target.kpis) {
-        if (kpi.sourceType == KPISourceType.timeSpentInCategory ||
-            kpi.sourceType == KPISourceType.plannerTaskDuration) {
-          kpi.currentValue += session.duration.inMinutes;
+        if (kpi.sourceType == KPISourceType.timeSpent ||
+            kpi.sourceType == KPISourceType.others) {
+          kpi.currentValue += session.minutesWorked;
         }
       }
       await ref.read(vaultProvider.notifier).updateObject(target);
     } else if (target is Project) {
-      target.totalPomodoroTime += session.duration.inMinutes;
+      target.totalPomodoroTime += session.minutesWorked;
       await ref.read(vaultProvider.notifier).updateObject(target);
     }
 
@@ -422,19 +439,10 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     final obsidianService = ref.read(obsidianServiceProvider);
     final dateStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-    final timeStr = DateFormat('HH:mm').format(session.startTime);
-    final title = state.currentItemTitle ?? 'Sessão livre';
-    final minutes = session.duration.inMinutes;
-    final block = [
-      '### $timeStr — $title',
-      if (state.currentItemId != null) '- Linked: [[${state.currentItemId}]]',
-      '- Blocos: ${state.completedSessions + 1} completos',
-      '- Tempo: ${minutes}min trabalhados',
-      '- Pausas: ${session.pomodoroType == PomodoroType.work ? 0 : minutes}min',
-    ].join('\n');
+    final block = session.toDailyNoteBlock();
 
     await obsidianService.appendToDailyNote(
-      session.startTime,
+      session.date,
       '## Pomodoros',
       block,
     );
@@ -503,17 +511,17 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       now.day,
     ).subtract(Duration(days: now.weekday - 1));
     final sessions = state.history
-        .where((session) => !session.startTime.isBefore(startOfWeek))
+        .where((session) => !session.date.isBefore(startOfWeek))
         .toList();
     final dayHours = List<double>.filled(7, 0);
     final byTitle = <String, int>{};
     for (final session in sessions) {
-      final index = session.startTime.weekday - 1;
+      final index = session.date.weekday - 1;
       if (index >= 0 && index < dayHours.length) {
-        dayHours[index] += session.duration.inMinutes / 60;
+        dayHours[index] += session.minutesWorked / 60;
       }
-      byTitle[session.taskTitle] =
-          (byTitle[session.taskTitle] ?? 0) + session.duration.inMinutes;
+      byTitle[session.title] =
+          (byTitle[session.title] ?? 0) + session.minutesWorked;
     }
     final totalHours = dayHours.fold<double>(0, (sum, value) => sum + value);
     final details =

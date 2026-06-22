@@ -98,7 +98,7 @@ class JournalEntryCard extends StatelessWidget {
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: photoUrls.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 6),
+                      separatorBuilder: (context, sep) => const SizedBox(width: 6),
                       itemBuilder: (context, index) {
                         return ClipRRect(
                           borderRadius: BorderRadius.circular(8),
@@ -526,13 +526,13 @@ class _StatCol extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          '\$count itens',
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
+          Text(
+            '$count itens',
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
           ),
-        ),
       ],
     );
   }

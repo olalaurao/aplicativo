@@ -36,7 +36,7 @@ class HighlightPickerSheet extends StatelessWidget {
               shrinkWrap: true,
               padding: const EdgeInsets.all(16),
               itemCount: highlights.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              separatorBuilder: (context, sep) => const SizedBox(height: 8),
               itemBuilder: (ctx, i) {
                 final hl = highlights[i];
                 return GestureDetector(
@@ -45,7 +45,7 @@ class HighlightPickerSheet extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.07),
-                      border: Border(
+                      border: const Border(
                         left: BorderSide(color: AppColors.primary, width: 2),
                       ),
                       borderRadius: const BorderRadius.only(

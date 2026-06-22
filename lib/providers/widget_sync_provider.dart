@@ -18,6 +18,9 @@ import '../models/pomodoro_session.dart';
 import '../models/reminder_model.dart';
 import '../models/task_model.dart';
 import '../models/shopping_item.dart';
+import '../models/journal_entry.dart';
+import '../models/note_model.dart';
+import '../models/resource_model.dart';
 import '../services/scheduler_service.dart';
 import '../services/widget_service.dart';
 import 'dashboard_provider.dart';
@@ -163,6 +166,15 @@ Map<String, dynamic> buildShoppingSnapshotForTest(
   List<ContentObject> allObjects,
 ) {
   return _buildShoppingSnapshot(allObjects);
+}
+
+@visibleForTesting
+Map<String, dynamic> buildFilterSnapshotForTest(
+  List<ContentObject> objects,
+  List<DashboardBlock> blocks, [
+  AppSettings? settings,
+]) {
+  return _buildFilterSnapshot(objects, blocks, settings);
 }
 
 Map<String, dynamic> _buildCalendarSnapshot(
@@ -548,6 +560,112 @@ Map<String, dynamic> _buildShoppingSnapshot(
   };
 }
 
+Map<String, dynamic> _buildFilterSnapshot(
+  List<ContentObject> allObjects,
+  List<DashboardBlock> dashboardBlocks, [
+  AppSettings? settings,
+]) {
+  final block = dashboardBlocks
+      .where((item) => item.id == 'home-area')
+      .firstOrNull;
+  final metadata = block?.metadata ?? {};
+  
+  final organizerSlug = settings?.universalWidgetOrganizer ?? metadata['organizerSlug'] as String?;
+  final rawTypes = settings?.universalWidgetObjectTypes ?? metadata['filterObjectTypes'] ?? metadata['objectTypes'];
+  final selectedTypes = rawTypes is List
+      ? rawTypes.map((item) => item.toString()).toSet()
+      : {'task', 'habit'};
+      
+  final organizers = [
+    ...allObjects.whereType<Organizer>().cast<ContentObject>(),
+    ...allObjects.whereType<Goal>().cast<ContentObject>(),
+  ].where((object) => 
+    object is Organizer ||
+    object is Goal ||
+    object.type == 'project' ||
+    object.type == 'person'
+  ).toList()..sort((a, b) => a.title.compareTo(b.title));
+  
+  final organizer = organizerSlug == null
+      ? (organizers.isNotEmpty ? organizers.first : null)
+      : organizers.where((item) => item.slug == organizerSlug || item.id == organizerSlug).firstOrNull;
+
+  final refs =
+      organizer == null
+            ? <ContentObject>[]
+            : allObjects.where((object) {
+                if (object.id == organizer.id) return false;
+                if (!selectedTypes.contains(object.type) &&
+                    !(selectedTypes.contains('entry') &&
+                        object is JournalEntry)) {
+                  return false;
+                }
+                return object.organizers.any(
+                  (ref) => ref.matches(
+                    organizer.id,
+                    organizer.slug,
+                    organizer.title,
+                  ),
+                );
+              }).toList()
+        ..sort((a, b) {
+          final aTime = a.updatedAt;
+          final bTime = b.updatedAt;
+          return bTime.compareTo(aTime);
+        });
+
+  final tasks = refs.whereType<Task>().toList();
+  final completedTasks = tasks.where((task) => task.isCompleted).length;
+  final totalProgress = tasks.length;
+  final todayKey = _dateKey(DateTime.now());
+  final chips =
+      <Map<String, dynamic>>[
+            {'label': 'Tarefas', 'count': refs.whereType<Task>().length},
+            {'label': 'Habitos', 'count': refs.whereType<Habit>().length},
+            {'label': 'Goals', 'count': refs.whereType<Goal>().length},
+            {'label': 'Notas', 'count': refs.whereType<Note>().length},
+            {'label': 'Recursos', 'count': refs.whereType<Resource>().length},
+          ]
+          .where(
+            (chip) => (chip['count'] as int) > 0 || chip['label'] == 'Tarefas',
+          )
+          .toList();
+
+  return {
+    'title': 'Filtro',
+    'organizer': organizer == null ? 'Sem filtro' : _displayTitle(organizer),
+    'chips': chips,
+    'progressDone': completedTasks,
+    'progressTotal': totalProgress,
+    'items': refs.take(8).map((item) {
+      final completed = item is Task
+          ? item.isCompleted
+          : item is Habit
+          ? _isHabitCompletedOn(item, DateTime.now())
+          : false;
+      final String? toggleUri = item is Task
+          ? 'citrine://widget-toggle?type=task&id=${Uri.encodeComponent(item.id)}&date=$todayKey'
+          : item is Habit
+          ? 'citrine://widget-toggle?type=habit&id=${Uri.encodeComponent(item.id)}&date=$todayKey'
+          : null;
+      final row = {
+        'id': item.id,
+        'title': _displayTitle(item),
+        'type': item.type,
+        'subtitle': item.organizers.isEmpty
+            ? _displayType(item)
+            : _organizerLabel(item, organizers),
+        'completed': completed,
+        'linkUri': 'citrine:///detail/${item.id}',
+      };
+      if (toggleUri != null) {
+        row['toggleUri'] = toggleUri;
+      }
+      return row;
+    }).toList(),
+  };
+}
+
 Map<String, dynamic> _buildPomodoroSnapshot(List<PomodoroSession> history) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
@@ -555,19 +673,19 @@ Map<String, dynamic> _buildPomodoroSnapshot(List<PomodoroSession> history) {
   final sessions = history
       .where(
         (session) =>
-            session.pomodoroType == PomodoroType.work &&
-            !session.startTime.isBefore(startOfWeek),
+            session.minutesWorked > 0 &&
+            !session.date.isBefore(startOfWeek),
       )
       .toList();
   final totalMinutes = sessions.fold<int>(
     0,
-    (sum, session) => sum + session.duration.inMinutes,
+    (sum, session) => sum + session.minutesWorked,
   );
   final bars = List.generate(7, (index) {
     final day = startOfWeek.add(Duration(days: index));
     final minutes = sessions
-        .where((session) => _isSameDay(session.startTime, day))
-        .fold<int>(0, (sum, session) => sum + session.duration.inMinutes);
+        .where((session) => _isSameDay(session.date, day))
+        .fold<int>(0, (sum, session) => sum + session.minutesWorked);
     return {
       'label': DateFormat('E', 'pt_BR').format(day),
       'hours': minutes / 60,
@@ -612,7 +730,7 @@ String _displayType(ContentObject item) {
     'habit' => 'Hábito',
     'goal' => 'Objetivo',
     'note' => 'Nota',
-    'journal_entry' => 'Diário',
+    'entry' => 'Diário',
     'resource' => 'Recurso',
     'person' => 'Pessoa',
     _ => item.displayType,

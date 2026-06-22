@@ -22,7 +22,7 @@ class ShoppingListBlockWidget extends ConsumerWidget {
         color: AppTheme.surfaceColor(context),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Theme.of(context).dividerColor.withOpacity(0.05),
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.05),
         ),
       ),
       child: Column(
@@ -66,7 +66,7 @@ class ShoppingListBlockWidget extends ConsumerWidget {
               physics: const NeverScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               itemCount: pending.length > 5 ? 5 : pending.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              separatorBuilder: (context, index) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final item = pending[index];
                 return InkWell(

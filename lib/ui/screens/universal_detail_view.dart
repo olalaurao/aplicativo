@@ -43,6 +43,7 @@ import '../widgets/wiki_text_view.dart';
 import '../widgets/journal_body_view.dart';
 import '../widgets/markdown_body_view.dart';
 import '../widgets/universal_search_picker.dart';
+import '../widgets/conflict_badge.dart';
 import '../../providers/settings_provider.dart';
 import '../forms/create_task_form.dart';
 import '../forms/create_habit_form.dart';
@@ -165,19 +166,30 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    object is MoodDefinition
-                        ? '${(object as MoodDefinition).emoji} ${object.title}'
-                        : (object.obsidianFileName.isNotEmpty
-                              ? object.obsidianFileName
-                              : 'Untitled'),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          object is MoodDefinition
+                              ? '${(object as MoodDefinition).emoji} ${object.title}'
+                              : (object.obsidianFileName.isNotEmpty
+                                    ? object.obsidianFileName
+                                    : 'Untitled'),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                      ConflictBadge(
+                        visible: currentObject.hasTypeConflict,
+                        tooltip: currentObject.conflictReason,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -765,7 +777,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       'project': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
       'person': ['edit', 'change_type', 'merge_note', 'delete'],
       'resource': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
-      'journal_entry': [
+      'entry': [
         'edit',
         'change_type',
         'save_template',
@@ -1002,14 +1014,14 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         _buildPropertyRow(
           context,
           'State',
-          project.state.name.toUpperCase(),
+          project.projectState.name.toUpperCase(),
           onTap: () => _showProjectStatePicker(context, ref, project),
         ),
         _divider(),
         _buildPropertyRow(
           context,
           'Priority',
-          project.priority.name.toUpperCase(),
+          project.projectPriority.name.toUpperCase(),
           onTap: () => _showProjectPriorityPicker(context, ref, project),
         ),
       ];
@@ -1109,6 +1121,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       final entries = ref.watch(allEntriesProvider);
       final moods = ref.watch(moodsProvider);
       final notes = ref.watch(notesProvider);
+      final tasks = ref.watch(tasksProvider);
 
       // Calculate live progress
       double total = 0;
@@ -1122,6 +1135,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           entries: entries,
           moods: moods,
           notes: notes,
+          tasks: tasks,
         );
         completed += (val / kpi.targetValue).clamp(0.0, 1.0);
       }
@@ -2418,17 +2432,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             setState(() => object = updated);
           },
         );
-      case NoteSubtype.routine:
-        // Treat routine as text editor
-        return RichTextEditor(
-          content: note.body,
-          expands: false,
-          onChanged: (v) {
-            final updated = note.copyWith(body: v);
-            ref.read(vaultProvider.notifier).updateObject(updated);
-            setState(() => object = updated);
-          },
-        );
     }
   }
 
@@ -2449,9 +2452,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         );
       case NoteSubtype.collection:
         return CollectionView(content: note.body);
-      case NoteSubtype.routine:
-        // Treat routine as text view
-        return MarkdownBodyView(content: note.body);
       case NoteSubtype.text:
         return MarkdownBodyView(content: note.body);
     }
@@ -2676,7 +2676,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
   String _getStatus(ContentObject obj) {
     if (obj is Task) return obj.stage.name.toUpperCase();
-    if (obj is Project) return obj.state.name.toUpperCase();
+    if (obj is Project) return obj.projectState.name.toUpperCase();
     if (obj is Resource) return obj.status.name.toUpperCase();
     if (obj is Goal) return obj.state.name.toUpperCase();
     return 'ACTIVE';
@@ -3338,6 +3338,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     switch (stage) {
       case TaskStage.idea:
         return 'Ideia';
+      case TaskStage.backlog:
+        return 'Backlog';
       case TaskStage.todo:
         return 'A Fazer';
       case TaskStage.inProgress:
@@ -3389,7 +3391,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       values: ProjectState.values,
       label: (value) => value.name,
       onSelected: (value) {
-        project.state = value;
+        project.projectState = value;
         ref.read(vaultProvider.notifier).updateObject(project);
       },
     );
@@ -3425,7 +3427,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       values: TaskPriority.values,
       label: (value) => value.name,
       onSelected: (value) {
-        project.priority = value;
+        project.projectPriority = value;
         ref.read(vaultProvider.notifier).updateObject(project);
       },
     );
@@ -3622,6 +3624,14 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           return 'Pessoa';
         case OrganizerType.place:
           return 'Lugar';
+        case OrganizerType.task:
+          return 'Tarefa';
+        case OrganizerType.goal:
+          return 'Objetivo';
+        case OrganizerType.habit:
+          return 'Hábito';
+        case OrganizerType.tracker:
+          return 'Rastreador';
       }
     }
     switch (obj.type) {
@@ -3631,7 +3641,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         return 'Hábito';
       case 'goal':
         return 'Objetivo';
-      case 'journal_entry':
+      case 'entry':
         return 'Diário';
       case 'calendar_session':
         return 'Evento';
@@ -3660,7 +3670,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         return AppColors.habitGreen;
       case 'goal':
         return AppColors.habitOrange;
-      case 'journal_entry':
+      case 'entry':
         return AppColors.habitPurple;
       case 'calendar_session':
         return AppColors.primary;
@@ -3683,7 +3693,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         return Icons.cached_rounded;
       case 'goal':
         return Icons.flag_outlined;
-      case 'journal_entry':
+      case 'entry':
         return Icons.auto_stories_rounded;
       case 'calendar_session':
         return Icons.calendar_today_outlined;
@@ -3704,6 +3714,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final entries = ref.watch(allEntriesProvider);
     final moods = ref.watch(moodsProvider);
     final notes = ref.watch(notesProvider);
+    final tasks = ref.watch(tasksProvider);
 
     final currentValue = KPIEngine.calculateKPIValue(
       kpi: kpi,
@@ -3712,6 +3723,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       entries: entries,
       moods: moods,
       notes: notes,
+      tasks: tasks,
     );
 
     final progress = kpi.targetValue <= 0
@@ -4047,6 +4059,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       final entries = ref.read(allEntriesProvider);
       final moods = ref.read(moodsProvider);
       final notes = ref.read(notesProvider);
+      final tasks = ref.read(tasksProvider);
 
       for (final kpi in goal.kpis) {
         currentKPIs[kpi.title] = KPIEngine.calculateKPIValue(
@@ -4056,6 +4069,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           entries: entries,
           moods: moods,
           notes: notes,
+          tasks: tasks,
         );
       }
     } else if (object is Project) {
@@ -4495,7 +4509,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     switch (type) {
       case 'task':
         return AppColors.info;
-      case 'journal_entry':
+      case 'entry':
         return AppColors.primary;
       case 'habit':
         return AppColors.habitGreen;
@@ -4516,7 +4530,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     switch (type) {
       case 'task':
         return Icons.check_circle_outline_rounded;
-      case 'journal_entry':
+      case 'entry':
         return Icons.book_rounded;
       case 'habit':
         return Icons.cached_rounded;

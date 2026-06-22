@@ -1,14 +1,27 @@
 // lib/services/obsidian_service.dart
 import 'dart:io';
 import 'dart:convert';
+import 'dart:async';
 import 'package:path_provider/path_provider.dart';
 import 'package:watcher/watcher.dart';
 import '../models/content_object.dart';
 import 'markdown_parser.dart';
+import 'package:flutter/foundation.dart';
 
 class ObsidianService {
   Directory? vaultDir;
   String? _currentVaultName;
+
+  List<File>? _allMarkdownFilesCache;
+  DateTime? _allMarkdownFilesCacheTimestamp;
+  final Map<String, MapEntry<List<File>, DateTime>> _folderCache = {};
+  static const _cacheValidDuration = Duration(seconds: 5);
+
+  void invalidateFileCache() {
+    _allMarkdownFilesCache = null;
+    _allMarkdownFilesCacheTimestamp = null;
+    _folderCache.clear();
+  }
 
   String get vaultPath => vaultDir?.path ?? '';
 
@@ -28,6 +41,7 @@ class ObsidianService {
       vaultDir = Directory('${appDocDir.path}/$folderName');
     }
     _currentVaultName = folderName;
+    invalidateFileCache();
     final dir = vaultDir!;
     if (!await dir.exists()) {
       await dir.create(recursive: true);
@@ -38,26 +52,13 @@ class ObsidianService {
   Future<void> _ensureVaultFolders() async {
     if (vaultDir == null) return;
     const folders = [
+      'app',
       'daily',
-      'habits',
-      'trackers',
-      'tasks',
-      'events',
-      'notes',
       'moods',
-      'projects',
-      'people',
-      'organizers/areas',
-      'organizers/projects',
-      'organizers/activities',
-      'organizers/people',
-      'organizers/places',
-      'organizers/labels',
-      'resources',
-      'social',
-      'sessions',
+      'analyses',
       '_attachments',
       '_deleted',
+      '_conflicts',
     ];
     // Create all subdirectories in parallel
     await Future.wait(
@@ -123,6 +124,7 @@ class ObsidianService {
       await file.parent.create(recursive: true);
     }
     await file.writeAsString(content, encoding: utf8);
+    invalidateFileCache();
   }
 
   Future<void> appendToDailyNote(
@@ -180,7 +182,16 @@ class ObsidianService {
   Future<List<File>> getFilesInFolder(
     String folderName, {
     bool includeDeleted = false,
+    bool forceRefresh = false,
   }) async {
+    final now = DateTime.now();
+    final cacheKey = '${folderName}_$includeDeleted';
+    if (!forceRefresh &&
+        _folderCache.containsKey(cacheKey) &&
+        now.difference(_folderCache[cacheKey]!.value) < _cacheValidDuration) {
+      return _folderCache[cacheKey]!.key;
+    }
+
     if (vaultDir == null) return [];
     final dir = Directory('${vaultDir!.path}/$folderName');
     if (!await dir.exists()) return [];
@@ -196,7 +207,51 @@ class ObsidianService {
         files.add(entity);
       }
     }
+    _folderCache[cacheKey] = MapEntry(files, now);
     return files;
+  }
+
+  Stream<List<WatchEvent>>? watchVaultDebounced({
+    Duration debounce = const Duration(milliseconds: 800),
+  }) {
+    if (vaultDir == null) return null;
+    final rawStream = Platform.isIOS
+        ? PollingDirectoryWatcher(
+            vaultDir!.path,
+            pollingDelay: const Duration(minutes: 1),
+          ).events
+        : DirectoryWatcher(vaultDir!.path).events;
+
+    StreamController<List<WatchEvent>>? controller;
+    Timer? timer;
+    final List<WatchEvent> buffer = [];
+
+    controller = StreamController<List<WatchEvent>>(
+      onListen: () {
+        final subscription = rawStream.listen((event) {
+          final path = event.path.replaceAll('\\', '/');
+          if (path.contains('/_attachments/') ||
+              path.contains('/_deleted/') ||
+              path.contains('/_backups/')) {
+            return;
+          }
+          buffer.add(event);
+          timer?.cancel();
+          timer = Timer(debounce, () {
+            if (buffer.isNotEmpty) {
+              controller?.add(List.from(buffer));
+              buffer.clear();
+            }
+          });
+        });
+        controller!.onCancel = () {
+          subscription.cancel();
+          timer?.cancel();
+        };
+      },
+    );
+
+    return controller.stream;
   }
 
   Stream<WatchEvent>? watchVault() {
@@ -216,6 +271,7 @@ class ObsidianService {
     if (await file.exists()) {
       await file.delete();
     }
+    invalidateFileCache();
   }
 
   Future<void> moveFile(String fromRelativePath, String toRelativePath) async {
@@ -231,6 +287,7 @@ class ObsidianService {
       await target.delete();
     }
     await source.rename(target.path);
+    invalidateFileCache();
   }
 
   // Phase 1.2 additions
@@ -238,7 +295,14 @@ class ObsidianService {
     return await readFile('$folderName/$slug.md');
   }
 
-  Future<List<File>> getAllMarkdownFiles() async {
+  Future<List<File>> getAllMarkdownFiles({bool forceRefresh = false}) async {
+    final now = DateTime.now();
+    if (!forceRefresh &&
+        _allMarkdownFilesCache != null &&
+        _allMarkdownFilesCacheTimestamp != null &&
+        now.difference(_allMarkdownFilesCacheTimestamp!) < _cacheValidDuration) {
+      return _allMarkdownFilesCache!;
+    }
     if (vaultDir == null) return [];
     final files = <File>[];
     await for (final entity in vaultDir!.list(
@@ -247,12 +311,17 @@ class ObsidianService {
     )) {
       if (entity is File && entity.path.endsWith('.md')) {
         final path = entity.path.replaceAll('\\', '/');
-        if (path.contains('/_attachments/') || path.contains('/_deleted/') || path.contains('/_conflicts/') || path.contains('/_backups/')) {
+        if (path.contains('/_attachments/') ||
+            path.contains('/_deleted/') ||
+            path.contains('/_conflicts/') ||
+            path.contains('/_backups/')) {
           continue;
         }
         files.add(entity);
       }
     }
+    _allMarkdownFilesCache = files;
+    _allMarkdownFilesCacheTimestamp = now;
     return files;
   }
 
@@ -274,5 +343,36 @@ class ObsidianService {
     final file = File('${vaultDir!.path}/$relativePath');
     if (await file.exists()) return file;
     return null;
+  }
+
+  Future<void> fixEntryTypeMigration() async {
+    if (vaultDir == null) return;
+    final files = await getAllMarkdownFiles();
+    for (final file in files) {
+      try {
+        final content = await file.readAsString(encoding: utf8);
+        final frontmatter = MarkdownParser.parseFrontmatter(content);
+        final type = frontmatter['type']?.toString();
+        if (type == 'journal_entry' || type == 'entry') {
+          var changed = false;
+          if (type == 'journal_entry') {
+            frontmatter['type'] = 'entry';
+            changed = true;
+          }
+          final entryType = frontmatter['entry_type']?.toString();
+          if (entryType != null && entryType.startsWith('_')) {
+            frontmatter['entry_type'] = entryType.substring(1);
+            changed = true;
+          }
+          if (changed) {
+            final body = MarkdownParser.extractBody(content);
+            await file.writeAsString(generateMarkdown(frontmatter, body), encoding: utf8);
+            debugPrint('Migrated journal entry file: ${file.path}');
+          }
+        }
+      } catch (e) {
+        debugPrint('Error migrating file ${file.path}: $e');
+      }
+    }
   }
 }

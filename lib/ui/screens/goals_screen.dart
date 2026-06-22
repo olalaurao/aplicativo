@@ -10,10 +10,6 @@ import '../widgets/object_action_wrapper.dart';
 import '../forms/create_goal_form.dart';
 import 'universal_detail_view.dart';
 
-import 'package:flutter/services.dart';
-import '../../models/saved_filter.dart';
-import '../../providers/settings_provider.dart';
-
 class GoalsScreen extends ConsumerStatefulWidget {
   const GoalsScreen({super.key});
 
@@ -22,17 +18,6 @@ class GoalsScreen extends ConsumerStatefulWidget {
 }
 
 class _GoalsScreenState extends ConsumerState<GoalsScreen> {
-  SavedFilter? _activeFilter;
-  List<SavedFilter> _savedFilters = [];
-  String _searchQuery = '';
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() => _savedFilters = ref.read(settingsProvider).filtersFor('goal'));
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -424,6 +409,7 @@ class _GoalCard extends ConsumerWidget {
     final entries = ref.watch(allEntriesProvider);
     final moods = ref.watch(moodsProvider);
     final notes = ref.watch(notesProvider);
+    final tasks = ref.watch(tasksProvider);
 
     double total = 0;
     double completed = 0;
@@ -437,6 +423,7 @@ class _GoalCard extends ConsumerWidget {
         entries: entries,
         moods: moods,
         notes: notes,
+        tasks: tasks,
       );
       completed += (currentValue / kpi.targetValue).clamp(0.0, 1.0);
     }

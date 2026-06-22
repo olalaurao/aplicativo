@@ -22,7 +22,7 @@ class HealthAlertsStrip extends ConsumerWidget {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           itemCount: alerts.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          separatorBuilder: (context, sep) => const SizedBox(width: 8),
           itemBuilder: (ctx, i) => _AlertCard(alert: alerts[i], compact: true)));
     }
 
@@ -72,9 +72,9 @@ class _AlertCard extends ConsumerWidget {
         width: 140,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: _color.withOpacity(0.08),
+          color: _color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _color.withOpacity(0.25))),
+          border: Border.all(color: _color.withValues(alpha: 0.25))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Text(_icon, style: const TextStyle(fontSize: 14)),
@@ -92,9 +92,9 @@ class _AlertCard extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: _color.withOpacity(0.07),
+        color: _color.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _color.withOpacity(0.25))),
+        border: Border.all(color: _color.withValues(alpha: 0.25))),
       child: Row(children: [
         Text(_icon, style: const TextStyle(fontSize: 20)),
         const SizedBox(width: 10),
@@ -119,7 +119,7 @@ class _AlertCard extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: _color.withOpacity(0.12),
+              color: _color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20)),
             child: Text('Registrar', style: TextStyle(
               fontSize: 11, fontWeight: FontWeight.w700, color: _color)))),

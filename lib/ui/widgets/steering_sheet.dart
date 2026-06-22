@@ -536,7 +536,9 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
           children: [
             Radio<String>(
               value: value,
+              // ignore: deprecated_member_use
               groupValue: groupValue,
+              // ignore: deprecated_member_use
               onChanged: onChanged,
               activeColor: activeColor,
             ),

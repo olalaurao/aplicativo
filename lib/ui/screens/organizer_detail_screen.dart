@@ -708,6 +708,14 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         return Icons.place_outlined;
       case OrganizerType.label:
         return Icons.label_outline_rounded;
+      case OrganizerType.task:
+        return Icons.check_circle_outline;
+      case OrganizerType.goal:
+        return Icons.flag_rounded;
+      case OrganizerType.habit:
+        return Icons.loop_rounded;
+      case OrganizerType.tracker:
+        return Icons.analytics_outlined;
     }
   }
 
@@ -726,7 +734,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         return Icons.cached_rounded;
       case 'goal':
         return Icons.flag_outlined;
-      case 'journal_entry':
+      case 'entry':
         return Icons.auto_stories_rounded;
       case 'calendar_session':
         return Icons.calendar_today_outlined;
@@ -755,7 +763,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         return AppColors.habitGreen;
       case 'goal':
         return AppColors.habitOrange;
-      case 'journal_entry':
+      case 'entry':
         return AppColors.habitPurple;
       case 'calendar_session':
         return AppColors.primary;
@@ -784,7 +792,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         return 'Habits';
       case 'goal':
         return 'Goals';
-      case 'journal_entry':
+      case 'entry':
         return 'Journal';
       case 'calendar_session':
         return 'Sessions';

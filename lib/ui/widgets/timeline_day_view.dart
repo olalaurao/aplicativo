@@ -597,17 +597,32 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                     ),
                   ),
                 ),
-                padding: const EdgeInsets.only(left: 10, top: 4),
-                alignment: Alignment.topLeft,
-                child: Text(
-                  block.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: bandColor.withValues(alpha: 0.8),
-                  ),
+                child: Stack(
+                  children: [
+                    if (block.energyLevel != null)
+                      Positioned.fill(
+                        child: Container(
+                          color: switch (block.energyLevel!) {
+                            EnergyLevel.high => const Color(0xFF4CAF50).withValues(alpha: 0.08),
+                            EnergyLevel.medium => const Color(0xFFFFC107).withValues(alpha: 0.08),
+                            EnergyLevel.low => const Color(0xFFFF7043).withValues(alpha: 0.08),
+                          },
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 10, top: 4),
+                      child: Text(
+                        block.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: bandColor.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

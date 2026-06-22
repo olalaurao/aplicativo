@@ -490,6 +490,14 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
         return Icons.place_outlined;
       case OrganizerType.label:
         return Icons.label_outline_rounded;
+      case OrganizerType.task:
+        return Icons.check_circle_outline;
+      case OrganizerType.goal:
+        return Icons.flag_rounded;
+      case OrganizerType.habit:
+        return Icons.loop_rounded;
+      case OrganizerType.tracker:
+        return Icons.analytics_outlined;
     }
   }
 }

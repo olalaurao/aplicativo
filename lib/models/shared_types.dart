@@ -102,7 +102,7 @@ class OrganizerReference {
     return OrganizerReference(type: defaultType, slug: slug, title: title);
   }
 
-  String toWikiLink() => type == 'label' ? '[[$slug]]' : '[[$type/$slug]]';
+  String toWikiLink() => '[[$slug]]';
 
   Map<String, dynamic> toMap() => {
     'type': type,
@@ -142,17 +142,28 @@ class Comment {
 }
 
 class ActionDef {
-  final String type; // add_tracking_record, add_entry, etc.
-  final String trigger; // slot_complete, day_complete
+  final String type; // add_tracking_record, add_entry, add_text_note, launch_url, etc.
+  final String trigger; // slot_complete, day_complete, kpi_reached
   final String? targetTracker;
+  /// Parâmetros extras específicos ao tipo de action.
+  /// Ex.: add_text_note: {'title': '...'}, launch_url: {'url': '...'}
+  final Map<String, dynamic>? params;
 
-  ActionDef({required this.type, required this.trigger, this.targetTracker});
+  ActionDef({
+    required this.type,
+    required this.trigger,
+    this.targetTracker,
+    this.params,
+  });
 
   factory ActionDef.fromJson(Map<String, dynamic> json) {
     return ActionDef(
       type: json['type'] as String,
-      trigger: json['trigger'] as String,
+      trigger: json['trigger'] as String? ?? 'day_complete',
       targetTracker: json['target_tracker'] as String?,
+      params: json['params'] != null
+          ? Map<String, dynamic>.from(json['params'] as Map)
+          : null,
     );
   }
 
@@ -160,6 +171,7 @@ class ActionDef {
     'type': type,
     'trigger': trigger,
     if (targetTracker != null) 'target_tracker': targetTracker,
+    if (params != null) 'params': params,
   };
 }
 
@@ -195,10 +207,15 @@ class Subtask {
   String id;
   String title;
   bool completed;
-  String? slug; // Link to a full Task file if promoted
-  bool isHeader; // If true, this is a group header
-  bool isCollapsed; // For session headers
-  String? session; // Group name
+  String? slug;     // Link para Task completa se promovida
+  bool isHeader;    // Se true, é um cabeçalho de grupo
+  bool isCollapsed; // Para cabeçalhos de sessão
+  String? session;  // Nome do grupo
+  /// Data de vencimento específica desta subtask (Tasks Plugin: `[due:: YYYY-MM-DD]`)
+  DateTime? dueDate;
+  /// Prioridade específica desta subtask (Tasks Plugin: `[priority:: high]`)
+  /// Valores: 'none', 'low', 'medium', 'high' — mesmo enum de TaskPriority.
+  String? priority;
 
   Subtask({
     String? id,
@@ -208,6 +225,8 @@ class Subtask {
     this.isHeader = false,
     this.isCollapsed = false,
     this.session,
+    this.dueDate,
+    this.priority,
   }) : id = id ?? const Uuid().v4();
 }
 

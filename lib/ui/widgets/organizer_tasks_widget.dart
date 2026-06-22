@@ -557,7 +557,7 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
     return switch (item.type) {
       'goal' => Icons.flag_rounded,
       'note' => Icons.sticky_note_2_rounded,
-      'journal_entry' => Icons.auto_stories_rounded,
+      'entry' => Icons.auto_stories_rounded,
       'resource' => Icons.book_rounded,
       'person' => Icons.person_rounded,
       _ => Icons.circle_rounded,

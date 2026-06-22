@@ -33,6 +33,9 @@ enum BlockType {
   calendar,
   systemQuickRun,
   energyMap,
+  // Bloco de Pacts: lista hábitos mode==pact ativos com checkbox de hoje
+  // e badge de dias restantes (endsAt - hoje)
+  pactToday,
 }
 
 class DashboardBlock {
@@ -83,12 +86,16 @@ class DashboardBlock {
 
   factory DashboardBlock.fromMap(Map<String, dynamic> map) {
     return DashboardBlock(
-      id: map['id'],
-      type: BlockType.values.firstWhere((e) => e.name == map['type']),
-      title: map['title'],
-      visible: map['visible'] ?? true,
-      order: map['order'] ?? 0,
-      metadata: map['metadata'] ?? {},
+      id: map['id'] as String? ?? 'block-${DateTime.now().millisecondsSinceEpoch}',
+      type: BlockType.values.firstWhere(
+        (e) => e.name == map['type'],
+        // Fallback seguro: tipos obsoletos/desconhecidos caem em customMarkdown
+        orElse: () => BlockType.customMarkdown,
+      ),
+      title: map['title'] as String? ?? '',
+      visible: map['visible'] as bool? ?? true,
+      order: map['order'] as int? ?? 0,
+      metadata: (map['metadata'] as Map?)?.cast<String, dynamic>() ?? {},
     );
   }
 }

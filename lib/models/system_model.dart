@@ -44,6 +44,8 @@ class SystemStep {
 class SystemDefinition extends ContentObject {
   String trigger;
   int estimatedMinutes;
+  // Derived fields — never persisted. Computed from linked Task history.
+  // See SystemsProvider._deriveSystemStats() for calculation logic.
   int runCount;
   DateTime? lastRun;
   int averageMinutes;
@@ -77,11 +79,6 @@ class SystemDefinition extends ContentObject {
     final map = toBaseMap();
     map['trigger'] = trigger;
     map['estimated_minutes'] = estimatedMinutes;
-    map['run_count'] = runCount;
-    if (lastRun != null) {
-      map['last_run'] = lastRun!.toIso8601String();
-    }
-    map['average_minutes'] = averageMinutes;
     map['steps'] = steps.map((s) => s.toMap()).toList();
     if (scheduler != null) {
       map['scheduler'] = scheduler!.toMap();

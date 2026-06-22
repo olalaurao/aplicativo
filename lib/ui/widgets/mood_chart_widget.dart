@@ -47,9 +47,11 @@ class MoodChartWidget extends ConsumerWidget {
                       title: '',
                       label: '',
                       emoji: '',
-                      numericValue: 3,
                       color: '',
                       order: 0,
+                      quadrant: MoodQuadrant.green,
+                      pleasantness: 3,
+                      energy: 3,
                     ),
                   );
                   return FlSpot(e.key.toDouble(), mood.numericValue.toDouble());

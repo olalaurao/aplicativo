@@ -72,18 +72,20 @@ class SyncManager {
 
   void _setupVaultWatcher() {
     final obsidian = _ref.read(obsidianServiceProvider);
-    final watchStream = obsidian.watchVault();
+    final watchStream = obsidian.watchVaultDebounced();
     if (watchStream != null) {
-      watchStream.listen((event) {
-        if (event.path.endsWith('.md')) {
-          _ref.invalidate(allObjectsProvider);
-          if (event.path.contains('daily')) {
-            final dateMatch = RegExp(
-              r'(\d{4}-\d{2}-\d{2})',
-            ).firstMatch(event.path);
-            if (dateMatch != null) {
-              final dateStr = dateMatch.group(1)!;
-              _ref.invalidate(dailyNoteDataProvider(dateStr));
+      watchStream.listen((events) {
+        for (final event in events) {
+          if (event.path.endsWith('.md')) {
+            _ref.invalidate(allObjectsProvider);
+            if (event.path.contains('daily')) {
+              final dateMatch = RegExp(
+                r'(\d{4}-\d{2}-\d{2})',
+              ).firstMatch(event.path);
+              if (dateMatch != null) {
+                final dateStr = dateMatch.group(1)!;
+                _ref.invalidate(dailyNoteDataProvider(dateStr));
+              }
             }
           }
         }

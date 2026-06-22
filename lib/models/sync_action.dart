@@ -5,7 +5,7 @@ enum SyncOperation { create, update, delete }
 
 class SyncAction {
   final int? id;
-  final String objectType; // e.g., 'task', 'journal_entry'
+  final String objectType; // e.g., 'task', 'entry'
   final String objectId;
   final SyncOperation operation;
   final Map<String, dynamic> payload; // The JSON serialization of the object

@@ -13,19 +13,21 @@ import '../widgets/metadata_strip.dart';
 import '../widgets/organizer_picker_modal.dart';
 import 'package:go_router/go_router.dart';
 
-enum NoteType { text, outline, collection, routine }
+enum NoteType { text, outline, collection }
 
 class CreateNoteForm extends ConsumerStatefulWidget {
   final String? initialTitle;
   final Note? existingNote;
   final List<String>? initialTags;
   final String? initialFolder;
+  final NoteType? initialType;
   const CreateNoteForm({
     super.key,
     this.initialTitle,
     this.existingNote,
     this.initialTags,
     this.initialFolder,
+    this.initialType,
   });
 
   @override
@@ -74,9 +76,10 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
         case NoteSubtype.collection:
           _noteType = NoteType.collection;
           break;
-        case NoteSubtype.routine:
-          _noteType = NoteType.routine;
-          break;
+      }
+    } else {
+      if (widget.initialType != null) {
+        _noteType = widget.initialType!;
       }
     }
   }
@@ -187,11 +190,6 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
                             'Collection',
                             Icons.grid_view_rounded,
                           ),
-                          _typeSelector(
-                            NoteType.routine,
-                            'Rotina',
-                            Icons.repeat_rounded,
-                          ),
                         ],
                       ),
                     ),
@@ -247,7 +245,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
                           onTap: () =>
                               setState(() => _isChecklist = !_isChecklist),
                         ),
-                        if (_noteType == NoteType.routine)
+                        if (_noteType == NoteType.text)
                           MetadataChip(
                             icon: _showInPlanner
                                 ? Icons.event_available_rounded
@@ -355,8 +353,6 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
         return 'Use bullets for your outline...';
       case NoteType.collection:
         return 'Add items to your collection...';
-      case NoteType.routine:
-        return 'Descreva os passos da rotina...';
     }
   }
 
@@ -379,7 +375,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
       tags: _tags,
       pinned: _pinned,
       isChecklist: _isChecklist,
-      showInPlanner: _noteType == NoteType.routine && _showInPlanner,
+      showInPlanner: _noteType == NoteType.text && _showInPlanner,
       schedulerSlug: widget.existingNote?.schedulerSlug,
     );
 
@@ -408,8 +404,6 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
         return NoteSubtype.outline;
       case NoteType.collection:
         return NoteSubtype.collection;
-      case NoteType.routine:
-        return NoteSubtype.routine;
     }
   }
 

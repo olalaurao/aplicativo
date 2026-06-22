@@ -8,6 +8,8 @@ enum GoalType { oneTime, repeating }
 
 enum GoalStatus { active, completed, cancelled, onHold }
 
+enum GoalMode { standard, plan }
+
 class Goal extends ContentObject {
   String? description;
   GoalType goalType;
@@ -25,6 +27,11 @@ class Goal extends ContentObject {
   String? linkedGoogleEventDate;
   String? linkedGoogleEventUrl;
   List<String> socialRefs;
+
+  GoalMode goalMode; // default: GoalMode.standard (Regra 5)
+  String? objective; // plan mode only
+  String? strategy; // plan mode only
+  List<String> phases; // plan mode only, default []
 
   Goal({
     super.id,
@@ -45,13 +52,18 @@ class Goal extends ContentObject {
     this.linkedGoogleEventDate,
     this.linkedGoogleEventUrl,
     List<String>? socialRefs,
+    this.goalMode = GoalMode.standard,
+    this.objective,
+    this.strategy,
+    List<String>? phases,
     super.organizers,
     super.categories,
     super.createdAt,
     super.updatedAt,
     super.obsidianPath,
-  }) : socialRefs = socialRefs ?? [],
-       super();
+  })  : socialRefs = socialRefs ?? [],
+        phases = phases ?? [],
+        super();
 
   @override
   String get type => 'goal';
@@ -85,6 +97,13 @@ class Goal extends ContentObject {
     }
     if (socialRefs.isNotEmpty) {
       frontmatter['social_refs'] = socialRefs;
+    }
+
+    frontmatter['goal_mode'] = goalMode.name;
+    if (goalMode == GoalMode.plan) {
+      if (objective != null) frontmatter['objective'] = objective;
+      if (strategy != null) frontmatter['strategy'] = strategy;
+      if (phases.isNotEmpty) frontmatter['phases'] = phases;
     }
 
     return generateMarkdown(frontmatter, description ?? '');
@@ -136,6 +155,15 @@ class Goal extends ContentObject {
           .toList();
     }
 
+    final rawMode = frontmatter['goal_mode']?.toString() ?? 'standard';
+    goal.goalMode = GoalMode.values.firstWhere(
+      (m) => m.name == rawMode,
+      orElse: () => GoalMode.standard,
+    );
+    goal.objective = frontmatter['objective'] as String?;
+    goal.strategy = frontmatter['strategy'] as String?;
+    goal.phases = List<String>.from(frontmatter['phases'] as List? ?? []);
+
     return goal;
   }
 
@@ -157,6 +185,10 @@ class Goal extends ContentObject {
     String? linkedGoogleEventDate,
     String? linkedGoogleEventUrl,
     List<String>? socialRefs,
+    GoalMode? goalMode,
+    String? objective,
+    String? strategy,
+    List<String>? phases,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     DateTime? createdAt,
@@ -164,32 +196,36 @@ class Goal extends ContentObject {
     String? obsidianPath,
   }) {
     return Goal(
-        id: id,
-        title: title ?? this.title,
-        description: description ?? this.description,
-        goalType: goalType ?? this.goalType,
-        state: state ?? this.state,
-        repeatInterval: repeatInterval ?? this.repeatInterval,
-        startDate: startDate ?? this.startDate,
-        deadline: deadline ?? this.deadline,
-        kpis: kpis ?? this.kpis,
-        subtasks: subtasks ?? this.subtasks,
-        schedulers: schedulers ?? this.schedulers,
-        color: color ?? this.color,
-        icon: icon ?? this.icon,
-        linkedGoogleEventId: linkedGoogleEventId ?? this.linkedGoogleEventId,
-        linkedGoogleEventTitle:
-            linkedGoogleEventTitle ?? this.linkedGoogleEventTitle,
-        linkedGoogleEventDate:
-            linkedGoogleEventDate ?? this.linkedGoogleEventDate,
-        linkedGoogleEventUrl: linkedGoogleEventUrl ?? this.linkedGoogleEventUrl,
-        socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
-        organizers: organizers ?? this.organizers,
-        categories: categories ?? this.categories,
-        createdAt: createdAt ?? this.createdAt,
-        updatedAt: updatedAt ?? DateTime.now(),
-        obsidianPath: obsidianPath ?? this.obsidianPath,
-      )
+      id: id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      goalType: goalType ?? this.goalType,
+      state: state ?? this.state,
+      repeatInterval: repeatInterval ?? this.repeatInterval,
+      startDate: startDate ?? this.startDate,
+      deadline: deadline ?? this.deadline,
+      kpis: kpis ?? this.kpis,
+      subtasks: subtasks ?? this.subtasks,
+      schedulers: schedulers ?? this.schedulers,
+      color: color ?? this.color,
+      icon: icon ?? this.icon,
+      linkedGoogleEventId: linkedGoogleEventId ?? this.linkedGoogleEventId,
+      linkedGoogleEventTitle:
+          linkedGoogleEventTitle ?? this.linkedGoogleEventTitle,
+      linkedGoogleEventDate:
+          linkedGoogleEventDate ?? this.linkedGoogleEventDate,
+      linkedGoogleEventUrl: linkedGoogleEventUrl ?? this.linkedGoogleEventUrl,
+      socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
+      goalMode: goalMode ?? this.goalMode,
+      objective: objective ?? this.objective,
+      strategy: strategy ?? this.strategy,
+      phases: phases ?? this.phases,
+      organizers: organizers ?? this.organizers,
+      categories: categories ?? this.categories,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? DateTime.now(),
+      obsidianPath: obsidianPath ?? this.obsidianPath,
+    )
       ..archived = archived
       ..pinned = pinned
       ..tags = List<String>.from(tags)

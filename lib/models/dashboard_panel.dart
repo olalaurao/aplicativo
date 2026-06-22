@@ -1,5 +1,14 @@
 // lib/models/dashboard_panel.dart
+//
+// DEPRECATED — este arquivo definia um segundo enum `PanelType` com apenas
+// 7 valores e uma classe `DashboardPanel` paralela e incompatível com
+// `DashboardBlock` (30+ tipos, a implementação real usada em todo o app).
+// Mantido apenas para referência histórica; não usar em código novo.
+// Use `DashboardBlock` e `BlockType` de `dashboard_block.dart`.
+//
+// ignore_for_file: unused_field, dead_code
 
+@Deprecated('Use DashboardBlock e BlockType de dashboard_block.dart')
 enum PanelType {
   pinnedItems,
   statistics,
@@ -10,8 +19,10 @@ enum PanelType {
   upcomingEvents,
 }
 
+@Deprecated('Use DashboardBlock de dashboard_block.dart')
 class DashboardPanel {
   final String id;
+  @Deprecated('Use BlockType')
   final PanelType type;
   final String title;
   final int x;
@@ -44,3 +55,4 @@ class DashboardPanel {
     };
   }
 }
+

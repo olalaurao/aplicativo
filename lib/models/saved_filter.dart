@@ -64,7 +64,7 @@ class MatrixConfig {
 class SavedFilter {
   final String id;
   final String name;
-  final String targetType; // 'note'|'resource'|'habit'|'task'|'goal'|'person'|'journal_entry'|'tracker'|'*'
+  final String targetType; // 'note'|'resource'|'habit'|'task'|'goal'|'person'|'entry'|'tracker'|'*'
   final List<FilterRule> rules;
   final SortField sortBy;
   final bool sortAscending;

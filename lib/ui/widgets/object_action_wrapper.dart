@@ -549,6 +549,14 @@ String _typeLabel(ContentObject object) {
         return 'Pessoa';
       case OrganizerType.place:
         return 'Lugar';
+      case OrganizerType.task:
+        return 'Tarefa';
+      case OrganizerType.goal:
+        return 'Objetivo';
+      case OrganizerType.habit:
+        return 'Hábito';
+      case OrganizerType.tracker:
+        return 'Rastreador';
     }
   }
   if (object is Reminder) return 'Lembrete';

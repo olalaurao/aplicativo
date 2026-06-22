@@ -429,8 +429,9 @@ class _OutlineEditorState extends State<OutlineEditor> {
       return;
     }
 
+    if (!mounted) return;
     final hlSelected = await showModalBottomSheet<HighlightItem>(
-      context: context,
+      context: context, // ignore: use_build_context_synchronously
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => DraggableScrollableSheet(

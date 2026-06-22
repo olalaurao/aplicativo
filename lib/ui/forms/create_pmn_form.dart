@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import '../../models/journal_entry.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
-import 'package:uuid/uuid.dart';
 import 'package:go_router/go_router.dart';
 
 class CreatePmnForm extends ConsumerStatefulWidget {
@@ -67,7 +66,7 @@ class _CreatePmnFormState extends ConsumerState<CreatePmnForm> {
       dateRangeEnd: _endDate,
       referencedDates: [_startDate, _endDate],
     ) ?? JournalEntry(
-      id: const Uuid().v4(),
+      id: 'pmn-$weekStr',
       title: 'PMN $weekStr',
       body: '',
       date: DateTime.now(),

@@ -525,7 +525,11 @@ class MarkdownParser {
         final entryBodyLines = <String>[];
         for (int i = 1; i < lines.length; i++) {
           final line = lines[i];
-          if (line.startsWith('mood::') || line.startsWith('organizers::')) {
+          if (line.startsWith('mood::') ||
+              line.startsWith('organizers::') ||
+              line.startsWith('entry_type::') ||
+              line.startsWith('category::') ||
+              line.startsWith('energy_value::')) {
             continue;
           }
           if (line.trim() == '---') continue;
@@ -554,6 +558,27 @@ class MarkdownParser {
           );
         }
 
+        // Parse entry_type, category, energy_value inline Dataview fields
+        final entryTypeMatch = RegExp(
+          r'^entry_type::\s*(.*)$',
+          multiLine: true,
+        ).firstMatch(section);
+        final entryTypeStr = entryTypeMatch?.group(1)?.trim();
+
+        final categoryMatch = RegExp(
+          r'^category::\s*(.*)$',
+          multiLine: true,
+        ).firstMatch(section);
+        final categoryStr = categoryMatch?.group(1)?.trim();
+
+        final energyMatch = RegExp(
+          r'^energy_value::\s*(\d+)',
+          multiLine: true,
+        ).firstMatch(section);
+        final energyValue = energyMatch != null
+            ? int.tryParse(energyMatch.group(1)!)
+            : null;
+
         final hashtags = extractTags(entryBody);
 
         final entryDate = parsedDay == null
@@ -574,28 +599,34 @@ class MarkdownParser {
           'organizers': orgsList,
           'hashtags': hashtags,
           'date': entryDate,
+          if (entryTypeStr != null) 'entry_type': entryTypeStr,
+          if (categoryStr != null) 'category': categoryStr,
+          if (energyValue != null) 'energy_value': energyValue,
         });
       }
     }
     return entries;
   }
 
+
   static Map<String, dynamic> parseHabitCompletions(
     Map<String, dynamic> frontmatter,
   ) {
-    // Check for explicit 'habits' map first (modern Citrine format)
+    // Legacy support: check for explicit nested 'habits' map first
     if (frontmatter['habits'] is Map) {
       return Map<String, dynamic>.from(frontmatter['habits']);
     }
 
-    // Fallback: collect top-level keys that look like habits (boolean or numeric values)
-    // excluding known system keys
+    // Modern flat format: collect top-level keys that look like habits
+    // (boolean or numeric values) excluding known system keys
     final habits = <String, dynamic>{};
-    final systemKeys = {
+    // All known daily-note metadata keys that are NOT habit slugs
+    const systemKeys = {
       'date',
       'tags',
       'type',
       'id',
+      'slug',
       'title',
       'trackers',
       'habit_completions',
@@ -603,6 +634,27 @@ class MarkdownParser {
       'status',
       'priority',
       'archived',
+      'day_theme',
+      'created_at',
+      'updated_at',
+      'organizers',
+      'categories',
+      'reminders',
+      'week',
+      'date_range_start',
+      'date_range_end',
+      'referenced_dates',
+      'pact_refs',
+      'entry_type',
+      'category',
+      'energy_value',
+      'mood_pleasantness',
+      'mood_energy',
+      'mood_label',
+      'mood_emoji',
+      'habits',
+      'body',
+      '__needs_rewrite__',
     };
 
     frontmatter.forEach((key, value) {
@@ -626,6 +678,25 @@ class MarkdownParser {
     return {};
   }
 
+  static Map<String, List<String>> parsePmnSections(String body) {
+    final result = {'plus': <String>[], 'minus': <String>[], 'next': <String>[]};
+    final sectionRegex = RegExp(r'^##\s*(Plus|Minus|Next)\s*$', multiLine: true, caseSensitive: false);
+    final matches = sectionRegex.allMatches(body).toList();
+    for (var i = 0; i < matches.length; i++) {
+      final key = matches[i].group(1)!.toLowerCase();
+      final start = matches[i].end;
+      final end = i + 1 < matches.length ? matches[i + 1].start : body.length;
+      final sectionText = body.substring(start, end);
+      final bullets = RegExp(r'^-\s*(.+)$', multiLine: true)
+          .allMatches(sectionText)
+          .map((m) => m.group(1)!.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      result[key] = bullets;
+    }
+    return result;
+  }
+
   static List<Map<String, dynamic>> parsePomodoros(String body) {
     final pomodoros = <Map<String, dynamic>>[];
     final sections = body.split(RegExp(r'^## Pomodoros', multiLine: true));
@@ -643,15 +714,25 @@ class MarkdownParser {
       if (match != null) {
         final time = match.group(1)!;
         final title = match.group(2)!;
-        final pom = {'time': time, 'title': title};
+        final Map<String, dynamic> pom = {'time': time, 'title': title};
 
         for (final line in lines.sublist(1)) {
-          if (line.contains('Duration:')) {
-            pom['duration'] =
-                RegExp(r'Duration:\s*(\d+)').firstMatch(line)?.group(1) ?? '';
-          } else if (line.contains('Blocks:')) {
-            pom['blocks'] =
-                RegExp(r'Blocks:\s*(\d+)').firstMatch(line)?.group(1) ?? '';
+          final trimmed = line.trim();
+          if (trimmed.contains('Duration:')) {
+            pom['worked'] = RegExp(r'Duration:\s*(\d+)').firstMatch(trimmed)?.group(1) ?? '';
+          } else if (trimmed.contains('Blocks:')) {
+            pom['blocks'] = RegExp(r'Blocks:\s*(\d+)').firstMatch(trimmed)?.group(1) ?? '';
+          } else if (trimmed.contains('- Linked:')) {
+            final linkMatch = RegExp(r'\[\[(.*?)\]\]').firstMatch(trimmed);
+            if (linkMatch != null) {
+              pom['linked_item'] = linkMatch.group(1);
+            }
+          } else if (trimmed.contains('- Blocos:')) {
+            pom['blocks'] = RegExp(r'Blocos:\s*(\d+)').firstMatch(trimmed)?.group(1) ?? '';
+          } else if (trimmed.contains('- Tempo trabalhado:') || trimmed.contains('- Tempo:')) {
+            pom['worked'] = RegExp(r'(?:trabalhado|Tempo):\s*(\d+)').firstMatch(trimmed)?.group(1) ?? '';
+          } else if (trimmed.contains('- Tempo de pausa:') || trimmed.contains('- Pausas:')) {
+            pom['break'] = RegExp(r'(?:pausa|Pausas):\s*(\d+)').firstMatch(trimmed)?.group(1) ?? '';
           }
         }
         pomodoros.add(pom);
@@ -721,6 +802,15 @@ class MarkdownParser {
               .join(', ');
           buffer.writeln('organizers:: $orgs');
         }
+        if (entry['entry_type'] != null) {
+          buffer.writeln('entry_type:: ${entry['entry_type']}');
+        }
+        if (entry['category'] != null) {
+          buffer.writeln('category:: ${entry['category']}');
+        }
+        if (entry['energy_value'] != null) {
+          buffer.writeln('energy_value:: ${entry['energy_value']}');
+        }
         buffer.writeln();
         buffer.writeln('---');
         buffer.writeln();
@@ -780,12 +870,16 @@ class MarkdownParser {
         final time = pom['time'] ?? '00:00';
         final title = pom['title'] ?? 'Session';
         buffer.writeln('### $time — $title');
-        buffer.writeln('- Duration: ${pom['duration']} min');
-        if (pom['linked'] != null) {
-          buffer.writeln('- Linked: [[${pom['linked']}]]');
+        final linked = pom['linked_item'] ?? pom['linked'];
+        if (linked != null) {
+          buffer.writeln('- Linked: [[$linked]]');
         }
-        if (pom['blocks'] != null) buffer.writeln('- Blocks: ${pom['blocks']}');
-        if (pom['type'] != null) buffer.writeln('- Type: ${pom['type']}');
+        final blocks = pom['blocks'] ?? '0';
+        final worked = pom['worked'] ?? pom['duration'] ?? '0';
+        final breakTime = pom['break'] ?? '0';
+        buffer.writeln('- Blocos: $blocks');
+        buffer.writeln('- Tempo trabalhado: $worked min');
+        buffer.writeln('- Tempo de pausa: $breakTime min');
         buffer.writeln();
       }
     }

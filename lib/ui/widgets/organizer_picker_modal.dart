@@ -74,6 +74,14 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
           return 'Pessoa';
         case OrganizerType.place:
           return 'Lugar';
+        case OrganizerType.task:
+          return 'Tarefa';
+        case OrganizerType.goal:
+          return 'Objetivo';
+        case OrganizerType.habit:
+          return 'Hábito';
+        case OrganizerType.tracker:
+          return 'Rastreador';
       }
     }
     switch (obj.type) {

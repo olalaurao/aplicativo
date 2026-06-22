@@ -161,7 +161,7 @@ class _ReminderList extends ConsumerWidget {
                       color: AppColors.textMuted,
                     ),
                   ),
-                if (reminder.timeBlockId != null)
+                if (reminder.timeBlock != null)
                   const Padding(
                     padding: EdgeInsets.only(left: 8),
                     child: Icon(

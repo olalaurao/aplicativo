@@ -12,7 +12,12 @@ import '../forms/create_task_form.dart';
 
 class SystemDetailScreen extends ConsumerStatefulWidget {
   final SystemDefinition system;
-  const SystemDetailScreen({super.key, required this.system});
+  final bool autoStart;
+  const SystemDetailScreen({
+    super.key,
+    required this.system,
+    this.autoStart = false,
+  });
 
   @override
   ConsumerState<SystemDetailScreen> createState() => _SystemDetailScreenState();
@@ -36,6 +41,10 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
   void initState() {
     super.initState();
     _stepsDone = List.filled(widget.system.steps.length, false);
+    if (widget.autoStart) {
+      _isRunning = true;
+      _runStart = DateTime.now();
+    }
   }
 
   void _startRun() {

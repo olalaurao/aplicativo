@@ -21,7 +21,7 @@ class SkeletonList extends StatelessWidget {
   Widget build(BuildContext context) => ListView.separated(
     padding: padding,
     itemCount: itemCount,
-    separatorBuilder: (_, __) => const SizedBox(height: 10),
+    separatorBuilder: (context, sep) => const SizedBox(height: 10),
     itemBuilder: (ctx, i) => _SkeletonCard(height: itemHeight),
   );
 }
@@ -80,7 +80,7 @@ class _SkeletonCardState extends State<_SkeletonCard>
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: _anim,
-    builder: (_, __) => Container(
+    builder: (context, b) => Container(
       height: widget.height,
       width: widget.width,
       decoration: AppTheme.cardDecoration(context),

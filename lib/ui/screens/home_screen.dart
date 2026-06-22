@@ -60,7 +60,6 @@ import '../widgets/organizer_tasks_widget.dart';
 import '../widgets/dashboard/shopping_list_block.dart';
 import '../widgets/universal_search_picker.dart';
 import '../widgets/energy_map.dart';
-import '../../providers/day_theme_provider.dart';
 import '../../models/day_theme_model.dart';
 import '../../models/system_model.dart';
 import '../../providers/systems_provider.dart';
@@ -857,6 +856,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         return _buildSystemQuickRunBlock();
       case BlockType.energyMap:
         return const EnergyMap(compact: true);
+      case BlockType.pactToday:
+        return _buildPactTodayBlock();
     }
   }
 
@@ -1018,7 +1019,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     final totalFocusMinutes = timerState.history.fold<int>(
       0,
-      (sum, s) => sum + s.duration.inMinutes,
+      (sum, s) => sum + s.minutesWorked,
     );
     final focusHours = (totalFocusMinutes / 60).toStringAsFixed(1);
 
@@ -1572,6 +1573,131 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(children: habits.map((h) => _buildHabitIcon(h)).toList()),
+      ),
+    );
+  }
+
+  Widget _buildPactTodayBlock() {
+    final today = DateTime.now();
+    final pacts = ref
+        .watch(habitsProvider)
+        .where(
+          (habit) =>
+              habit.status == HabitStatus.active &&
+              habit.habitMode == HabitMode.pact,
+        )
+        .toList();
+
+    if (pacts.isEmpty) {
+      return _buildCard(
+        title: 'Pactos de hoje',
+        icon: Icons.handshake_rounded,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            'Nenhum pacto ativo para hoje',
+            style: TextStyle(color: AppTheme.textMutedColor(context), fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    return _buildCard(
+      title: 'Pactos de hoje',
+      icon: Icons.handshake_rounded,
+      onAdd: () => showCreateMenu(context),
+      child: Column(
+        children: pacts.map((habit) {
+          final color = _parseHexColor(habit.color, fallback: AppColors.accent);
+          final todayRecord = habit.completionHistory.where((r) {
+            return r.date.year == today.year &&
+                r.date.month == today.month &&
+                r.date.day == today.day;
+          });
+          final completedToday = todayRecord.isNotEmpty
+              ? todayRecord.first.completions
+              : 0;
+          final isCompleted = completedToday >= habit.dailyGoal;
+
+          int remainingDays = 0;
+          int dayCount = 0;
+          if (habit.startedAt != null) {
+            final todayDate = DateTime(today.year, today.month, today.day);
+            final startedAtDate = DateTime(habit.startedAt!.year, habit.startedAt!.month, habit.startedAt!.day);
+            dayCount = todayDate.difference(startedAtDate).inDays + 1;
+            if (habit.endsAt != null) {
+              final endsAtDate = DateTime(habit.endsAt!.year, habit.endsAt!.month, habit.endsAt!.day);
+              remainingDays = endsAtDate.difference(todayDate).inDays;
+            }
+          }
+
+          return InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => UniversalDetailView(object: habit)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: isCompleted,
+                    activeColor: color,
+                    onChanged: (val) {
+                      HapticFeedback.lightImpact();
+                      ref.read(habitsProvider.notifier).toggleHabit(habit, today);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          habit.displayTitle,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isCompleted ? AppTheme.textMutedColor(context) : AppTheme.textPrimaryColor(context),
+                            decoration: isCompleted ? TextDecoration.lineThrough : null,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (dayCount > 0) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Dia $dayCount${habit.endsAt != null ? \' · $remainingDays dias restantes\' : \'\'}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textMutedColor(context),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (habit.endsAt != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        remainingDays >= 0 ? '$remainingDays d' : 'Expirado',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -3411,7 +3537,7 @@ extension on _HomeScreenState {
     'goal': 'Goals',
     'habit': 'Habits',
     'note': 'Notes',
-    'journal_entry': 'Journal',
+    'entry': 'Journal',
     'resource': 'Resources',
     'person': 'People',
   };
@@ -3653,20 +3779,20 @@ extension on _HomeScreenState {
     final today = DateTime(now.year, now.month, now.day);
     final weekStart = today.subtract(Duration(days: now.weekday - 1));
     final workSessions = timerState.history
-        .where((session) => session.pomodoroType == PomodoroType.work)
+        .where((session) => session.minutesWorked > 0)
         .toList();
     final todayMinutes = workSessions
-        .where((session) => !session.startTime.isBefore(today))
-        .fold<int>(0, (sum, session) => sum + session.duration.inMinutes);
+        .where((session) => !session.date.isBefore(today))
+        .fold<int>(0, (sum, session) => sum + session.minutesWorked);
     final weekMinutes = workSessions
-        .where((session) => !session.startTime.isBefore(weekStart))
-        .fold<int>(0, (sum, session) => sum + session.duration.inMinutes);
+        .where((session) => !session.date.isBefore(weekStart))
+        .fold<int>(0, (sum, session) => sum + session.minutesWorked);
     final weekDays = List.generate(7, (i) => weekStart.add(Duration(days: i)));
     final maxMinutes = weekDays
         .map(
           (day) => workSessions
-              .where((session) => _isSameDay(session.startTime, day))
-              .fold<int>(0, (sum, session) => sum + session.duration.inMinutes),
+              .where((session) => _isSameDay(session.date, day))
+              .fold<int>(0, (sum, session) => sum + session.minutesWorked),
         )
         .fold<int>(0, (max, value) => value > max ? value : max);
 
@@ -3693,10 +3819,10 @@ extension on _HomeScreenState {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: weekDays.map((day) {
               final minutes = workSessions
-                  .where((session) => _isSameDay(session.startTime, day))
+                  .where((session) => _isSameDay(session.date, day))
                   .fold<int>(
                     0,
-                    (sum, session) => sum + session.duration.inMinutes,
+                    (sum, session) => sum + session.minutesWorked,
                   );
               final height = maxMinutes == 0
                   ? 6.0
@@ -4095,7 +4221,7 @@ extension on _HomeScreenState {
     'pomodoro': 'Pomodoros agendados',
     'goal': 'Goals',
     'note': 'Notas',
-    'journal_entry': 'Journal',
+    'entry': 'Journal',
     'resource': 'Recursos',
     'person': 'Pessoas',
   };
@@ -4608,13 +4734,13 @@ extension on _HomeScreenState {
         DateFormat('E').format(startOfWeek.add(Duration(days: i))): 0,
     };
     for (final session in history.where(
-      (s) => !s.startTime.isBefore(startOfWeek),
+      (s) => !s.date.isBefore(startOfWeek),
     )) {
-      taskMinutes[session.taskTitle] =
-          (taskMinutes[session.taskTitle] ?? 0) + session.duration.inMinutes;
-      final dayKey = DateFormat('E').format(session.startTime);
+      taskMinutes[session.title] =
+          (taskMinutes[session.title] ?? 0) + session.minutesWorked;
+      final dayKey = DateFormat('E').format(session.date);
       dayMinutes[dayKey] =
-          (dayMinutes[dayKey] ?? 0) + session.duration.inMinutes;
+          (dayMinutes[dayKey] ?? 0) + session.minutesWorked;
     }
 
     final sortedTasks = taskMinutes.entries.toList()
@@ -4777,7 +4903,7 @@ extension on _HomeScreenState {
     final tasks = refs.whereType<Task>().toList();
     final entries = refs.whereType<JournalEntry>().toList();
     final pomodoros = ref.watch(pomodoroProvider).history.where((session) {
-      final title = session.taskTitle.toLowerCase();
+      final title = session.title.toLowerCase();
       return title.contains(organizer.title.toLowerCase()) ||
           title.contains(organizer.slug.toLowerCase());
     }).toList();

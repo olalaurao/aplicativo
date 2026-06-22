@@ -22,11 +22,13 @@ class CreateTaskForm extends ConsumerStatefulWidget {
   final String? initialTitle;
   final Task? existingTask;
   final String? initialTimeBlock;
+  final TaskStage? initialStage;
   const CreateTaskForm({
     super.key,
     this.initialTitle,
     this.existingTask,
     this.initialTimeBlock,
+    this.initialStage,
   });
 
   @override
@@ -105,6 +107,9 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       _estimatedMinutes = task.estimatedMinutes;
     } else {
       _timeBlock = widget.initialTimeBlock;
+      if (widget.initialStage != null) {
+        _stage = widget.initialStage!;
+      }
     }
   }
 
@@ -1750,6 +1755,8 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     switch (stage) {
       case TaskStage.idea:
         return 'Idea';
+      case TaskStage.backlog:
+        return 'Backlog';
       case TaskStage.todo:
         return 'To-do';
       case TaskStage.inProgress:

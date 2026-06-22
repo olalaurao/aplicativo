@@ -1,5 +1,1668 @@
 ================================================================================
-CITRINE — IMPLEMENTATION SPEC v2 (AI-OPTIMIZED)
+GAP ANALYSIS — ADENDO V2 (Phases 12–16 consolidadas)
+Audiência: agente de IA com acesso total ao repositório.
+Origem: auditoria linha a linha do código real (lib/models/*.dart — 35
+        arquivos, 100% lidos — mais leitura completa de
+        obsidian_service.dart, vault_provider.dart, markdown_parser.dart,
+        dataview_generator.dart, system_model.dart, scheduler.dart, e 6
+        arquivos de UI: triple_check_sheet.dart, steering_sheet.dart,
+        create_menu_sheet.dart, command_center_overlay.dart, habit_row.dart,
+        type_signatures_screen.dart) comparada item a item com
+        guidelines.md (App Guidelines V4) e com o GAP ANALYSIS original
+        (Phases 1–11).
+Convenção: igual ao documento original — cada tarefa é FILE + ACTION +
+        ANCHOR + INSTRUCTION, autocontida (as correções entre tarefas já
+        foram fundidas no texto; não é necessário voltar a nenhuma Phase
+        12–16 separada, este documento já as substitui).
+
+────────────────────────────────────────────────────────────────────────────────
+⚠ COMO ESTE DOCUMENTO SE RELACIONA COM O GAP ANALYSIS ORIGINAL (Phases 1–11)
+────────────────────────────────────────────────────────────────────────────────
+O GAP ANALYSIS original (Phases 1–11) foi escrito sem ler o código-fonte
+real — foi derivado por inferência a partir da guidelines.md e de uma
+inspeção parcial. Esta auditoria (Phases 12–16, consolidadas aqui) LEU o
+código real, arquivo por arquivo, e encontrou:
+
+  (a) Vários itens das Phases 1–11 CONFIRMADOS como corretos e necessários
+      (ex.: Phase 9 Tasks 9.A.6–9.A.9, 9.B.1, 9.C.10; Phase 11 Tasks
+      11.1–11.4) — implementá-los como estão escritos.
+
+  (b) Pelo menos 2 itens das Phases 1–11 com a LOCALIZAÇÃO/CLASSE ERRADA
+      (apontavam para um arquivo ou nome de símbolo que não existe no
+      código real). Esses foram corrigidos aqui (ver TIER 1 e TIER 2 —
+      procurar "SUBSTITUI A PHASE 9").
+
+  (c) Achados TOTALMENTE NOVOS, nunca mencionados nas Phases 1–11, vários
+      deles P0 (bloqueiam compilação ou inutilizam features inteiras em
+      runtime mesmo que pareçam "prontas" na UI).
+
+  ESTE ADENDO (Phases 12–16) TEM PRIORIDADE DE IMPLEMENTAÇÃO MAIOR QUE O
+  GAP ANALYSIS ORIGINAL. Motivo: as Phases 1–11 originais assumem, em
+  vários pontos, uma base de código que SIMPLESMENTE NÃO EXISTE como
+  escrito (ex.: assumem que `Habit` já tem campos de Pact; assumem que
+  `Task` já tem `TripleCheck`; assumem uma classe `SchedulerRuleType` que
+  não existe). Se alguém tentar implementar a Phase 9, por exemplo, ANTES
+  de aplicar o TIER 0 deste documento, vai encontrar erros de compilação
+  ou comportamento inconsistente que não fazem sentido sem este contexto.
+
+  ORDEM RECOMENDADA DE EXECUÇÃO GERAL:
+    1. Este documento (Adendo V2) — TIER 0, depois TIER 1.
+    2. GAP ANALYSIS original, Phases 1–11 (na ordem em que já estão).
+    3. Este documento (Adendo V2) — TIER 2 e TIER 3.
+  (Itens do TIER 1 deste adendo tocam arquivos centrais — vault_provider.dart,
+  obsidian_service.dart, habit_model.dart, task_model.dart — que a Phase 9
+  original também edita. Aplicar o TIER 0/1 primeiro evita retrabalho.)
+
+================================================================================
+LISTA DE PRIORIDADE DE IMPLEMENTAÇÃO (visão geral)
+================================================================================
+
+TIER 0 — BLOQUEADORES DE COMPILAÇÃO (fazer primeiro, sem exceção):
+  0.1  Habit: adicionar todo o subsistema Pact (campos ausentes que a UI
+       já usa em produção — steering_sheet.dart E habit_row.dart)
+  0.2  Task: adicionar classe TripleCheck (campo ausente que
+       triple_check_sheet.dart já usa em produção)
+  0.3  DECISÃO DE PRODUTO necessária antes de seguir: o que fazer com
+       Idea/Inbox/Event/ShoppingList (tipos fora da spec V4)
+
+TIER 1 — INTEGRIDADE DE DADOS DO VAULT (núcleo de parsing/storage):
+  1.1  Estrutura de pastas: `app/` flat como default, não pasta-por-tipo
+       (3 arquivos precisam mudar juntos: obsidian_service.dart,
+       vault_provider.dart, dataview_generator.dart)
+  1.2  PMN (`daily/YYYY-MM-WNN.md`) é invisível ao app — corrigir regex
+  1.3  Field Note/PMN: entry_type nunca é lido pelo parser principal
+  1.4  `type: system` e `type: calendar_session` ausentes do dispatcher
+       central — viram Note genérica com organizador placeholder bugado
+  1.5  Habit completions gravadas aninhadas (`habits:`) em vez de chaves
+       planas na raiz do frontmatter — quebra todo Dataview de exemplo
+  1.6  Daily note template não gera o formato canônico (tags, mood_*,
+       esqueleto de seções)
+  1.7  IDs são UUID aleatório; WikiLinks devem usar slug estável
+  1.8  OrganizerReference.toWikiLink() grava "[[tipo/slug]]" em vez de
+       "[[slug]]" — quebra backlinks nativos do Obsidian em todo o vault
+
+TIER 2 — FEATURES INCOMPLETAS (P1):
+  2.1  PomodoroSession não persiste em lugar nenhum
+  2.2  KPI: taxonomia incompatível, falta auto-complete e botão "+N"
+  2.3  Dashboard: falta painel pact_today; dashboard_panel.dart morto
+  2.4  Combined Analysis: faltam campos de normalização/dimensão; falta
+       bloco do plugin Obsidian Charts (o bloco Tracker já existe)
+  2.5  Conflict Detection (Object Identification) não existe em lugar
+       nenhum do app
+  2.6  Command Center: faltam seções Systems/Próximas Sessões; busca não
+       agrupa por tipo
+  2.7  Scheduler: serialização camelCase em vez de snake_case (local
+       correto: SchedulerRule.repeatType, não "SchedulerRuleType")
+  2.8  Auto-categoria "[[people]]" nunca aplicada a Person; outras 4
+       entidades ganham auto-categorias que a spec não pede
+  2.9  Falta hook "checar Pacts vencidos a cada abertura do app"
+  2.10 Subtasks de Task não usam sintaxe do Tasks Plugin do Obsidian
+  2.11 Índice Dataview de mood usa campo antigo de 1 dimensão
+  2.12 Faltam índices Dataview de Systems e Pacts
+  2.13 Sistema de Actions: só 2 dos 7 tipos implementados; falta trigger
+       de Tracker (só Habit dispara hoje)
+  2.14 Strings em inglês misturadas com o resto do app em português
+       (automation_service.dart)
+  2.15 checkKPIGoals() auto-completa o Goal inteiro sem confirmação —
+       comportamento não documentado na spec (decisão de produto)
+
+CONFIRMADO FUNCIONANDO (sem gap): `AutomationService.checkPersonContacts()`
+  implementa corretamente o "Scheduler automático" de Person da PARTE 8
+  (cria Task "Contatar [Nome]" via detecção de menção/backlink) — não
+  precisa de nenhuma ação.
+
+TIER 3 — POLIMENTO E DETALHES (P2):
+  3.1  ContentObject sem campo `links` universal
+  3.2  Project sem campo `scheduler`
+  3.3  Person sem campo `notes`
+  3.4  Snapshot sem `photos`; `subject` não é WikiLink real
+  3.5  ReminderConfig.ringOnSilent com default errado
+  3.6  Triple Check Sheet: botões de ação são stubs vazios; sem proteção
+       de dismiss; sem validação; sem modo batch/read-only
+  3.7  Steering Sheet: sem botão X; sem validação por etapa; default de
+       duração errado
+  3.8  FAB: falta card "System"; "Sessão" abre Pomodoro em vez de
+       Calendar Session
+  3.9  create_system_form.dart não existe — impossível criar System pela UI
+  3.10 Object Identification: tradução de tipos incompleta (faltam
+       system/tracker/entry/reminder)
+  3.11 Corpo da daily note (seção ## Habits) usa WikiLink em vez do
+       título do habit
+  3.12 SystemDefinition.scheduler é extensão não documentada
+
+COBERTURA: este adendo leu 100% dos models e leitura profunda de 6
+  serviços/providers centrais + 6 widgets/telas de UI. NÃO leu ainda:
+  automation_service.dart, notification_service.dart, scheduler_service.dart,
+  sync_manager.dart, google_drive_sync_service.dart, os ~24 arquivos de
+  lib/ui/forms/, e a maior parte de lib/ui/screens/ e lib/ui/widgets/.
+  Tratar como uma Phase 17+ futura, depois de TIER 0–2 estarem implementados.
+
+================================================================================
+TIER 0 — BLOQUEADORES DE COMPILAÇÃO
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+0.1 — HABIT: ADICIONAR TODO O SUBSISTEMA PACT
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/habit_model.dart
+ACTION: EDIT
+
+POR QUE É P0: lib/ui/widgets/steering_sheet.dart E lib/ui/widgets/habit_row.dart
+  (dois arquivos de UI usados em produção) já referenciam, hoje:
+  widget.habit.startedAt, widget.habit.endsAt, widget.habit.previousCycles,
+  widget.habit.hypothesis, widget.habit.displayTitle, widget.habit.habitMode,
+  HabitMode.pact, e constroem PactCycle(...) / usam PactOutcome.persist
+  /.pause/.pivot — NENHUM desses símbolos existe em habit_model.dart hoje
+  (a classe Habit só tem: description, color, icon, completionUnit,
+  dailyGoal, slots, schedulers, linkedTrackerSlug, timeBlock,
+  completionHistory, actions, status, habitStartDate, priority, streak,
+  isNegative, inputType). Ou o projeto não compila, ou esses dois widgets
+  são código morto e a feature Pact inteira (Steering Sheet, badge "PACT",
+  Pact no Planner, dashboard pact_today) não funciona de fato.
+
+ADD enums:
+  enum HabitMode { habit, pact }
+  enum PactOutcome { persist, pause, pivot }
+
+ADD classe:
+  class PactCycle {
+    final DateTime startedAt;
+    final DateTime endsAt;
+    final PactOutcome outcome;
+    final String? reflection;
+    final bool? hypothesisCorrect;
+    final String? endedReason;
+
+    PactCycle({
+      required this.startedAt,
+      required this.endsAt,
+      required this.outcome,
+      this.reflection,
+      this.hypothesisCorrect,
+      this.endedReason,
+    });
+
+    Map<String, dynamic> toMap() => {
+      'started_at': startedAt.toIso8601String().split('T').first,
+      'ends_at': endsAt.toIso8601String().split('T').first,
+      'outcome': outcome.name,
+      if (reflection != null) 'reflection': reflection,
+      if (hypothesisCorrect != null) 'hypothesis_correct': hypothesisCorrect,
+      if (endedReason != null) 'ended_reason': endedReason,
+    };
+
+    factory PactCycle.fromMap(Map<String, dynamic> map) => PactCycle(
+      startedAt: DateTime.tryParse(map['started_at']?.toString() ?? '') ?? DateTime.now(),
+      endsAt: DateTime.tryParse(map['ends_at']?.toString() ?? '') ?? DateTime.now(),
+      outcome: PactOutcome.values.firstWhere(
+        (e) => e.name == map['outcome'], orElse: () => PactOutcome.pause),
+      reflection: map['reflection']?.toString(),
+      hypothesisCorrect: map['hypothesis_correct'] as bool?,
+      endedReason: map['ended_reason']?.toString(),
+    );
+  }
+
+ADD fields à classe Habit (Regra 3 do guidelines: habit_mode ausente →
+  tratar como `habit`):
+  HabitMode habitMode = HabitMode.habit;
+  String? curiosityQuestion;
+  String? hypothesis;
+  DateTime? startedAt;
+  DateTime? endsAt;
+  PactOutcome? pactOutcome;
+  List<PactCycle> previousCycles = [];
+
+EDIT construtor: adicionar os 7 parâmetros acima com defaults
+  (habitMode = HabitMode.habit, previousCycles = const []).
+
+ADD getter:
+  String get displayTitle => title;
+
+EDIT copyWith(): adicionar os 7 novos parâmetros.
+
+EDIT toMarkdown(): ADD (apenas quando habitMode == HabitMode.pact):
+    frontmatter['habit_mode'] = habitMode.name;
+    if (habitMode == HabitMode.pact) {
+      if (curiosityQuestion != null) frontmatter['curiosity_question'] = curiosityQuestion;
+      if (hypothesis != null) frontmatter['hypothesis'] = hypothesis;
+      if (startedAt != null) frontmatter['started_at'] = startedAt!.toIso8601String().split('T').first;
+      if (endsAt != null) frontmatter['ends_at'] = endsAt!.toIso8601String().split('T').first;
+      frontmatter['pact_outcome'] = pactOutcome?.name;
+      frontmatter['previous_cycles'] = previousCycles.map((c) => c.toMap()).toList();
+    }
+
+EDIT fromMarkdown(): ADD leitura simétrica (Regra 3 — default `habit`):
+    final rawMode = frontmatter['habit_mode']?.toString() ?? 'habit';
+    habit.habitMode = HabitMode.values.firstWhere(
+      (m) => m.name == rawMode, orElse: () => HabitMode.habit);
+    habit.curiosityQuestion = frontmatter['curiosity_question']?.toString();
+    habit.hypothesis = frontmatter['hypothesis']?.toString();
+    if (frontmatter['started_at'] != null) {
+      habit.startedAt = DateTime.tryParse(frontmatter['started_at'].toString());
+    }
+    if (frontmatter['ends_at'] != null) {
+      habit.endsAt = DateTime.tryParse(frontmatter['ends_at'].toString());
+    }
+    if (frontmatter['pact_outcome'] != null) {
+      habit.pactOutcome = PactOutcome.values.firstWhereOrNull(
+        (e) => e.name == frontmatter['pact_outcome']);
+    }
+    if (frontmatter['previous_cycles'] is List) {
+      habit.previousCycles = (frontmatter['previous_cycles'] as List)
+          .whereType<Map>()
+          .map((c) => PactCycle.fromMap(Map<String, dynamic>.from(c)))
+          .toList();
+    }
+  (usar `firstWhereOrNull` de package:collection, ou implementar
+  manualmente um try/catch retornando null, já que `firstWhere` puro do
+  Dart não aceita `orElse: () => null` em enum não-nullable.)
+
+VALIDAÇÃO: depois de aplicar, rodar `flutter analyze` e confirmar que
+  steering_sheet.dart e habit_row.dart não têm mais nenhum erro de símbolo
+  não resolvido.
+
+────────────────────────────────────────────────────────────────────────────────
+0.2 — TASK: ADICIONAR CLASSE TripleCheck
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/task_model.dart
+ACTION: EDIT
+
+POR QUE É P0: lib/ui/widgets/triple_check_sheet.dart já referencia, em
+  produção: widget.task.tripleCheck, TripleCheckAnswer (enum .yes/.unsure
+  /.no), TripleCheck(head:, heart:, hand:, diagnosis:, checkedAt:), e
+  widget.task.copyWith(tripleCheck: tc) — nenhum desses símbolos existe em
+  task_model.dart hoje.
+
+ADD enum:
+  enum TripleCheckAnswer { yes, unsure, no }
+
+ADD classe:
+  class TripleCheck {
+    final TripleCheckAnswer head;
+    final TripleCheckAnswer heart;
+    final TripleCheckAnswer hand;
+    final String diagnosis;
+    final DateTime checkedAt;
+
+    TripleCheck({
+      required this.head,
+      required this.heart,
+      required this.hand,
+      required this.diagnosis,
+      required this.checkedAt,
+    });
+
+    // Regra 7 do guidelines + diagnóstico derivado single-value (head >
+    // heart > hand em ordem de prioridade — "incerto" conta como bloqueio).
+    String? get blocker {
+      if (head != TripleCheckAnswer.yes) return 'head';
+      if (heart != TripleCheckAnswer.yes) return 'heart';
+      if (hand != TripleCheckAnswer.yes) return 'hand';
+      return null;
+    }
+
+    Map<String, dynamic> toMap() => {
+      'head': head == TripleCheckAnswer.yes,
+      'heart': heart == TripleCheckAnswer.yes,
+      'hand': hand == TripleCheckAnswer.yes,
+      'blocker': blocker,
+      'diagnosis': diagnosis,
+      'checked_at': checkedAt.toIso8601String(),
+    };
+
+    factory TripleCheck.fromMap(Map<String, dynamic> map) {
+      TripleCheckAnswer fromBool(dynamic v) =>
+          v == true ? TripleCheckAnswer.yes : TripleCheckAnswer.no;
+      return TripleCheck(
+        head: fromBool(map['head']),
+        heart: fromBool(map['heart']),
+        hand: fromBool(map['hand']),
+        diagnosis: map['diagnosis']?.toString() ?? '',
+        checkedAt: DateTime.tryParse(map['checked_at']?.toString() ?? '') ?? DateTime.now(),
+      );
+    }
+  }
+  NOTA: ao serializar, "incerto" (unsure) vira `false` no frontmatter
+  (booleano puro, igual a "no") — perda de fidelidade aceita e documentada
+  aqui, pois a spec grava head/heart/hand como booleanos puros no exemplo
+  de frontmatter.
+
+ADD field à classe Task: `TripleCheck? tripleCheck;`
+EDIT construtor: adicionar `this.tripleCheck,`.
+EDIT copyWith(): adicionar `TripleCheck? tripleCheck` — como `copyWith`
+  precisa também conseguir LIMPAR o campo de propósito (ex.: "Re-executar
+  diagnóstico"), adicionar um parâmetro extra:
+  `bool clearTripleCheck = false`, e usar
+  `tripleCheck: clearTripleCheck ? null : (tripleCheck ?? this.tripleCheck)`.
+
+EDIT toMarkdown(): ADD
+  if (tripleCheck != null) frontmatter['triple_check'] = tripleCheck!.toMap();
+  // Regra 7: ausente → nunca exibir badge nem diagnóstico.
+
+EDIT fromMarkdown(): ADD
+  if (frontmatter['triple_check'] is Map) {
+    task.tripleCheck = TripleCheck.fromMap(
+      Map<String, dynamic>.from(frontmatter['triple_check'] as Map));
+  }
+
+TAMBÉM NESTE ARQUIVO — confirmar/adicionar (já estava correto na Phase 9
+  Task 9.B.1, reconfirmado por leitura direta): `TaskStage` precisa incluir
+  `backlog`. Enum atual é `{idea, todo, inProgress, pending, finalized}` —
+  ADD `backlog` (posição recomendada: logo após `idea`, antes de `todo`).
+
+ADD também (já especificado na Phase 9 Task 9.B.2, reconfirmado ausente
+  por leitura direta): campo `String? linkedSystem;` na classe Task, com
+  leitura/escrita simétrica em toMarkdown()/fromMarkdown()/copyWith()
+  (chave de frontmatter: `linked_system`).
+
+DEPOIS de aplicar 0.1 e 0.2: editar lib/ui/widgets/triple_check_sheet.dart
+  para não precisar mais calcular `blocker` manualmente (a classe já deriva
+  via `tc.blocker`) e rodar `flutter analyze` para confirmar zero erros.
+
+────────────────────────────────────────────────────────────────────────────────
+0.3 — DECISÃO DE PRODUTO: Idea / Inbox / Event / ShoppingList (tipos fora
+      da spec V4)
+────────────────────────────────────────────────────────────────────────────────
+SEVERIDADE: P0 (arquitetural) — decisão precisa ser tomada ANTES do TIER 1,
+  porque a Task 1.4 (dispatcher central) e a Task 1.1 (estrutura de pastas)
+  dependem de saber se esses 4 tipos continuam existindo ou são migrados.
+
+EVIDÊNCIA: guidelines V4, PARTE 1.2, enumera EXATAMENTE 9 tipos de
+  conteúdo e 10 de organizador. "Regra 1 — Este documento anula todas as
+  versões anteriores." O código tem, com type/model/tela próprios:
+  • lib/models/idea_model.dart (`type: idea`) + ideas_screen.dart — a
+    spec já cobre esse caso com `Task.stage: idea`.
+  • lib/models/inbox_model.dart (`type: inbox`) + inbox_screen.dart — sem
+    equivalente na V4.
+  • lib/models/event_model.dart (`type: event`) — sobrepõe quase 100% com
+    CalendarSession (que a Phase 9 Task 9.A.6 manda criar do zero, sem
+    nunca mencionar migrar Event).
+  • lib/models/shopping_list_model.dart (`type: shopping_list`) +
+    shopping_list_screen.dart + shopping_list_block.dart — sem
+    equivalente na V4.
+
+OPÇÃO A (recomendada — conformidade estrita): migrar e remover os 4:
+  1. Idea → Task com `stage: idea`. Campos sem equivalente direto (horizon,
+     convertedToType/Id) viram tags/organizers ou ficam em `notes`. Apagar
+     idea_model.dart, ideas_screen.dart, IdeaStatus, IdeaHorizon.
+  2. Inbox → migrar para Task (`stage: idea`/`backlog`) ou Note. Remover
+     inbox_model.dart, inbox_screen.dart.
+  3. Event → consolidar com CalendarSession (Task 1.4 abaixo cria o
+     model): mapear startDatetime→date+timeOfDay, endDatetime→endTime,
+     googleEventId→linkedGoogleEventId, etc. Migrar arquivos `type: event`
+     existentes no vault para `type: calendar_session` (migração one-shot
+     no carregamento). Remover event_model.dart e toda tela/form que cria
+     `type: event`.
+  4. ShoppingList → sem equivalente direto. Opções: Tracker com
+     InputFieldType.checklist, ou Note subtipo Collection. Decidir e
+     migrar; ou OPÇÃO B abaixo.
+
+OPÇÃO B (se o produto realmente precisa desses 4 recursos): atualizar o
+  PRÓPRIO guidelines.md, PARTE 1.2, incluindo-os formalmente como
+  extensões da V4, com seção de especificação própria (propriedades,
+  storage, UI) no mesmo padrão dos outros 9 objetos.
+
+QUALQUER QUE SEJA A ESCOLHA: documentar a decisão no topo deste arquivo de
+  gap analysis antes de prosseguir, porque ela muda o conteúdo exato das
+  Tasks 1.1 e 1.4 abaixo (se Event for mantido, a Task 1.4 precisa também
+  adicionar um dispatch para `type: event`, por exemplo).
+
+================================================================================
+TIER 1 — INTEGRIDADE DE DADOS DO VAULT
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+1.1 — ESTRUTURA DE PASTAS: `app/` FLAT COMO PADRÃO (não pasta-por-tipo)
+────────────────────────────────────────────────────────────────────────────────
+SEVERIDADE: P0 — viola a PARTE 1.1 da guidelines, base de toda a
+  arquitetura de Object Identification. Confirmado em 3 arquivos
+  independentes que concordam entre si (não é bug isolado, é o
+  comportamento real e consistente do app hoje).
+
+EVIDÊNCIA:
+  • obsidian_service.dart, `_ensureVaultFolders()`: cria incondicionalmente
+    daily, habits, trackers, tasks, notes, moods, projects, people,
+    organizers/areas, organizers/projects, organizers/activities,
+    organizers/people, organizers/places, organizers/labels, resources,
+    social, sessions, _attachments, _deleted. SEM `app/`, SEM `_conflicts/`.
+  • vault_provider.dart, `VaultNotifier._defaultFolderForSignature()`:
+    roteia escrita por tipo: task→tasks, habit→habits, goal→goals,
+    note→notes, resource→resources, social_post→social,
+    person→organizers/people, project→organizers/projects,
+    area→organizers/areas, activity→organizers/activities,
+    place→organizers/places, label→organizers/labels, organizer→organizers,
+    tracker_definition/tracker_record→trackers, reminder→reminders,
+    time_block→time_blocks, day_theme→day_themes, template→templates,
+    snapshot→snapshots. (mood_definition→moods e combined_analysis→analyses
+    ESTÃO CORRETOS — são exceções fixas da spec, NÃO mexer nesses dois.)
+  • dataview_generator.dart: os 6 índices auto-gerados (`tasks/index.md`,
+    `habits/index.md`, `goals/index.md`, `notes/index.md`,
+    `social/index.md`, `daily/mood-index.md`) têm `FROM "tasks"` /
+    `FROM "habits"` / etc. hardcoded.
+
+  Spec (PARTE 1.1 + PARTE 20): default é `app/` flat para TODOS os tipos,
+  exceto as exceções fixas `daily/`, `moods/`, `analyses/`,
+  `_attachments/`, `_deleted/`, `_conflicts/`. Pasta-por-tipo só deveria
+  existir quando o usuário CONFIGURA isso em Object Identification (Regra
+  12: "o app nunca presume localização por tipo").
+
+FILE: lib/services/obsidian_service.dart
+ACTION: EDIT
+ANCHOR: `_ensureVaultFolders()`, lista `folders`.
+REPLACE por:
+  const folders = [
+    'app',
+    'daily',
+    'moods',
+    'analyses',
+    '_attachments',
+    '_deleted',
+    '_conflicts',
+  ];
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+ANCHOR: `VaultNotifier._defaultFolderForSignature()`.
+REPLACE o corpo inteiro por:
+  String _defaultFolderForSignature(String type) {
+    return switch (type) {
+      'mood_definition'   => 'moods',
+      'combined_analysis' => 'analyses',
+      _ => 'app',
+    };
+  }
+  (`_writeObject()` já dá prioridade a uma `TypeSignature` de pasta
+  configurada pelo usuário antes de cair nesse default — não precisa
+  mexer em `prepareForSave`.)
+
+FILE: lib/services/dataview_generator.dart
+ACTION: EDIT
+  1. Trocar em TODAS as 5 queries Dataview + a query DataviewJS de
+     `_writeHabitsIndex()`:
+       `FROM "tasks"`  → `FROM "app" WHERE type = "task"`
+       `FROM "habits"` → `FROM "app" WHERE type = "habit"`
+       `FROM "goals"`  → `FROM "app" WHERE type = "goal"`
+       `FROM "notes"`  → `FROM "app" WHERE type = "note"`
+       `FROM "social"` → `FROM "app" WHERE type = "social_post"`
+       `dv.pages('"habits"')` → `dv.pages('"app"').where(p => p.type === "habit")`
+  2. MELHOR: gerar a cláusula FROM dinamicamente a partir de Object
+     Identification em vez de hardcoded:
+       String _fromClauseFor(String type, Settings settings) {
+         final sig = settings.typeSignatures[type];
+         if (sig?.markerType == MarkerType.folder && sig?.value.isNotEmpty == true) {
+           return 'FROM "${sig!.value}"';
+         }
+         return 'FROM "app" WHERE type = "$type"';
+       }
+     Requer passar `Settings` para os métodos `_writeXxxIndex()` (já são
+     métodos de instância de `DataviewGenerator`, só precisam receber
+     `Settings` via construtor ou parâmetro).
+
+MIGRAÇÃO: não é necessário mover arquivos já existentes nas pastas antigas
+  — `AllObjectsNotifier` escaneia o vault inteiro recursivamente e decide
+  o tipo pelo `type` do frontmatter (ver Task 1.4), não pela pasta física,
+  exceto quando há `TypeSignature` de pasta configurada. O pior caso é
+  apenas: arquivos novos vão para `app/`, arquivos antigos continuam nas
+  pastas antigas — ambos continuam sendo lidos normalmente.
+
+────────────────────────────────────────────────────────────────────────────────
+1.2 — PMN (`daily/YYYY-MM-WNN.md`) É INVISÍVEL AO APP
+────────────────────────────────────────────────────────────────────────────────
+SEVERIDADE: P0 — a feature de revisão semanal (Plus/Minus/Next) é gravada
+  corretamente no disco mas NUNCA mais lida de volta.
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+ANCHOR: dentro de `AllObjectsNotifier.build()`, bloco:
+    final isDaily = relativePath.split('/').contains('daily');
+    ...
+    if (isDaily || type == 'daily_note') {
+      final dateMatch = RegExp(r'(\d{4}-\d{2}-\d{2})').firstMatch(relativePath);
+      if (dateMatch != null) { ... }
+      // hoje: se dateMatch for null (caso de um PMN "YYYY-MM-WNN"), nada
+      // acontece — o arquivo é descartado silenciosamente.
+    } else { ... }
+
+REPLACE a checagem por:
+    final pmnMatch = RegExp(r'(\d{4})-(\d{2})-W(\d{2})').firstMatch(relativePath);
+    final isPmnFile = pmnMatch != null && relativePath.split('/').contains('daily');
+
+    if (isPmnFile) {
+      // Processar como PMN — ver passo abaixo.
+      final entry = JournalEntry(
+        id: frontmatter['id']?.toString() ?? stableIdFor(relativePath),
+        body: '', // PMN não usa `body` solto — usa plus/minus/next no corpo.
+        date: DateTime.tryParse(frontmatter['date_range_start']?.toString() ?? '') ?? DateTime.now(),
+        title: 'PMN ${frontmatter['week'] ?? ''}',
+        entryType: JournalEntryType.pmn, // depende do field entryType existir em JournalEntry
+        obsidianPath: relativePath,
+      );
+      entry.week = frontmatter['week']?.toString();
+      entry.dateRangeStart = DateTime.tryParse(frontmatter['date_range_start']?.toString() ?? '');
+      entry.dateRangeEnd = DateTime.tryParse(frontmatter['date_range_end']?.toString() ?? '');
+      entry.referencedDates = (frontmatter['referenced_dates'] as List? ?? [])
+          .map((d) => d.toString()).toList();
+      entry.pactRefs = (frontmatter['pact_refs'] as List? ?? [])
+          .map((p) => p.toString()).toList();
+      final pmnSections = MarkdownParser.parsePmnSections(body); // criar este método (ver abaixo)
+      entry.plus = pmnSections['plus'] ?? [];
+      entry.minus = pmnSections['minus'] ?? [];
+      entry.next = pmnSections['next'] ?? [];
+      results.add(entry);
+    } else if (isDaily || type == 'daily_note') {
+      final dateMatch = RegExp(r'(\d{4}-\d{2}-\d{2})').firstMatch(relativePath);
+      if (dateMatch != null) { ... (lógica já existente, inalterada) ... }
+    } else { ... (lógica já existente, inalterada) ... }
+
+  (Os nomes exatos de campo em `JournalEntry` — `week`, `dateRangeStart`,
+  `dateRangeEnd`, `referencedDates`, `pactRefs`, `plus`, `minus`, `next` —
+  precisam ser conferidos/adicionados ao model `JournalEntry`
+  individualmente se ainda não existirem; ver Task 1.3 abaixo, que já
+  assume essa adição.)
+
+FILE: lib/services/markdown_parser.dart
+ACTION: ADD método novo:
+  static Map<String, List<String>> parsePmnSections(String body) {
+    final result = {'plus': <String>[], 'minus': <String>[], 'next': <String>[]};
+    final sectionRegex = RegExp(r'^##\s*(Plus|Minus|Next)\s*$', multiLine: true, caseSensitive: false);
+    final matches = sectionRegex.allMatches(body).toList();
+    for (var i = 0; i < matches.length; i++) {
+      final key = matches[i].group(1)!.toLowerCase();
+      final start = matches[i].end;
+      final end = i + 1 < matches.length ? matches[i + 1].start : body.length;
+      final sectionText = body.substring(start, end);
+      final bullets = RegExp(r'^-\s*(.+)$', multiLine: true)
+          .allMatches(sectionText)
+          .map((m) => m.group(1)!.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      result[key] = bullets;
+    }
+    return result;
+  }
+
+ADD ÍNDICE em memória para o card "📋 Revisão WNN" ao abrir uma data:
+  FILE: lib/providers/vault_provider.dart
+  ADD provider:
+    final pmnByReferencedDateProvider = Provider<Map<String, List<JournalEntry>>>((ref) {
+      final all = ref.watch(allObjectsProvider).valueOrNull ?? [];
+      final map = <String, List<JournalEntry>>{};
+      for (final entry in all.whereType<JournalEntry>()) {
+        if (entry.entryType != JournalEntryType.pmn) continue;
+        for (final dateStr in entry.referencedDates) {
+          map.putIfAbsent(dateStr, () => []).add(entry);
+        }
+      }
+      return map;
+    });
+  USAR este provider em Journal/Planner/Timeline (telas ainda não
+  auditadas — ver "Cobertura" no topo) para exibir o card de revisão ao
+  abrir qualquer data referenciada por uma PMN.
+
+────────────────────────────────────────────────────────────────────────────────
+1.3 — FIELD NOTE / PMN: entry_type NUNCA É LIDO PELO PARSER PRINCIPAL
+────────────────────────────────────────────────────────────────────────────────
+SEVERIDADE: P0 — combinado com 1.2, confirma que Field Note e PMN (2 dos 3
+  sub-modos de Entry) nunca chegam corretamente à UI em memória, mesmo
+  gravados corretamente em disco.
+
+FILE: lib/services/markdown_parser.dart
+ACTION: EDIT
+ANCHOR: `parseJournalEntries()`, dentro do loop de seções, bloco que monta
+  `entries.add({...})` — hoje só extrai time/title/body/mood/organizers/
+  hashtags/date.
+
+ADD extração de `entry_type`/`category`/`energy_value` (mesmo padrão já
+  usado para `mood::`):
+    final entryTypeMatch = RegExp(r'^entry_type:\s*(.*)$', multiLine: true).firstMatch(section);
+    final entryType = entryTypeMatch?.group(1)?.trim() ?? 'standard';
+    final categoryMatch = RegExp(r'^category:\s*(.*)$', multiLine: true).firstMatch(section);
+    final category = categoryMatch?.group(1)?.trim();
+    final energyMatch = RegExp(r'^energy_value:\s*(\d+)$', multiLine: true).firstMatch(section);
+    final energyValue = energyMatch != null ? int.tryParse(energyMatch.group(1)!) : null;
+
+  ADD ao Map retornado: `'entry_type': entryType, 'category': category,
+  'energy_value': energyValue,`. Excluir essas linhas do `body` extraído
+  (mesmo tratamento já dado a `mood::`/`organizers::`, para não vazarem
+  para dentro do corpo da entry).
+
+FILE: lib/models/journal_entry.dart
+ACTION: EDIT (caso os campos abaixo ainda não existam — conferir antes)
+ADD (se ausentes): `JournalEntryType entryType = JournalEntryType.standard;`,
+  `String? category;`, `int? energyValue;`, e para PMN: `String? week;`,
+  `DateTime? dateRangeStart;`, `DateTime? dateRangeEnd;`,
+  `List<String> referencedDates = [];`, `List<String> pactRefs = [];`,
+  `List<String> plus = [];`, `List<String> minus = [];`, `List<String> next = [];`.
+  Incluir em toMarkdown()/fromMarkdown()/copyWith() seguindo o mesmo
+  padrão de serialização já usado nos outros campos do model. (Esta task
+  depende/complementa a Phase 9 Task 9.A.1 e 9.A.2 originais do GAP
+  ANALYSIS — que corrigem bugs de serialização do `entryType` já
+  presumindo que o campo existe; aplicar PRIMEIRO esta adição de campo, se
+  ele ainda não existir, antes da Phase 9.A.1/9.A.2.)
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+ANCHOR: construção do `JournalEntry` dentro de `AllObjectsNotifier.build()`
+  (branch de daily note normal, não-PMN).
+ADD: `entryType:` mapeado de `data['entry_type']` (string → enum), e,
+  quando `field_note`, propagar `category`/`energyValue` lidos de
+  `data['category']`/`data['energy_value']`.
+
+────────────────────────────────────────────────────────────────────────────────
+1.4 — `type: system` E `type: calendar_session` AUSENTES DO DISPATCHER
+      CENTRAL
+────────────────────────────────────────────────────────────────────────────────
+SEVERIDADE: P0 — mesmo com o model de System corrigido e CalendarSession
+  criado (Phase 9 Tasks 9.A.3/9.A.6), nenhum dos dois jamais carregaria
+  corretamente, porque o dispatcher nem tenta reconhecê-los.
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+ANCHOR: dentro de `AllObjectsNotifier.build()`, a cadeia `if (type ==
+  'task') {...} else if (type == 'habit') {...} else if ...` (cobre hoje:
+  task, habit, project, person, organizer/area/activity/place/label,
+  resource, social_post, goal, note, tracker_definition, mood_definition,
+  reminder, tracker_record, combined_analysis, snapshot, time_block,
+  day_theme, template — falta system e calendar_session).
+
+ADD, antes do `else` final (fallback genérico):
+  } else if (type == 'system') {
+    // ATENÇÃO: SystemDefinition.fromMarkdown tem 3 parâmetros posicionais
+    // (frontmatter, body, filePath) — diferente do padrão de 2 parâmetros
+    // usado pelos outros tipos. NÃO usar `..obsidianPath =` depois.
+    obj = SystemDefinition.fromMarkdown(frontmatter, body, relativePath);
+  } else if (type == 'calendar_session') {
+    obj = CalendarSession.fromMarkdown(frontmatter, body)
+      ..obsidianPath = relativePath;
+    // (depende da Phase 9 Task 9.A.6 já ter criado este model/factory.)
+  }
+
+ANCHOR: o `else` final (fallback genérico) — hoje cria:
+    obj = Note(
+      id: stableId,
+      title: frontmatter['title'] ?? fallbackTitle,
+      body: body,
+      subtype: NoteSubtype.text,
+      organizers: [
+        shared_types.OrganizerReference(type: 'person', slug: 'placeholder', title: 'placeholder'),
+      ],
+    )..obsidianPath = relativePath;
+  Este `OrganizerReference` hardcoded ("placeholder") parece resíduo de
+  debug esquecido — qualquer arquivo de tipo não reconhecido herda um
+  organizador fantasma, poluindo listagens de People/Organizers.
+
+REPLACE por:
+    obj = Note(
+      id: stableId,
+      title: frontmatter['title'] ?? fallbackTitle,
+      body: body,
+      subtype: NoteSubtype.text,
+    )..obsidianPath = relativePath;
+  (sem `organizers:` — `loadBaseMap()`, chamado logo depois, já popula
+  `organizers` a partir do frontmatter real do arquivo, se houver.)
+
+(SE a decisão da Task 0.3 for manter `Event` como tipo válido — OPÇÃO B —
+adicionar aqui também um `else if (type == 'event') { obj =
+Event.fromMarkdown(...) }`. Se a decisão for OPÇÃO A — migrar Event para
+CalendarSession — não é necessário, mas garantir que a migração one-shot
+rode ANTES deste dispatcher processar o vault, ou arquivos `type: event`
+antigos cairão no fallback genérico de Note até a migração rodar.)
+
+────────────────────────────────────────────────────────────────────────────────
+1.5 — HABIT COMPLETIONS: CHAVES PLANAS NO FRONTMATTER, NÃO ANINHADAS SOB
+      `habits:`
+────────────────────────────────────────────────────────────────────────────────
+SEVERIDADE: P0 — quebra TODAS as queries Dataview de exemplo da própria
+  guidelines.
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+ANCHOR: `HabitsNotifier.toggleHabit()` E `HabitsNotifier.recordHabitValue()`
+  — ambos fazem `frontmatter['habits'] = habitsMap;`.
+
+REPLACE (nos dois métodos) por:
+    // Regra/PARTE 20: completions ficam como chaves PLANAS na raiz do
+    // frontmatter, uma por habit slug — nunca aninhadas sob 'habits'.
+    for (final entry in habitsMap.entries) {
+      frontmatter[entry.key] = entry.value;
+    }
+    frontmatter.remove('habits');
+
+FILE: lib/services/markdown_parser.dart
+ACTION: EDIT
+ANCHOR: `parseHabitCompletions()` — hoje só lê `frontmatter['habits']`
+  como fallback secundário; precisa virar o caminho PRIMÁRIO.
+REPLACE por:
+    static Map<String, dynamic> parseHabitCompletions(Map<String, dynamic> frontmatter) {
+      final habits = <String, dynamic>{};
+      final systemKeys = {
+        'date', 'tags', 'type', 'id', 'title', 'trackers',
+        'habit_completions', 'target', 'status', 'priority', 'archived',
+        'day_theme', 'mood_pleasantness', 'mood_energy', 'mood_label',
+        'mood_emoji', 'habits',
+      };
+      frontmatter.forEach((key, value) {
+        if (!systemKeys.contains(key) &&
+            (value is bool || value is num || value is List)) {
+          habits[key] = value;
+        }
+      });
+      // Fallback de retrocompatibilidade com vaults gravados no formato
+      // antigo (aninhado).
+      if (frontmatter['habits'] is Map) {
+        (frontmatter['habits'] as Map).forEach((k, v) {
+          habits.putIfAbsent(k.toString(), () => v);
+        });
+      }
+      return habits;
+    }
+
+ADD migração one-shot (gatear por SharedPreferences
+  `daily_note_habits_migration_done`): no carregamento inicial do vault,
+  para cada `daily/YYYY-MM-DD.md` cujo frontmatter tenha a chave `habits:`
+  (Map), promover cada entrada para o nível raiz e remover a chave
+  `habits:`, reescrevendo o arquivo.
+
+────────────────────────────────────────────────────────────────────────────────
+1.6 — DAILY NOTE TEMPLATE NÃO GERA O FORMATO CANÔNICO
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+ANCHOR: função `getDailyNoteTemplate(String dateStr, List<DayTheme> dayThemes)`
+  (nível de arquivo, não dentro de classe) — hoje gera apenas:
+    '---\ndate: $dateStr\ntype: daily_note\nday_theme: $themeSlug\n---\n\n# $dateStr\n'
+  sem tags, sem mood_*, sem esqueleto de seções.
+
+REPLACE por:
+    String getDailyNoteTemplate(String dateStr, List<DayTheme> dayThemes,
+        {List<Habit> activeHabits = const []}) {
+      const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      final parsedDate = DateTime.tryParse(dateStr) ?? DateTime.now();
+      final dayName = weekDayNames[parsedDate.weekday - 1];
+      final activeTheme = dayThemes.cast<DayTheme?>().firstWhere(
+        (theme) => theme?.daysOfWeek.contains(dayName) ?? false,
+        orElse: () => null,
+      );
+      final themeSlug = activeTheme?.id ?? '';
+      final habitKeys = activeHabits.map((h) => '${h.slug}: false').join('\n');
+      return '---\n'
+          'date: $dateStr\n'
+          'type: daily_note\n'
+          'tags: [daily]\n'
+          '${themeSlug.isNotEmpty ? 'day_theme: $themeSlug\n' : ''}'
+          '${habitKeys.isNotEmpty ? '$habitKeys\n' : ''}'
+          'mood_pleasantness:\n'
+          'mood_energy:\n'
+          'mood_label:\n'
+          'mood_emoji:\n'
+          '---\n\n'
+          '# $dateStr\n\n'
+          '## Journal Entries\n\n'
+          '## Habits\n\n'
+          '## Trackers\n\n'
+          '## Pomodoros\n';
+    }
+  (campo `day_theme:` é uma extensão não documentada na spec — mantida
+  aqui condicionalmente só quando há tema ativo, por compatibilidade; se
+  preferir remover por completo, é uma decisão de produto separada e de
+  baixo risco.)
+
+ATUALIZAR todos os 5+ pontos de chamada já identificados
+  (`HabitsNotifier.toggleHabit`, `HabitsNotifier.recordHabitValue`,
+  `JournalNotifier.addEntry`, `JournalNotifier.updateEntry`,
+  `JournalNotifier.deleteEntry`) para passar
+  `activeHabits: ref.read(habitsProvider).where((h) => h.status == HabitStatus.active).toList()`.
+
+────────────────────────────────────────────────────────────────────────────────
+1.7 — IDs DE OBJETOS SÃO UUID ALEATÓRIO; WIKILINKS DEVEM USAR SLUG ESTÁVEL
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/content_object.dart
+ACTION: EDIT (decisão arquitetural — aplicar com cuidado)
+
+EVIDÊNCIA: `id = id ?? const Uuid().v4()` — todo objeto sem id explícito
+  ganha um UUID v4 aleatório. Mas TODOS os exemplos de frontmatter da spec
+  usam ids legíveis e estáveis derivados do título (`id:
+  "task-comprar-equipamento"`, `id: "escrever-100-palavras"`), e WikiLinks
+  como `linked_system: "[[system-publicar-instagram]]"` e a chave de
+  completion de habit na daily note (Task 1.5 acima) usam esse mesmo
+  slug — nunca o UUID interno.
+
+ACTION:
+  1. PADRONIZAR: todo WikiLink gravado no vault (organizers, links,
+     linked_system, linked_task, linked_goal, parent_task, pact_refs,
+     participants, places, e a chave de completion de habit na daily
+     note) DEVE usar `ContentObject.slug` (derivado do título, estável,
+     legível) — NUNCA `ContentObject.id` (UUID interno, conforme Regra 11:
+     "IDs são internos. Nunca exibir ao usuário").
+  2. AUDITAR todo lugar do código que hoje grava `obj.id` dentro de um
+     WikiLink ou nome de arquivo (buscar por `obj.id` próximo de `'[['`
+     ou em `obsidianFileName`/chamadas de `writeFile` em
+     obsidian_service.dart e em todos os `toMarkdown()`) e trocar para
+     `obj.slug`.
+  3. RESOLVER colisão de slug (dois títulos iguais geram o mesmo slug):
+     em `VaultNotifier._writeObject()` / `MarkdownParser.prepareForSave()`,
+     ao gravar um novo arquivo, se `slug.md` já existir E pertencer a um
+     `id` diferente do objeto sendo salvo, sufixar com `-2`, `-3`, etc.
+     antes de escrever.
+  4. `id` (UUID) continua existindo apenas como chave primária interna em
+     memória (para encontrar o objeto certo numa lista após editar o
+     título, que mudaria o slug). NUNCA gravar o `id` UUID em nenhum
+     WikiLink do vault.
+
+────────────────────────────────────────────────────────────────────────────────
+1.8 — OrganizerReference.toWikiLink() GRAVA "[[tipo/slug]]" EM VEZ DE
+      "[[slug]]"
+────────────────────────────────────────────────────────────────────────────────
+SEVERIDADE: P0 — quebra backlinks nativos do Obsidian em TODO o vault
+  (organizers de todo objeto, e a linha `organizers::` gerada dentro de
+  cada Journal Entry pelo `generateDailyNoteBody()`).
+
+FILE: lib/models/shared_types.dart
+ACTION: EDIT
+ANCHOR: método `toWikiLink()` em `OrganizerReference` — hoje:
+  `String toWikiLink() => type == 'label' ? '[[$slug]]' : '[[$type/$slug]]';`
+
+REPLACE por:
+  String toWikiLink() => '[[$slug]]';
+
+MANTER `fromWikiLink()` tratando ambos os formatos (com e sem `tipo/`)
+  para retrocompatibilidade de leitura. ADD migração one-shot: ao carregar
+  qualquer WikiLink de `organizers`/`links`/`participants`/`places` que
+  contenha `/`, reescrever o arquivo sem o prefixo de tipo na próxima vez
+  que for salvo (não precisa ser proativo/imediato — corrigir
+  lazily/gradualmente conforme os arquivos são reescritos no uso normal).
+
+================================================================================
+TIER 2 — FEATURES INCOMPLETAS (P1)
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+2.1 — PomodoroSession NÃO PERSISTE EM LUGAR NENHUM
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/pomodoro_session.dart
+ACTION: REWRITE
+
+EVIDÊNCIA: model atual só tem taskTitle, startTime, duration (Duration
+  única), pomodoroType, completed, linkedOrganizerRef opcional, e
+  `toMarkdown() => ''`. Spec (PARTE 7) exige work/short/long break
+  duration configuráveis, long_break_after_blocks, blocks_completed/
+  minutes_worked/minutes_break derivados, state (scheduled|active|paused|
+  completed|cancelled), linked_item (WikiLink para qualquer objeto), e
+  armazenamento na daily note sob `## Pomodoros`.
+
+REESCREVER:
+  enum PomodoroState { scheduled, active, paused, completed, cancelled }
+
+  class PomodoroSession extends ContentObject {
+    String? linkedItemSlug;
+    DateTime date;
+    int workDuration = 25;
+    int shortBreakDuration = 5;
+    int longBreakDuration = 20;
+    int longBreakAfterBlocks = 4;
+    int blocksCompleted = 0;
+    int minutesWorked = 0;
+    int minutesBreak = 0;
+    PomodoroState state = PomodoroState.scheduled;
+
+    ... construtor ...
+
+    @override
+    String get type => 'pomodoro_session';
+
+    String toDailyNoteBlock() {
+      final hh = date.hour.toString().padLeft(2, '0');
+      final mm = date.minute.toString().padLeft(2, '0');
+      final buf = StringBuffer()
+        ..writeln('### $hh:$mm — $title');
+      if (linkedItemSlug != null) buf.writeln('- Linked: [[$linkedItemSlug]]');
+      buf
+        ..writeln('- Blocos: $blocksCompleted')
+        ..writeln('- Tempo trabalhado: $minutesWorked min')
+        ..writeln('- Tempo de pausa: $minutesBreak min');
+      return buf.toString();
+    }
+
+    @override
+    String toMarkdown() => ''; // não é standalone — embutido na daily note
+
+    factory PomodoroSession.fromDailyNoteBlock(String block, DateTime day) {
+      // Regex linha a linha: ### HH:MM — title / - Linked: [[slug]] /
+      // - Blocos: N / - Tempo trabalhado: N min / - Tempo de pausa: N min
+      ...
+    }
+  }
+
+CONECTAR à persistência: localizar pomodoro_provider.dart e
+  pomodoro_bg_service.dart (não auditados ainda — ver "Cobertura") e, ao
+  completar/cancelar uma sessão, gravar o bloco em `## Pomodoros` da daily
+  note do dia (mesmo padrão incremental de leitura/escrita já usado para
+  habit completions na Task 1.5). Sem isso, o histórico de Pomodoro nunca
+  sobrevive a um restart nem aparece na Organizer Detail View (PARTE 23.8,
+  item "Pomodoro" na Timeline Section).
+
+────────────────────────────────────────────────────────────────────────────────
+2.2 — KPI: TAXONOMIA INCOMPATÍVEL; FALTA AUTO-COMPLETE E BOTÃO "+N"
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/kpi_model.dart
+ACTION: EDIT
+
+EVIDÊNCIA: spec define 8 `source_types` exatos: subtasks, tracker_field,
+  habit, collection, entry, time_spent, manual_quantity, others. Model
+  atual (`KPISourceType`) tem 24 valores granulares pré-fixados
+  (habitCompletionCount, habitStreak, trackerFieldSum, trackerFieldMax,
+  goalSubtaskCompletion, moodAverage, etc.), com labels que misturam
+  português e inglês na mesma string. Falta `autoCompleteAction`
+  (spec: "quando current_value >= target_value, acionada ação
+  configurada") e botão de incremento rápido "+N" para manual_quantity.
+
+ACTION:
+  1. Realinhar `KPISourceType` para os 8 valores exatos:
+     subtasks, trackerField, habit, collection, entry, timeSpent,
+     manualQuantity, others. Persistir como `source_type` snake_case.
+  2. ADD `String? calculationMode` para granularidade dentro de cada
+     source_type (ex.: habit → 'streak'|'successful_days'|
+     'total_completions'; trackerField → 'sum'|'average'|'count'|'max'|'min').
+  3. ADD `Map<String,dynamic>? autoCompleteAction` (mesma forma de ActionDef
+     em shared_types.dart), disparado quando `currentValue >= targetValue`
+     muda de false→true.
+  4. Corrigir todas as labels para português consistente.
+  5. Migração: mapear os 24 valores antigos para (novo source_type,
+     calculationMode) na leitura, preservando dados existentes.
+  6. ADD botão "+N" inline na UI de KPI (tracker_metric_card.dart ou
+     equivalente — não auditado ainda) quando source_type == manualQuantity.
+
+ACHADO ADICIONAL (lib/services/kpi_engine.dart, lido por completo): o
+  motor de cálculo é AINDA MENOS completo do que a taxonomia do model
+  sugere. De 24 valores de `KPISourceType`, `calculateKPIValue()` só
+  calcula 12 (habitCompletionCount, habitStreak, habitSuccessRate,
+  trackerFieldSum/Average/Max/Min, moodAverage, entryCount,
+  collectionItemCount, customNumericInput, plannerTaskDuration — este
+  último é um stub que sempre `return 0`). Os outros 11 valores do enum
+  (goalSubtaskCompletion, goalProgressPercentage, plannerTaskCount,
+  plannerOverdueCount, journalWordCount, moodTrend, photoCount,
+  commentCount, reflectionLength, organizerAssociationCount,
+  timeSpentInCategory) caem no `default: return 0;` — ou seja, são tipos
+  que existem no enum e provavelmente aparecem como opção selecionável na
+  UI de criação de KPI, mas SEMPRE retornam 0 silenciosamente, sem
+  nenhum erro ou aviso ao usuário. Qualquer KPI configurado com um desses
+  11 tipos nunca vai progredir.
+
+  TAMBÉM CONFIRMADO: `KPISourceType.moodAverage` usa
+  `m?.numericValue.toDouble()` — o campo ANTIGO de 1 dimensão de
+  `MoodDefinition` (Phase 9 Task 9.A.8 está reescrevendo `MoodDefinition`
+  para o sistema de 2 eixos `pleasantness`/`energy`, REMOVENDO
+  `numericValue`). Isso significa que aplicar a Task 9.A.8 SEM
+  atualizar `kpi_engine.dart` simultaneamente QUEBRA a compilação deste
+  arquivo (referência a campo removido). ADICIONAR EXPLICITAMENTE à
+  Phase 9 Task 9.A.8: ao remover `numericValue` de `MoodDefinition`,
+  editar `KPIEngine.calculateKPIValue()` no case `moodAverage` para usar
+  `m?.pleasantness.toDouble()` (ou expor a dimensão escolhida via
+  `kpi.calculationMode`, reaproveitando o campo já proposto no item 2
+  acima — ex.: `calculationMode == 'energy' ? m.energy : m.pleasantness`).
+
+FILE: lib/services/kpi_engine.dart
+ACTION: EDIT — implementar os 11 cases faltantes (ou removê-los do enum
+  se decidir que não são necessários — decisão de produto), e corrigir o
+  case `moodAverage` conforme acima.
+
+CORREÇÃO (lib/services/automation_service.dart, lido por completo): o
+  "auto-complete" NÃO está 100% ausente como dito acima — `AutomationService.
+  updateAllKPIs()` já implementa `if (!kpi.completed && newValue >=
+  kpi.targetValue) { kpi.completed = true; ...
+  NotificationService().showImmediateNotification(...) }`. O que falta de
+  fato é só a parte "ação CONFIGURADA": hoje a única ação ao bater a meta
+  é uma notificação genérica hardcoded — não há como o usuário escolher,
+  por KPI, qual das 7 ações (PARTE 6) disparar. Ajustar o item 3 acima: o
+  campo `autoCompleteAction` deve ser lido e executado dentro de
+  `updateAllKPIs()`, reaproveitando o dispatcher genérico de ações criado
+  na Task 2.13 abaixo (generalizado para aceitar um `ActionDef` vindo de
+  um KPI, não só de um Habit).
+
+────────────────────────────────────────────────────────────────────────────────
+2.13 — SISTEMA DE ACTIONS: SÓ 2 DOS 7 TIPOS DA SPEC ESTÃO IMPLEMENTADOS;
+       FALTA TRIGGER DE TRACKER (só Habit dispara hoje); 1 tipo extra não
+       documentado ("create_task")
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/services/automation_service.dart
+ACTION: EDIT
+
+EVIDÊNCIA (lido por completo): `_executeAction()` (dispatcher central de
+  Actions) só implementa um `switch (action.type)` com 3 cases:
+  `'add_entry'` (✓ existe na spec), `'add_tracking_record'` (✓ existe na
+  spec), e `'create_task'` (✗ NÃO é um dos 7 tipos da PARTE 6 — extensão
+  não documentada). FALTAM os outros 4 tipos da spec: `add_text_note`,
+  `add_collection_item`, `view_statistics`, `view_item`, `launch_url`
+  (esse último é o 5º que falta — recontando: faltam 5 dos 7, sobram 2
+  implementados + 1 extra não documentado).
+
+  Além disso, `executeHabitSlotActions`/`executeHabitActions` só são
+  chamados a partir do fluxo de Habit (confirmado em vault_provider.dart,
+  Task 1.x). A spec (PARTE 6) define 3 eventos de trigger, não 2: "(1)
+  Completar qualquer slot individual de um habit, (2) Completar o goal
+  diário de um habit, (3) Salvar um tracking record." NÃO existe nenhum
+  método `executeTrackerActions`/equivalente disparado ao salvar um
+  TrackingRecord — Trackers, hoje, nunca disparam nenhuma Action, apesar
+  de `TrackerSection`/`InputField` poderem ter `actions` configuradas
+  (CONFERIR se o model de Tracker realmente expõe esse campo — não
+  confirmado nesta leitura específica de automation_service.dart).
+
+ACTION:
+  1. ADD os 5 cases faltantes a `_executeAction()`:
+       case 'add_text_note': // abre/cria uma Text Note vinculada
+         final notesNotifier = ref.read(notesProvider.notifier);
+         await notesNotifier.addNote(Note(
+           title: 'Nota automática: ${habit.displayTitle}',
+           body: '',
+           subtype: NoteSubtype.text,
+         ));
+         break;
+       case 'add_collection_item':
+         // requer action.targetCollectionNoteId (ADD esse campo a ActionDef
+         // se ainda não existir) — adicionar um CollectionItem vazio/
+         // pré-preenchido na Collection Note especificada.
+         break;
+       case 'view_statistics':
+         // navegação pura — não tem efeito de dados; deve ser tratado na
+         // CAMADA DE UI (não em automation_service.dart), recebendo um
+         // callback de navegação. Documentar a divisão de responsabilidade.
+         break;
+       case 'view_item':
+         // idem — navegação para action.targetItemId; tratar na UI.
+         break;
+       case 'launch_url':
+         // usar package:url_launcher já presente no projeto (confirmar em
+         // pubspec.yaml) para abrir action.targetUrl.
+         await launchUrl(Uri.parse(action.targetUrl ?? ''));
+         break;
+  2. RENOMEAR ou remover `'create_task'`: já que não é um tipo documentado,
+     decidir (mesma lógica de decisão de produto da Task 0.3): manter como
+     extensão documentada no guidelines.md, ou remover.
+  3. ADD `static Future<void> executeTrackerActions(Ref ref,
+     TrackerDefinition tracker, TrackingRecord record) async { ... }`,
+     iterando as Actions configuradas nos InputFields do tracker que foram
+     preenchidos neste record, chamando o mesmo `_executeAction` (adaptado
+     para aceitar um contexto genérico em vez de só `Habit habit, DateTime
+     date` — trocar a assinatura de `_executeAction` para receber um
+     `String contextTitle` e `DateTime contextDate` genéricos em vez de
+     `Habit habit`).
+  4. CHAMAR esse novo método no provider de TrackingRecord (`saveTrackerRecord()`
+     em vault_provider.dart) logo após salvar o record.
+
+────────────────────────────────────────────────────────────────────────────────
+2.14 — INCONSISTÊNCIA DE IDIOMA: STRINGS EM INGLÊS MISTURADAS COM O RESTO
+       DO APP EM PORTUGUÊS
+────────────────────────────────────────────────────────────────────────────────
+SEVERIDADE: P2 — visível ao usuário final, mas não quebra funcionalidade.
+
+EVIDÊNCIA: lib/services/automation_service.dart tem várias strings
+  voltadas ao usuário final em inglês, contrastando com o resto do app
+  (confirmado em português em toda a guidelines e em todos os outros
+  arquivos lidos): `'Automatic: Habit "..." completed.'`, `'Habit
+  Completion'`, `'Acompanhamento: ...'` (esse já em português, inconsistente
+  com os vizinhos), `'Task created automatically after completing the
+  habit.'`, `'Task created automatically from the configured contact
+  frequency.'` (em inglês, enquanto o texto análogo `'Contatar ${person.title}'`
+  está em português), `'KPI atingido'` (português, correto) vs `'Goal
+  Reached!'`/`'Congratulations! You reached every target for "..."'` (inglês).
+  Esse mesmo padrão de mistura PT/EN já foi notado de forma isolada na
+  Phase 12 (Task 12.B.2, labels de KPISourceType) — agora confirma-se que
+  é um problema mais amplo, presente em pelo menos 2 arquivos distintos.
+
+FILE: lib/services/automation_service.dart
+ACTION: EDIT — traduzir todas as strings voltadas ao usuário para
+  português, revisando: o texto de entry automática ao completar habit, o
+  título "Habit Completion", as 2 notas automáticas de Task ("Task created
+  automatically..." → "Task criada automaticamente..."), e as 2 strings
+  de notificação de Goal ("Goal Reached!"/"Congratulations!..." →
+  "Meta atingida!"/"Parabéns! Você alcançou todos os alvos de '...'.").
+
+────────────────────────────────────────────────────────────────────────────────
+2.15 — `checkKPIGoals()` AUTO-COMPLETA O GOAL INTEIRO QUANDO TODOS OS KPIs
+       BATEM A META — COMPORTAMENTO NÃO DOCUMENTADO NA SPEC
+────────────────────────────────────────────────────────────────────────────────
+SEVERIDADE: P2 — extensão de comportamento, não um bug, mas muda o
+  `state` de um Goal automaticamente sem confirmação do usuário, o que
+  pode surpreender (ex.: usuário queria manter o Goal "active" por mais
+  tempo mesmo com os KPIs batidos, para acompanhamento contínuo).
+
+EVIDÊNCIA: `AutomationService.checkKPIGoals()` muda
+  `goal.state = GoalStatus.completed` automaticamente quando
+  `goal.kpis.every((k) => k.completed || k.currentValue >= k.targetValue)`.
+  A spec (PARTE: KPI) só descreve "auto-complete" no nível de KPI
+  individual disparando uma ação configurada — não descreve o Goal pai
+  mudando de estado sozinho.
+
+ACTION: DECISÃO DE PRODUTO — manter esse comportamento como extensão
+  documentada formalmente no guidelines.md (com uma forma de o usuário
+  desativar isso por Goal, ex.: `goal.autoCompleteWhenKpisHit: bool`), ou
+  trocar por uma notificação/sugestão não-destrutiva ("Todos os KPIs desta
+  meta foram atingidos — marcar como concluída?") em vez de mudar o estado
+  silenciosamente.
+
+────────────────────────────────────────────────────────────────────────────────
+2.3 — DASHBOARD: FALTA PAINEL pact_today; dashboard_panel.dart MORTO
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/dashboard_block.dart
+ACTION: EDIT
+ADD ao enum BlockType: `pactToday,` — renderização: lista de Habits com
+  `habitMode == HabitMode.pact && status == active`, cada linha com
+  checkbox de check-in de hoje + badge "dias restantes" (`endsAt - hoje`).
+
+FILE: lib/models/dashboard_panel.dart
+ACTION: DELETE (ou @Deprecated) — este arquivo define um SEGUNDO enum
+  `PanelType` com só 7 valores e uma classe `DashboardPanel` paralela e
+  incompatível com `DashboardBlock` (30 tipos, a implementação realmente
+  usada). Confirmar com `grep -r "PanelType\|DashboardPanel(" lib/` que
+  não há uso real antes de remover.
+
+────────────────────────────────────────────────────────────────────────────────
+2.4 — COMBINED ANALYSIS: CAMPOS FALTANDO; FALTA BLOCO DO PLUGIN OBSIDIAN
+      CHARTS (o bloco Tracker JÁ EXISTE)
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/analysis_model.dart
+ACTION: EDIT
+  1. ADD a `MetricSource`: `String? dimension` ('pleasantness'|'energy',
+     null para fontes não-mood), `String axis` ('left'|'right', default
+     'left'), `bool showEmojiMarkers` (default false), `Map<String,num>?
+     valueMapping`.
+  2. ADD a `AnalysisChart`: `String normalization` ('none'|'dual_axis'|
+     'normalize_0_1', default 'dual_axis' quando há mood + tracker juntos).
+  3. ADD `DateTimeRange? defaultDateRange` a `CombinedAnalysis`.
+  4. Exigir `dimension` não-nulo na validação do form quando
+     `MetricType.mood` (mood sempre precisa de pleasantness OU energy
+     explícito).
+
+CORREÇÃO IMPORTANTE (achado original estava incompleto): o bloco do
+  plugin Obsidian TRACKER (```tracker, exemplo da PARTE 11) JÁ É gerado
+  dinamicamente — `VaultNotifier._writeObject()` em vault_provider.dart
+  chama `DataviewGenerator.generateTrackerPluginBlock(object)` para todo
+  `CombinedAnalysis` e anexa como seção `## Obsidian Tracker`. NÃO
+  duplicar esse trabalho. O que REALMENTE falta é só o bloco do plugin
+  Obsidian CHARTS (```chart, o outro exemplo da PARTE 11/PARTE 20) — isso
+  nunca é gerado em lugar nenhum (nem em `CombinedAnalysis.toMarkdown()`,
+  que só emite um comentário placeholder, nem em `_writeObject()`).
+
+FILE: lib/services/dataview_generator.dart
+ACTION: ADD método `generateChartsPluginBlock(CombinedAnalysis analysis)`
+  gerando:
+    ```chart
+    type: line
+    labels: [...]
+    series:
+      - title: ...
+        data: [...]
+    width: 80%
+    beginAtZero: false
+    ```
+  (dados reais extraídos do período corrente da análise).
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+ANCHOR: `VaultNotifier._writeObject()`, branch `else if (object is
+  CombinedAnalysis)` — ADD, junto ao bloco Tracker já existente, uma
+  segunda seção `## Obsidian Charts` usando o novo
+  `generateChartsPluginBlock`.
+
+FILE: lib/models/analysis_model.dart
+ACTION: EDIT — remover/condicionar o comentário placeholder em
+  `toMarkdown()` (`// Gráfico renderizado dinamicamente pelo Citrine`) já
+  que o bloco real passa a ser gerado externamente por `_writeObject`.
+
+────────────────────────────────────────────────────────────────────────────────
+2.5 — CONFLICT DETECTION (OBJECT IDENTIFICATION) NÃO EXISTE
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/ui/screens/object_conflicts_screen.dart
+ACTION: CREATE (arquivo não existe)
+
+EVIDÊNCIA: guidelines, PARTE 1.1 + PARTE 21: "Se um objeto tem atributos
+  que apontam para tipos conflitantes..., o app exibe ⚠️ ao lado do título
+  em TODAS as telas onde aparece, e o objeto aparece na página 'Conflitos'
+  (menu Mais)." `type_signatures_screen.dart` (a tela de Object
+  Identification, lida por completo) não tem NENHUMA lógica de detecção
+  de conflito nem link para tal página. `sync_conflicts_screen.dart` trata
+  só de conflitos de SINCRONIZAÇÃO (merge do Google Drive) — conceito
+  diferente.
+
+ACTION:
+  1. CREATE a tela: lista objetos cujo `type` resolvido por Object
+     Identification diverge de outro atributo do arquivo (ex.: está na
+     pasta configurada para `task` mas tem `type: area` no frontmatter).
+     Cada linha: ícone + título + explicação textual + ação de resolução.
+  2. Acessível via menu "Mais".
+  3. Implementar detecção durante o parsing do vault
+     (`AllObjectsNotifier.build()`): comparar o tipo resolvido pela Object
+     Identification contra o `type` literal do frontmatter; se divergirem,
+     marcar um novo campo em memória `bool hasTypeConflict` +
+     `String? conflictReason` (em ContentObject, ou num provider paralelo
+     `conflictedObjectsProvider` para não poluir o model base).
+  4. ADD badge ⚠️ compartilhado (`ConflictBadge(visible: obj.hasTypeConflict)`)
+     reaproveitado em todas as listagens/detail views do app.
+
+────────────────────────────────────────────────────────────────────────────────
+2.6 — COMMAND CENTER: FALTAM SEÇÕES SYSTEMS/PRÓXIMAS SESSÕES; BUSCA NÃO
+      AGRUPA POR TIPO
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/ui/widgets/command_center_overlay.dart
+ACTION: EDIT
+
+EVIDÊNCIA (lido por completo, vs PARTE 23.9):
+  1. Ações rápidas hoje: "Nova Entrada"/"Nova Task"/"Novo Registro"/"Nova
+     Nota" — a 4ª deveria ser "Novo System".
+  2. Não existe seção "Systems" (3 chips de quick-run com tap→bottom sheet
+     Via C e long-press→detail view).
+  3. Não existe seção "Próximas Sessões" (Calendar Sessions) — código
+     mostra "Próximas Tasks" por deadline em vez disso.
+  4. Busca é `o.title.contains(query)` plano — sem agrupar por tipo
+     (header de grupo, máx. 4 por grupo) nem pesquisar aliases/body.
+  5. Sem fechar por tecla Escape.
+  6. Chips de "Recentes" sem swipe-to-remove + undo snackbar.
+
+ACTION:
+  1. Trocar 4º botão para "Novo System" → CreateSystemForm (Task 3.9).
+  2. ADD seção Systems: novo provider `topSystemsProvider` (3 com maior
+     `run_count` derivado); chips horizontais "▶ nome"; tap→quick-run (Via
+     C); long-press→detail view.
+  3. ADD seção Próximas Sessões: baseada em `calendarSessionsProvider`
+     (Phase 9 Task 9.A.7), `date.isAfter(now)`, top 3, dot colorido =
+     `session.color`.
+  4. Reescrever busca: agrupar `searchResults` por `obj.type`, header por
+     grupo, truncar em 4 por grupo; também testar contra aliases (mood) e
+     primeiros 200 caracteres do corpo quando disponível.
+  5. ADD `Shortcuts`/`Actions` capturando `LogicalKeyboardKey.escape` → `_close()`.
+  6. ADD `Dismissible`/swipe horizontal nos chips de "Recentes",
+     removendo de `historyProvider` + `SnackBar` com "Undo".
+
+────────────────────────────────────────────────────────────────────────────────
+2.7 — SCHEDULER: SERIALIZAÇÃO camelCase EM VEZ DE snake_case
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/scheduler.dart
+ACTION: EDIT
+
+CORREÇÃO DE LOCALIZAÇÃO (a Phase 9 Task 9.C.4 original apontava para uma
+  classe `SchedulerRuleType`/campo `ruleType` que NÃO existe; a estrutura
+  real, lida diretamente, é `Scheduler.rules: List<SchedulerRule>`, cada
+  `SchedulerRule.repeatType: RepeatType`, com `'repeat_type': repeatType.name`
+  gravando "numberOfDays" em vez de "number_of_days").
+
+  `RepeatType` tem 13 valores: os 11 da spec + 2 extras
+  (`daysOfTheme`, `daysWithBlock` — extensão não documentada, decisão de
+  produto igual à Task 0.3/OPÇÃO B: documentar ou remover).
+
+ADD extension:
+  extension RepeatTypeX on RepeatType {
+    String get specName => switch (this) {
+      RepeatType.numberOfDays            => 'number_of_days',
+      RepeatType.daysOfWeek              => 'days_of_week',
+      RepeatType.numberOfWeeks           => 'number_of_weeks',
+      RepeatType.numberOfMonths          => 'number_of_months',
+      RepeatType.numberOfHours           => 'number_of_hours',
+      RepeatType.daysAfterLastStart      => 'days_after_last_start',
+      RepeatType.daysAfterLastEnd        => 'days_after_last_end',
+      RepeatType.numberOfDaysPerPeriod   => 'days_per_period',
+      RepeatType.linkedItemAppears       => 'linked_item_appears',
+      RepeatType.nDaysAfterLinkedItem    => 'n_days_after_linked_item',
+      RepeatType.firstBusinessDayOfMonth => 'first_business_day_of_month',
+      RepeatType.daysOfTheme             => 'days_of_theme',
+      RepeatType.daysWithBlock           => 'days_with_block',
+    };
+    static RepeatType fromSpecName(String s) => RepeatType.values.firstWhere(
+      (t) => t.specName == s || t.name == s, orElse: () => RepeatType.numberOfDays);
+  }
+
+EDIT `SchedulerRule.toMap()`: `'repeat_type': repeatType.specName,`
+EDIT `SchedulerRule.fromMap()`: `repeatType: RepeatTypeX.fromSpecName(map['repeat_type']?.toString() ?? ''),`
+
+  (Esta task SUBSTITUI integralmente a Phase 9 Task 9.C.4 original — não
+  aplicar a versão antiga, ela referencia símbolos inexistentes.)
+
+────────────────────────────────────────────────────────────────────────────────
+2.8 — AUTO-CATEGORIA "[[people]]" NUNCA APLICADA A Person; OUTRAS 4
+      ENTIDADES GANHAM AUTO-CATEGORIAS QUE A SPEC NÃO PEDE
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+
+EVIDÊNCIA: `PeopleNotifier.addPerson()` NÃO adiciona nenhuma categoria
+  automática (spec PARTE 8: "categories — auto-inclui [[people]]" —
+  ausente). Já `OrganizersNotifier.addOrganizer()` adiciona
+  `'[[organizers]]'`, `TrackersNotifier.addTracker()` adiciona
+  `'[[trackers]]'`, `SnapshotsNotifier.addSnapshot()` adiciona
+  `'[[snapshots]]'`, e `saveTrackerRecord()` adiciona
+  `'[[tracker_records]]'` — NENHUM desses 4 é pedido pela spec.
+
+ACTION:
+  1. ADD em `PeopleNotifier.addPerson()`, antes de persistir:
+       if (!person.categories.contains('[[people]]')) {
+         person.categories.add('[[people]]');
+       }
+  2. Para Organizer/Tracker/Snapshot/TrackingRecord: REMOVER essas
+     auto-categorias (recomendado — não têm base na spec e poluem o
+     frontmatter sem benefício funcional comprovado), OU documentar
+     formalmente como extensão no guidelines.md (decisão de produto, igual
+     à Task 0.3/OPÇÃO B).
+
+────────────────────────────────────────────────────────────────────────────────
+2.9 — FALTA HOOK "CHECAR PACTS VENCIDOS A CADA ABERTURA DO APP"
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/providers/vault_provider.dart + lib/services/automation_service.dart
+ACTION: ADD
+
+EVIDÊNCIA: spec (PARTE 2 OBJETO 4 + PARTE 22 #14): comparar `ends_at` com
+  hoje para Habits `habit_mode: pact`, `status: active`; se vencido e
+  `pact_outcome == null`, agendar notificação de Steering Sheet. O padrão
+  equivalente já existe e funciona para People
+  (`PeopleNotifier.build()` chama `AutomationService.checkPersonContacts()`
+  via `Future.microtask`) mas NÃO tem equivalente para Habits/Pacts.
+
+ACTION: replicar o padrão de People para Habits:
+  class HabitsNotifier extends Notifier<List<Habit>> {
+    @override
+    List<Habit> build() {
+      final habits = ref.watch(objectsByTypeProvider('habit')).cast<Habit>();
+      if (habits.isNotEmpty) {
+        Future.microtask(() => AutomationService.checkPactExpirations(ref, habits));
+      }
+      return habits;
+    }
+    ...
+  }
+  E implementar `AutomationService.checkPactExpirations()` (novo método),
+  espelhando `checkPersonContacts()`: filtrar `habitMode == HabitMode.pact
+  && status == HabitStatus.active && endsAt != null &&
+  !endsAt!.isAfter(DateTime.now()) && pactOutcome == null`, agendar a
+  notificação/trigger da Steering Sheet para cada um.
+  (DEPENDE da Task 0.1 — campos de Pact em Habit — já terem sido aplicados.)
+
+────────────────────────────────────────────────────────────────────────────────
+2.10 — SUBTASKS NÃO USAM SINTAXE DO TASKS PLUGIN DO OBSIDIAN
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/task_model.dart (escrita) + lib/models/shared_types.dart
+      (classe Subtask) + lib/services/markdown_parser.dart (leitura)
+ACTION: EDIT
+
+EVIDÊNCIA: guidelines PARTE 21: "Tasks em daily notes e nos arquivos de
+  task usam sintaxe do Tasks Plugin: `- [ ] Título [due:: 2024-12-31]
+  [priority:: high]`." `Task.toMarkdown()` escreve subtasks sem nenhum
+  campo inline; `MarkdownParser.parseSubtasks()` usa um regex que captura
+  tudo após o checkbox como texto cru, sem extrair `[chave:: valor]`.
+
+ACTION:
+  1. lib/models/shared_types.dart, classe `Subtask`: ADD `DateTime?
+     dueDate;` e `TaskPriority? priority;`.
+  2. lib/models/task_model.dart, `toMarkdown()`: ao serializar cada
+     subtask, anexar sintaxe inline quando aplicável:
+       String renderSubtaskLine(Subtask s) {
+         final check = s.completed ? '[x]' : '[ ]';
+         final title = s.slug != null ? '[[${s.slug!}]]' : s.title;
+         final fields = StringBuffer();
+         if (s.dueDate != null) {
+           fields.write(' [due:: ${s.dueDate!.toIso8601String().split('T').first}]');
+         }
+         if (s.priority != null && s.priority != TaskPriority.none) {
+           fields.write(' [priority:: ${s.priority!.name}]');
+         }
+         return '- $check $title$fields';
+       }
+  3. lib/services/markdown_parser.dart, `parseSubtasks()`: extrair `[due::
+     ...]` e `[priority:: ...]` do texto capturado, populando os novos
+     campos de `Subtask`. Aplicar o mesmo tratamento em
+     `parseTasksFromDailyNote()` (mesma sintaxe de checklist na seção
+     `## Tasks` da daily note).
+
+────────────────────────────────────────────────────────────────────────────────
+2.11 — ÍNDICE DATAVIEW DE MOOD USA CAMPO ANTIGO DE 1 DIMENSÃO
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/services/dataview_generator.dart
+ACTION: EDIT
+ANCHOR: `_writeMoodIndex()` — hoje `TABLE mood AS "Humor"... WHERE mood`.
+  Depende da Phase 9 Tasks 9.A.8 (MoodDefinition 2 eixos) e 9.C.11
+  (gravação dos 4 campos de mood na daily note) já terem sido aplicadas.
+REPLACE por:
+    ```dataview
+    TABLE mood_emoji AS "😊", mood_label AS "Humor", mood_pleasantness AS "Agradabilidade", mood_energy AS "Energia", date AS "Data"
+    FROM "daily"
+    WHERE type = "daily_note" AND mood_label
+    SORT file.name DESC
+    LIMIT 30
+    ```
+  (idêntico ao exemplo "Humor tendência" já presente na PARTE 20 da
+  guidelines).
+
+────────────────────────────────────────────────────────────────────────────────
+2.12 — FALTAM ÍNDICES DATAVIEW DE SYSTEMS E PACTS
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/services/dataview_generator.dart
+ACTION: ADD `_writeSystemsIndex()` e `_writePactsIndex()`, registrados em
+  `regenerateAll()`, usando as queries já prontas na PARTE 20:
+    -- Systems por frequência
+    TABLE trigger AS "Quando", run_count AS "Execuções", estimated_minutes AS "Estimado"
+    FROM "app" WHERE type = "system"
+    SORT run_count DESC
+
+    -- Todos os pacts ativos
+    TABLE ends_at AS "Termina", hypothesis AS "Hipótese"
+    FROM "app" WHERE type = "habit" AND habit_mode = "pact" AND status = "active"
+    SORT ends_at ASC
+  (já usando `FROM "app"`, consistente com a Task 1.1/2.x — não usar
+  `FROM "systems"` nem `FROM "habits"`.)
+
+================================================================================
+TIER 3 — POLIMENTO E DETALHES (P2)
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+3.1 — ContentObject SEM CAMPO `links` UNIVERSAL
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/content_object.dart
+ACTION: EDIT — ADD `List<String> links = [];` na base (PARTE 16 + PARTE 20
+  "Frontmatter Universal" listam `links:` como comum a TODOS os tipos).
+  Incluir em `toBaseMap()`/`loadBaseMap()`. Depois, remover/redirecionar
+  campos `links`/`socialRefs` duplicados específicos de Task/System/
+  SocialPost para usar o campo base, evitando duas fontes de verdade.
+
+────────────────────────────────────────────────────────────────────────────────
+3.2 — Project SEM CAMPO `scheduler`
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/project_model.dart
+ACTION: EDIT — ADD `Scheduler? scheduler;` (spec PARTE 10: "projeto
+  recorre/reinicia no schedule"). Incluir em toMarkdown/fromMarkdown/
+  copyWith. Implementar a lógica de "reiniciar" o projeto quando o
+  scheduler dispara em scheduler_service.dart (não auditado ainda).
+
+────────────────────────────────────────────────────────────────────────────────
+3.3 — Person SEM CAMPO `notes`
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/people_model.dart
+ACTION: EDIT — ADD `String? notes;` (spec PARTE 8 lista `notes` entre as
+  propriedades de Person). Incluir em toMarkdown/fromMarkdown
+  (recomendado: como corpo do markdown, não frontmatter).
+
+────────────────────────────────────────────────────────────────────────────────
+3.4 — Snapshot SEM `photos`; `subject` NÃO É WIKILINK REAL
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/snapshot_model.dart
+ACTION: EDIT
+  1. ADD `List<String> photos = [];`.
+  2. Renomear/gravar `parentId` como WikiLink (`'[[${parentId}]]'`) sob a
+     chave `subject` no frontmatter, não `parent_id` cru.
+  3. Avaliar generalizar `kpiValues: Map<String,double>` para
+     `Map<String,dynamic> stateData` (spec: "state_data — estado
+     serializado", genérico) — manter `kpiValues` como getter de
+     conveniência se quiser preservar compatibilidade.
+
+────────────────────────────────────────────────────────────────────────────────
+3.5 — ReminderConfig.ringOnSilent COM DEFAULT ERRADO
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/reminder_config.dart
+ACTION: EDIT — `this.ringOnSilent = false,` → `this.ringOnSilent = true,`
+  (spec PARTE 13: "tocar mesmo no silencioso (default: sim)", relevante
+  quando `type == NotificationType.alarm`).
+
+────────────────────────────────────────────────────────────────────────────────
+3.6 — TRIPLE CHECK SHEET: BOTÕES STUB; SEM PROTEÇÃO DE DISMISS; SEM
+      VALIDAÇÃO; SEM MODO BATCH/READ-ONLY
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/ui/widgets/triple_check_sheet.dart
+ACTION: EDIT
+
+EVIDÊNCIA (lido por completo, vs PARTE 23.5):
+  1. `_openEditTask()` é literalmente `Navigator.of(context).pop();` — os
+     botões "Reformular"/"Criar subtarefas"/"Adicionar dependência"/"Pedir
+     ajuda" fecham o sheet e não fazem mais nada.
+  2. Sem `PopScope`/proteção contra fechar sem salvar (spec: vibrar +
+     shake ao tentar fechar sem diagnóstico salvo).
+  3. Sem modo batch (PMN → "Tasks paradas" → "Task N de M").
+  4. Sem modo read-only para reabrir diagnóstico já salvo.
+
+ACTION:
+  1. Implementar cada ação de fato: "Reformular"/"Criar subtarefas"/
+     "Adicionar dependência" → navegar para CreateTaskForm já com o campo
+     relevante focado; "Pedir ajuda" → abrir picker de People.
+  2. Envolver com `PopScope(canPop: _saved, onPopInvoked: ... haptic +
+     shake quando !_saved)`.
+  3. ADD parâmetro `List<Task>? batchQueue`; quando presente, mostrar
+     "Task N de M" e avançar automaticamente ao salvar.
+  4. ADD parâmetro `bool readOnly = false`; abrir read-only quando vindo
+     do badge ⚠ do card (não do menu ⋯), com botão "Re-executar diagnóstico".
+
+────────────────────────────────────────────────────────────────────────────────
+3.7 — STEERING SHEET: SEM BOTÃO X; SEM VALIDAÇÃO POR ETAPA; DEFAULT DE
+      DURAÇÃO ERRADO
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/ui/widgets/steering_sheet.dart
+ACTION: EDIT
+
+EVIDÊNCIA (lido por completo, vs PARTE 23.6):
+  1. Sem botão X/fechar com confirmação ("Sair"/"Continuar revisão").
+  2. Etapa 1: "Avançar" nunca desabilitado mesmo com texto vazio.
+  3. Etapa 2: "Avançar" nunca desabilitado sem os 2 radios selecionados.
+  4. `_persistDays`: dropdown fixo [7,14,21,30,60,90] default 30, em vez
+     de campo numérico livre com default = duração original do ciclo.
+
+ACTION:
+  1. ADD `IconButton(icon: Icons.close)` no header → `showDialog` com
+     "Você pode revisar depois..." + "Sair"/"Continuar revisão".
+  2. `onPressed` Etapa 1 → `_reflectionController.text.trim().isNotEmpty ? _nextStep : null`.
+  3. `onPressed` Etapa 2 → `(_hypothesisEvaluation != null && _endedReason != null) ? _nextStep : null`.
+  4. Trocar dropdown por `TextField` numérico, inicializado com:
+     `_persistDays = (widget.habit.endsAt != null && widget.habit.startedAt != null)
+        ? widget.habit.endsAt!.difference(widget.habit.startedAt!).inDays : 30;`
+
+────────────────────────────────────────────────────────────────────────────────
+3.8 — FAB: FALTA CARD "SYSTEM"; "SESSÃO" ABRE POMODORO EM VEZ DE CALENDAR
+      SESSION
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/ui/widgets/create_menu_sheet.dart
+ACTION: EDIT (substitui/complementa a Phase 9 Task 9.B.6 original)
+
+EVIDÊNCIA: grid atual ("Capture"/"Criar") não tem nenhum card para criar
+  System; card "Sessão" abre `PomodoroScreen` direto em vez de um form de
+  Calendar Session; card "Journal" abre direto CreateEntryForm sem
+  sub-menu Entrada completa/Observação rápida/PMN.
+
+ACTION: ao reestruturar para as 4 abas Journal/Plan/Record/Note (Phase 9
+  Task 9.B.6), garantir explicitamente:
+  1. Aba "Note" inclui "⚙️ System" → CreateSystemForm (Task 3.9).
+  2. Aba "Plan" → "Session" abre CreateCalendarSessionForm (Phase 9 Task
+     9.C.2), NÃO PomodoroScreen.
+  3. Aba "Journal" → "Entry" abre segmented control Entrada completa/
+     Observação rápida ANTES de abrir qualquer form.
+
+────────────────────────────────────────────────────────────────────────────────
+3.9 — NÃO EXISTE lib/ui/forms/create_system_form.dart
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/ui/forms/create_system_form.dart
+ACTION: CREATE (confirmado ausente — todos os outros 24
+  `create_*_form.dart` existem, este não)
+
+ACTION: criar conforme PARTE 23.7 + PARTE 2 OBJETO 9: título, campo
+  Trigger, tempo estimado, lista de steps (texto + estimativa + substeps),
+  organizadores/tags, notas, botão "✨ Estruturar com IA" (auditar se já
+  existe alguma chamada à API da Anthropic em outro form do app antes de
+  decidir a implementação dessa parte — não confirmado nesta auditoria).
+
+────────────────────────────────────────────────────────────────────────────────
+3.10 — OBJECT IDENTIFICATION: TRADUÇÃO DE TIPOS INCOMPLETA
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/ui/screens/type_signatures_screen.dart
+ACTION: EDIT
+ANCHOR: `_translateType()` — cobre task, idea, habit, project, goal,
+  calendar_session ("Calendar Event", inglês), note, resource, person,
+  area, activity, place, label, organizer. Faltam: system, tracker, entry,
+  reminder, social_post, mood_definition.
+ADD ao switch: 'system'→'Sistema', 'tracker'→'Rastreador',
+  'entry'→'Entrada de Diário', 'reminder'→'Lembrete',
+  'social_post'→'Post Social', 'mood_definition'→'Definição de Humor'.
+CORRIGIR 'calendar_session'→'Sessão de Calendário' (remover inglês).
+REMOVER 'idea' quando a Task 0.3 for resolvida.
+
+────────────────────────────────────────────────────────────────────────────────
+3.11 — CORPO DA DAILY NOTE (## Habits) USA WIKILINK EM VEZ DO TÍTULO DO
+       HABIT
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/services/markdown_parser.dart
+ACTION: EDIT
+ANCHOR: `generateDailyNoteBody()`, bloco `if (habits.isNotEmpty)` — escreve
+  `'- $status [[$slug]]$details'`. Exemplo da spec usa o TÍTULO em texto
+  puro: `- [x] Meditar (Slot 1: 08:00)` / `- [x] Escrever 100 palavras ←
+  pact`.
+ACTION:
+  1. Mudar assinatura de `generateDailyNoteBody()` para também receber
+     `List<Habit> habitDefs` (ou `Map<String,String> slugToTitle`) e usar
+     `habit.title` na renderização em vez do slug.
+  2. ADD sufixo " ← pact" quando `habit.habitMode == HabitMode.pact`
+     (depende da Task 0.1).
+  3. Opcional: incluir rótulo do slot ("Slot 1: 08:00") lendo de
+     `habit.slots` pelo índice usado no toggle.
+
+────────────────────────────────────────────────────────────────────────────────
+3.12 — SystemDefinition.scheduler É EXTENSÃO NÃO DOCUMENTADA
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/system_model.dart
+ACTION: DECISÃO — campo `Scheduler? scheduler` não está na PARTE 2 OBJETO
+  9 da spec. Documentar formalmente no guidelines.md como extensão
+  ("Systems podem ter um Scheduler opcional para execução recorrente") ou
+  remover se não houver UI conectada (conferir quando create_system_form.dart
+  — Task 3.9 — for criado).
+
+================================================================================
+COBERTURA E PRÓXIMOS PASSOS (Phase 17+, depois de TIER 0–2 implementados)
+================================================================================
+
+Lido integralmente nesta auditoria: todos os 35 models de lib/models/;
+lib/services/obsidian_service.dart, markdown_parser.dart,
+dataview_generator.dart, automation_service.dart, kpi_engine.dart;
+lib/models/system_model.dart, scheduler.dart; ~90% de
+lib/providers/vault_provider.dart (cortado em `importExistingVault()`);
+lib/ui/widgets/triple_check_sheet.dart, steering_sheet.dart,
+create_menu_sheet.dart, command_center_overlay.dart, habit_row.dart;
+lib/ui/screens/type_signatures_screen.dart.
+
+NÃO auditado ainda (recomendado para uma Phase 17 futura, DEPOIS de TIER
+0–2 estarem implementados e validados com `flutter analyze` + `flutter test`):
+  • Restante de vault_provider.dart (`importExistingVault`,
+    `updateObject`/`deleteObject` completos de VaultNotifier).
+  • lib/services/notification_service.dart, scheduler_service.dart
+    (implementação real dos 11+2 tipos de regra), sync_manager.dart,
+    sync_queue_service.dart, google_drive_sync_service.dart,
+    backup_service.dart.
+  • Todos os 24 arquivos de lib/ui/forms/ (nenhum lido diretamente —
+    inclui create_habit_form.dart, crítico para confirmar a UI de criação/
+    edição de Pact depois da Task 0.1).
+  • A maior parte de lib/ui/screens/ (~55 arquivos) e lib/ui/widgets/
+    (~65 arquivos) — incluindo mood_chart_widget.dart, analysis_calendar.dart,
+    mood_settings_screen.dart, system_detail_screen.dart, e a confirmação
+    de que combined_analysis_screen.dart realmente não existe (não está
+    na listagem de arquivos do projeto, apesar de a PARTE 23.4 descrever
+    uma tela dedicada inteira).
+
+================================================================================
+END OF GAP ANALYSIS — ADENDO V2 (Phases 12–16 consolidadas)
+================================================================================
+
+
+GAP ANALYSIS v1
 Audience: AI coding agent with full repo access
 Convention: every instruction is an atomic, unambiguous action on a specific
             file + location. No explanations unless they prevent a mistake.

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../models/content_object.dart';
+import '../../models/task_model.dart';
+import '../../models/goal_model.dart';
+import '../../models/project_model.dart';
 import '../../providers/pomodoro_provider.dart';
 import '../theme.dart';
 import '../../models/shared_types.dart';
@@ -17,12 +20,13 @@ class PomodoroWeekOverview extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final pomodoroState = ref.watch(pomodoroProvider);
     final allOrganizers = ref.watch(organizerListProvider);
+    final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
 
     // Calculate total hours this week
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1)); // Monday
-    final sessionsThisWeek = pomodoroState.history.where((s) => s.startTime.isAfter(startOfWeek)).toList();
-    final totalMinutesThisWeek = sessionsThisWeek.fold<int>(0, (sum, s) => sum + s.duration.inMinutes);
+    final sessionsThisWeek = pomodoroState.history.where((s) => s.date.isAfter(startOfWeek)).toList();
+    final totalMinutesThisWeek = sessionsThisWeek.fold<int>(0, (sum, s) => sum + s.minutesWorked);
     final totalHoursThisWeek = totalMinutesThisWeek / 60;
     final avgHoursPerDay = totalHoursThisWeek / (now.weekday); // Average up to today
     final mutedColor = AppTheme.textMutedColor(context);
@@ -34,17 +38,37 @@ class PomodoroWeekOverview extends ConsumerWidget {
       dailyMinutes[i] = 0.0;
     }
     for (final session in sessionsThisWeek) {
-      final day = session.startTime.weekday - 1; // 0 for Monday, 6 for Sunday
-      dailyMinutes[day] = (dailyMinutes[day] ?? 0.0) + session.duration.inMinutes;
+      final day = session.date.weekday - 1; // 0 for Monday, 6 for Sunday
+      dailyMinutes[day] = (dailyMinutes[day] ?? 0.0) + session.minutesWorked;
     }
 
     // Group sessions by organizer
     final Map<String, double> organizerMinutes = {};
     for (final session in sessionsThisWeek) {
-      final orgRef = session.linkedOrganizerRef;
-      if (orgRef != null) {
-        final slug = orgRef.slug;
-        organizerMinutes[slug] = (organizerMinutes[slug] ?? 0.0) + session.duration.inMinutes;
+      String? orgSlug;
+      if (session.linkedItemSlug != null) {
+        final target = allObjects.firstWhere(
+          (o) => o.id == session.linkedItemSlug || o.slug == session.linkedItemSlug,
+          orElse: () => null as dynamic,
+        ) as ContentObject?;
+        if (target != null) {
+          if (target is Task) {
+            orgSlug = target.organizers.firstOrNull?.slug;
+          } else if (target is Goal) {
+            orgSlug = target.organizers.firstOrNull?.slug;
+          } else if (target is Project) {
+            orgSlug = target.slug;
+          }
+        }
+        if (orgSlug == null) {
+          final isOrganizer = allOrganizers.any((o) => o.slug == session.linkedItemSlug);
+          if (isOrganizer) {
+            orgSlug = session.linkedItemSlug;
+          }
+        }
+      }
+      if (orgSlug != null) {
+        organizerMinutes[orgSlug] = (organizerMinutes[orgSlug] ?? 0.0) + session.minutesWorked;
       }
     }
 

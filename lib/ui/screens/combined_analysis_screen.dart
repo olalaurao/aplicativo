@@ -11,6 +11,7 @@ import '../../providers/google_calendar_provider.dart';
 import '../../models/tracker_model.dart';
 import '../../models/mood_model.dart';
 import '../../models/analysis_model.dart';
+import '../../models/pomodoro_session.dart';
 import '../theme.dart';
 import '../widgets/citrine_chart.dart';
 import '../widgets/analysis_calendar.dart';
@@ -808,13 +809,13 @@ class _CombinedAnalysisScreenState
       final pState = ref.read(pomodoroProvider);
       final sessions = pState.history.where(
         (s) =>
-            s.startTime.year == date.year &&
-            s.startTime.month == date.month &&
-            s.startTime.day == date.day &&
-            s.completed,
+            s.date.year == date.year &&
+            s.date.month == date.month &&
+            s.date.day == date.day &&
+            s.state == PomodoroSessionState.completed,
       );
       if (sessions.isEmpty) return null;
-      return sessions.fold<double>(0, (sum, s) => sum + s.duration.inMinutes);
+      return sessions.fold<double>(0, (sum, s) => sum + s.minutesWorked);
     } catch (_) {
       return null;
     }
@@ -925,6 +926,7 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
           id: 'mood',
           label: 'Meu Humor',
           color: AppColors.primary,
+          dimension: 'pleasantness',
         ),
       );
     }
@@ -1234,9 +1236,63 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                       label: val,
                       fieldId: source.fieldId,
                       color: source.color,
+                      dimension: source.dimension,
+                      axis: source.axis,
+                      showEmojiMarkers: source.showEmojiMarkers,
+                      valueMapping: source.valueMapping,
                     );
                   },
                 ),
+                if (source.type == MetricType.mood) ...[
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: source.dimension,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.textPrimaryColor(context),
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Dimensão do Humor (Requerido)',
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                    ),
+                    dropdownColor: AppTheme.surfaceColor(context),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'pleasantness',
+                        child: Text('Agradabilidade (Pleasantness)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'energy',
+                        child: Text('Energia (Energy)'),
+                      ),
+                    ],
+                    validator: (val) {
+                      if (val == null || val.isEmpty) {
+                        return 'Por favor, selecione a dimensão do humor';
+                      }
+                      return null;
+                    },
+                    onChanged: (val) {
+                      setState(() {
+                        _tempSources[index] = MetricSource(
+                          type: source.type,
+                          id: source.id,
+                          label: source.label,
+                          fieldId: source.fieldId,
+                          color: source.color,
+                          dimension: val,
+                          axis: source.axis,
+                          showEmojiMarkers: source.showEmojiMarkers,
+                          valueMapping: source.valueMapping,
+                        );
+                      });
+                    },
+                  ),
+                ],
                 const SizedBox(height: 10),
 
                 // Color Selection Strip
@@ -1262,6 +1318,10 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                             label: source.label,
                             fieldId: source.fieldId,
                             color: color,
+                            dimension: source.dimension,
+                            axis: source.axis,
+                            showEmojiMarkers: source.showEmojiMarkers,
+                            valueMapping: source.valueMapping,
                           );
                         });
                       },
@@ -1374,6 +1434,7 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                       id: 'mood',
                       label: 'Humor',
                       color: AppColors.primary,
+                      dimension: 'pleasantness',
                     ),
                   );
                   Navigator.pop(ctx);

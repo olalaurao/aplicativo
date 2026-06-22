@@ -13,8 +13,6 @@ class KPIEngine {
   static double calculateProjectProgress(Project project, List<Task> allTasks) {
     if (project.taskLinks.isEmpty) return 0.0;
 
-    // Find tasks linked to this project
-    // Either by project.taskLinks (IDs) or tasks having project in their organizers
     final linkedTasks = allTasks
         .where(
           (task) =>
@@ -46,67 +44,56 @@ class KPIEngine {
     required List<JournalEntry> entries,
     required List<MoodDefinition> moods,
     required List<Note> notes,
+    required List<Task> tasks,
   }) {
     switch (kpi.sourceType) {
       // ─── HABITS ───
-      case KPISourceType.habitCompletionCount:
-        final habit = habits.where((h) => h.id == kpi.sourceId).firstOrNull;
-        return habit?.completionHistory
-                .where((c) => c.successful)
-                .length
-                .toDouble() ??
-            0;
-      case KPISourceType.habitStreak:
-        final habit = habits.where((h) => h.id == kpi.sourceId).firstOrNull;
-        return habit?.streak.toDouble() ?? 0;
-      case KPISourceType.habitSuccessRate:
-        final habit = habits.where((h) => h.id == kpi.sourceId).firstOrNull;
-        if (habit == null || habit.completionHistory.isEmpty) return 0;
-        final successCount = habit.completionHistory
-            .where((c) => c.successful)
-            .length;
-        return (successCount / habit.completionHistory.length) * 100;
+      case KPISourceType.habit:
+        final habit = habits.where((h) => h.id == kpi.sourceId || h.slug == kpi.sourceId).firstOrNull;
+        if (habit == null) return 0;
+        if (kpi.calculationMode == 'streak') {
+          return habit.streak.toDouble();
+        } else if (kpi.calculationMode == 'success_rate') {
+          if (habit.completionHistory.isEmpty) return 0;
+          final successCount = habit.completionHistory.where((c) => c.successful).length;
+          return (successCount / habit.completionHistory.length) * 100;
+        } else {
+          return habit.completionHistory.where((c) => c.successful).length.toDouble();
+        }
 
       // ─── TRACKERS ───
-      case KPISourceType.trackerFieldSum:
+      case KPISourceType.trackerField:
         final values = _getTrackerValues(kpi, trackerRecords);
-        return sum(values);
-      case KPISourceType.trackerFieldAverage:
-        final values = _getTrackerValues(kpi, trackerRecords);
-        return average(values);
-      case KPISourceType.trackerFieldMax:
-        final values = _getTrackerValues(kpi, trackerRecords);
-        return max(values);
-      case KPISourceType.trackerFieldMin:
-        final values = _getTrackerValues(kpi, trackerRecords);
-        return min(values);
+        if (kpi.calculationMode == 'average') {
+          return average(values);
+        } else if (kpi.calculationMode == 'max') {
+          return max(values);
+        } else if (kpi.calculationMode == 'min') {
+          return min(values);
+        } else if (kpi.calculationMode == 'count') {
+          return values.length.toDouble();
+        } else if (kpi.calculationMode == 'latest') {
+          return values.isEmpty ? 0 : values.last;
+        } else {
+          return sum(values);
+        }
 
-      // ─── TIME / TASKS ───
-      case KPISourceType.plannerTaskDuration:
-        return 0; // Sessions deprecated, refactor if needed for task duration later
-
-      // ─── MOOD ───
-      case KPISourceType.moodAverage:
-        final dayMoods = entries.where((e) => e.moodSlug != null).map((e) {
-          final m = moods.where((m) => m.id == e.moodSlug).firstOrNull;
-          return m?.numericValue.toDouble() ?? 0.0;
+      // ─── SUBTASKS ───
+      case KPISourceType.subtasks:
+        final linkedTasks = tasks.where((t) {
+          return t.organizers.any((org) => org.slug == kpi.sourceId) ||
+                 t.dependsOn.contains('[[${kpi.sourceId}]]');
         }).toList();
-        return average(dayMoods);
-
-      // ─── ENTRIES ───
-      case KPISourceType.entryCount:
-        if (kpi.sourceId == null) return entries.length.toDouble();
-        return entries
-            .where(
-              (e) =>
-                  e.body.contains('[[${kpi.sourceId}]]') ||
-                  e.organizers.any((o) => o.slug == kpi.sourceId),
-            )
-            .length
-            .toDouble();
+        if (linkedTasks.isEmpty) return 0;
+        final completed = linkedTasks.where((t) => t.stage == TaskStage.finalized).length;
+        if (kpi.calculationMode == 'goal_percentage') {
+          return (completed / linkedTasks.length) * 100;
+        } else {
+          return completed.toDouble();
+        }
 
       // ─── COLLECTIONS ───
-      case KPISourceType.collectionItemCount:
+      case KPISourceType.collection:
         final note = notes
             .where(
               (n) =>
@@ -135,12 +122,106 @@ class KPIEngine {
             .length
             .toDouble();
 
-      // ─── CUSTOM ───
-      case KPISourceType.customNumericInput:
+      // ─── ENTRIES ───
+      case KPISourceType.entry:
+        final filteredEntries = kpi.sourceId == null
+            ? entries
+            : entries.where((e) =>
+                e.body.contains('[[${kpi.sourceId}]]') ||
+                e.organizers.any((o) => o.slug == kpi.sourceId));
+        if (kpi.calculationMode == 'word_count') {
+          return filteredEntries.fold<double>(0, (sumVal, e) {
+            final words = e.body.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+            return sumVal + words;
+          });
+        } else {
+          return filteredEntries.length.toDouble();
+        }
+
+      // ─── TIME SPENT ───
+      case KPISourceType.timeSpent:
+        final matchedTasks = tasks.where((t) {
+          if (kpi.sourceId == null) return true;
+          return t.organizers.any((o) => o.slug == kpi.sourceId);
+        });
+        final totalTaskMinutes = matchedTasks.fold<double>(0, (sumVal, t) => sumVal + t.timerSessions);
+        return totalTaskMinutes;
+
+      // ─── MANUAL QUANTITY ───
+      case KPISourceType.manualQuantity:
         return kpi.currentValue;
 
-      default:
+      // ─── OTHERS ───
+      case KPISourceType.others:
+        if (kpi.calculationMode == 'mood_average') {
+          // Sistema de 2 eixos: pleasantness (padrão) ou energy
+          final useEnergy = kpi.fieldId == 'energy';
+          final dayMoods = entries.where((e) => e.moodSlug != null).map((e) {
+            final m = moods.where((m) => m.id == e.moodSlug).firstOrNull;
+            if (useEnergy) {
+              return (m?.energy ?? 0).toDouble();
+            }
+            return (m?.pleasantness ?? m?.numericValue ?? 0).toDouble();
+          }).where((val) => val > 0).toList();
+          return average(dayMoods);
+        } else if (kpi.calculationMode == 'mood_trend') {
+          // Diferença entre média da última semana vs semana anterior
+          final now = DateTime.now();
+          final cutoff = now.subtract(const Duration(days: 7));
+          final prevCutoff = now.subtract(const Duration(days: 14));
+          double moodVal(JournalEntry e) {
+            final m = moods.where((m) => m.id == e.moodSlug).firstOrNull;
+            return (m?.pleasantness ?? m?.numericValue ?? 0).toDouble();
+          }
+          final recentMoods = entries
+              .where((e) => e.moodSlug != null && e.date.isAfter(cutoff))
+              .map(moodVal)
+              .where((v) => v > 0)
+              .toList();
+          final prevMoods = entries
+              .where((e) => e.moodSlug != null && e.date.isAfter(prevCutoff) && !e.date.isAfter(cutoff))
+              .map(moodVal)
+              .where((v) => v > 0)
+              .toList();
+          return average(recentMoods) - average(prevMoods);
+        } else if (kpi.calculationMode == 'photo_count') {
+          return entries.fold<double>(0, (sumVal, e) => sumVal + e.photos.length);
+        } else if (kpi.calculationMode == 'comment_count') {
+          return entries.fold<double>(0, (sumVal, e) => sumVal + e.comments.length);
+        } else if (kpi.calculationMode == 'reflection_length') {
+          return tasks.fold<double>(0, (sumVal, t) => sumVal + (t.reflection?.length ?? 0));
+        } else if (kpi.calculationMode == 'planner_task_count') {
+          if (kpi.sourceId != null) {
+            return tasks
+                .where((t) => t.organizers.any((o) => o.slug == kpi.sourceId))
+                .length
+                .toDouble();
+          }
+          return tasks.length.toDouble();
+        } else if (kpi.calculationMode == 'planner_overdue_count') {
+          final now = DateTime.now();
+          return tasks
+              .where((t) =>
+                  t.endDate != null &&
+                  t.endDate!.isBefore(now) &&
+                  t.stage != TaskStage.finalized &&
+                  (kpi.sourceId == null ||
+                      t.organizers.any((o) => o.slug == kpi.sourceId)))
+              .length
+              .toDouble();
+        } else if (kpi.calculationMode == 'organizer_association_count') {
+          // Número de objetos associados a um organizer
+          if (kpi.sourceId == null) return 0;
+          return tasks
+              .where((t) => t.organizers.any((o) => o.slug == kpi.sourceId))
+              .length
+              .toDouble();
+        }
         return 0;
+
+      // ─── TIME SPENT (planner_task_duration e category_duration) ───
+      // Nota: o case principal já trata timeSpent acima; este bloco é
+      // necessário apenas como extensão do switch para satisfazer o Dart.
     }
   }
 
@@ -159,6 +240,7 @@ class KPIEngine {
     required List<JournalEntry> entries,
     required List<MoodDefinition> moods,
     required List<Note> notes,
+    required List<Task> tasks,
   }) {
     bool allMet = true;
     for (final kpi in kpis) {
@@ -169,6 +251,7 @@ class KPIEngine {
         entries: entries,
         moods: moods,
         notes: notes,
+        tasks: tasks,
       );
       if (kpi.currentValue >= kpi.targetValue) {
         kpi.completed = true;

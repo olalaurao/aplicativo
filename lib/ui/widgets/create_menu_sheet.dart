@@ -1,47 +1,22 @@
 // lib/ui/widgets/create_menu_sheet.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import '../theme.dart';
 import '../forms/create_task_form.dart';
 import '../forms/create_entry_form.dart';
 import '../forms/create_pmn_form.dart';
-import '../forms/create_habit_form.dart';
 import '../forms/create_idea_form.dart';
 import '../forms/create_goal_form.dart';
 import '../forms/create_note_form.dart';
-import '../forms/create_event_form.dart';
-import '../forms/create_social_post_form.dart';
-import '../forms/create_scan_document_form.dart';
 import '../forms/create_reminder_form.dart';
-import '../forms/create_project_form.dart';
-import '../forms/create_person_form.dart';
-import '../forms/create_resource_form.dart';
-import '../forms/create_snapshot_form.dart';
 import '../forms/create_tracker_form.dart';
 import '../forms/create_system_form.dart';
-import '../screens/pomodoro_screen.dart';
-
-class MenuItemDef {
-  final String id;
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final Widget Function(BuildContext)? targetBuilder;
-  final void Function(BuildContext)? onTapOverride;
-
-  MenuItemDef({
-    required this.id,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    this.targetBuilder,
-    this.onTapOverride,
-  });
-}
+import '../forms/create_record_form.dart';
+import '../forms/create_calendar_session_form.dart';
+import '../../providers/vault_provider.dart';
+import '../../models/journal_entry.dart';
+import '../../models/task_model.dart';
 
 class CreateMenuSheet extends ConsumerStatefulWidget {
   final String? initialTitle;
@@ -52,217 +27,593 @@ class CreateMenuSheet extends ConsumerStatefulWidget {
 }
 
 class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
-  bool _isCaptureTab = true;
-  bool _isReordering = false;
+  int _selectedTab = 0; // 0 = Journal, 1 = Plan, 2 = Record, 3 = Note
 
-  late List<MenuItemDef> _captureItems;
-  late List<MenuItemDef> _createItems;
+  // Journal Tab state
+  bool _isEntryStandard = true; // true = Entrada completa, false = Observação rápida
+  String? _selectedCategory; // 'insight', 'energia', 'humor', 'encontro'
+  final TextEditingController _quickTextController = TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    _initItems();
-    _loadOrder();
+  void dispose() {
+    _quickTextController.dispose();
+    super.dispose();
   }
 
-  void _initItems() {
-    _captureItems = [
-      MenuItemDef(
-        id: 'mercado',
-        icon: Icons.shopping_cart_outlined,
-        title: 'Mercado',
-        subtitle: 'Lista de compras',
-        color: AppColors.accent,
-        onTapOverride: (context) {
-          context.push('/shopping');
-          Navigator.of(context).pop();
-        },
-      ),
-      MenuItemDef(
-        id: 'ideia',
-        icon: Icons.lightbulb_outline_rounded,
-        title: 'Ideia',
-        subtitle: 'Captura rápida',
-        color: AppColors.warning,
-        targetBuilder: (_) => CreateIdeaForm(initialTitle: widget.initialTitle),
-      ),
-      MenuItemDef(
-        id: 'tarefa',
-        icon: Icons.check_box_outlined,
-        title: 'Tarefa',
-        subtitle: 'Add something to your list',
-        color: AppColors.info,
-        targetBuilder: (_) => CreateTaskForm(initialTitle: widget.initialTitle),
-      ),
-      MenuItemDef(
-        id: 'journal',
-        icon: Icons.menu_book_rounded,
-        title: 'Journal',
-        subtitle: 'Registre seus pensamentos',
-        color: AppColors.primary,
-        targetBuilder: (_) => CreateEntryForm(initialTitle: widget.initialTitle),
-      ),
-      MenuItemDef(
-        id: 'note',
-        icon: Icons.description_outlined,
-        title: 'Note',
-        subtitle: 'Create reference material',
-        color: AppColors.habitPink,
-        targetBuilder: (_) => CreateNoteForm(initialTitle: widget.initialTitle),
-      ),
-      MenuItemDef(
-        id: 'foto',
-        icon: Icons.camera_alt_outlined,
-        title: 'Foto',
-        subtitle: 'Quick photo entry',
-        color: AppColors.warning,
-        targetBuilder: (_) => CreateSnapshotForm(initialTitle: widget.initialTitle),
-      ),
-      MenuItemDef(
-        id: 'sessao',
-        icon: Icons.timer_outlined,
-        title: 'Sessão',
-        subtitle: 'Start a Pomodoro session',
-        color: AppColors.error,
-        targetBuilder: (_) => const PomodoroScreen(),
-      ),
-      MenuItemDef(
-        id: 'social',
-        icon: Icons.play_circle_outline_rounded,
-        title: 'Post social',
-        subtitle: 'Salvar link de uma rede',
-        color: AppColors.info,
-        targetBuilder: (_) => const CreateSocialPostForm(),
-      ),
-      MenuItemDef(
-        id: 'escanear',
-        icon: Icons.document_scanner_outlined,
-        title: 'Escanear',
-        subtitle: 'Scan a physical document',
-        color: AppColors.habitGreen,
-        targetBuilder: (_) => CreateScanDocumentForm(initialTitle: widget.initialTitle),
-      ),
-      MenuItemDef(
-        id: 'pmn',
-        icon: Icons.view_week_rounded,
-        title: 'PMN',
-        subtitle: 'Plus, Minus, Next da semana',
-        color: AppColors.primary,
-        targetBuilder: (_) => const CreatePmnForm(),
-      ),
-    ];
-
-    _createItems = [
-      MenuItemDef(
-        id: 'projeto',
-        icon: Icons.rocket_launch_rounded,
-        title: 'Projeto',
-        subtitle: 'Large goal com tasks',
-        color: AppColors.priorityHigh,
-        targetBuilder: (_) => CreateProjectForm(initialTitle: widget.initialTitle),
-      ),
-      MenuItemDef(
-        id: 'habit',
-        icon: Icons.cached_rounded,
-        title: 'Habit',
-        subtitle: 'Rastreie um comportamento',
-        color: AppColors.habitPurple,
-        targetBuilder: (_) => CreateHabitForm(initialTitle: widget.initialTitle),
-      ),
-      MenuItemDef(
-        id: 'goal',
-        icon: Icons.flag_circle_rounded,
-        title: 'Goal',
-        subtitle: 'Defina uma meta',
-        color: AppColors.habitGreen,
-        targetBuilder: (_) => CreateGoalForm(initialTitle: widget.initialTitle),
-      ),
-      MenuItemDef(
-        id: 'rastreador',
-        icon: Icons.show_chart_rounded,
-        title: 'Rastreador',
-        subtitle: 'Create a data form',
-        color: AppColors.error,
-        targetBuilder: (_) => const CreateTrackerForm(),
-      ),
-      MenuItemDef(
-        id: 'resource',
-        icon: Icons.local_library_rounded,
-        title: 'Resource',
-        subtitle: 'Media to consume',
-        color: AppColors.warning,
-        targetBuilder: (_) => CreateResourceForm(initialTitle: widget.initialTitle),
-      ),
-      MenuItemDef(
-        id: 'person',
-        icon: Icons.person_outline_rounded,
-        title: 'Person',
-        subtitle: 'CRM e contatos',
-        color: AppColors.habitPink,
-        targetBuilder: (_) => CreatePersonForm(initialTitle: widget.initialTitle),
-      ),
-      MenuItemDef(
-        id: 'lembrete',
-        icon: Icons.notifications_none_rounded,
-        title: 'Lembrete',
-        subtitle: 'Quick alert',
-        color: AppColors.warning,
-        targetBuilder: (_) => const CreateReminderForm(),
-      ),
-      MenuItemDef(
-        id: 'evento',
-        icon: Icons.event_rounded,
-        title: 'Evento',
-        subtitle: 'Criar no Google Calendar',
-        color: AppColors.info,
-        targetBuilder: (_) => CreateEventForm(initialTitle: widget.initialTitle),
-      ),
-      MenuItemDef(
-        id: 'system',
-        icon: Icons.account_tree_rounded,
-        title: 'System',
-        subtitle: 'SOP reutilizável com steps',
-        color: AppColors.habitPurple,
-        targetBuilder: (_) => const CreateSystemForm(),
-      ),
-    ];
+  String _getCategoryPlaceholder(String category) {
+    return switch (category) {
+      'insight' => '💡 O que você percebeu?',
+      'energia' => '⚡ Como está sua energia agora (1-5)?',
+      'humor' => '😊 Como você está se sentindo?',
+      'encontro' => '👥 Quem você encontrou? Do que conversaram?',
+      _ => 'Digite sua observação...',
+    };
   }
 
-  Future<void> _loadOrder() async {
-    final prefs = await SharedPreferences.getInstance();
-    final capOrder = prefs.getStringList('menuOrder_capture');
-    if (capOrder != null) {
-      setState(() {
-        _captureItems.sort((a, b) {
-          final aIdx = capOrder.indexOf(a.id);
-          final bIdx = capOrder.indexOf(b.id);
-          if (aIdx == -1 && bIdx == -1) return 0;
-          if (aIdx == -1) return 1;
-          if (bIdx == -1) return -1;
-          return aIdx.compareTo(bIdx);
-        });
-      });
+  Color _getCategoryColor(String category) {
+    return switch (category) {
+      'insight' => AppColors.warning,
+      'energia' => AppColors.info,
+      'humor' => AppColors.success,
+      'encontro' => AppColors.habitPink,
+      _ => AppColors.primary,
+    };
+  }
+
+  String _getCategoryLabel(String category) {
+    return switch (category) {
+      'insight' => '💡 Insight',
+      'energia' => '⚡ Energia',
+      'humor' => '😊 Humor',
+      'encontro' => '👥 Encontro',
+      _ => category,
+    };
+  }
+
+  void _saveQuickObservation() async {
+    final text = _quickTextController.text.trim();
+    if (text.isEmpty || _selectedCategory == null) return;
+
+    int? energyValue;
+    if (_selectedCategory == 'energia') {
+      energyValue = int.tryParse(text);
     }
 
-    final creOrder = prefs.getStringList('menuOrder_create');
-    if (creOrder != null) {
-      setState(() {
-        _createItems.sort((a, b) {
-          final aIdx = creOrder.indexOf(a.id);
-          final bIdx = creOrder.indexOf(b.id);
-          if (aIdx == -1 && bIdx == -1) return 0;
-          if (aIdx == -1) return 1;
-          if (bIdx == -1) return -1;
-          return aIdx.compareTo(bIdx);
-        });
-      });
+    final entry = JournalEntry(
+      id: const Uuid().v4(),
+      body: text,
+      date: DateTime.now(),
+      entryType: JournalEntryType.fieldNote,
+      category: _selectedCategory,
+    );
+    if (energyValue != null) {
+      entry.energyValue = energyValue;
+    }
+
+    try {
+      await ref.read(todayJournalProvider.notifier).addEntry(entry);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Observação rápida salva com sucesso.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao salvar observação: $e')),
+        );
+      }
     }
   }
 
-  Future<void> _saveOrder() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('menuOrder_capture', _captureItems.map((e) => e.id).toList());
-    await prefs.setStringList('menuOrder_create', _createItems.map((e) => e.id).toList());
+  Widget _buildTabHeaderButton(String label, int index) {
+    final isSelected = _selectedTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedTab = index),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                color: isSelected ? AppColors.primary : AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              height: 2,
+              color: isSelected ? AppColors.primary : Colors.transparent,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOptionRow({
+    required IconData icon,
+    required Color color,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildJournalTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Segmented Control
+        Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.darkCardFill
+                : AppColors.surfaceVariant,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          padding: const EdgeInsets.all(4),
+          child: Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _isEntryStandard = true),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: _isEntryStandard
+                          ? (Theme.of(context).brightness == Brightness.dark
+                              ? AppColors.darkSurface
+                              : Colors.white)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Entrada completa',
+                      style: TextStyle(
+                        fontWeight: _isEntryStandard ? FontWeight.w700 : FontWeight.w500,
+                        color: _isEntryStandard
+                            ? AppTheme.textPrimaryColor(context)
+                            : AppTheme.textSecondaryColor(context),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _isEntryStandard = false),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: !_isEntryStandard
+                          ? (Theme.of(context).brightness == Brightness.dark
+                              ? AppColors.darkSurface
+                              : Colors.white)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Observação rápida',
+                      style: TextStyle(
+                        fontWeight: !_isEntryStandard ? FontWeight.w700 : FontWeight.w500,
+                        color: !_isEntryStandard
+                            ? AppTheme.textPrimaryColor(context)
+                            : AppTheme.textSecondaryColor(context),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        if (_isEntryStandard) ...[
+          // Entrada completa
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CreateEntryForm(initialTitle: widget.initialTitle),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+            child: const Text(
+              '📓 Nova entrada',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CreatePmnForm()),
+              );
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: AppColors.primary),
+              minimumSize: const Size(double.infinity, 48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+            child: const Text(
+              '📋 PMN da semana',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ] else ...[
+          // Observação rápida (Field Note)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: ['insight', 'energia', 'humor', 'encontro'].map((cat) {
+                final isSelected = _selectedCategory == cat;
+                final color = _getCategoryColor(cat);
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(_getCategoryLabel(cat)),
+                    selected: isSelected,
+                    selectedColor: color,
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.white : color,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                    backgroundColor: color.withValues(alpha: 0.15),
+                    side: BorderSide.none,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    onSelected: (val) {
+                      setState(() {
+                        _selectedCategory = val ? cat : null;
+                      });
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          if (_selectedCategory != null) ...[
+            const SizedBox(height: 16),
+            TextField(
+              controller: _quickTextController,
+              maxLines: 4,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                hintText: _getCategoryPlaceholder(_selectedCategory!),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: AppColors.divider.withValues(alpha: 0.5)),
+                ),
+                filled: true,
+                fillColor: Theme.of(context).brightness == Brightness.dark
+                    ? AppColors.darkCardFill
+                    : AppColors.surfaceVariant.withValues(alpha: 0.5),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _quickTextController.text.trim().isNotEmpty ? _saveQuickObservation : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Salvar observação',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPlanTab() {
+    return Column(
+      children: [
+        _buildOptionRow(
+          icon: Icons.check_circle_outline_rounded,
+          color: AppColors.info,
+          label: '✅ Nova task',
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CreateTaskForm(initialTitle: widget.initialTitle),
+              ),
+            );
+          },
+        ),
+        const Divider(),
+        _buildOptionRow(
+          icon: Icons.flag_outlined,
+          color: AppColors.habitGreen,
+          label: '🎯 Nova meta',
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CreateGoalForm(initialTitle: widget.initialTitle),
+              ),
+            );
+          },
+        ),
+        const Divider(),
+        _buildOptionRow(
+          icon: Icons.event_outlined,
+          color: AppColors.secondary,
+          label: '📅 Nova sessão',
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CreateCalendarSessionForm(initialTitle: widget.initialTitle),
+              ),
+            );
+          },
+        ),
+        const Divider(),
+        _buildOptionRow(
+          icon: Icons.alarm,
+          color: AppColors.warning,
+          label: '🔔 Novo lembrete',
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CreateReminderForm()),
+            );
+          },
+        ),
+        const Divider(),
+        _buildOptionRow(
+          icon: Icons.inbox_outlined,
+          color: AppColors.info,
+          label: '📥 Adicionar ao backlog',
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CreateTaskForm(
+                  initialTitle: widget.initialTitle,
+                  initialStage: TaskStage.backlog,
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecordTab() {
+    final trackers = ref.watch(trackersProvider);
+
+    if (trackers.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Column(
+          children: [
+            const Icon(Icons.show_chart_rounded, size: 48, color: AppColors.textMuted),
+            const SizedBox(height: 12),
+            const Text(
+              'Você ainda não tem trackers.',
+              style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CreateTrackerForm()),
+                );
+              },
+              child: const Text('Criar um'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (trackers.length == 1) {
+      final t = trackers.first;
+      return Column(
+        children: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => CreateRecordForm(tracker: t)),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+            child: Text(
+              'Registrar ${t.title}',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: trackers.length,
+      separatorBuilder: (context, index) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        final t = trackers[index];
+        final tColor = Color(int.tryParse(t.color.replaceAll('#', '0xFF')) ?? AppColors.primary.toARGB32());
+
+        return ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          leading: Icon(Icons.show_chart_rounded, color: tColor),
+          title: Text(
+            t.title,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+          ),
+          trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => CreateRecordForm(tracker: t)),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildNoteTab() {
+    return Column(
+      children: [
+        _buildOptionRow(
+          icon: Icons.description_outlined,
+          color: AppColors.primary,
+          label: '📝 Nota de texto',
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CreateNoteForm(
+                  initialTitle: widget.initialTitle,
+                  initialType: NoteType.text,
+                ),
+              ),
+            );
+          },
+        ),
+        const Divider(),
+        _buildOptionRow(
+          icon: Icons.format_list_bulleted,
+          color: AppColors.info,
+          label: '🗂 Nota de outline',
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CreateNoteForm(
+                  initialTitle: widget.initialTitle,
+                  initialType: NoteType.outline,
+                ),
+              ),
+            );
+          },
+        ),
+        const Divider(),
+        _buildOptionRow(
+          icon: Icons.table_chart_outlined,
+          color: AppColors.habitPink,
+          label: '🗃 Coleção',
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CreateNoteForm(
+                  initialTitle: widget.initialTitle,
+                  initialType: NoteType.collection,
+                ),
+              ),
+            );
+          },
+        ),
+        const Divider(),
+        _buildOptionRow(
+          icon: Icons.settings_outlined,
+          color: AppColors.warning,
+          label: '⚙️ System',
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CreateSystemForm()),
+            );
+          },
+        ),
+        const Divider(),
+        _buildOptionRow(
+          icon: Icons.lightbulb_outline_rounded,
+          color: AppColors.warning,
+          label: '💡 Idea',
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CreateIdeaForm(initialTitle: widget.initialTitle),
+              ),
+            );
+          },
+        ),
+      ],
+    );
   }
 
   @override
@@ -273,6 +624,9 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
       child: SafeArea(
         top: false,
@@ -290,272 +644,39 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            // Title row with close button
+
+            // Tabs Row
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  const Text(
-                    'Criar Novo',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: Icon(
-                      _isReordering ? Icons.check_circle_rounded : Icons.edit_rounded,
-                      color: _isReordering ? AppColors.accent : AppTheme.textSecondaryColor(context),
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isReordering = !_isReordering;
-                      });
-                      if (!_isReordering) {
-                        _saveOrder();
-                      }
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceVariantColor(context),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.close_rounded,
-                        size: 18,
-                        color: AppTheme.textSecondaryColor(context),
-                      ),
-                    ),
-                  ),
+                  _buildTabHeaderButton('Journal', 0),
+                  _buildTabHeaderButton('Plan', 1),
+                  _buildTabHeaderButton('Record', 2),
+                  _buildTabHeaderButton('Note', 3),
                 ],
               ),
             ),
-            const SizedBox(height: 18),
-            // ─── Tabs ───
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? AppColors.darkCardFill
-                      : AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.all(4),
-                child: Row(
-                  children: [
-                    _buildTabButton('Capture', true),
-                    _buildTabButton('Criar', false),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
-            // ─── Grid or Reorderable List ───
+            // Tab Content
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _isReordering ? _buildReorderableList(context) : _buildDynamicGrid(context),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 150),
+                  child: KeyedSubtree(
+                    key: ValueKey<int>(_selectedTab),
+                    child: switch (_selectedTab) {
+                      0 => _buildJournalTab(),
+                      1 => _buildPlanTab(),
+                      2 => _buildRecordTab(),
+                      3 => _buildNoteTab(),
+                      _ => const SizedBox.shrink(),
+                    },
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabButton(String label, bool isCapture) {
-    final isSelected = _isCaptureTab == isCapture;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          if (!_isReordering) {
-            setState(() => _isCaptureTab = isCapture);
-          }
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isSelected
-                ? (Theme.of(context).brightness == Brightness.dark
-                      ? AppColors.darkSurface
-                      : Colors.white)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                    ),
-                  ]
-                : null,
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              color: isSelected
-                  ? AppTheme.textPrimaryColor(context)
-                  : (_isReordering ? AppTheme.textMutedColor(context) : AppTheme.textSecondaryColor(context)),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReorderableList(BuildContext context) {
-    final items = _isCaptureTab ? _captureItems : _createItems;
-    
-    return ReorderableListView(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      onReorder: (oldIndex, newIndex) {
-        if (newIndex > oldIndex) newIndex -= 1;
-        setState(() {
-          final item = items.removeAt(oldIndex);
-          items.insert(newIndex, item);
-        });
-      },
-      children: items.map((item) {
-        return Container(
-          key: ValueKey(item.id),
-          margin: const EdgeInsets.only(bottom: 8),
-          decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? AppColors.darkCardFill
-                : AppColors.cardFill,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
-            ),
-          ),
-          child: ListTile(
-            leading: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: item.color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(item.icon, color: item.color, size: 18),
-            ),
-            title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text(item.subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-            trailing: const Icon(Icons.drag_handle_rounded, color: AppColors.textMuted),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildDynamicGrid(BuildContext context) {
-    final items = _isCaptureTab ? _captureItems : _createItems;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final itemWidth = (screenWidth - 40 - 12) / 2; // 40 horizontal padding, 12 spacing
-
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: items.map((item) {
-        return SizedBox(
-          width: itemWidth,
-          child: _buildCreateCard(
-            context,
-            icon: item.icon,
-            title: item.title,
-            subtitle: item.subtitle,
-            color: item.color,
-            targetBuilder: item.targetBuilder,
-            onTapOverride: item.onTapOverride,
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildCreateCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    Widget Function(BuildContext)? targetBuilder,
-    void Function(BuildContext)? onTapOverride,
-  }) {
-    return InkWell(
-      onTap: () {
-        if (_isReordering) return;
-        if (onTapOverride != null) {
-          onTapOverride(context);
-        } else {
-          final nav = Navigator.of(context);
-          nav.pop();
-          if (targetBuilder != null) {
-            nav.push(MaterialPageRoute(builder: targetBuilder));
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('$title is currently unavailable')),
-            );
-          }
-        }
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? AppColors.darkCardFill
-              : AppColors.cardFill,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? AppColors.darkDivider
-                : AppColors.divider,
-            width: 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 22),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textMuted,
-                height: 1.3,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

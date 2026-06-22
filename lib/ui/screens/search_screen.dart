@@ -50,7 +50,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final Map<String, String> _typeLabels = {
     'task': 'Tasks',
     'habit': 'Habits',
-    'journal_entry': 'Journal',
+    'entry': 'Journal',
     'note': 'Notes',
     'idea': 'Ideias',
     'goal': 'Goals',
@@ -686,7 +686,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         return Icons.person_rounded;
       case 'resource':
         return Icons.local_library_rounded;
-      case 'journal_entry':
+      case 'entry':
         return Icons.auto_stories_rounded;
       case 'note':
         return Icons.sticky_note_2_rounded;
@@ -712,6 +712,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           return 'Pessoa';
         case OrganizerType.place:
           return 'Lugar';
+        case OrganizerType.task:
+          return 'Tarefa';
+        case OrganizerType.goal:
+          return 'Objetivo';
+        case OrganizerType.habit:
+          return 'Hábito';
+        case OrganizerType.tracker:
+          return 'Tracker';
       }
     }
     switch (obj.type) {
@@ -750,7 +758,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         return AppColors.info;
       case 'resource':
         return AppColors.warning;
-      case 'journal_entry':
+      case 'entry':
         return AppColors.habitPurple;
       case 'note':
         return AppColors.primary;

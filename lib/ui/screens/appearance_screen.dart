@@ -20,10 +20,6 @@ class AppearanceScreen extends ConsumerWidget {
     Color(0xFF14B8A6), // Teal
   ];
 
-  String _colorToHex(Color color) {
-    final argb = color.toARGB32();
-    return '#${argb.toRadixString(16).substring(2).toUpperCase()}';
-  }
 
   Color _parseColor(String hex) {
     try {

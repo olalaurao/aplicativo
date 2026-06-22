@@ -23,6 +23,8 @@ class DataviewGenerator {
       _writeGoalsIndex(),
       _writeNotesIndex(),
       _writeSocialIndex(),
+      _writeSystemsIndex(),
+      _writePactsIndex(),
     ]);
   }
 
@@ -98,6 +100,46 @@ line:
     return blocks;
   }
 
+  static String generateChartsPluginBlock(
+    CombinedAnalysis analysis, {
+    required List<String> labels,
+    required List<List<num>> seriesData,
+  }) {
+    if (analysis.charts.isEmpty) return '';
+
+    final buffer = StringBuffer();
+    for (int i = 0; i < analysis.charts.length; i++) {
+      final chart = analysis.charts[i];
+      final seriesBuffer = StringBuffer();
+
+      for (final source in chart.sources) {
+        final sourceIdx = analysis.dataSources.indexWhere(
+          (s) => s.id == source.id && s.fieldId == source.fieldId,
+        );
+        final List<num> data = (sourceIdx >= 0 && sourceIdx < seriesData.length)
+            ? seriesData[sourceIdx]
+            : [];
+
+        seriesBuffer.writeln('  - title: "${source.label}"');
+        seriesBuffer.writeln('    data: [${data.join(", ")}]');
+      }
+
+      buffer.writeln('```chart');
+      buffer.writeln('type: ${chart.type.name}');
+      buffer.writeln('labels: [${labels.map((l) => '"$l"').join(", ")}]');
+      buffer.writeln('series:');
+      buffer.write(seriesBuffer.toString());
+      buffer.writeln('width: 80%');
+      buffer.writeln('beginAtZero: false');
+      buffer.write('```');
+      if (i < analysis.charts.length - 1) {
+        buffer.writeln();
+        buffer.writeln();
+      }
+    }
+    return buffer.toString();
+  }
+
   static String trackerChartBlock({
     required String trackerSlug,
     required String fieldSlug,
@@ -161,8 +203,8 @@ title: Tasks Index
 
 ```dataview
 TABLE stage AS "Stage", priority AS "Priority", file.link AS "Task"
-FROM "tasks"
-WHERE stage != "finalized"
+FROM "app"
+WHERE type = "task" AND stage != "finalized"
 SORT priority DESC, file.name ASC
 ```
 
@@ -170,11 +212,12 @@ SORT priority DESC, file.name ASC
 
 ```dataview
 TABLE stage AS "Stage", priority AS "Priority", file.link AS "Task", end_date AS "Deadline"
-FROM "tasks"
+FROM "app"
+WHERE type = "task"
 SORT stage ASC, priority DESC
 ```
 ''';
-    await _safeWrite('tasks/index.md', content);
+    await _safeWrite('app/tasks-index.md', content);
   }
 
   Future<void> _writeHabitsIndex() async {
@@ -189,16 +232,15 @@ title: Habits Index
 
 ```dataview
 TABLE file.link AS "Habit", frequency AS "Frequency"
-FROM "habits"
-WHERE status = "active"
+FROM "app"
+WHERE type = "habit" AND status = "active"
 SORT file.name ASC
 ```
 
 ## Habit Streaks (last 30 days)
 
 ```dataviewjs
-const folder = "daily";
-const habitFiles = dv.pages('"habits"').where(p => p.status === "active");
+const habitFiles = dv.pages('"app"').where(p => p.type === "habit" && p.status === "active");
 const dailyNotes = dv.pages('"daily"').sort(p => p.file.name, "desc").limit(30);
 
 for (const habit of habitFiles) {
@@ -214,23 +256,23 @@ for (const habit of habitFiles) {
 }
 ```
 ''';
-    await _safeWrite('habits/index.md', content);
+    await _safeWrite('app/habits-index.md', content);
   }
 
   Future<void> _writeMoodIndex() async {
     const content = '''---
 type: index
-title: Mood Trend
+title: Humor — Tendência
 ---
 
-# Mood
+# Humor
 
-## Last 30 Days
+## Últimos 30 dias
 
 ```dataview
-TABLE mood AS "Humor", date AS "Data"
+TABLE mood_emoji AS "😊", mood_label AS "Humor", mood_pleasantness AS "Agradabilidade", mood_energy AS "Energia", date AS "Data"
 FROM "daily"
-WHERE type = "daily_note" AND mood
+WHERE type = "daily_note" AND mood_label
 SORT file.name DESC
 LIMIT 30
 ```
@@ -248,11 +290,12 @@ title: Goals Index
 
 ```dataview
 TABLE status AS "Status", description AS "Descrição"
-FROM "goals"
+FROM "app"
+WHERE type = "goal"
 SORT file.name ASC
 ```
 ''';
-    await _safeWrite('goals/index.md', content);
+    await _safeWrite('app/goals-index.md', content);
   }
 
   Future<void> _writeNotesIndex() async {
@@ -265,11 +308,12 @@ title: Notes Index
 
 ```dataview
 TABLE note_subtype AS "Tipo", file.mtime AS "Modificada"
-FROM "notes"
+FROM "app"
+WHERE type = "note"
 SORT file.mtime DESC
 ```
 ''';
-    await _safeWrite('notes/index.md', content);
+    await _safeWrite('app/notes-index.md', content);
   }
 
   Future<void> _writeSocialIndex() async {
@@ -284,7 +328,7 @@ title: Social Posts Index
 
 ```dataview
 TABLE platform AS "Plataforma", author_handle AS "Autor", posted_at AS "Data", watched AS "Visto"
-FROM "social"
+FROM "app"
 WHERE type = "social_post"
 SORT created_at DESC
 ```
@@ -293,39 +337,70 @@ SORT created_at DESC
 
 ```dataview
 TABLE platform AS "Plataforma", author_handle AS "Autor", file.link AS "Post"
-FROM "social"
+FROM "app"
 WHERE type = "social_post" AND watched = false
 SORT created_at DESC
 ```
+''';
+    await _safeWrite('app/social-index.md', content);
+  }
 
-## TikTok
+  Future<void> _writeSystemsIndex() async {
+    const content = '''---
+type: index
+title: Systems Index
+---
+
+# Systems
+
+## Por frequência de uso
 
 ```dataview
-TABLE author_handle AS "Autor", posted_at AS "Data", watched AS "Visto"
-FROM "social"
-WHERE type = "social_post" AND platform = "tiktok"
-SORT posted_at DESC
+TABLE trigger AS "Quando", run_count AS "Execuções", estimated_minutes AS "Estimado"
+FROM "app"
+WHERE type = "system"
+SORT run_count DESC
 ```
 
-## Instagram
+## Todos os Systems
 
 ```dataview
-TABLE author_handle AS "Autor", posted_at AS "Data", watched AS "Visto"
-FROM "social"
-WHERE type = "social_post" AND platform = "instagram"
-SORT posted_at DESC
-```
-
-## Substack
-
-```dataview
-TABLE author_name AS "Autor", posted_at AS "Data", watched AS "Lido"
-FROM "social"
-WHERE type = "social_post" AND platform = "substack"
-SORT posted_at DESC
+TABLE status AS "Status", file.mtime AS "Modificado"
+FROM "app"
+WHERE type = "system"
+SORT file.name ASC
 ```
 ''';
-    await _safeWrite('social/index.md', content);
+    await _safeWrite('app/systems-index.md', content);
+  }
+
+  Future<void> _writePactsIndex() async {
+    const content = '''---
+type: index
+title: Pacts Index
+---
+
+# Pacts
+
+## Todos os Pacts ativos
+
+```dataview
+TABLE ends_at AS "Termina", hypothesis AS "Hipótese"
+FROM "app"
+WHERE type = "habit" AND habit_mode = "pact" AND status = "active"
+SORT ends_at ASC
+```
+
+## Pacts Vencidos (sem outcome registrado)
+
+```dataview
+TABLE ends_at AS "Venceu em", hypothesis AS "Hipótese"
+FROM "app"
+WHERE type = "habit" AND habit_mode = "pact" AND status = "active" AND ends_at < date(today)
+SORT ends_at ASC
+```
+''';
+    await _safeWrite('app/pacts-index.md', content);
   }
 
   Future<void> _safeWrite(String path, String content) async {

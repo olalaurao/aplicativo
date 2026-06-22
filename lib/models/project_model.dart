@@ -5,8 +5,6 @@ import 'task_model.dart';
 enum ProjectState { active, paused, completed, archived }
 
 class Project extends Organizer {
-  ProjectState state;
-  TaskPriority priority;
   String? description;
   String? primaryKpiId;
   List<String> secondaryKpiIds;
@@ -18,11 +16,23 @@ class Project extends Organizer {
   String? linkedGoogleEventDate;
   String? linkedGoogleEventUrl;
 
+  ProjectState get projectState => ProjectState.values.firstWhere(
+        (e) => e.name == super.state,
+        orElse: () => ProjectState.active,
+      );
+  set projectState(ProjectState value) => super.state = value.name;
+
+  TaskPriority get projectPriority => TaskPriority.values.firstWhere(
+        (e) => e.name == super.priority,
+        orElse: () => TaskPriority.none,
+      );
+  set projectPriority(TaskPriority value) => super.priority = value.name;
+
   Project({
     super.id,
     required super.title,
-    this.state = ProjectState.active,
-    this.priority = TaskPriority.none,
+    ProjectState state = ProjectState.active,
+    TaskPriority priority = TaskPriority.none,
     this.description,
     this.primaryKpiId,
     List<String>? secondaryKpiIds,
@@ -46,7 +56,11 @@ class Project extends Organizer {
   }) : secondaryKpiIds = secondaryKpiIds ?? [],
        taskLinks = taskLinks ?? [],
        quickAccessLinks = quickAccessLinks ?? [],
-       super(organizerType: OrganizerType.project);
+       super(
+         organizerType: OrganizerType.project,
+         state: state.name,
+         priority: priority.name,
+       );
 
   @override
   String get type => 'project';
@@ -55,8 +69,8 @@ class Project extends Organizer {
   String toMarkdown() {
     final frontmatter = toBaseMap();
     frontmatter['organizer_type'] = organizerType.name;
-    frontmatter['state'] = state.name;
-    frontmatter['priority'] = priority.name;
+    frontmatter['state'] = projectState.name;
+    frontmatter['priority'] = projectPriority.name;
     if (description != null) frontmatter['description'] = description;
     if (primaryKpiId != null) frontmatter['primary_kpi'] = primaryKpiId;
     frontmatter['secondary_kpis'] = secondaryKpiIds;
@@ -94,13 +108,13 @@ class Project extends Organizer {
     project.loadBaseMap(frontmatter);
 
     if (frontmatter['state'] != null) {
-      project.state = ProjectState.values.firstWhere(
+      project.projectState = ProjectState.values.firstWhere(
         (e) => e.name == frontmatter['state'],
         orElse: () => ProjectState.active,
       );
     }
     if (frontmatter['priority'] != null) {
-      project.priority = TaskPriority.values.firstWhere(
+      project.projectPriority = TaskPriority.values.firstWhere(
         (e) => e.name == frontmatter['priority'],
         orElse: () => TaskPriority.none,
       );

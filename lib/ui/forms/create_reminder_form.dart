@@ -24,7 +24,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
   DateTime _date = DateTime.now();
   TimeOfDay? _time;
   Scheduler? _scheduler;
-  String? _timeBlockId;
+  String? _timeBlock;
   bool _completable = true;
   final List<String> _checkboxes = [];
   final List<OrganizerReference> _organizers = [];
@@ -179,9 +179,9 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
                         const SizedBox(width: 8),
                         _metadataChip(
                           icon: Icons.view_timeline_outlined,
-                          label: _timeBlockId ?? 'Time block',
+                          label: _timeBlock ?? 'Time block',
                           onTap: _pickTimeBlock,
-                          isActive: _timeBlockId != null,
+                          isActive: _timeBlock != null,
                         ),
                       ],
                     ),
@@ -424,7 +424,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
       isCompletable: _completable,
       notes: _checkboxes.isNotEmpty ? _checkboxes.join('\n') : null,
       scheduler: _scheduler,
-      timeBlockId: _timeBlockId,
+      timeBlock: _timeBlock,
       organizers: _organizers,
       reminders: [
         ReminderConfig(
@@ -548,7 +548,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
                 leading: const Icon(Icons.view_timeline_outlined),
                 title: Text(block.title),
                 subtitle: Text(_formatTimeBlock(block)),
-                selected: _timeBlockId == block.id,
+                selected: _timeBlock == block.id,
                 onTap: () => Navigator.pop(ctx, block.id),
               ),
             ),
@@ -557,7 +557,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
       ),
     );
     if (selected != null) {
-      setState(() => _timeBlockId = selected.isEmpty ? null : selected);
+      setState(() => _timeBlock = selected.isEmpty ? null : selected);
     }
   }
 

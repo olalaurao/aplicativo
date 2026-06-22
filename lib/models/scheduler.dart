@@ -12,8 +12,34 @@ enum RepeatType {
   linkedItemAppears,
   nDaysAfterLinkedItem,
   firstBusinessDayOfMonth,
+  // Extensões não documentadas na spec — documentadas aqui como extensão
   daysOfTheme,
   daysWithBlock,
+}
+
+/// Mapeia `RepeatType` para os nomes snake_case canônicos da spec.
+/// Garante retrocompatibilidade de leitura com o formato camelCase antigo.
+extension RepeatTypeX on RepeatType {
+  String get specName => switch (this) {
+    RepeatType.numberOfDays           => 'number_of_days',
+    RepeatType.daysOfWeek             => 'days_of_week',
+    RepeatType.numberOfWeeks          => 'number_of_weeks',
+    RepeatType.numberOfMonths         => 'number_of_months',
+    RepeatType.numberOfHours          => 'number_of_hours',
+    RepeatType.daysAfterLastStart     => 'days_after_last_start',
+    RepeatType.daysAfterLastEnd       => 'days_after_last_end',
+    RepeatType.numberOfDaysPerPeriod  => 'days_per_period',
+    RepeatType.linkedItemAppears      => 'linked_item_appears',
+    RepeatType.nDaysAfterLinkedItem   => 'n_days_after_linked_item',
+    RepeatType.firstBusinessDayOfMonth => 'first_business_day_of_month',
+    RepeatType.daysOfTheme            => 'days_of_theme',
+    RepeatType.daysWithBlock          => 'days_with_block',
+  };
+
+  static RepeatType fromSpecName(String s) => RepeatType.values.firstWhere(
+    (t) => t.specName == s || t.name == s,
+    orElse: () => RepeatType.numberOfDays,
+  );
 }
 
 enum OverduePolicy { skip, keep, prompt }
@@ -49,7 +75,7 @@ class SchedulerRule {
 
   Map<String, dynamic> toMap() {
     return {
-      'repeat_type': repeatType.name,
+      'repeat_type': repeatType.specName,
       'interval': interval,
       'days_of_week': daysOfWeek,
       'days_of_month': daysOfMonth,
@@ -65,9 +91,8 @@ class SchedulerRule {
 
   factory SchedulerRule.fromMap(Map<String, dynamic> map) {
     return SchedulerRule(
-      repeatType: RepeatType.values.firstWhere(
-        (e) => e.name == map['repeat_type'],
-        orElse: () => RepeatType.numberOfDays,
+      repeatType: RepeatTypeX.fromSpecName(
+        map['repeat_type']?.toString() ?? '',
       ),
       interval: map['interval'] as int?,
       daysOfWeek: map['days_of_week'] != null

@@ -46,7 +46,7 @@ Quando a Object Identification define uma pasta para um tipo, o app salva novos 
 
 ### 1.2 Duas categorias de objetos
 
-**OBJETOS DE CONTEÚDO** — Conteúdo gerado pelo usuário. 9 tipos:
+**OBJETOS DE CONTEÚDO** — Conteúdo gerado pelo usuário (ou, no caso do Event, espelhado de fora). 14 tipos:
 1. Entry (journal entry) — inclui Field Note e PMN como sub-modos
 2. Task — inclui Triple Check e link com System
 3. Goal — inclui modo Project Plan
@@ -55,7 +55,12 @@ Quando a Object Identification define uma pasta para um tipo, o app salva novos 
 6. Note (Text Note, Outline Note, Collection Note)
 7. Calendar Session
 8. Reminder
-9. System ← novo
+9. System
+10. Social Post
+11. Idea
+12. Inbox Item
+13. Event ← **exceção:** não vira arquivo no vault, não passa pela Object Identification. É um espelho somente-leitura de um evento do Google Calendar, populado em memória a cada sync (ver Objeto 13). Listado aqui porque aparece na mesma Timeline/Planner que os outros, mas não tem persistência local.
+14. Shopping List (+ Shopping Item)
 
 **OBJETOS ORGANIZADORES** — Contêineres estruturais. Todo objeto de conteúdo pertence a múltiplos organizadores simultaneamente. Organizadores têm sua própria Timeline com todo conteúdo associado.
 
@@ -648,6 +653,246 @@ Use este system sempre que for publicar.
 2. Caption e media extraídos ou upload
 3. Seção de linkagem unificada: busca qualquer objeto do vault
 4. Filtro por tipo dentro da busca (Tarefas, Notas, Áreas, Metas, etc.)
+
+---
+
+> **Nota de implementação (2026-06-21):** dois problemas no código atual motivaram as decisões dos objetos 11–14 abaixo. (1) A triagem do Inbox mandava "ideia" para `CreateNoteForm` em vez de criar um `IdeaDefinition` — corrigido no Objeto 12. (2) Existiam dois modelos de Shopping List concorrentes (`shopping_item.dart`, solto, usado de fato hoje, e `shopping_list_model.dart`, com itens aninhados, órfão) — resolvido no Objeto 14, que define `ShoppingList` como fonte de verdade dali pra frente.
+
+### OBJETO 11: IDEA
+
+**Propósito:** capturar uma possibilidade, insight ou pensamento em estágio de maturação — algo que ainda não é uma ação definida (por isso não é Task) e que tem ciclo de vida próprio, não é só referência estática (por isso não é Note). Pode nascer sozinha, a partir da triagem de um Inbox item, ou comentando qualquer outro objeto do vault.
+
+Resolve diretamente o pedido: *"como anotar ideias? q podem tá relacionada a qqr coisa no vault"* (09/06).
+
+**Propriedades:**
+- `id` — string, único
+- `type` — sempre `idea`
+- `title` — string, obrigatório
+- `body` — rich text
+- `status` — enum: `raw` | `developing` | `ready_to_act` | `converted` | `dropped`. Default: `raw`
+- `horizon` — enum: `now` | `soon` | `someday` | `no_deadline`. Default: `someday`
+- `priority` — enum opcional (mesmo enum de Task: `none`/`low`/`medium`/`high`)
+- `target_date` — date, opcional
+- `linked_slugs` — array de WikiLinks para **qualquer objeto do vault** (Task, Note, Area, Project, Resource, Social Post, People, Place, outro Idea, etc.) — é o campo que resolve "relacionada a qualquer coisa"
+- `converted_to_type` / `converted_to_id` — preenchidos apenas quando `status: converted`
+- `organizers`, `tags`, `color`, `emoji` — opcionais, padrão universal
+- `archived` — boolean, default false
+
+**Significado de cada `status`:**
+- `raw` — acabou de ser capturada, sem refinamento. Estado inicial sempre.
+- `developing` — usuária voltou a ela: editou o body, adicionou links, ou trocou manualmente. Transição automática na primeira edição substancial após a criação (ou manual via menu).
+- `ready_to_act` — marcada manualmente quando a ideia está madura o suficiente para virar algo concreto. Aparece destacada numa seção "Prontas para agir" na tela de Ideas.
+- `converted` — terminal. Definido automaticamente pelo fluxo de conversão (ver abaixo). Idea some das listas ativas, mas continua acessível via Archive e via link reverso no objeto que ela gerou.
+- `dropped` — terminal, descarte consciente. Diferente de deletar: fica arquivada para histórico ("já pensei nisso e decidi que não vale a pena").
+
+**`horizon` — para que serve:** não é prazo (isso é `target_date`), é urgência de revisão. Define o agrupamento/ordenação padrão na tela de Ideas: `now` no topo, depois `soon`, depois `someday`/`no_deadline` juntas no fim.
+
+**Comportamento de conversão (Idea → Task/Goal/Project/Note):**
+1. Detail view → botão "✨ Transformar em..." → bottom sheet com 4 opções: Task, Goal, Project (organizador), Note.
+2. Ao escolher: abre o formulário de criação do tipo escolhido, pré-preenchido com `title` (vira título do novo objeto) + `body` (vira description/notes/body, conforme o tipo) + `linked_slugs` copiados para `organizers`/`links` do novo objeto, quando fizer sentido pro tipo de destino.
+3. Ao salvar o novo objeto com sucesso:
+   - A Idea original recebe `status: converted`, `converted_to_type`, `converted_to_id`.
+   - O novo objeto recebe automaticamente `links: [["idea-slug"]]` — preserva a proveniência, visível na seção "Menções" de ambos (PARTE 16 — Linking Universal).
+4. Cancelar o formulário de destino não altera a Idea.
+
+Isso garante que nenhuma informação da ideia original se perde na conversão — o mesmo princípio do pedido sobre Social Post → Task (13/06): *"sem perder as infos da tarefa/projeto nem do post"*.
+
+**UI de criação:**
+FAB → aba **Note** ganha uma 5ª opção: "💡 Ideia" (junto de Nota de texto, Outline, Coleção, System). Formulário: Título (obrigatório), Body (rich text, opcional), Horizon (segmented control: Agora/Em breve/Algum dia), Relacionada a... (abre o Link Picker Universal — mesma busca fuzzy de qualquer objeto do vault descrita na PARTE 16), Organizadores, Tags.
+
+**Tela de Ideas (nova página, listada em PARTE 4 entre as páginas disponíveis para a bottom nav):**
+- Filtros: chips de status (Todas / Raw / Developing / Prontas / —) e horizon.
+- Cards: título (15pt medium) + preview do body (1 linha, muted) + badge de horizon (cor por urgência: now=vermelho suave, soon=amarelo, someday=cinza) + badge de status + até 3 chips de `linked_slugs` (ícone do tipo linkado + título truncado) + "+N" se houver mais + emoji se definido, alinhado à direita do título.
+- Seção fixa no topo "Prontas para agir" quando houver itens `ready_to_act`.
+- Empty state: ícone 💡 + "Nenhuma ideia ainda" + CTA "Capturar ideia".
+
+**Formato Obsidian:**
+```yaml
+---
+id: "idea-app-de-receitas-tiktok"
+type: idea
+title: "App de receitas separado por dicas do TikTok"
+status: developing
+horizon: soon
+linked_slugs:
+  - "[[social-post-receita-carne-123]]"
+  - "[[area-cozinha]]"
+organizers:
+  - "[[area-cozinha]]"
+converted_to_type: null
+converted_to_id: null
+archived: false
+created_at: 2026-06-09T11:30:00
+updated_at: 2026-06-15T09:00:00
+---
+
+Reunir todas as dicas de carne que salvo do TikTok num lugar só, com tags por tipo de corte.
+```
+
+---
+
+### OBJETO 12: INBOX ITEM
+
+**Propósito:** ponto de captura universal e instantâneo, estilo GTD — um lugar para jogar qualquer pensamento sem decidir agora o que ele é. Por definição, tudo no Inbox é não-tipado: texto cru. A única coisa que se faz com um item de Inbox depois é **triá-lo** (decidir o tipo real e converter) ou descartá-lo.
+
+**Propriedades:**
+- `id`, `type: inbox`, `title` (o texto digitado), `content` (corpo opcional, hoje sempre vazio na captura — reservado para anexos futuros), `created_at`, `archived`
+
+**Captura:** campo único de texto, sempre focado ao abrir a tela, Enter ou botão de enviar cria o item. Sem campos adicionais — qualquer fricção aqui anula o propósito do Inbox (consistente com o padrão de fricção mínima pedido em vários pontos: transcrição automática, embed automático, etc.).
+
+**Auto-arquivamento:** item com `created_at` há mais de 30 dias sem triagem é arquivado automaticamente na próxima abertura da tela (mesmo fluxo de `_deleted/` usado em todo o app — PARTE 5, Undo em Delete/Archive). Um snackbar avisa quantos itens foram arquivados e seus títulos. Isso existe para o Inbox não virar um cemitério de pensamentos esquecidos, mas também significa que ele precisa ser revisado com alguma regularidade — sugestão: se `pendingCount > 0` por mais de 7 dias, considerar um lembrete leve (não implementado ainda, fica como nota para o futuro).
+
+**Triagem — bottom sheet "O que é isso?"**
+
+Cada opção abre o formulário de criação correspondente, **pré-preenchido com o texto capturado** (sem perda de informação), e remove o item do Inbox somente se o formulário de destino for salvo com sucesso (cancelar mantém o item no Inbox).
+
+| Opção | Ação |
+|---|---|
+| ✅ Virou uma task | `CreateTaskForm(initialTitle: item.title)` |
+| 💡 Era uma ideia | `CreateIdeaForm(initialTitle: item.title)` — ⚠️ **corrige o bug atual**, que mandava isso para `CreateNoteForm` |
+| 📝 Era uma nota | `CreateNoteForm(initialTitle: item.title)` — opção nova, separada da Idea |
+| 📓 É uma entrada do journal | `CreateEntryForm(initialBody: item.title)` |
+| 📅 Era um evento/compromisso | `CreateCalendarSessionForm(initialTitle: item.title)` — agenda dentro do app (ver Objeto 13 sobre por que não é `Event`) |
+| 🛒 Item de compra | adiciona como item `active` na Shopping List padrão (pergunta qual lista se houver mais de uma — ver Objeto 14) |
+| 🗑 Descartar | delete direto, sem criar nada, sem confirmação adicional (já existe swipe pra isso na lista) |
+
+**UI da lista:** ordenada do item mais antigo para o mais novo (o que está esperando há mais tempo aparece primeiro — empurra a triagem do que está acumulando). Swipe left → arquiva/descarta. Swipe right ou tap → abre a triagem. Badge de contagem (`pendingCount`) no ícone da bottom nav (se "Inbox" estiver na barra) e na seção correspondente do Command Center.
+
+**Formato Obsidian:** pasta fixa `inbox/`, um arquivo por item, nomeado por timestamp: `inbox/YYYY-MM-DD-HH-mm.md`.
+
+```yaml
+---
+id: "inbox-2026-06-09-11-26"
+type: inbox
+title: "ver se da pra puxar transcricao do tiktok de graca com whisper"
+created_at: 2026-06-09T11:26:00
+archived: false
+---
+```
+
+---
+
+### OBJETO 13: EVENT (espelho somente-leitura do Google Calendar)
+
+**Propósito:** representar um evento que existe no Google Calendar mas **não** foi criado dentro do app — é o lado inverso da integração. **Calendar Session** (Objeto de conteúdo #7, já documentado na PARTE 2 principal) é a sessão nativa do app, que opcionalmente pode ser exportada para o Google. **Event** é o caminho contrário: um evento que já existia no Google (criado por outro app, por outra pessoa convidando você, etc.) e que o app só reflete.
+
+**Diferença explícita Event × Calendar Session** (resolve a ambiguidade entre os dois, que hoje não está documentada em lugar nenhum):
+
+| | Calendar Session | Event |
+|---|---|---|
+| Origem | Criada dentro do app | Já existia no Google Calendar |
+| Vive como arquivo no vault | Sim — `app/calendar-session-SLUG.md` | Não — existe só em memória/cache, populada a cada sync via Google Calendar API |
+| Editável dentro do app | Sim, todos os campos | Não — somente leitura. Editar abre o Google Agenda |
+| Pode ter Task/Goal/organizers vinculados | Sim, nativamente (`task`, `goal`, `organizers`) | Indireto: dá pra vincular Participantes (resolvidos para People) e adicionar `organizers`/`links` localmente, mas o evento em si não é editável |
+| Aparece no Planner/Timeline | Sim | Sim, na mesma timeline, com ícone do Google para diferenciar visualmente |
+| Sentido do sync | App → Google (se `scheduler`/export configurado) | Google → App, nunca o inverso |
+
+**Propriedades:**
+- `id`, `type: event`, `title`
+- `start_datetime`, `end_datetime` opcional
+- `location`, `description` opcionais
+- `participants` — array de e-mails/nomes crus do Google
+- `google_event_id`, `google_calendar_id`, `google_event_url`
+- `organizers` — atribuídos manualmente pela usuária dentro do app (não vêm do Google)
+- `tags`, `reminders` — lembretes locais do app, independentes de qualquer lembrete configurado no Google
+
+**Comportamento:**
+- Nunca passa pela Object Identification nem é gravado no vault — é populado por `google_calendar_provider` a cada sync e mesclado na timeline junto às Calendar Sessions.
+- Sync é **one-way** (Google → app). O app nunca escreve de volta no Google a partir de um Event; escrever de volta só acontece para Calendar Session, via export explícito.
+- Detail view (já existe, `google_event_detail_screen.dart`): título, data/hora, local, descrição, participantes com resolução para People existentes, botão "Abrir no Google Agenda".
+- **Deduplicação:** se um Event tem o mesmo `google_event_id` de uma Calendar Session já exportada (campo `exported_calendar_id` da Calendar Session), o app mostra **só a Calendar Session** — ela é a fonte de verdade local — com um badge "🔄 sincronizado". O Event "puro" correspondente fica oculto para não duplicar visualmente o mesmo compromisso na timeline.
+
+**UI de criação:** não existe — Events só chegam via sync. Se a usuária quer criar algo, ela cria uma Calendar Session (que pode depois ser exportada pro Google).
+
+**Formato Obsidian:** nenhum. Objeto efêmero, não é arquivo do vault.
+
+---
+
+### OBJETO 14: SHOPPING LIST (+ Shopping Item)
+
+**Propósito:** lista de compras com captura ultra-rápida, agrupamento por categoria, suporte a múltiplas listas, e suporte a widget nativo na home screen.
+
+**⚠️ Decisão de arquitetura — qual modelo é a fonte de verdade daqui pra frente:**
+
+Adoto `ShoppingList` com itens aninhados (`shopping_list_model.dart`) como modelo canônico, e `shopping_item.dart` (item solto, lista única global) como **deprecado**. Motivos:
+- Suporta múltiplas listas nomeadas (ex: "Mercado", "Farmácia", "Casa nova") — o modelo antigo só tinha uma lista plana global, sem como separar contextos.
+- Suporta `quantity` por item (ex: "2 kg", "1 caixa") — sem isso a lista de compras é só um checklist genérico, não cumpre a função real de lista de compras.
+- Suporta `category` nativamente, permitindo o agrupamento visual (Hortifruti, Limpeza, etc.) sem gambiarra.
+- `hide_checked` já modela o comportamento padrão de qualquer lista de compras: esconder o que já foi comprado.
+
+**Migração necessária:** a tela atual (`shopping_list_screen.dart`), o provider (`shoppingItemsProvider`) e o dashboard block (`shopping_list_block.dart`) precisam ser reescritos para ler de `ShoppingList.items` em vez do `ShoppingItem` solto. Os itens soltos existentes devem ser importados, na migração, como uma única `ShoppingList` chamada "Lista de Compras" — preservando nome e status (`active`/`checked`).
+
+**Propriedades — ShoppingList:**
+- `id`, `type: shopping_list`, `title`
+- `emoji` — default `🛒`
+- `color` opcional
+- `items` — array de ShoppingItem (abaixo)
+- `hide_checked` — boolean, default `true`
+- `organizers`, `tags`, `archived`
+
+**Propriedades — ShoppingItem (aninhado, sem arquivo próprio):**
+- `id`, `name`
+- `quantity` — string livre, ex: "2 kg", "1 caixa"
+- `category` — string livre, ex: "Hortifruti", "Limpeza"
+- `note` — opcional
+- `status` — enum: `active` | `checked` | `archived`
+- `order` — integer, para ordenação manual dentro do grupo
+
+**Comportamento de captura e duplicatas:**
+Campo de texto fixo no topo (mesmo padrão de fricção mínima usado no Inbox) → Enter cria item com `status: active`, sem categoria (vai pro grupo "Outros" até ser categorizado).
+
+Detecção de duplicata ao capturar (mesmo nome, case-insensitive, na mesma lista):
+- Se já existe um item `checked` com esse nome: ele volta para `active` (reaproveita o item, não cria um novo) e funde `quantity`/`note` se algo novo foi informado.
+- Se já existe um item `active`: não cria duplicado — só dá um highlight visual de 1s no item existente, como feedback de "já está na lista".
+
+**Agrupamento e exibição:**
+- Itens `active` agrupados por `category`, em seções com header; dentro de cada grupo, ordenados por `order`. Sem categoria → grupo "Outros" ao final.
+- Itens `checked`: se `hide_checked = true`, ficam numa seção colapsável "Comprados (N)" ao final da lista; se `false`, aparecem riscados e com opacidade reduzida nos seus grupos de categoria originais.
+- Toggle de `hide_checked` na AppBar da lista (ícone de olho).
+- Swipe left no item → toggle active/checked. Swipe right → delete (com Undo padrão de 5s, PARTE 5).
+
+**Múltiplas listas:**
+Tela índice "Shopping Lists" — cards por lista (emoji + título + "N de M itens"), tap abre a lista. Criar nova lista: nome + emoji picker.
+
+**Integração com Inbox (Objeto 12):**
+Opção de triagem "🛒 Item de compra" pergunta em qual lista adicionar (default: última lista usada) e cria o item como `active`.
+
+**Widget nativo (PARTE 15):**
+O widget tipo "Category" já cobre este caso — configurado para apontar para uma `ShoppingList` específica. Marcar um item no widget precisa de write-through direto para o vault (mesmo princípio de qualquer outra mudança offline-first, PARTE 12).
+
+**UI de criação de lista:** nome (placeholder "Mercado", "Farmácia"...) + emoji picker + "Criar". Itens são adicionados depois, dentro da lista, pelo campo de captura.
+
+**Formato Obsidian:** um arquivo por lista, `app/shopping-list-SLUG.md`. Frontmatter com `items` como array YAML; corpo com checklist Markdown espelhado (`- [ ]` / `- [x]`) para legibilidade nativa no Obsidian puro e compatibilidade com o Tasks Plugin.
+
+```yaml
+---
+id: "shopping-list-mercado"
+type: shopping_list
+title: "Mercado"
+emoji: "🛒"
+hide_checked: true
+archived: false
+items:
+  - id: "i1"
+    name: "Leite"
+    quantity: "2 caixas"
+    category: "Laticínios"
+    status: active
+    order: 0
+  - id: "i2"
+    name: "Detergente"
+    category: "Limpeza"
+    status: checked
+    order: 0
+created_at: 2026-06-01T09:00:00
+updated_at: 2026-06-20T18:00:00
+---
+
+## Mercado
+
+- [ ] Leite (2 caixas)
+- [x] Detergente
+```
 
 ---
 
@@ -1527,6 +1772,7 @@ vault/
 ├── daily/                ← Daily notes + PMN
 │   ├── YYYY-MM-DD.md     ← entradas, habit completions, tracker records
 │   └── YYYY-MM-WNN.md    ← Plus/Minus/Next (mês = date_range_start; ex: 2026-05-W21.md)
+├── inbox/                ← Itens de Inbox (captura crua, não-tipada)
 ├── analyses/             ← Combined Analysis definitions
 ├── moods/                ← Mood definition files (criados lazily na primeira vez que o mood é registrado)
 ├── _attachments/         ← Fotos e arquivos
@@ -1539,7 +1785,7 @@ vault/
 ```yaml
 ---
 id: "unique-id"
-type: task  # task|habit|tracker|goal|note|entry|system|calendar_session|reminder|social_post|mood_definition|area|project|activity|label|person|place
+type: task  # task|habit|tracker|goal|note|entry|system|calendar_session|reminder|social_post|idea|inbox|shopping_list|mood_definition|area|project|activity|label|person|place
 title: "Título"
 created_at: 2026-05-19T09:00:00
 updated_at: 2026-05-19T14:00:00
@@ -1703,6 +1949,10 @@ updated_at: 2026-05-24T18:30:00
 | Reminder | daily note ou próprio arquivo | type: reminder | Via daily note |
 | System | app/system-SLUG.md | type: system | Sim |
 | Social Post | app/social-post-SLUG.md | type: social_post | Sim |
+| Idea | app/idea-SLUG.md | type: idea | Sim |
+| Inbox Item | inbox/YYYY-MM-DD-HH-mm.md | type: inbox | Não (item efêmero, sem seção de menções) |
+| Shopping List | app/shopping-list-SLUG.md | type: shopping_list | Sim |
+| Event (Google Calendar) | Não persistido — espelho em memória, populado a cada sync | type: event | Não |
 | Mood Definition | moods/SLUG.md — criado lazily na primeira vez que o mood é registrado | type: mood_definition | Sim (todas as entradas linkam de volta via mood::) |
 | Area/Project/Activity/Label/Person/Place | app/organizer-SLUG.md | type: area/project/etc | Sim |
 | Combined Analysis | analyses/SLUG.md | type: analysis | Sim |
@@ -1840,6 +2090,8 @@ Objeto tem atributos apontando para tipos diferentes → badge ⚠️ ao lado do
 **Compatibilidade com Tasks Plugin do Obsidian:**
 Tasks em daily notes e nos arquivos de task usam sintaxe do Tasks Plugin: `- [ ] Título da task [due:: 2024-12-31] [priority:: high]`. Isso garante que abrir daily notes no Obsidian mostre as tasks na interface nativa do Tasks Plugin.
 
+**Conflito de migração — Shopping List:** durante a transição do modelo `ShoppingItem` solto (legado) para `ShoppingList` com itens aninhados (canônico, ver Objeto 14), o parser não deve tratar `type: shopping_item` e `type: shopping_list` como o mesmo tipo de objeto. Object Identification deve sinalizar os dois coexistindo na mesma pasta como o mesmo tipo de conflito tratado em "Detecção de conflito" (PARTE 1.1), até a migração ser concluída e `type: shopping_item` ser descontinuado.
+
 ---
 
 ## PARTE 22 — NOTES ON IMPLEMENTATION (para AI e desenvolvedores)
@@ -1875,6 +2127,13 @@ Tasks em daily notes e nos arquivos de task usam sintaxe do Tasks Plugin: `- [ ]
 15. **PMN e Triple Check têm ligação direta:** o formulário de criação de PMN deve oferecer opção de batch Triple Check para tasks que estão no mesmo stage há 7+ dias.
 
 16. **Combined Analysis com moods:** ao adicionar `journal_mood` como fonte, o usuário escolhe qual dimensão plotar: `pleasantness`, `energy`, ou ambas como séries separadas. `value_mapping` é usado apenas para campos categóricos de tracker — campos numéricos e mood não precisam de mapeamento, apenas de `normalization` de escala quando necessário.
+
+17. **Idea ≠ Note.** Ao triar um Inbox item como "ideia", criar um `IdeaDefinition` (`type: idea`), nunca uma `Note`. Os dois têm ciclos de vida diferentes — Idea tem `status` evolutivo e fluxo de conversão; Note é referência estática.
+
+18. **Event nunca é gravado no vault.** É populado em memória a cada sync do Google Calendar e descartado/recriado a cada refresh. Calendar Session é a única metade da integração que vira arquivo.
+
+19. **Shopping List é a fonte de verdade para compras**, não `ShoppingItem` solto. Ver Objeto 14 para o plano de migração.
+
 ---
 
 ## PARTE 23 — UI/UX DETALHADA
@@ -2556,6 +2815,7 @@ Lista de opções em coluna:
 - 🗂 Nota de outline
 - 🗃 Coleção
 - ⚙️ System (cor laranja)
+- 💡 Idea
 
 Separador hairline entre cada uma. Tap → fecha sheet + abre formulário correspondente.
 

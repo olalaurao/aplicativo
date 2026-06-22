@@ -17,6 +17,10 @@ class MetricSource {
   final String label;
   final String? fieldId;
   final Color? color;
+  final String? dimension;
+  final String axis;
+  final bool showEmojiMarkers;
+  final Map<String, num>? valueMapping;
 
   MetricSource({
     required this.type,
@@ -24,6 +28,10 @@ class MetricSource {
     required this.label,
     this.fieldId,
     this.color,
+    this.dimension,
+    this.axis = 'left',
+    this.showEmojiMarkers = false,
+    this.valueMapping,
   });
 
   Map<String, dynamic> toMap() {
@@ -34,6 +42,10 @@ class MetricSource {
       if (fieldId != null) 'field_id': fieldId,
       if (color != null)
         'color': '#${color!.toARGB32().toRadixString(16).padLeft(8, '0')}',
+      'axis': axis,
+      'show_emoji_markers': showEmojiMarkers,
+      if (dimension != null) 'dimension': dimension,
+      if (valueMapping != null) 'value_mapping': valueMapping,
     };
   }
 
@@ -47,6 +59,12 @@ class MetricSource {
       label: map['label']?.toString() ?? '',
       fieldId: map['field_id']?.toString(),
       color: _parseColor(map['color']),
+      axis: map['axis']?.toString() ?? 'left',
+      showEmojiMarkers: map['show_emoji_markers'] == true,
+      dimension: map['dimension']?.toString(),
+      valueMapping: map['value_mapping'] != null
+          ? Map<String, num>.from(map['value_mapping'] as Map)
+          : null,
     );
   }
 
@@ -71,11 +89,13 @@ class AnalysisChart {
   String title;
   ChartType type;
   List<MetricSource> sources;
+  String normalization;
 
   AnalysisChart({
     required this.title,
     this.type = ChartType.line,
     this.sources = const [],
+    this.normalization = 'dual_axis',
   });
 
   Map<String, dynamic> toMap() {
@@ -83,6 +103,7 @@ class AnalysisChart {
       'title': title,
       'type': type.name,
       'sources': sources.map((s) => s.toMap()).toList(),
+      'normalization': normalization,
     };
   }
 
@@ -97,6 +118,7 @@ class AnalysisChart {
           .whereType<Map>()
           .map((s) => MetricSource.fromMap(Map<String, dynamic>.from(s)))
           .toList(),
+      normalization: map['normalization'] as String? ?? 'dual_axis',
     );
   }
 }
@@ -105,6 +127,7 @@ class CombinedAnalysis extends ContentObject {
   String? description;
   List<MetricSource> dataSources;
   List<AnalysisChart> charts;
+  DateTimeRange? defaultDateRange;
 
   CombinedAnalysis({
     super.id,
@@ -112,6 +135,7 @@ class CombinedAnalysis extends ContentObject {
     this.description,
     this.dataSources = const [],
     this.charts = const [],
+    this.defaultDateRange,
     super.organizers,
     super.categories,
     super.createdAt,
@@ -128,6 +152,12 @@ class CombinedAnalysis extends ContentObject {
     if (description != null) frontmatter['description'] = description;
     frontmatter['data_sources'] = dataSources.map((s) => s.toMap()).toList();
     frontmatter['charts'] = charts.map((c) => c.toMap()).toList();
+    if (defaultDateRange != null) {
+      frontmatter['default_date_range'] = {
+        'start': defaultDateRange!.start.toIso8601String().split('T').first,
+        'end': defaultDateRange!.end.toIso8601String().split('T').first,
+      };
+    }
 
     final buffer = StringBuffer();
     if (description != null && description!.isNotEmpty) {
@@ -135,15 +165,7 @@ class CombinedAnalysis extends ContentObject {
       buffer.writeln();
     }
 
-    for (final chart in charts) {
-      buffer.writeln('## ${chart.title}');
-      buffer.writeln('```dataviewjs');
-      buffer.writeln('// Gráfico renderizado dinamicamente pelo Citrine');
-      buffer.writeln('// Tipo: ${chart.type.name}');
-      buffer.writeln('// Fontes: ${chart.sources.map((s) => s.id).join(", ")}');
-      buffer.writeln('```');
-      buffer.writeln();
-    }
+    // O bloco do plugin Obsidian Charts e Obsidian Tracker são gerados dinamicamente em VaultNotifier._writeObject
 
     return generateMarkdown(frontmatter, buffer.toString());
   }
@@ -169,6 +191,18 @@ class CombinedAnalysis extends ContentObject {
           .whereType<Map>()
           .map((c) => AnalysisChart.fromMap(Map<String, dynamic>.from(c)))
           .toList();
+    }
+    if (frontmatter['default_date_range'] != null && frontmatter['default_date_range'] is Map) {
+      final rangeMap = frontmatter['default_date_range'] as Map;
+      final startStr = rangeMap['start']?.toString();
+      final endStr = rangeMap['end']?.toString();
+      if (startStr != null && endStr != null) {
+        final start = DateTime.tryParse(startStr);
+        final end = DateTime.tryParse(endStr);
+        if (start != null && end != null) {
+          analysis.defaultDateRange = DateTimeRange(start: start, end: end);
+        }
+      }
     }
     if (analysis.dataSources.isEmpty) {
       analysis.dataSources = analysis.charts.expand((c) => c.sources).toList();

@@ -21,6 +21,11 @@ abstract class ContentObject {
   int? order;
   String? snippet;
 
+  // Conflict fields
+  bool hasTypeConflict = false;
+  String? conflictReason;
+  String? literalType;
+
   ContentObject({
     String? id,
     required this.title,

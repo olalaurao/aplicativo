@@ -667,7 +667,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
                 child: InkWell(
                   onTap: () => context.push(
                     '/planner',
-                    extra: {'initialDate': s.startTime},
+                    extra: {'initialDate': s.date},
                   ),
                   child: Row(
                     children: [
@@ -681,14 +681,14 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              s.taskTitle,
+                              s.title,
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             Text(
-                              '${DateFormat('HH:mm').format(s.startTime)} • ${s.duration.inMinutes} min',
+                              '${DateFormat('HH:mm').format(s.date)} • ${s.minutesWorked} min',
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: AppColors.textMuted,
@@ -697,9 +697,9 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
                           ],
                         ),
                       ),
-                      _badge(
-                        s.completed ? 'Completed' : 'Incomplete',
-                        s.completed ? AppColors.habitGreen : AppColors.warning,
+                       _badge(
+                        s.state == PomodoroSessionState.completed ? 'Completed' : 'Incomplete',
+                        s.state == PomodoroSessionState.completed ? AppColors.habitGreen : AppColors.warning,
                       ),
                     ],
                   ),

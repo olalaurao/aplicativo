@@ -33,6 +33,8 @@ class HistoryNotifier extends Notifier<List<HistoryEntry>> {
     state = [entry, ...state.where((e) => e.id != object.id)].take(20).toList();
   }
 
+  void remove(String id) => state = state.where((e) => e.id != id).toList();
+
   void clear() => state = [];
 }
 

@@ -8,9 +8,9 @@ import '../../models/navigation_item.dart';
 import 'settings_screen.dart';
 import 'appearance_screen.dart';
 import 'category_management_screen.dart';
-import 'deleted_files_screen.dart';
 import 'shopping_list_screen.dart';
 import 'vault_files_screen.dart';
+import 'object_conflicts_screen.dart';
 import '../../providers/google_calendar_provider.dart';
 import '../widgets/navigation_shortcut_picker.dart';
 import '../../providers/vault_provider.dart';
@@ -190,6 +190,27 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                       MaterialPageRoute(
                         builder: (_) => const VaultFilesScreen(),
                       ),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 8),
+                Consumer(
+                  builder: (context, ref, child) {
+                    final conflictsCount = ref.watch(typeConflictedObjectsProvider).length;
+                    return _buildMenuRow(
+                      context,
+                      'Conflitos de Tipo${conflictsCount > 0 ? " ($conflictsCount)" : ""}',
+                      Icons.warning_amber_rounded,
+                      conflictsCount > 0 ? AppColors.error : AppColors.warning,
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ObjectConflictsScreen(),
+                          ),
+                        );
+                      },
                     );
                   },
                 ),

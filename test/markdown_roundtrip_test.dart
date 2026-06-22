@@ -64,9 +64,9 @@ void main() {
         slug: 'launch',
         title: 'Launch',
       );
-      final parsed = OrganizerReference.fromWikiLink(reference.toWikiLink());
+      final parsed = OrganizerReference.fromWikiLink(reference.toWikiLink(), defaultType: 'project');
 
-      expect(reference.toWikiLink(), '[[project/launch]]');
+      expect(reference.toWikiLink(), '[[launch]]');
       expect(parsed.type, 'project');
       expect(parsed.slug, 'launch');
     });
@@ -396,9 +396,11 @@ Texto original.
           title: 'Good',
           label: 'Good',
           emoji: ':)',
-          numericValue: 4,
           color: '#66AA77',
           order: 4,
+          quadrant: MoodQuadrant.green,
+          pleasantness: 4,
+          energy: 4,
         );
         final moodMarkdown = mood.toMarkdown();
         final parsedMood = MoodDefinition.fromMarkdown(
@@ -491,7 +493,7 @@ Texto original.
       final kpi = kpi_model.KPI(
         id: 'collection-count',
         title: 'Collection count',
-        sourceType: kpi_model.KPISourceType.collectionItemCount,
+        sourceType: kpi_model.KPISourceType.collection,
         sourceId: 'collection-note',
       );
       final note = Note(
@@ -508,6 +510,7 @@ Texto original.
         entries: const [],
         moods: const [],
         notes: [note],
+        tasks: const [],
       );
 
       expect(value, 3);
@@ -517,7 +520,7 @@ Texto original.
       final kpi = kpi_model.KPI(
         id: 'markdown-collection-count',
         title: 'Markdown collection count',
-        sourceType: kpi_model.KPISourceType.collectionItemCount,
+        sourceType: kpi_model.KPISourceType.collection,
         sourceId: 'markdown-note',
       );
       final note = Note(
@@ -534,6 +537,7 @@ Texto original.
         entries: const [],
         moods: const [],
         notes: [note],
+        tasks: const [],
       );
 
       expect(value, 3);

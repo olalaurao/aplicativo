@@ -15,6 +15,8 @@ import '../widgets/rich_text_editor.dart';
 import '../theme.dart';
 import '../widgets/organizer_picker_modal.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/mood_model.dart';
+import '../widgets/mood_picker.dart';
 
 class CreateEntryForm extends ConsumerStatefulWidget {
   final String? initialTitle;
@@ -35,6 +37,7 @@ class CreateEntryForm extends ConsumerStatefulWidget {
 
 class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
   late final TextEditingController _titleController;
+  late final TextEditingController _feelingsController;
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
   String _content = '';
@@ -74,6 +77,9 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
     _titleController = WikiLinkTextController(
       context: context,
       text: widget.existingEntry?.title ?? widget.initialTitle,
+    );
+    _feelingsController = TextEditingController(
+      text: widget.existingEntry?.feelings ?? '',
     );
 
     if (widget.existingEntry != null) {
@@ -144,6 +150,7 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
   @override
   void dispose() {
     _titleController.dispose();
+    _feelingsController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -439,77 +446,43 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'How are you feeling?',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 24),
-                  if (moods.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Text(
-                        'Nenhum humor cadastrado ainda.',
-                        style: TextStyle(color: AppColors.textMuted),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    )
-                  else
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: moods.map((mood) {
-                          final selected =
-                              _moodSlug == mood.id || _moodSlug == mood.slug;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() => _moodSlug = mood.id);
-                                setModalState(() {});
-                              },
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: selected
-                                      ? AppColors.primary.withValues(alpha: 0.1)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: selected
-                                        ? AppColors.primary
-                                        : Colors.transparent,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      mood.emoji,
-                                      style: const TextStyle(fontSize: 36),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      mood.title,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: selected
-                                            ? AppColors.primary
-                                            : AppColors.textMuted,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                  MoodPicker(
+                    initialMood: moods.cast<MoodDefinition>().firstWhere(
+                      (m) => m.id == _moodSlug || m.slug == _moodSlug,
+                      orElse: () => MoodDefinition.systemMoods.firstWhere(
+                        (m) => m.id == _moodSlug,
+                        orElse: () => MoodDefinition(
+                          id: _moodSlug ?? 'neutral',
+                          label: _moodSlug ?? 'Neutral',
+                          emoji: '😐',
+                          color: '#9E9E9E',
+                        ),
                       ),
                     ),
+                    onSelected: (mood) {
+                      setState(() {
+                        _moodSlug = mood.id;
+                      });
+                      setModalState(() {});
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Sentimentos (opcional)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _feelingsController,
+                    decoration: const InputDecoration(
+                      hintText: 'Ex: leveza, tensão no peito',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
                   const SizedBox(height: 32),
                   const Text(
                     'Sentimentos extras',
@@ -915,6 +888,9 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
       body: _content, // Storing as JSON string
       date: _entryDate,
       moodSlug: _moodSlug,
+      feelings: _feelingsController.text.trim().isNotEmpty
+          ? _feelingsController.text.trim()
+          : null,
       location: _location,
       templateId: _templateId,
       organizers: _organizers,

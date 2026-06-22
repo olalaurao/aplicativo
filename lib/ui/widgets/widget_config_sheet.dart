@@ -686,7 +686,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
       'pomodoro': 'Pomodoros',
       'goal': 'Objetivos',
       'note': 'Notas',
-      'journal_entry': 'Diário',
+      'entry': 'Diário',
       'resource': 'Recursos',
       'person': 'Pessoas',
     };

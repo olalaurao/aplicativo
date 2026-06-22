@@ -83,8 +83,11 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
       _activeFilter = f;
       _savedFilters = ref.read(settingsProvider).filtersFor('resource');
       if (f != null) {
-        if (f.viewMode == ViewMode.grid) _resourceViewMode = ResourceViewMode.shelfHighlights;
-        else _resourceViewMode = ResourceViewMode.listHighlights;
+        if (f.viewMode == ViewMode.grid) {
+          _resourceViewMode = ResourceViewMode.shelfHighlights;
+        } else {
+          _resourceViewMode = ResourceViewMode.listHighlights;
+        }
       }
     }));
 
@@ -219,7 +222,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: resources.take(8).length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (ctx, i) => _buildShelfItem(ctx, resources.take(8).toList()[i]))),
     ]);
 
@@ -234,7 +237,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
             color: AppColors.surfaceVariant),
           child: resource.coverImage?.isNotEmpty == true
             ? Image.network(resource.coverImage!, fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _fallbackIcon(resource))
+                errorBuilder: (ctx, err, stack) => _fallbackIcon(resource))
             : _fallbackIcon(resource)),
         const SizedBox(height: 4),
         Text(resource.title, maxLines: 1, overflow: TextOverflow.ellipsis,
@@ -274,7 +277,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: _resourceColor(hl.r).withOpacity(0.08),
+              color: _resourceColor(hl.r).withValues(alpha: 0.08),
               border: Border(left: BorderSide(color: _resourceColor(hl.r), width: 2)),
               borderRadius: const BorderRadius.only(
                 topRight: Radius.circular(8), bottomRight: Radius.circular(8))),
@@ -366,7 +369,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
           size: 16,
           color: i < resource.rating
               ? AppColors.warning
-              : AppColors.textMuted.withOpacity(0.2),
+              : AppColors.textMuted.withValues(alpha: 0.2),
         ),
       ),
     );

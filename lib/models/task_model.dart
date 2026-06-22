@@ -6,7 +6,7 @@ import 'scheduler.dart';
 import 'reminder_config.dart';
 import 'package:uuid/uuid.dart';
 
-enum TaskStage { idea, todo, inProgress, pending, finalized }
+enum TaskStage { idea, backlog, todo, inProgress, pending, finalized }
 
 enum TaskPriority { none, low, medium, high }
 
@@ -33,20 +33,18 @@ class TripleCheck {
     required this.checkedAt,
   });
 
-  /// Which dimensions are blocking (not `yes`)
-  List<String> get blockers {
-    final b = <String>[];
-    if (head != TripleCheckAnswer.yes) b.add('head');
-    if (heart != TripleCheckAnswer.yes) b.add('heart');
-    if (hand != TripleCheckAnswer.yes) b.add('hand');
-    return b;
+  String? get primaryBlocker {
+    if (head != TripleCheckAnswer.yes) return 'head';
+    if (heart != TripleCheckAnswer.yes) return 'heart';
+    if (hand != TripleCheckAnswer.yes) return 'hand';
+    return null;
   }
 
   Map<String, dynamic> toMap() => {
     'head': head.name,
     'heart': heart.name,
     'hand': hand.name,
-    'blocker': blockers.join(','),
+    'blocker': primaryBlocker,
     'diagnosis': diagnosis,
     'checked_at': checkedAt.toIso8601String(),
   };
@@ -113,6 +111,7 @@ class Task extends ContentObject {
   List<String> socialRefs;
   int? estimatedMinutes;
   TripleCheck? tripleCheck;
+  String? linkedSystem;
 
   Task({
     super.id,
@@ -155,6 +154,7 @@ class Task extends ContentObject {
     this.socialRefs = const [],
     this.estimatedMinutes,
     this.tripleCheck,
+    this.linkedSystem,
     DateTime? reminderDate,
   }) {
     if (reminderDate != null) {
@@ -308,6 +308,9 @@ class Task extends ContentObject {
     }
     // Triple Check block — stored inline in frontmatter, never as separate file
     frontmatter['triple_check'] = tripleCheck?.toMap();
+    if (linkedSystem != null) {
+      frontmatter['linked_system'] = linkedSystem;
+    }
 
     if (scheduler != null) frontmatter['scheduler'] = scheduler!.toMap();
 
@@ -370,7 +373,17 @@ class Task extends ContentObject {
           final title = subtask.slug != null
               ? '[[${subtask.slug!}]]'
               : subtask.title;
-          buffer.writeln('- $check $title');
+          // Sintaxe Tasks Plugin do Obsidian: campos inline [chave:: valor]
+          final fields = StringBuffer();
+          if (subtask.dueDate != null) {
+            final d = subtask.dueDate!;
+            final dateStr = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+            fields.write(' [due:: $dateStr]');
+          }
+          if (subtask.priority != null && subtask.priority != 'none') {
+            fields.write(' [priority:: ${subtask.priority}]');
+          }
+          buffer.writeln('- $check $title$fields');
         }
       }
       buffer.writeln();
@@ -480,6 +493,7 @@ class Task extends ContentObject {
         debugPrint('TripleCheck parse error: $e');
       }
     }
+    task.linkedSystem = frontmatter['linked_system']?.toString();
     if (frontmatter['scheduler'] != null) {
       task.scheduler = Scheduler.fromMap(
         Map<String, dynamic>.from(frontmatter['scheduler'] as Map),
@@ -525,6 +539,19 @@ class Task extends ContentObject {
           line.startsWith('- [X] ')) {
         final completed = line.substring(3, 4).toLowerCase() == 'x';
         String content = line.substring(6).trim();
+        // Extrair campos Tasks Plugin inline: [due:: ...] [priority:: ...]
+        DateTime? dueDate;
+        String? subtaskPriority;
+        final dueMatch = RegExp(r'\[due::\s*(\d{4}-\d{2}-\d{2})\]').firstMatch(content);
+        if (dueMatch != null) {
+          dueDate = DateTime.tryParse(dueMatch.group(1)!);
+          content = content.replaceAll(dueMatch.group(0)!, '').trim();
+        }
+        final priorityMatch = RegExp(r'\[priority::\s*(\w+)\]').firstMatch(content);
+        if (priorityMatch != null) {
+          subtaskPriority = priorityMatch.group(1)?.toLowerCase();
+          content = content.replaceAll(priorityMatch.group(0)!, '').trim();
+        }
         String? slug;
         if (content.startsWith('[[') && content.endsWith(']]')) {
           slug = content.substring(2, content.length - 2);
@@ -543,6 +570,8 @@ class Task extends ContentObject {
               title: content,
               completed: completed,
               slug: slug,
+              dueDate: dueDate,
+              priority: subtaskPriority,
             ),
           );
           subtaskInSessionIndex++;
@@ -604,6 +633,7 @@ class Task extends ContentObject {
     int? estimatedMinutes,
     TripleCheck? tripleCheck,
     bool clearTripleCheck = false,
+    String? linkedSystem,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     List<String>? tags,
@@ -646,6 +676,7 @@ class Task extends ContentObject {
       socialRefs: socialRefs ?? this.socialRefs,
       estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
       tripleCheck: clearTripleCheck ? null : (tripleCheck ?? this.tripleCheck),
+      linkedSystem: linkedSystem ?? this.linkedSystem,
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       tags: tags ?? this.tags,

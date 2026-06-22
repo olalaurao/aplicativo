@@ -56,8 +56,8 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
 
     if (widget.existingProject != null) {
       final project = widget.existingProject!;
-      _state = project.state;
-      _priority = project.priority;
+      _state = project.projectState;
+      _priority = project.projectPriority;
       _startDate = project.startDate;
       _endDate = project.endDate;
       _selectedColor = project.color ?? '#3B82F6';

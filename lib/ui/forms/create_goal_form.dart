@@ -698,7 +698,7 @@ class _KpiBuilderSheet extends ConsumerStatefulWidget {
 class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
   final _titleController = TextEditingController();
   final _targetController = TextEditingController();
-  KPISourceType _sourceType = KPISourceType.customNumericInput;
+  KPISourceType _sourceType = KPISourceType.manualQuantity;
   String? _sourceId;
   String? _fieldId;
 

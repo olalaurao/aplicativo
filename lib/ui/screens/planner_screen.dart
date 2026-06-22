@@ -1634,7 +1634,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     final routines = ref
         .read(notesProvider)
         .where(
-          (note) => note.subtype == NoteSubtype.routine && note.showInPlanner,
+          // TODO: NoteSubtype.routine was removed per spec. We now check note.showInPlanner for notes of type text.
+          (note) => note.subtype == NoteSubtype.text && note.showInPlanner,
         )
         .toList();
     final backlog = tasks

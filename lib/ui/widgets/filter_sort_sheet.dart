@@ -34,7 +34,7 @@ class FilterSortSheet extends ConsumerStatefulWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => ProviderScope(
-        parent: ProviderScope.containerOf(context),
+        overrides: const [],
         child: DraggableScrollableSheet(
           initialChildSize: 0.80,
           minChildSize: 0.5,
@@ -147,10 +147,10 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: AppColors.info.withOpacity(0.08),
+                            color: AppColors.info.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: AppColors.info.withOpacity(0.25),
+                              color: AppColors.info.withValues(alpha: 0.25),
                             ),
                           ),
                           child: const Row(
@@ -296,11 +296,11 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
         decoration: BoxDecoration(
           color:
               isActive
-                  ? AppColors.primary.withOpacity(0.15)
+                  ? AppColors.primary.withValues(alpha: 0.15)
                   : AppTheme.surfaceVariantColor(context),
           border:
               isActive
-                  ? Border.all(color: AppColors.primary.withOpacity(0.3))
+                  ? Border.all(color: AppColors.primary.withValues(alpha: 0.3))
                   : null,
           borderRadius: BorderRadius.circular(20),
         ),
@@ -323,7 +323,7 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
       margin: const EdgeInsets.only(right: 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.info.withOpacity(0.10),
+        color: AppColors.info.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(20),
       ),
       child: const Text(
@@ -608,11 +608,11 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
           decoration: BoxDecoration(
             color:
                 active
-                    ? AppColors.primary.withOpacity(0.12)
+                    ? AppColors.primary.withValues(alpha: 0.12)
                     : AppTheme.surfaceVariantColor(context),
             border:
                 active
-                    ? Border.all(color: AppColors.primary.withOpacity(0.3))
+                    ? Border.all(color: AppColors.primary.withValues(alpha: 0.3))
                     : null,
             borderRadius: BorderRadius.circular(9),
           ),
@@ -644,11 +644,11 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
           decoration: BoxDecoration(
             color:
                 active
-                    ? AppColors.primary.withOpacity(0.12)
+                    ? AppColors.primary.withValues(alpha: 0.12)
                     : AppTheme.surfaceVariantColor(context),
             border:
                 active
-                    ? Border.all(color: AppColors.primary.withOpacity(0.3))
+                    ? Border.all(color: AppColors.primary.withValues(alpha: 0.3))
                     : null,
             borderRadius: BorderRadius.circular(9),
           ),

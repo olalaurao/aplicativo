@@ -40,7 +40,7 @@ final energyMapProvider = Provider<List<_HourEnergy>>((ref) {
       .toList();
 
   // Mapeia moodSlug → numericValue
-  double? _moodValue(String? slug) {
+  double? moodValue(String? slug) {
     if (slug == null) return null;
     return moods
         .where((m) => m.id == slug || m.slug == slug)
@@ -55,7 +55,7 @@ final energyMapProvider = Provider<List<_HourEnergy>>((ref) {
   // De journal entries
   for (final entry in entries) {
     final hour = entry.date.hour;
-    final value = _moodValue(entry.moodSlug);
+    final value = moodValue(entry.moodSlug);
     if (value != null) {
       hourValues.putIfAbsent(hour, () => []).add(value);
     }
@@ -68,7 +68,7 @@ final energyMapProvider = Provider<List<_HourEnergy>>((ref) {
     final match = RegExp(
       r'(?:energia|energy)[:\s]+(\d)',
       caseSensitive: false,
-    ).firstMatch(note.title + ' ' + note.body);
+    ).firstMatch('${note.title} ${note.body}');
     final value = match != null
         ? double.tryParse(match.group(1) ?? '')
         : null;
@@ -121,27 +121,27 @@ class EnergyMap extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (!compact)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+        const Padding(
+            padding: EdgeInsets.only(bottom: 12),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.bolt_rounded,
                   size: 18,
                   color: AppColors.warning,
                 ),
-                const SizedBox(width: 8),
-                const Text(
+                SizedBox(width: 8),
+                Text(
                   'Energy Map',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const Spacer(),
+                Spacer(),
                 Text(
                   'Últimos 30 dias',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textMuted,
                   ),

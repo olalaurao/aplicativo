@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/scheduler.dart';
-import '../../models/day_theme_model.dart';
 import '../../providers/day_theme_provider.dart';
 import '../theme.dart';
 import '../widgets/wiki_link_picker.dart';

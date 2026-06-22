@@ -18,6 +18,7 @@ class JournalEntry extends ContentObject {
   Map<String, dynamic>? weather;
 
   JournalEntryType entryType;
+  String? feelings;
 
   // field_note specific
   String? category;
@@ -47,6 +48,7 @@ class JournalEntry extends ContentObject {
     this.comments = const [],
     this.weather,
     this.entryType = JournalEntryType.standard,
+    this.feelings,
     this.category,
     this.energyValue,
     this.text,
@@ -69,8 +71,14 @@ class JournalEntry extends ContentObject {
          updatedAt: updatedAt ?? createdAt ?? date,
        );
 
+  static String _entryTypeToString(JournalEntryType t) => switch (t) {
+    JournalEntryType.standard  => 'standard',
+    JournalEntryType.fieldNote => 'field_note',
+    JournalEntryType.pmn       => 'pmn',
+  };
+
   @override
-  String get type => 'journal_entry';
+  String get type => 'entry';
 
   @override
   String toMarkdown() {
@@ -80,8 +88,9 @@ class JournalEntry extends ContentObject {
     if (location != null) frontmatter['location'] = location;
     if (templateId != null) frontmatter['template_id'] = templateId;
     if (photos.isNotEmpty) frontmatter['photos'] = photos;
+    if (feelings != null) frontmatter['feelings'] = feelings;
     
-    frontmatter['entry_type'] = entryType.name.replaceAll(RegExp(r'([A-Z])'), r'_\1').toLowerCase();
+    frontmatter['entry_type'] = _entryTypeToString(entryType);
     
     if (entryType == JournalEntryType.fieldNote) {
       if (category != null) frontmatter['category'] = category;
@@ -139,7 +148,7 @@ class JournalEntry extends ContentObject {
     }
 
     if (moodSlug != null) {
-      finalBody = finalBody.trimRight() + '\n\n' + 'mood:: [[$moodSlug]]';
+      finalBody = '${finalBody.trimRight()}\n\nmood:: [[$moodSlug]]';
     }
 
     return generateMarkdown(
@@ -172,6 +181,17 @@ class JournalEntry extends ContentObject {
     );
     entry.loadBaseMap(frontmatter);
 
+    if (type == JournalEntryType.pmn && frontmatter['id'] == null) {
+      final weekStr = frontmatter['week']?.toString() ?? '';
+      final weekNum = int.tryParse(weekStr);
+      final startStr = frontmatter['date_range_start']?.toString();
+      final startDate = startStr != null ? DateTime.tryParse(startStr) : null;
+      final year = startDate?.year ?? entry.date.year;
+      if (weekNum != null) {
+        entry.id = 'pmn-$year-W${weekNum.toString().padLeft(2, '0')}';
+      }
+    }
+
     final moodLineMatch = RegExp(r'^mood::\s*(.*)$', multiLine: true).firstMatch(body);
     if (moodLineMatch != null) {
       final val = moodLineMatch.group(1)!;
@@ -181,6 +201,7 @@ class JournalEntry extends ContentObject {
       entry.moodSlug = frontmatter['mood']?.toString();
     }
 
+    entry.feelings = frontmatter['feelings'] as String?;
     entry.location = frontmatter['location'] as String?;
     entry.templateId = frontmatter['template_id'] as String?;
     final rawPhotos = frontmatter['photos'];
@@ -259,6 +280,7 @@ class JournalEntry extends ContentObject {
     DateTime? updatedAt,
     String? obsidianPath,
     JournalEntryType? entryType,
+    String? feelings,
     String? category,
     int? energyValue,
     String? text,
@@ -289,6 +311,7 @@ class JournalEntry extends ContentObject {
       updatedAt: updatedAt ?? DateTime.now(),
       obsidianPath: obsidianPath ?? this.obsidianPath,
       entryType: entryType ?? this.entryType,
+      feelings: feelings ?? this.feelings,
       category: category ?? this.category,
       energyValue: energyValue ?? this.energyValue,
       text: text ?? this.text,

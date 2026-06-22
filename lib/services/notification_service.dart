@@ -143,6 +143,11 @@ class NotificationService with WidgetsBindingObserver {
   }
 
   Future<void> init() async {
+    // flutter_local_notifications is not supported on Windows/Linux/macOS.
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      debugPrint('NotificationService: skipping init on desktop platform');
+      return;
+    }
     tz.initializeTimeZones();
     final timeZoneInfo = await FlutterTimezone.getLocalTimezone();
     final timeZoneName = timeZoneInfo.identifier;
@@ -197,6 +202,7 @@ class NotificationService with WidgetsBindingObserver {
     // Check for native payload immediately on initialization
     _checkPendingPayloadFromNative();
   }
+
 
   /// Handle a notification that launched the app via fullScreenIntent.
   void _handleFullScreenLaunch(NotificationResponse response) {

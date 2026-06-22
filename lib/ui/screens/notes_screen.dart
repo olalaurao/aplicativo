@@ -70,9 +70,13 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       _activeFilter = f;
       _savedFilters = ref.read(settingsProvider).filtersFor('note');
       if (f != null) {
-        if (f.viewMode == ViewMode.grid) _viewMode = NoteViewMode.grid;
-        else if (f.viewMode == ViewMode.grouped) _viewMode = NoteViewMode.grouped;
-        else _viewMode = NoteViewMode.list;
+        if (f.viewMode == ViewMode.grid) {
+          _viewMode = NoteViewMode.grid;
+        } else if (f.viewMode == ViewMode.grouped) {
+          _viewMode = NoteViewMode.grouped;
+        } else {
+          _viewMode = NoteViewMode.list;
+        }
       }
     }));
 
@@ -128,7 +132,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
+                              color: AppColors.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Icon(
@@ -202,7 +206,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     Icon(
                       Icons.sticky_note_2_outlined,
                       size: 56,
-                      color: AppColors.primary.withOpacity(0.3),
+                      color: AppColors.primary.withValues(alpha: 0.3),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -263,7 +267,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           margin: const EdgeInsets.only(right: 6),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
-            color: AppColors.info.withOpacity(0.10),
+            color: AppColors.info.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(20)),
           child: const Text('+ filtro', style: TextStyle(
             fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.info)))),
@@ -318,7 +322,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   Widget _typeBadge(String label, Color color) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
     decoration: BoxDecoration(
-      color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+      color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)),
     child: Text(label, style: TextStyle(
       fontSize: 9, fontWeight: FontWeight.w700, color: color)));
 
@@ -348,7 +352,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
+                          color: color.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(icon, size: 20, color: color),
@@ -427,10 +431,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     decoration: BoxDecoration(
                       color: Theme.of(context)
                           .scaffoldBackgroundColor
-                          .withOpacity(0.5),
+                          .withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: AppColors.divider.withOpacity(0.5),
+                        color: AppColors.divider.withValues(alpha: 0.5),
                       ),
                     ),
                     child: _buildExpandedEditor(note),

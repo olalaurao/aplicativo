@@ -1,31 +1,68 @@
 // lib/models/mood_model.dart
+import 'package:flutter/material.dart';
 import 'content_object.dart';
+
+enum MoodQuadrant { red, yellow, green, blue }
+enum MoodSource { system, user }
 
 class MoodDefinition extends ContentObject {
   final String label;
   final String emoji;
-  final int numericValue;
   final String color;
+  final MoodSource source;
+  final bool hidden;
+  final String? labelEn;
+  final String? description;
+  final MoodQuadrant quadrant;
+  final int pleasantness;
+  final int energy;
+
+  int get numericValue => pleasantness;
 
   MoodDefinition({
-    super.id, // slug like 'good', 'bad'
-    required super.title, // same as label or more descriptive
+    super.id,
+    String? title,
     required this.label,
     required this.emoji,
-    required this.numericValue,
     required this.color,
-    required super.order,
+    super.order,
+    this.source = MoodSource.system,
+    this.hidden = false,
+    this.labelEn,
+    this.description,
+    int? pleasantness,
+    int? energy,
+    MoodQuadrant? quadrant,
+    int? numericValue,
+    super.aliases,
     super.obsidianPath,
-  });
+  })  : pleasantness = pleasantness ?? numericValue ?? 3,
+        energy = energy ?? 3,
+        quadrant = quadrant ?? _quadrantFromPleasantness(pleasantness ?? numericValue ?? 3),
+        super(title: title ?? label);
+
+  static MoodQuadrant _quadrantFromPleasantness(int p) {
+    if (p <= 3) return MoodQuadrant.red;
+    if (p <= 6) return MoodQuadrant.blue;
+    if (p <= 10) return MoodQuadrant.green;
+    return MoodQuadrant.yellow;
+  }
 
   MoodDefinition copyWith({
     String? id,
     String? title,
     String? label,
     String? emoji,
-    int? numericValue,
     String? color,
     int? order,
+    MoodSource? source,
+    bool? hidden,
+    String? labelEn,
+    String? description,
+    MoodQuadrant? quadrant,
+    int? pleasantness,
+    int? energy,
+    List<String>? aliases,
     String? obsidianPath,
   }) {
     final copy = MoodDefinition(
@@ -33,9 +70,16 @@ class MoodDefinition extends ContentObject {
       title: title ?? this.title,
       label: label ?? this.label,
       emoji: emoji ?? this.emoji,
-      numericValue: numericValue ?? this.numericValue,
       color: color ?? this.color,
       order: order ?? this.order,
+      source: source ?? this.source,
+      hidden: hidden ?? this.hidden,
+      labelEn: labelEn ?? this.labelEn,
+      description: description ?? this.description,
+      quadrant: quadrant ?? this.quadrant,
+      pleasantness: pleasantness ?? this.pleasantness,
+      energy: energy ?? this.energy,
+      aliases: aliases ?? this.aliases,
       obsidianPath: obsidianPath ?? this.obsidianPath,
     );
     copy.loadBaseMap(toBaseMap());
@@ -51,12 +95,17 @@ class MoodDefinition extends ContentObject {
   @override
   String toMarkdown() {
     final frontmatter = toBaseMap();
+    frontmatter['source'] = source.name;
+    frontmatter['hidden'] = hidden;
     frontmatter['label'] = label;
+    if (labelEn != null) frontmatter['label_en'] = labelEn;
+    if (description != null) frontmatter['description'] = description;
     frontmatter['emoji'] = emoji;
-    frontmatter['numeric_value'] = numericValue;
+    frontmatter['quadrant'] = quadrant.name;
+    frontmatter['pleasantness'] = pleasantness;
+    frontmatter['energy'] = energy;
     frontmatter['color'] = color;
-    frontmatter['order'] = order;
-    return generateMarkdown(frontmatter, '# $label');
+    return generateMarkdown(frontmatter, description ?? '');
   }
 
   factory MoodDefinition.fromMarkdown(
@@ -68,11 +117,86 @@ class MoodDefinition extends ContentObject {
       title: frontmatter['title'] as String? ?? 'Neutral',
       label: frontmatter['label'] as String? ?? 'Neutral',
       emoji: frontmatter['emoji'] as String? ?? '😐',
-      numericValue: (frontmatter['numeric_value'] as num? ?? 3).toInt(),
       color: frontmatter['color'] as String? ?? '#9E9E9E',
       order: (frontmatter['order'] as num? ?? 3).toInt(),
+      source: MoodSource.values.firstWhere(
+        (e) => e.name == frontmatter['source']?.toString(),
+        orElse: () => MoodSource.system,
+      ),
+      hidden: frontmatter['hidden'] == true,
+      labelEn: frontmatter['label_en'] as String?,
+      description: frontmatter['description'] as String? ?? body.trim(),
+      quadrant: MoodQuadrant.values.firstWhere(
+        (q) => q.name == frontmatter['quadrant']?.toString(),
+        orElse: () => MoodQuadrant.blue,
+      ),
+      pleasantness: (frontmatter['pleasantness'] as num? ?? 3).toInt(),
+      energy: (frontmatter['energy'] as num? ?? 3).toInt(),
+      aliases: List<String>.from(frontmatter['aliases'] ?? []),
     );
     mood.loadBaseMap(frontmatter);
     return mood;
   }
+
+  static Color quadrantColor(MoodQuadrant q) => switch (q) {
+    MoodQuadrant.red    => const Color(0xFFEF5350),
+    MoodQuadrant.yellow => const Color(0xFFFFA726),
+    MoodQuadrant.green  => const Color(0xFF66BB6A),
+    MoodQuadrant.blue   => const Color(0xFF42A5F5),
+  };
+
+  static List<MoodDefinition> get systemMoods => [
+    // RED quadrant (12)
+    MoodDefinition(id:'enraged',    source:MoodSource.system, label:'Enfurecida',    labelEn:'Enraged',    emoji:'😡', quadrant:MoodQuadrant.red,    pleasantness:1, energy:5, color:'#EF5350', order:1,  aliases:['enraged','enfurecida']),
+    MoodDefinition(id:'panicked',   source:MoodSource.system, label:'Em pânico',     labelEn:'Panicked',   emoji:'😱', quadrant:MoodQuadrant.red,    pleasantness:1, energy:5, color:'#EF5350', order:2,  aliases:['panicked','em panico','panico']),
+    MoodDefinition(id:'livid',      source:MoodSource.system, label:'Furiosa',       labelEn:'Livid',      emoji:'🤬', quadrant:MoodQuadrant.red,    pleasantness:1, energy:5, color:'#EF5350', order:3,  aliases:['livid','furiosa']),
+    MoodDefinition(id:'furious',    source:MoodSource.system, label:'Raivosa',       labelEn:'Furious',    emoji:'😤', quadrant:MoodQuadrant.red,    pleasantness:1, energy:5, color:'#EF5350', order:4,  aliases:['furious','raivosa']),
+    MoodDefinition(id:'terrified',  source:MoodSource.system, label:'Aterrorizada',  labelEn:'Terrified',  emoji:'😨', quadrant:MoodQuadrant.red,    pleasantness:1, energy:5, color:'#EF5350', order:5,  aliases:['terrified','aterrorizada']),
+    MoodDefinition(id:'shocked',    source:MoodSource.system, label:'Chocada',       labelEn:'Shocked',    emoji:'😳', quadrant:MoodQuadrant.red,    pleasantness:1, energy:5, color:'#EF5350', order:6,  aliases:['shocked','chocada']),
+    MoodDefinition(id:'anxious',    source:MoodSource.system, label:'Ansiosa',       labelEn:'Anxious',    emoji:'😰', quadrant:MoodQuadrant.red,    pleasantness:2, energy:4, color:'#EF5350', order:7,  aliases:['anxious','ansiosa']),
+    MoodDefinition(id:'stressed',   source:MoodSource.system, label:'Estressada',    labelEn:'Stressed',   emoji:'😖', quadrant:MoodQuadrant.red,    pleasantness:2, energy:4, color:'#EF5350', order:8,  aliases:['stressed','estressada']),
+    MoodDefinition(id:'frustrated', source:MoodSource.system, label:'Frustrada',     labelEn:'Frustrated', emoji:'😣', quadrant:MoodQuadrant.red,    pleasantness:2, energy:4, color:'#EF5350', order:9,  aliases:['frustrated','frustrada']),
+    MoodDefinition(id:'agitated',   source:MoodSource.system, label:'Agitada',       labelEn:'Agitated',   emoji:'😬', quadrant:MoodQuadrant.red,    pleasantness:2, energy:4, color:'#EF5350', order:10, aliases:['agitated','agitada']),
+    MoodDefinition(id:'irritated',  source:MoodSource.system, label:'Irritada',      labelEn:'Irritated',  emoji:'😒', quadrant:MoodQuadrant.red,    pleasantness:2, energy:4, color:'#EF5350', order:11, aliases:['irritated','irritada']),
+    MoodDefinition(id:'jittery',    source:MoodSource.system, label:'Nervosa',       labelEn:'Jittery',    emoji:'😵', quadrant:MoodQuadrant.red,    pleasantness:2, energy:4, color:'#EF5350', order:12, aliases:['jittery','nervosa']),
+    // YELLOW quadrant (12)
+    MoodDefinition(id:'ecstatic',   source:MoodSource.system, label:'Eufórica',      labelEn:'Ecstatic',   emoji:'🤩', quadrant:MoodQuadrant.yellow, pleasantness:5, energy:5, color:'#FFA726', order:13, aliases:['ecstatic','euforica']),
+    MoodDefinition(id:'elated',     source:MoodSource.system, label:'Radiante',      labelEn:'Elated',     emoji:'😄', quadrant:MoodQuadrant.yellow, pleasantness:5, energy:5, color:'#FFA726', order:14, aliases:['elated','radiante']),
+    MoodDefinition(id:'excited',    source:MoodSource.system, label:'Empolgada',     labelEn:'Excited',    emoji:'😃', quadrant:MoodQuadrant.yellow, pleasantness:5, energy:4, color:'#FFA726', order:15, aliases:['excited','empolgada']),
+    MoodDefinition(id:'enthusiastic',source:MoodSource.system,label:'Entusiasmada',  labelEn:'Enthusiastic',emoji:'🙌',quadrant:MoodQuadrant.yellow, pleasantness:5, energy:4, color:'#FFA726', order:16, aliases:['enthusiastic','entusiasmada']),
+    MoodDefinition(id:'energized',  source:MoodSource.system, label:'Energizada',    labelEn:'Energized',  emoji:'⚡', quadrant:MoodQuadrant.yellow, pleasantness:4, energy:5, color:'#FFA726', order:17, aliases:['energized','energizada']),
+    MoodDefinition(id:'happy',      source:MoodSource.system, label:'Feliz',         labelEn:'Happy',      emoji:'😊', quadrant:MoodQuadrant.yellow, pleasantness:5, energy:4, color:'#FFA726', order:18, aliases:['happy','feliz']),
+    MoodDefinition(id:'joyful',     source:MoodSource.system, label:'Alegre',        labelEn:'Joyful',     emoji:'😁', quadrant:MoodQuadrant.yellow, pleasantness:5, energy:4, color:'#FFA726', order:19, aliases:['joyful','alegre']),
+    MoodDefinition(id:'upbeat',     source:MoodSource.system, label:'Animada',       labelEn:'Upbeat',     emoji:'😀', quadrant:MoodQuadrant.yellow, pleasantness:4, energy:4, color:'#FFA726', order:20, aliases:['upbeat','animada']),
+    MoodDefinition(id:'inspired',   source:MoodSource.system, label:'Inspirada',     labelEn:'Inspired',   emoji:'✨', quadrant:MoodQuadrant.yellow, pleasantness:4, energy:4, color:'#FFA726', order:21, aliases:['inspired','inspirada']),
+    MoodDefinition(id:'motivated',  source:MoodSource.system, label:'Motivada',      labelEn:'Motivated',  emoji:'💪', quadrant:MoodQuadrant.yellow, pleasantness:4, energy:4, color:'#FFA726', order:22, aliases:['motivated','motivada']),
+    MoodDefinition(id:'optimistic', source:MoodSource.system, label:'Otimista',      labelEn:'Optimistic', emoji:'🌟', quadrant:MoodQuadrant.yellow, pleasantness:4, energy:4, color:'#FFA726', order:23, aliases:['optimistic','otimista']),
+    MoodDefinition(id:'proud',      source:MoodSource.system, label:'Orgulhosa',     labelEn:'Proud',      emoji:'🥹', quadrant:MoodQuadrant.yellow, pleasantness:4, energy:4, color:'#FFA726', order:24, aliases:['proud','orgulhosa']),
+    // GREEN quadrant (12)
+    MoodDefinition(id:'calm',       source:MoodSource.system, label:'Calma',         labelEn:'Calm',       emoji:'😌', quadrant:MoodQuadrant.green,  pleasantness:5, energy:2, color:'#66BB6A', order:25, aliases:['calm','calma','tranquila']),
+    MoodDefinition(id:'content',    source:MoodSource.system, label:'Satisfeita',    labelEn:'Content',    emoji:'🙂', quadrant:MoodQuadrant.green,  pleasantness:5, energy:2, color:'#66BB6A', order:26, aliases:['content','satisfeita']),
+    MoodDefinition(id:'peaceful',   source:MoodSource.system, label:'Em paz',        labelEn:'Peaceful',   emoji:'🕊️',quadrant:MoodQuadrant.green,  pleasantness:5, energy:1, color:'#66BB6A', order:27, aliases:['peaceful','em paz','paz']),
+    MoodDefinition(id:'serene',     source:MoodSource.system, label:'Serena',        labelEn:'Serene',     emoji:'🌿', quadrant:MoodQuadrant.green,  pleasantness:5, energy:1, color:'#66BB6A', order:28, aliases:['serene','serena']),
+    MoodDefinition(id:'grateful',   source:MoodSource.system, label:'Grata',         labelEn:'Grateful',   emoji:'🤍', quadrant:MoodQuadrant.green,  pleasantness:5, energy:2, color:'#66BB6A', order:29, aliases:['grateful','grata']),
+    MoodDefinition(id:'relaxed',    source:MoodSource.system, label:'Relaxada',      labelEn:'Relaxed',    emoji:'😮‍💨',quadrant:MoodQuadrant.green, pleasantness:4, energy:1, color:'#66BB6A', order:30, aliases:['relaxed','relaxada']),
+    MoodDefinition(id:'comfortable',source:MoodSource.system, label:'Confortável',   labelEn:'Comfortable',emoji:'🛋️',quadrant:MoodQuadrant.green,  pleasantness:4, energy:2, color:'#66BB6A', order:31, aliases:['comfortable','confortavel']),
+    MoodDefinition(id:'at_ease',    source:MoodSource.system, label:'À vontade',     labelEn:'At ease',    emoji:'😴', quadrant:MoodQuadrant.green,  pleasantness:4, energy:1, color:'#66BB6A', order:32, aliases:['at_ease','a vontade','vontade']),
+    MoodDefinition(id:'balanced',   source:MoodSource.system, label:'Equilibrada',   labelEn:'Balanced',   emoji:'⚖️', quadrant:MoodQuadrant.green,  pleasantness:4, energy:2, color:'#66BB6A', order:33, aliases:['balanced','equilibrada']),
+    MoodDefinition(id:'loving',     source:MoodSource.system, label:'Amorosa',       labelEn:'Loving',     emoji:'🥰', quadrant:MoodQuadrant.green,  pleasantness:5, energy:2, color:'#66BB6A', order:34, aliases:['loving','amorosa']),
+    MoodDefinition(id:'thoughtful', source:MoodSource.system, label:'Reflexiva',     labelEn:'Thoughtful', emoji:'🌙', quadrant:MoodQuadrant.green,  pleasantness:4, energy:2, color:'#66BB6A', order:35, aliases:['thoughtful','reflexiva']),
+    MoodDefinition(id:'secure',     source:MoodSource.system, label:'Segura',        labelEn:'Secure',     emoji:'🏡', quadrant:MoodQuadrant.green,  pleasantness:4, energy:2, color:'#66BB6A', order:36, aliases:['secure','segura']),
+    // BLUE quadrant (12)
+    MoodDefinition(id:'sad',        source:MoodSource.system, label:'Triste',        labelEn:'Sad',        emoji:'😢', quadrant:MoodQuadrant.blue,   pleasantness:1, energy:2, color:'#42A5F5', order:37, aliases:['sad','triste']),
+    MoodDefinition(id:'depressed',  source:MoodSource.system, label:'Deprimida',     labelEn:'Depressed',  emoji:'😞', quadrant:MoodQuadrant.blue,   pleasantness:1, energy:1, color:'#42A5F5', order:38, aliases:['depressed','deprimida']),
+    MoodDefinition(id:'hopeless',   source:MoodSource.system, label:'Sem esperança', labelEn:'Hopeless',   emoji:'😔', quadrant:MoodQuadrant.blue,   pleasantness:1, energy:1, color:'#42A5F5', order:39, aliases:['hopeless','sem esperanca']),
+    MoodDefinition(id:'lonely',     source:MoodSource.system, label:'Solitária',     labelEn:'Lonely',     emoji:'🥺', quadrant:MoodQuadrant.blue,   pleasantness:1, energy:2, color:'#42A5F5', order:40, aliases:['lonely','solitaria']),
+    MoodDefinition(id:'bored',      source:MoodSource.system, label:'Entediada',     labelEn:'Bored',      emoji:'😑', quadrant:MoodQuadrant.blue,   pleasantness:2, energy:1, color:'#42A5F5', order:41, aliases:['bored','entediada']),
+    MoodDefinition(id:'disconnected',source:MoodSource.system,label:'Desconectada',  labelEn:'Disconnected',emoji:'🌫️',quadrant:MoodQuadrant.blue,   pleasantness:2, energy:1, color:'#42A5F5', order:42, aliases:['disconnected','desconectada']),
+    MoodDefinition(id:'exhausted',  source:MoodSource.system, label:'Exausta',       labelEn:'Exhausted',  emoji:'😩', quadrant:MoodQuadrant.blue,   pleasantness:1, energy:1, color:'#42A5F5', order:43, aliases:['exhausted','exausta']),
+    MoodDefinition(id:'discouraged',source:MoodSource.system, label:'Desanimada',    labelEn:'Discouraged',emoji:'😪', quadrant:MoodQuadrant.blue,   pleasantness:2, energy:2, color:'#42A5F5', order:44, aliases:['discouraged','desanimada']),
+    MoodDefinition(id:'disappointed',source:MoodSource.system,label:'Decepcionada',  labelEn:'Disappointed',emoji:'😕',quadrant:MoodQuadrant.blue,   pleasantness:2, energy:2, color:'#42A5F5', order:45, aliases:['disappointed','decepcionada']),
+    MoodDefinition(id:'numb',       source:MoodSource.system, label:'Anestesiada',   labelEn:'Numb',       emoji:'😶', quadrant:MoodQuadrant.blue,   pleasantness:2, energy:1, color:'#42A5F5', order:46, aliases:['numb','anestesiada']),
+    MoodDefinition(id:'melancholic',source:MoodSource.system, label:'Melancólica',   labelEn:'Melancholic',emoji:'🌧️',quadrant:MoodQuadrant.blue,   pleasantness:2, energy:2, color:'#42A5F5', order:47, aliases:['melancholic','melancolica']),
+    MoodDefinition(id:'defeated',   source:MoodSource.system, label:'Derrotada',     labelEn:'Defeated',   emoji:'😓', quadrant:MoodQuadrant.blue,   pleasantness:1, energy:2, color:'#42A5F5', order:48, aliases:['defeated','derrotada']),
+  ];
 }

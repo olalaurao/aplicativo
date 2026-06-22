@@ -1,6 +1,8 @@
 // lib/models/day_theme_model.dart
 import 'content_object.dart';
 
+enum EnergyLevel { high, medium, low }
+
 class TimeRange {
   final int startHour;
   final int startMinute;
@@ -36,12 +38,14 @@ class TimeRange {
 class TimeBlock extends ContentObject {
   List<TimeRange> timeRanges;
   String? color;
+  EnergyLevel? energyLevel; // null = not set
 
   TimeBlock({
     super.id,
     required super.title,
     this.timeRanges = const [],
     this.color,
+    this.energyLevel,
     super.order,
   });
 
@@ -53,6 +57,7 @@ class TimeBlock extends ContentObject {
     final frontmatter = toBaseMap();
     frontmatter['color'] = color;
     frontmatter['time_ranges'] = timeRanges.map((tr) => tr.toMap()).toList();
+    if (energyLevel != null) frontmatter['energy_level'] = energyLevel!.name;
     return generateMarkdown(frontmatter, '');
   }
 
@@ -64,6 +69,10 @@ class TimeBlock extends ContentObject {
               ?.map((e) => TimeRange.fromMap(Map<String, dynamic>.from(e as Map)))
               .toList() ??
           [],
+      energyLevel: EnergyLevel.values.cast<EnergyLevel?>().firstWhere(
+            (e) => e?.name == (map['energy_level'] as String?),
+            orElse: () => null,
+          ),
     );
     block.loadBaseMap(map);
     return block;

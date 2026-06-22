@@ -3,7 +3,7 @@ import 'content_object.dart';
 import 'shared_types.dart';
 import 'reminder_config.dart';
 
-enum NoteSubtype { text, outline, collection, routine }
+enum NoteSubtype { text, outline, collection }
 
 class Note extends ContentObject {
   final NoteSubtype subtype;
@@ -14,6 +14,7 @@ class Note extends ContentObject {
   bool isChecklist;
   String? schedulerSlug;
   bool showInPlanner;
+  List<String> links; // WikiLink strings e.g. '[[some-note]]'
 
   Note({
     super.id,
@@ -26,6 +27,7 @@ class Note extends ContentObject {
     this.schedulerSlug,
     this.showInPlanner = false,
     List<String>? socialRefs,
+    List<String>? links,
     super.organizers,
     super.categories,
     super.tags,
@@ -36,7 +38,8 @@ class Note extends ContentObject {
     super.pinned,
     super.order,
     super.obsidianPath,
-  }) : socialRefs = socialRefs ?? [];
+  }) : socialRefs = socialRefs ?? [],
+       links = links ?? [];
 
   @override
   String get type => 'note';
@@ -53,6 +56,7 @@ class Note extends ContentObject {
     if (isChecklist) frontmatter['is_checklist'] = true;
     if (schedulerSlug != null) frontmatter['scheduler_slug'] = schedulerSlug;
     if (showInPlanner) frontmatter['show_in_planner'] = true;
+    if (links.isNotEmpty) frontmatter['links'] = links;
 
     final markdownBody = subtype == NoteSubtype.text
         ? normalizeRichTextBodyForMarkdown(body)
@@ -71,6 +75,7 @@ class Note extends ContentObject {
       title: frontmatter['title'] as String? ?? '',
       subtype: subtype,
       body: body,
+      links: List<String>.from(frontmatter['links'] as List? ?? []),
     );
     note.loadBaseMap(frontmatter);
     note.parentNoteId = frontmatter['parent_note_id'] as String?;
@@ -96,6 +101,7 @@ class Note extends ContentObject {
     String? schedulerSlug,
     bool? showInPlanner,
     List<String>? socialRefs,
+    List<String>? links,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     List<String>? tags,
@@ -118,6 +124,7 @@ class Note extends ContentObject {
       schedulerSlug: schedulerSlug ?? this.schedulerSlug,
       showInPlanner: showInPlanner ?? this.showInPlanner,
       socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
+      links: links ?? List<String>.from(this.links),
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       tags: tags ?? this.tags,

@@ -30,6 +30,8 @@ import '../models/template_model.dart';
 import '../models/idea_model.dart';
 import '../models/inbox_model.dart';
 import '../models/event_model.dart';
+import '../models/calendar_session.dart';
+import '../models/pomodoro_session.dart';
 
 import '../models/sync_action.dart';
 import '../services/sync_queue_service.dart';
@@ -42,6 +44,7 @@ import '../models/shared_types.dart' as shared_types;
 import '../services/widget_service.dart';
 import '../services/dataview_generator.dart';
 import 'settings_provider.dart';
+import 'pomodoro_provider.dart';
 import '../services/google_drive_sync_service.dart';
 
 final obsidianServiceProvider = Provider<ObsidianService>((ref) {
@@ -54,7 +57,11 @@ final obsidianServiceProvider = Provider<ObsidianService>((ref) {
   return service;
 });
 
-String getDailyNoteTemplate(String dateStr, List<DayTheme> dayThemes) {
+String getDailyNoteTemplate(
+  String dateStr,
+  List<DayTheme> dayThemes, {
+  List<Habit> activeHabits = const [],
+}) {
   const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   final parsedDate = DateTime.tryParse(dateStr) ?? DateTime.now();
   final dayName = weekDayNames[parsedDate.weekday - 1];
@@ -63,12 +70,27 @@ String getDailyNoteTemplate(String dateStr, List<DayTheme> dayThemes) {
     orElse: () => null,
   );
   final themeSlug = activeTheme?.id ?? '';
-  return '---\n'
-      'date: $dateStr\n'
-      'type: daily_note\n'
-      'day_theme: $themeSlug\n'
-      '---\n\n'
-      '# $dateStr\n';
+  // Flat habit keys in frontmatter (spec PARTE 20)
+  final habitKeys = activeHabits.map((h) => '${h.slug}: false').join('\n');
+  final buf = StringBuffer();
+  buf.write('---\n');
+  buf.write('date: $dateStr\n');
+  buf.write('type: daily_note\n');
+  buf.write('tags: [daily]\n');
+  if (themeSlug.isNotEmpty) buf.write('day_theme: $themeSlug\n');
+  if (habitKeys.isNotEmpty) buf.write('$habitKeys\n');
+  buf.write('mood_pleasantness:\n');
+  buf.write('mood_energy:\n');
+  buf.write('mood_label:\n');
+  buf.write('mood_emoji:\n');
+  buf.write('---\n\n');
+  buf.write('# $dateStr\n\n');
+  buf.write('## Journal Entries\n\n');
+  buf.write('## Habits\n\n');
+  buf.write('## Trackers\n\n');
+  buf.write('## Tasks\n\n');
+  buf.write('## Pomodoros\n');
+  return buf.toString();
 }
 
 class _ParsedQuickTask {
@@ -161,6 +183,12 @@ final conflictingObjectsProvider = Provider<Map<String, List<ContentObject>>>((
     }),
   );
 });
+
+final typeConflictedObjectsProvider = Provider<List<ContentObject>>((ref) {
+  final all = ref.watch(allObjectsProvider).valueOrNull ?? [];
+  return all.where((obj) => obj.hasTypeConflict).toList();
+});
+
 
 Future<void> _cancelHabitSlotReminderNotification(
   Habit habit,
@@ -347,7 +375,11 @@ final shoppingListsProvider =
 class HabitsNotifier extends Notifier<List<Habit>> {
   @override
   List<Habit> build() {
-    return ref.watch(objectsByTypeProvider('habit')).cast<Habit>();
+    final habits = ref.watch(objectsByTypeProvider('habit')).cast<Habit>();
+    if (habits.isNotEmpty) {
+      Future.microtask(() => AutomationService.checkPactExpirations(ref, habits));
+    }
+    return habits;
   }
 
   Future<void> addHabit(Habit habit) async {
@@ -363,9 +395,12 @@ class HabitsNotifier extends Notifier<List<Habit>> {
     try {
       final path = 'daily/$dateStr.md';
       final dayThemes = ref.read(dayThemesProvider);
-      final content =
-          await obsidianService.readFile(path) ??
-          getDailyNoteTemplate(dateStr, dayThemes);
+      final content = await obsidianService.readFile(path) ??
+          getDailyNoteTemplate(
+            dateStr,
+            dayThemes,
+            activeHabits: state.where((h) => h.status == HabitStatus.active).toList(),
+          );
 
       final frontmatter = MarkdownParser.parseFrontmatter(content);
       final body = MarkdownParser.extractBody(content);
@@ -416,7 +451,12 @@ class HabitsNotifier extends Notifier<List<Habit>> {
         }
       }
 
-      frontmatter['habits'] = habitsMap;
+      // Write habit completions as flat frontmatter keys (Obsidian format)
+      // Remove old nested 'habits' key if it exists
+      frontmatter.remove('habits');
+      habitsMap.forEach((slug, value) {
+        frontmatter[slug] = value;
+      });
 
       // Preserve all other sections.
       final entries = MarkdownParser.parseJournalEntries(body, dateStr);
@@ -574,7 +614,11 @@ class HabitsNotifier extends Notifier<List<Habit>> {
     final dayThemes = ref.read(dayThemesProvider);
     final content =
         await obsidianService.readFile(path) ??
-        getDailyNoteTemplate(dateStr, dayThemes);
+        getDailyNoteTemplate(
+          dateStr,
+          dayThemes,
+          activeHabits: state.where((h) => h.status == HabitStatus.active).toList(),
+        );
 
     final frontmatter = MarkdownParser.parseFrontmatter(content);
     final body = MarkdownParser.extractBody(content);
@@ -598,7 +642,11 @@ class HabitsNotifier extends Notifier<List<Habit>> {
       habitsMap[habit.slug] = value;
     }
 
-    frontmatter['habits'] = habitsMap;
+    // Write habit completions as flat frontmatter keys (Obsidian format)
+    frontmatter.remove('habits');
+    habitsMap.forEach((slug, value) {
+      frontmatter[slug] = value;
+    });
 
     final entries = MarkdownParser.parseJournalEntries(body, dateStr);
     final tasks = MarkdownParser.parseTasksFromDailyNote(body);
@@ -776,6 +824,10 @@ class PeopleNotifier extends Notifier<List<Person>> {
   }
 
   Future<void> addPerson(Person person) async {
+    // Spec PARTE 8: Person auto-inclui a categoria [[people]]
+    if (!person.categories.contains('[[people]]')) {
+      person.categories.add('[[people]]');
+    }
     state = [...state, person];
     await ref.read(vaultProvider.notifier).createObject(person);
   }
@@ -1097,6 +1149,28 @@ class MoodsNotifier extends Notifier<List<MoodDefinition>> {
     await ref.read(vaultProvider.notifier).createObject(mood);
   }
 
+  Future<void> ensureMoodFileExists(String moodId) async {
+    final mood = state.firstWhere(
+      (m) => m.id == moodId,
+      orElse: () => MoodDefinition.systemMoods.firstWhere(
+        (m) => m.id == moodId,
+        orElse: () => MoodDefinition(
+          id: moodId,
+          label: moodId,
+          emoji: '😐',
+          color: '#9E9E9E',
+        ),
+      ),
+    );
+    final obsidian = ref.read(obsidianServiceProvider);
+    final path = 'moods/${mood.id}.md';
+    if (await obsidian.fileExists(path)) return;
+    await obsidian.writeFile(path, mood.toMarkdown());
+    if (!state.any((m) => m.id == mood.id)) {
+      state = [...state, mood];
+    }
+  }
+
   Future<void> updateMood(MoodDefinition mood) async {
     state = [
       for (final m in state)
@@ -1298,6 +1372,12 @@ final templatesProvider =
       return TemplatesNotifier();
     });
 
+final calendarSessionsProvider = Provider<List<CalendarSession>>((ref) {
+  final asyncAll = ref.watch(allObjectsProvider);
+  final all = asyncAll.valueOrNull ?? [];
+  return all.whereType<CalendarSession>().toList();
+});
+
 final allEntriesProvider = Provider<List<JournalEntry>>((ref) {
   final asyncValue = ref.watch(allObjectsProvider);
   final data = asyncValue.valueOrNull;
@@ -1308,6 +1388,19 @@ final allEntriesProvider = Provider<List<JournalEntry>>((ref) {
   }
 
   return [];
+});
+
+final pmnByReferencedDateProvider = Provider<Map<String, List<JournalEntry>>>((ref) {
+  final all = ref.watch(allObjectsProvider).valueOrNull ?? [];
+  final map = <String, List<JournalEntry>>{};
+  for (final entry in all.whereType<JournalEntry>()) {
+    if (entry.entryType != JournalEntryType.pmn) continue;
+    for (final date in entry.referencedDates) {
+      final dateStr = date.toIso8601String().split('T').first;
+      map.putIfAbsent(dateStr, () => []).add(entry);
+    }
+  }
+  return map;
 });
 
 DateTime _journalEntryDateFromDaily(String dateStr, String? time) {
@@ -1365,6 +1458,9 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
     Map<String, List<Map<String, dynamic>>> dailyHabitCompletions = {};
     Map<String, List<Map<String, dynamic>>> dailyTrackerRecords = {};
 
+    // Run journal entry migration
+    await service.fixEntryTypeMigration();
+
     // 1. Fetch all markdown files (single call)
     final mdFiles = (await service.getFilesInFolder(
       '',
@@ -1389,7 +1485,8 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
             final body = MarkdownParser.extractBody(content);
 
             final isDaily = _isDailyNote(relativePath, frontmatter, settings);
-            String? type = frontmatter['type'];
+            final String? literalType = frontmatter['type']?.toString();
+            String? type = literalType;
 
             final entries = typeSignatures.entries.toList();
             final organizerIdx = entries.indexWhere(
@@ -1412,7 +1509,36 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
               }
             }
 
-            if (isDaily || type == 'daily_note') {
+            final pmnMatch = RegExp(r'(\d{4})-(\d{2})-W(\d{2})').firstMatch(relativePath);
+            final isPmnFile = pmnMatch != null && relativePath.split('/').contains('daily');
+
+            if (isPmnFile) {
+              final yearStr = pmnMatch.group(1)!;
+              final weekStr = pmnMatch.group(3)!;
+              final canonicalId = 'pmn-$yearStr-W$weekStr';
+              final entry = JournalEntry(
+                id: frontmatter['id']?.toString() ?? canonicalId,
+                body: '',
+                date: DateTime.tryParse(frontmatter['date_range_start']?.toString() ?? '') ?? DateTime.now(),
+                title: 'PMN ${frontmatter['week'] ?? weekStr}',
+                entryType: JournalEntryType.pmn,
+                obsidianPath: relativePath,
+              );
+              entry.week = frontmatter['week']?.toString();
+              entry.dateRangeStart = DateTime.tryParse(frontmatter['date_range_start']?.toString() ?? '');
+              entry.dateRangeEnd = DateTime.tryParse(frontmatter['date_range_end']?.toString() ?? '');
+              entry.referencedDates = (frontmatter['referenced_dates'] as List? ?? [])
+                  .map((d) => DateTime.tryParse(d.toString()))
+                  .whereType<DateTime>()
+                  .toList();
+              entry.pactRefs = (frontmatter['pact_refs'] as List? ?? [])
+                  .map((p) => p.toString()).toList();
+              final pmnSections = MarkdownParser.parsePmnSections(body);
+              entry.plus = pmnSections['plus'] ?? [];
+              entry.minus = pmnSections['minus'] ?? [];
+              entry.next = pmnSections['next'] ?? [];
+              results.add(entry);
+            } else if (isDaily || type == 'daily_note') {
               final dateMatch = RegExp(
                 r'(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{2})',
               ).firstMatch(relativePath);
@@ -1425,6 +1551,12 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                 final List<JournalEntry> journalEntries = [];
 
                 for (final data in entriesData) {
+                  // Resolve entry_type from inline Dataview field
+                  JournalEntryType resolvedEntryType = JournalEntryType.standard;
+                  final rawEntryType = data['entry_type']?.toString().replaceAll('_', '').toLowerCase();
+                  if (rawEntryType == 'fieldnote') resolvedEntryType = JournalEntryType.fieldNote;
+                  if (rawEntryType == 'pmn') resolvedEntryType = JournalEntryType.pmn;
+
                   final entry = JournalEntry(
                     id: data['id'],
                     body: data['body'],
@@ -1438,6 +1570,11 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                         : data['time'],
                     moodSlug: data['mood'],
                     obsidianPath: relativePath,
+                    entryType: resolvedEntryType,
+                    category: data['category']?.toString(),
+                    energyValue: data['energy_value'] is int
+                        ? data['energy_value'] as int
+                        : int.tryParse(data['energy_value']?.toString() ?? ''),
                   );
                   if (data['organizers'] != null) {
                     entry.organizers = (data['organizers'] as List)
@@ -1472,6 +1609,39 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                       .toList();
                 }
 
+                final parsedDay = DateTime.tryParse(dateStr) ?? DateTime.now();
+                final pomodorosData = MarkdownParser.parsePomodoros(body);
+                for (final pom in pomodorosData) {
+                  final timeStr = pom['time'] as String? ?? '00:00';
+                  final title = pom['title'] as String? ?? 'Focus Session';
+                  final hours = int.tryParse(timeStr.split(':').first) ?? 0;
+                  final minutes = int.tryParse(timeStr.split(':').last) ?? 0;
+                  final sessionDate = DateTime(
+                    parsedDay.year,
+                    parsedDay.month,
+                    parsedDay.day,
+                    hours,
+                    minutes,
+                  );
+                  
+                  final blocks = int.tryParse(pom['blocks']?.toString() ?? '') ?? 0;
+                  final worked = int.tryParse(pom['worked']?.toString() ?? '') ?? 0;
+                  final breakTime = int.tryParse(pom['break']?.toString() ?? '') ?? 0;
+                  final linkedItem = pom['linked_item'] as String?;
+
+                  final session = PomodoroSession(
+                    id: 'pomodoro_${dateStr}_${timeStr.replaceAll(':', '_')}',
+                    taskTitle: title,
+                    date: sessionDate,
+                    linkedItemSlug: linkedItem,
+                    blocksCompleted: blocks,
+                    minutesWorked: worked,
+                    minutesBreak: breakTime,
+                    state: PomodoroSessionState.completed,
+                  );
+                  results.add(session);
+                }
+
                 // Store in dailyMap for the O(1) provider
                 dailyMap[dateStr] = {
                   'entries': journalEntries,
@@ -1492,7 +1662,7 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                   .replaceAll('.md', '');
               ContentObject? obj;
 
-              if (type == 'task') {
+              if (type == 'task' && !relativePath.startsWith('organizers/')) {
                 obj = Task.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
               } else if (type == 'shopping_item') {
@@ -1503,7 +1673,7 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                   frontmatter,
                   body,
                 )..obsidianPath = relativePath;
-              } else if (type == 'habit') {
+              } else if (type == 'habit' && !relativePath.startsWith('organizers/')) {
                 obj = Habit.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
               } else if (type == 'project' ||
@@ -1520,7 +1690,11 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                   type == 'area' ||
                   type == 'activity' ||
                   type == 'place' ||
-                  type == 'label') {
+                  type == 'label' ||
+                  (type == 'task' && relativePath.startsWith('organizers/')) ||
+                  (type == 'goal' && relativePath.startsWith('organizers/')) ||
+                  (type == 'habit' && relativePath.startsWith('organizers/')) ||
+                  (type == 'tracker' && relativePath.startsWith('organizers/'))) {
                 if (frontmatter['organizer_type'] == null &&
                     type != 'organizer') {
                   frontmatter['organizer_type'] = type;
@@ -1536,7 +1710,7 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
               } else if (type == 'social_post') {
                 obj = SocialPost.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
-              } else if (type == 'goal') {
+              } else if (type == 'goal' && !relativePath.startsWith('organizers/')) {
                 obj = Goal.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
               } else if (type == 'entry') {
@@ -1575,6 +1749,9 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                   body,
                   relativePath,
                 );
+              } else if (type == 'calendar_session') {
+                obj = CalendarSession.fromMarkdown(frontmatter, body)
+                  ..obsidianPath = relativePath;
               } else if (type == 'time_block') {
                 obj = TimeBlock.fromMap(frontmatter, body: body)
                   ..obsidianPath = relativePath;
@@ -1593,17 +1770,16 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                   title: frontmatter['title'] ?? fallbackTitle,
                   body: body,
                   subtype: NoteSubtype.text,
-                  organizers: [
-                    shared_types.OrganizerReference(
-                      type: 'person',
-                      slug: 'placeholder',
-                      title: 'placeholder',
-                    ),
-                  ],
+                  organizers: const [],
                 )..obsidianPath = relativePath;
               }
 
               obj.loadBaseMap(frontmatter, fallbackId: stableId);
+              obj.literalType = literalType;
+              if (literalType != null && literalType != type) {
+                obj.hasTypeConflict = true;
+                obj.conflictReason = 'Tipo no frontmatter ("$literalType") diverge do tipo detectado pela assinatura ("$type").';
+              }
               if (obj.title == 'Untitled' ||
                   obj.title.toLowerCase() == 'untitled' ||
                   obj.title.isEmpty) {
@@ -1845,6 +2021,10 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
         hour,
         minute,
       ).toIso8601String(),
+      if (entry.entryType != JournalEntryType.standard)
+        'entry_type': entry.entryType.name.replaceAll(RegExp(r'([A-Z])'), r'_\1').toLowerCase(),
+      if (entry.category != null) 'category': entry.category,
+      if (entry.energyValue != null) 'energy_value': entry.energyValue,
     };
   }
 
@@ -1941,7 +2121,11 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     final dayThemes = ref.read(dayThemesProvider);
     String content =
         await obsidianService.readFile(relativePath) ??
-        getDailyNoteTemplate(dateStr, dayThemes);
+        getDailyNoteTemplate(
+          dateStr,
+          dayThemes,
+          activeHabits: ref.read(habitsProvider).where((h) => h.status == HabitStatus.active).toList(),
+        );
 
     final frontmatter = MarkdownParser.parseFrontmatter(content);
     final body = MarkdownParser.extractBody(content);
@@ -2032,7 +2216,11 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     final dayThemes = ref.read(dayThemesProvider);
     final content =
         await obsidianService.readFile(relativePath) ??
-        getDailyNoteTemplate(dateStr, dayThemes);
+        getDailyNoteTemplate(
+          dateStr,
+          dayThemes,
+          activeHabits: ref.read(habitsProvider).where((h) => h.status == HabitStatus.active).toList(),
+        );
 
     final frontmatter = MarkdownParser.parseFrontmatter(content);
     final body = MarkdownParser.extractBody(content);
@@ -2184,32 +2372,8 @@ class VaultNotifier extends Notifier<void> {
 
   String _defaultFolderForSignature(String type) {
     return switch (type) {
-      'task' => 'tasks',
-      'habit' => 'habits',
-      'goal' => 'goals',
-      'note' => 'notes',
-      'idea' => 'ideas',
-      'resource' => 'resources',
-      'social_post' => 'social',
-      'person' => 'organizers/people',
-      'project' => 'organizers/projects',
-      'area' => 'organizers/areas',
-      'activity' => 'organizers/activities',
-      'place' => 'organizers/places',
-      'label' => 'organizers/labels',
-      'organizer' => 'organizers',
-      'tracker_definition' || 'tracker_record' => 'trackers',
-      'mood_definition' => 'moods',
+      'mood_definition'   => 'moods',
       'combined_analysis' => 'analyses',
-      'snapshot' => 'snapshots',
-      'time_block' => 'time_blocks',
-      'day_theme' => 'day_themes',
-      'template' => 'templates',
-      'reminder' => 'reminders',
-      'event' => 'events',
-      'inbox' => 'inbox',
-      'entry' => 'daily',
-      'system' => 'systems',
       _ => 'app',
     };
   }
@@ -2388,9 +2552,46 @@ class VaultNotifier extends Notifier<void> {
           settings.folderPaths[object.type] ??
           _defaultFolderForSignature(signatureKey),
     );
-    final relativePath = prepared['path']!;
+    var relativePath = prepared['path']!;
     final oldPath = object.obsidianPath;
 
+    // Resolve slug collision (avoid overwriting files belonging to different IDs)
+    final folder = relativePath.contains('/')
+        ? relativePath.substring(0, relativePath.lastIndexOf('/'))
+        : '';
+    final filename = relativePath.contains('/')
+        ? relativePath.substring(folder.length + 1, relativePath.length - 3)
+        : relativePath.substring(0, relativePath.length - 3);
+
+    final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+    var pathToCheck = relativePath;
+    var suffixCounter = 1;
+
+    if (oldPath != pathToCheck) {
+      while (true) {
+        final collision = allObjects.any((o) => o.id != object.id && o.obsidianPath == pathToCheck);
+        if (!collision) {
+          if (await obsidianService.fileExists(pathToCheck)) {
+            try {
+              final content = await obsidianService.readFile(pathToCheck);
+              if (content != null) {
+                final fm = MarkdownParser.parseFrontmatter(content);
+                if (fm['id']?.toString() == object.id) {
+                  break;
+                }
+              }
+            } catch (_) {}
+            suffixCounter++;
+            pathToCheck = folder.isNotEmpty ? '$folder/$filename-$suffixCounter.md' : '$filename-$suffixCounter.md';
+            continue;
+          }
+          break;
+        }
+        suffixCounter++;
+        pathToCheck = folder.isNotEmpty ? '$folder/$filename-$suffixCounter.md' : '$filename-$suffixCounter.md';
+      }
+    }
+    relativePath = pathToCheck;
     object.obsidianPath = relativePath;
 
     var markdown = prepared['markdown']!;
@@ -2420,13 +2621,61 @@ class VaultNotifier extends Notifier<void> {
       ].join('\n\n');
     } else if (object is CombinedAnalysis) {
       final trackerBlock = DataviewGenerator.generateTrackerPluginBlock(object);
-      if (trackerBlock.isNotEmpty) {
-        markdown = [
-          markdown.trimRight(),
-          '## Obsidian Tracker',
-          trackerBlock,
-        ].join('\n\n');
+      
+      final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+      final entries = ref.read(allEntriesProvider);
+      final pomodoros = ref.read(pomodoroProvider).history;
+
+      final List<DateTime> dates = [];
+      final today = DateTime.now();
+      final dateRange = object.defaultDateRange;
+      if (dateRange != null) {
+        var current = DateTime(dateRange.start.year, dateRange.start.month, dateRange.start.day);
+        final end = DateTime(dateRange.end.year, dateRange.end.month, dateRange.end.day);
+        while (!current.isAfter(end)) {
+          dates.add(current);
+          current = current.add(const Duration(days: 1));
+        }
+      } else {
+        for (int i = 0; i < 14; i++) {
+          dates.add(DateTime(today.year, today.month, today.day).subtract(Duration(days: 13 - i)));
+        }
       }
+
+      final List<String> labels = dates.map((d) => '${d.day.toString().padLeft(2, "0")}/${d.month.toString().padLeft(2, "0")}').toList();
+
+      final List<List<num>> seriesData = [];
+      for (final source in object.dataSources) {
+        final List<num> values = [];
+        for (final date in dates) {
+          final val = _getValueForDate(
+            source: source,
+            date: date,
+            allObjects: allObjects,
+            entries: entries,
+            pomodoros: pomodoros,
+          );
+          values.add(val ?? 0);
+        }
+        seriesData.add(values);
+      }
+
+      final chartBlock = DataviewGenerator.generateChartsPluginBlock(
+        object,
+        labels: labels,
+        seriesData: seriesData,
+      );
+
+      final List<String> blocks = [markdown.trimRight()];
+      if (trackerBlock.isNotEmpty) {
+        blocks.add('## Obsidian Tracker');
+        blocks.add(trackerBlock);
+      }
+      if (chartBlock.isNotEmpty) {
+        blocks.add('## Obsidian Charts');
+        blocks.add(chartBlock);
+      }
+      markdown = blocks.join('\n\n');
     }
 
     await obsidianService.writeFile(relativePath, markdown);
@@ -2458,6 +2707,137 @@ class VaultNotifier extends Notifier<void> {
       });
     }
     return relativePath;
+  }
+
+  double? _getValueForDate({
+    required MetricSource source,
+    required DateTime date,
+    required List<ContentObject> allObjects,
+    required List<JournalEntry> entries,
+    required List<PomodoroSession> pomodoros,
+  }) {
+    switch (source.type) {
+      case MetricType.mood:
+        final dayEntries = entries
+            .where(
+              (e) =>
+                  e.date.year == date.year &&
+                  e.date.month == date.month &&
+                  e.date.day == date.day &&
+                  e.moodSlug != null,
+            )
+            .toList();
+        if (dayEntries.isNotEmpty) {
+          final moods = allObjects.whereType<MoodDefinition>().toList();
+          final values = dayEntries
+              .map((entry) => moods.where((m) => m.id == entry.moodSlug || m.slug == entry.moodSlug).firstOrNull)
+              .whereType<MoodDefinition>()
+              .map((mood) {
+                if (source.dimension == 'energy') {
+                  return mood.energy.toDouble();
+                } else if (source.dimension == 'pleasantness') {
+                  return mood.pleasantness.toDouble();
+                }
+                return (mood.pleasantness + mood.energy) / 2.0;
+              })
+              .toList();
+          if (values.isNotEmpty) {
+            return values.reduce((a, b) => a + b) / values.length;
+          }
+        }
+        return null;
+
+      case MetricType.habit:
+        final habit = allObjects.whereType<Habit>().where((h) => h.id == source.id).firstOrNull;
+        if (habit == null) return null;
+        final record = habit.completionHistory
+            .where(
+              (c) =>
+                  c.date.year == date.year &&
+                  c.date.month == date.month &&
+                  c.date.day == date.day,
+            )
+            .firstOrNull;
+        if (record == null) return null;
+        return record.successful || record.completions > 0 ? 1.0 : 0.0;
+
+      case MetricType.trackerField:
+        final records = allObjects.whereType<TrackingRecord>().toList();
+        final dayRecords = records
+            .where(
+              (r) =>
+                  _recordBelongsToTracker(r, source.id, allObjects) &&
+                  r.date.year == date.year &&
+                  r.date.month == date.month &&
+                  r.date.day == date.day,
+            )
+            .toList();
+        if (dayRecords.isEmpty) return null;
+
+        var total = 0.0;
+        var foundValue = false;
+        final fieldId = source.fieldId ?? '';
+        for (final record in dayRecords) {
+          final val = record.fieldValues[fieldId];
+          if (val is num) {
+            total += val.toDouble();
+            foundValue = true;
+          } else if (val is bool) {
+            total += val ? 1.0 : 0.0;
+            foundValue = true;
+          } else if (val is List) {
+            total += val.length.toDouble();
+            foundValue = true;
+          } else if (val is String) {
+            final parsed = double.tryParse(val);
+            if (parsed != null) {
+              total += parsed;
+              foundValue = true;
+            }
+          }
+        }
+        return foundValue ? total : null;
+
+      case MetricType.trackerScore:
+        final records = allObjects.whereType<TrackingRecord>().toList();
+        final count = records
+            .where(
+              (r) =>
+                  _recordBelongsToTracker(r, source.id, allObjects) &&
+                  r.date.year == date.year &&
+                  r.date.month == date.month &&
+                  r.date.day == date.day,
+            )
+            .length
+            .toDouble();
+        return count == 0 ? null : count;
+
+      case MetricType.googleCalendar:
+        return 0;
+
+      case MetricType.pomodoro:
+        final sessions = pomodoros.where(
+          (s) =>
+              s.date.year == date.year &&
+              s.date.month == date.month &&
+              s.date.day == date.day &&
+              s.state == PomodoroSessionState.completed,
+        );
+        if (sessions.isEmpty) return null;
+        return sessions.fold<double>(0, (sum, s) => sum + s.minutesWorked);
+    }
+  }
+
+  bool _recordBelongsToTracker(TrackingRecord record, String trackerId, List<ContentObject> allObjects) {
+    if (record.trackerId == trackerId) return true;
+    final tracker = allObjects
+        .whereType<TrackerDefinition>()
+        .where((t) => t.id == trackerId || t.slug == trackerId)
+        .firstOrNull;
+    if (tracker == null) return false;
+    return record.trackerId == tracker.slug ||
+        record.trackerId == tracker.title ||
+        record.trackerId == tracker.id;
   }
 
   String _mergeConvertedMarkdown({
