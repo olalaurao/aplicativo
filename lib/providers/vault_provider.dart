@@ -694,9 +694,21 @@ final habitsProvider = NotifierProvider<HabitsNotifier, List<Habit>>(() {
 class OrganizersNotifier extends Notifier<List<organizer_model.Organizer>> {
   @override
   List<organizer_model.Organizer> build() {
-    return ref
-        .watch(objectsByTypeProvider('organizer'))
-        .cast<organizer_model.Organizer>();
+    final areas = ref.watch(objectsByTypeProvider('area')).cast<organizer_model.Organizer>();
+    final projects = ref.watch(objectsByTypeProvider('project')).cast<organizer_model.Organizer>();
+    final activities = ref.watch(objectsByTypeProvider('activity')).cast<organizer_model.Organizer>();
+    final people = ref.watch(objectsByTypeProvider('person')).cast<organizer_model.Organizer>();
+    final places = ref.watch(objectsByTypeProvider('place')).cast<organizer_model.Organizer>();
+    final labels = ref.watch(objectsByTypeProvider('label')).cast<organizer_model.Organizer>();
+
+    return [
+      ...areas,
+      ...projects,
+      ...activities,
+      ...people,
+      ...places,
+      ...labels,
+    ];
   }
 
   Future<void> addOrganizer(organizer_model.Organizer organizer) async {

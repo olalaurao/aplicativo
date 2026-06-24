@@ -124,6 +124,7 @@ class _UniversalSearchPickerSheetState
                 _filterChip('goal', 'Objetivos'),
                 _filterChip('project', 'Projetos'),
                 _filterChip('area', 'Áreas'),
+                _filterChip('label', 'Etiquetas'),
                 _filterChip('note', 'Notas'),
                 _filterChip('idea', 'Ideias'),
                 _filterChip('resource', 'Recursos'),
@@ -151,6 +152,11 @@ class _UniversalSearchPickerSheetState
                       if (obj.type != 'project' &&
                           (obj is! Organizer ||
                               (obj).organizerType != OrganizerType.project)) {
+                        return false;
+                      }
+                    } else if (_selectedFilter == 'label') {
+                      if (obj is! Organizer ||
+                          (obj).organizerType != OrganizerType.label) {
                         return false;
                       }
                     } else {
@@ -404,6 +410,10 @@ class _UniversalSearchPickerSheetState
         case OrganizerType.project:
           icon = Icons.folder_outlined;
           color = AppColors.primary;
+          break;
+        case OrganizerType.label:
+          icon = Icons.label_outline_rounded;
+          color = AppColors.habitPurple;
           break;
         default:
           icon = Icons.radio_button_unchecked_rounded;
