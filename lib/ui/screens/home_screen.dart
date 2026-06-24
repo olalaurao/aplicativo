@@ -250,7 +250,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   parent: BouncingScrollPhysics(),
                 ),
                 slivers: [
-                // ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ Header ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬
+                // ─── Header ───
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
@@ -284,7 +284,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ),
                 ),
 
-                // ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ Blocks ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬
+                // ─── Blocks ───
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                   sliver: _isEditMode
@@ -908,7 +908,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
-                    '${system.steps.length} steps${system.estimatedMinutes > 0 ? ' · ${system.estimatedMinutes}min' : ''}${system.runCount > 0 ? ' · ${system.runCount}x executado' : ''}',
+                    '${system.steps.length} steps · ${system.estimatedMinutes > 0 ? '${system.estimatedMinutes}min' : ''}${system.runCount > 0 ? ' · ${system.runCount}x executado' : ''}',
                     style: const TextStyle(fontSize: 11),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1317,7 +1317,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             controller: ctrl,
                             maxLines: 3,
                             decoration: const InputDecoration(
-                              hintText: '"Frase" ââ‚¬â€ Autor',
+                              hintText: '"Frase" — Autor',
                             ),
                           ),
                           actions: [
@@ -1667,7 +1667,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         if (dayCount > 0) ...[
                           const SizedBox(height: 2),
                           Text(
-                            'Dia $dayCount${habit.endsAt != null ? \' · $remainingDays dias restantes\' : \'\'}',
+                            'Dia $dayCount${habit.endsAt != null ? " · $remainingDays dias restantes" : ""}',
                             style: TextStyle(
                               fontSize: 11,
                               color: AppTheme.textMutedColor(context),
@@ -3014,7 +3014,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         ? 'Sem horário'
                         : block.timeRanges
                             .map((r) =>
-                                '${r.startHour.toString().padLeft(2, '0')}:${r.startMinute.toString().padLeft(2, '0')}ââ‚¬â€œ${r.endHour.toString().padLeft(2, '0')}:${r.endMinute.toString().padLeft(2, '0')}')
+                                '${r.startHour.toString().padLeft(2, '0')}:${r.startMinute.toString().padLeft(2, '0')}–${r.endHour.toString().padLeft(2, '0')}:${r.endMinute.toString().padLeft(2, '0')}')
                             .join(' | ');
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 10),
@@ -3280,7 +3280,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '$dateLabel  ââ‚¬Â¢  $time',
+                              '$dateLabel  •  $time',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.textSecondaryColor(context),

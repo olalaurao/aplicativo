@@ -43,6 +43,8 @@ class _SocialNativeVideoPlayerState extends State<SocialNativeVideoPlayer> {
           ..initialize()
               .then((_) {
                 if (!mounted) return;
+                _controller.setLooping(true);
+                _controller.play();
                 setState(() => _initialized = true);
               })
               .catchError((error) {

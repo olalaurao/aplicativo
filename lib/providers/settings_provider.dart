@@ -134,7 +134,7 @@ class AppSettings {
     this.habitWidgetFilterType = 'all',
     this.habitWidgetOrganizer = '',
     this.ideaStrategy = 'tag',
-    this.ideaTag = 'idea',
+    this.ideaTag = 'ideia',
     this.ideaFolder = 'notes/ideas',
     this.userName,
     this.savedFiltersRaw = const [],
@@ -870,6 +870,35 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       ideaTag: tag ?? state.ideaTag,
       ideaFolder: folder ?? state.ideaFolder,
     );
+
+    // Sincronizar com typeSignatures para que a identificação de ideas
+    // no vault reflita imediatamente a estratégia escolhida.
+    final effectiveTag = tag ?? state.ideaTag;
+    final effectiveFolder = folder ?? state.ideaFolder;
+    final TypeSignature updatedSig;
+    switch (strategy) {
+      case 'folder':
+        updatedSig = TypeSignature(
+          objectType: 'idea',
+          markerType: MarkerType.folder,
+          markerValue: effectiveFolder,
+        );
+        break;
+      case 'any_note':
+        updatedSig = TypeSignature(
+          objectType: 'idea',
+          markerType: MarkerType.property,
+          markerValue: 'type: idea',
+        );
+        break;
+      default: // 'tag'
+        updatedSig = TypeSignature(
+          objectType: 'idea',
+          markerType: MarkerType.tag,
+          markerValue: effectiveTag,
+        );
+    }
+    await updateTypeSignature('idea', updatedSig);
   }
 
   Future<void> addRecentSearch(String query) async {

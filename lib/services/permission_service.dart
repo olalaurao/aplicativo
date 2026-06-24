@@ -138,20 +138,20 @@ class PermissionService {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Exact Alarm Permission'),
+        title: const Text('Permissão de Alarme Exato'),
         content: const Text(
-          'To deliver alarms and popup notifications at the exact scheduled '
-          'time, Citrine needs the "Schedule exact alarms" permission.\n\n'
-          'You will be taken to the system settings page.',
+          'Para disparar alarmes e notificações popup no horário exato, '
+          'o Citrine precisa da permissão "Agendar alarmes exatos".\n\n'
+          'Você será levado às configurações do sistema.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Later'),
+            child: const Text('Depois'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Open Settings'),
+            child: const Text('Abrir Configurações'),
           ),
         ],
       ),

@@ -14,9 +14,15 @@ import 'social_native_video_player.dart';
 import 'social_post_grid_card.dart';
 
 class SocialEmbedView extends StatefulWidget {
+  const SocialEmbedView({
+    super.key,
+    required this.post,
+  });
+
   final SocialPost post;
 
-  const SocialEmbedView({super.key, required this.post});
+  // Cache estático: postId -> (videoUrl, resolvedAt) com TTL de 2h
+  static final Map<String, (String url, DateTime resolvedAt)> _videoCache = {};
 
   @override
   State<SocialEmbedView> createState() => _SocialEmbedViewState();
@@ -120,7 +126,15 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
     }
 
     if (widget.post.platform == SocialPlatform.tiktok) {
-      _hasError = true;
+      // Tentar embed antes de mostrar erro (imagens, carousels, etc.)
+      final embedUrl = _embedUrlFor(widget.post);
+      if (embedUrl != null && embedUrl.isNotEmpty) {
+        _controller.loadHtmlString(
+          _buildEmbedHtml(widget.post, embedUrl: embedUrl),
+        );
+      } else {
+        _hasError = true;
+      }
       return;
     }
 
@@ -245,6 +259,16 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
         widget.post.mediaType != SocialMediaType.video) {
       return false;
     }
+
+    // Verificar cache em memória (TTL: 2h)
+    final postId = widget.post.id;
+    final cached = SocialEmbedView._videoCache[postId];
+    if (cached != null &&
+        DateTime.now().difference(cached.$2).inHours < 2) {
+      if (mounted) setState(() => _resolvedVideoUrl = cached.$1);
+      return true;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final endpoint = prefs.getString('tiktokResolverEndpoint') ?? '';
     if (endpoint.trim().isEmpty) return false;
@@ -256,6 +280,11 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
       apiKey: apiKey,
     ).resolve(widget.post.url);
     if (!mounted) return false;
+
+    if (resolved != null) {
+      SocialEmbedView._videoCache[postId] = (resolved, DateTime.now());
+    }
+
     setState(() {
       _resolvingVideo = false;
       _resolvedVideoUrl = resolved;

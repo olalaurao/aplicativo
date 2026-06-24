@@ -456,7 +456,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     children: [
                       ListTile(
                         title: const Text(
-                          'Dormir Atí© Mais Tarde',
+                          'Dormir Até Mais Tarde',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -464,7 +464,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         subtitle: Text(
                           settings.sleepInTomorrow
-                              ? 'Ignorar alarmes de hábitos amanhã atí© ${settings.sleepInUntil}'
+                              ? 'Ignorar alarmes de hábitos amanhã até ${settings.sleepInUntil}'
                               : 'Ignorar alarmes de hábitos do dia seguinte',
                           style: const TextStyle(fontSize: 12),
                         ),
@@ -480,7 +480,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 SnackBar(
                                   content: Text(
                                     v
-                                        ? 'Modo dormir ativado: alarmes de hábitos ignorados atí© ${settings.sleepInUntil} de amanhã.'
+                                        ? 'Modo dormir ativado: alarmes de hábitos ignorados até ${settings.sleepInUntil} de amanhã.'
                                         : 'Alarmes de hábitos restaurados.',
                                   ),
                                 ),
@@ -494,7 +494,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         const Divider(height: 1, indent: 16),
                         ListTile(
                           title: const Text(
-                            'Silenciar alarmes atí©',
+                            'Silenciar alarmes até',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
@@ -535,7 +535,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'Alarmes de hábitos serão silenciados atí© $formattedTime de amanhã.',
+                                      'Alarmes de hábitos serão silenciados até $formattedTime de amanhã.',
                                     ),
                                   ),
                                 );
@@ -569,7 +569,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 size: 20,
                               ),
                               title: const Text(
-                                'Exact Alarm Permission',
+                                'Permissão de Alarme Exato',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
@@ -577,8 +577,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                               subtitle: Text(
                                 granted
-                                    ? 'Granted âââ€šÂ¬ââ‚¬Â alarms fire at exact times'
-                                    : 'Not granted âââ€šÂ¬ââ‚¬Â alarms may be delayed',
+                                    ? 'Concedida — alarmes disparam no horário exato'
+                                    : 'Não concedida — alarmes podem atrasar',
                                 style: const TextStyle(fontSize: 12),
                               ),
                               trailing: granted
@@ -614,7 +614,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 size: 20,
                               ),
                               title: const Text(
-                                'Full-Screen Intent',
+                                'Notificação em Tela Cheia',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
@@ -622,8 +622,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                               subtitle: Text(
                                 granted
-                                    ? 'Granted âââ€šÂ¬ââ‚¬Â popups show over lock screen'
-                                    : 'Not granted âââ€šÂ¬ââ‚¬Â popups may not show on lock screen',
+                                    ? 'Concedida — popups aparecem sobre a tela de bloqueio'
+                                    : 'Não concedida — popups podem não aparecer na tela de bloqueio',
                                 style: const TextStyle(fontSize: 12),
                               ),
                               trailing: granted
@@ -877,29 +877,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () =>
                             _showDailyNoteDialog(context, settings, notifier),
-                      ),
-                      const Divider(height: 1, indent: 16),
-                      ListTile(
-                        leading: const Icon(
-                          Icons.folder_copy_outlined,
-                          color: AppColors.primary,
-                        ),
-                        title: const Text(
-                          'Pastas por tipo',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: const Text(
-                          'Define onde novos objetos serão salvos no vault',
-                          style: TextStyle(fontSize: 12),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () =>
-                            _showFolderPathsDialog(context, settings, notifier),
                       ),
                       const Divider(height: 1, indent: 16),
                       ListTile(
@@ -1536,79 +1513,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _showFolderPathsDialog(
-    BuildContext context,
-    AppSettings settings,
-    SettingsNotifier notifier,
-  ) {
-    const defaults = <String, String>{
-      'task': 'tasks',
-      'habit': 'habits',
-      'goal': 'goals',
-      'note': 'notes',
-      'resource': 'resources',
-      'event': 'events',
-      'social_post': 'social',
-      'person': 'organizers/people',
-      'project': 'organizers/projects',
-      'area': 'organizers/areas',
-      'activity': 'organizers/activities',
-      'tracker_definition': 'trackers',
-      'mood_definition': 'moods',
-      'combined_analysis': 'analyses',
-    };
-    final controllers = {
-      for (final entry in defaults.entries)
-        entry.key: TextEditingController(
-          text: settings.folderPaths[entry.key] ?? entry.value,
-        ),
-    };
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Pastas por tipo'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              for (final entry in defaults.entries)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: TextField(
-                    controller: controllers[entry.key],
-                    decoration: InputDecoration(
-                      labelText: entry.key,
-                      hintText: entry.value,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('CANCELAR'),
-          ),
-          TextButton(
-            onPressed: () async {
-              for (final entry in controllers.entries) {
-                await notifier.updateFolderPath(entry.key, entry.value.text);
-              }
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('SALVAR'),
-          ),
-        ],
-      ),
-    ).whenComplete(() {
-      for (final controller in controllers.values) {
-        controller.dispose();
-      }
-    });
-  }
 
   void _showTikTokResolverDialog(
     BuildContext context,

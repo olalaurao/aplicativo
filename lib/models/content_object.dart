@@ -99,11 +99,30 @@ abstract class ContentObject {
     }
   }
 
-  String get slug => title
-      .toLowerCase()
-      .trim()
-      .replaceAll(' ', '-')
-      .replaceAll(RegExp(r'[^a-z0-9-]'), '');
+  String get slug {
+    const accents = {
+      'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a',
+      'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
+      'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i',
+      'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o',
+      'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u',
+      'ç': 'c', 'ñ': 'n',
+      'À': 'a', 'Á': 'a', 'Â': 'a', 'Ã': 'a', 'Ä': 'a',
+      'È': 'e', 'É': 'e', 'Ê': 'e', 'Ë': 'e',
+      'Ì': 'i', 'Í': 'i', 'Î': 'i', 'Ï': 'i',
+      'Ò': 'o', 'Ó': 'o', 'Ô': 'o', 'Õ': 'o', 'Ö': 'o',
+      'Ù': 'u', 'Ú': 'u', 'Û': 'u', 'Ü': 'u',
+      'Ç': 'c', 'Ñ': 'n',
+    };
+    return title
+        .toLowerCase()
+        .trim()
+        .split('')
+        .map((c) => accents[c] ?? c)
+        .join()
+        .replaceAll(' ', '-')
+        .replaceAll(RegExp(r'[^a-z0-9-]'), '');
+  }
 
   String get obsidianFileName => obsidianPath.isEmpty
       ? title
