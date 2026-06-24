@@ -798,7 +798,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       case BlockType.timeline:
         return _buildTimelineBlock();
       case BlockType.quotes:
-        return _buildQuoteBlock();
+        return _buildQuoteBlock(block);
       case BlockType.photos:
         return _buildPhotosBlock();
       case BlockType.kpi:
@@ -1238,22 +1238,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildQuoteBlock() {
+  Widget _buildQuoteBlock(DashboardBlock block) {
     final resources = ref.watch(resourcesProvider);
     final allHighlights = <({String text, String source})>[];
     for (final r in resources) {
       final hls = MarkdownParser.extractHighlights(r.synopsis ?? '');
       allHighlights.addAll(hls.map((h) => (text: h.text, source: r.title)));
     }
+
+    final customQuotes = (block.metadata['quotes'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        <String>[];
+
     final today = DateTime.now();
     final dayIndex = today.day + today.month * 31;
-    final quote = allHighlights.isEmpty
-        ? (text: 'The best way to predict the future is to create it.', source: 'Peter Drucker')
-        : allHighlights[dayIndex % allHighlights.length];
+
+    final quote = customQuotes.isNotEmpty
+        ? (text: customQuotes[dayIndex % customQuotes.length], source: 'Personalizado')
+        : (allHighlights.isEmpty
+            ? (text: 'The best way to predict the future is to create it.', source: 'Peter Drucker')
+            : allHighlights[dayIndex % allHighlights.length]);
 
     return _buildCard(
-      title: 'Destaque do dia',
+      title: block.title.isNotEmpty ? block.title : 'Destaque do dia',
       icon: Icons.format_quote_rounded,
+      onConfigure: () => _showQuotePoolEditor(block, customQuotes),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

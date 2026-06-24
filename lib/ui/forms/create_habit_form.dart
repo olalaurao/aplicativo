@@ -52,7 +52,6 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
   late final TextEditingController _hypothesisController;
   int _pactDurationDays = 30;
   DateTime? _startedAt;
-  DateTime? _endsAt;
   PactOutcome? _pactOutcome;
   List<PactCycle> _previousCycles = [];
 
@@ -108,7 +107,6 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
 
       _habitMode = habit.habitMode;
       _startedAt = habit.startedAt;
-      _endsAt = habit.endsAt;
       _pactOutcome = habit.pactOutcome;
       _previousCycles = List.from(habit.previousCycles);
       if (habit.startedAt != null && habit.endsAt != null) {
