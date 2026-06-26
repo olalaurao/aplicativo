@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:path_provider/path_provider.dart';
 import 'package:watcher/watcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/content_object.dart';
 import 'markdown_parser.dart';
 import 'package:flutter/foundation.dart';
@@ -254,6 +255,7 @@ class ObsidianService {
     return controller.stream;
   }
 
+  @Deprecated('Use watchVaultDebounced() to avoid reload storms during sync.')
   Stream<WatchEvent>? watchVault() {
     if (vaultDir == null) return null;
     if (Platform.isIOS) {
@@ -300,7 +302,8 @@ class ObsidianService {
     if (!forceRefresh &&
         _allMarkdownFilesCache != null &&
         _allMarkdownFilesCacheTimestamp != null &&
-        now.difference(_allMarkdownFilesCacheTimestamp!) < _cacheValidDuration) {
+        now.difference(_allMarkdownFilesCacheTimestamp!) <
+            _cacheValidDuration) {
       return _allMarkdownFilesCache!;
     }
     if (vaultDir == null) return [];
@@ -366,7 +369,10 @@ class ObsidianService {
           }
           if (changed) {
             final body = MarkdownParser.extractBody(content);
-            await file.writeAsString(generateMarkdown(frontmatter, body), encoding: utf8);
+            await file.writeAsString(
+              generateMarkdown(frontmatter, body),
+              encoding: utf8,
+            );
             debugPrint('Migrated journal entry file: ${file.path}');
           }
         }
@@ -374,5 +380,47 @@ class ObsidianService {
         debugPrint('Error migrating file ${file.path}: $e');
       }
     }
+  }
+
+  Future<void> migrateDailyHabitCompletions(SharedPreferences prefs) async {
+    if (vaultDir == null) return;
+    const migrationKey = 'daily_note_habits_migration_done';
+    if (prefs.getBool(migrationKey) == true) return;
+
+    final files = await getAllMarkdownFiles();
+    for (final file in files) {
+      final relativePath = getRelativePath(file.path);
+      final isDailyFile =
+          relativePath == 'daily' ||
+          relativePath.startsWith('daily/') ||
+          relativePath.contains('/daily/');
+      if (!isDailyFile || !relativePath.endsWith('.md')) {
+        continue;
+      }
+
+      try {
+        final content = await file.readAsString(encoding: utf8);
+        final frontmatter = MarkdownParser.parseFrontmatter(content);
+        if (frontmatter['habits'] is Map) {
+          final habitData = Map<String, dynamic>.from(
+            frontmatter['habits'] as Map,
+          );
+          for (final entry in habitData.entries) {
+            frontmatter[entry.key] = entry.value;
+          }
+          frontmatter.remove('habits');
+          final body = MarkdownParser.extractBody(content);
+          await file.writeAsString(
+            generateMarkdown(frontmatter, body),
+            encoding: utf8,
+          );
+          debugPrint('Migrated daily habits file: ${file.path}');
+        }
+      } catch (e) {
+        debugPrint('Error migrating daily habits file ${file.path}: $e');
+      }
+    }
+
+    await prefs.setBool(migrationKey, true);
   }
 }

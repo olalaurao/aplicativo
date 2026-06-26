@@ -156,6 +156,7 @@ class TrackerDefinition extends ContentObject {
   String? description;
   List<TrackerSection> sections;
   bool isHealthTracker; // A6.3
+  List<ActionDef> actions;
 
   TrackerDefinition({
     super.id,
@@ -165,13 +166,14 @@ class TrackerDefinition extends ContentObject {
     this.description,
     this.sections = const [],
     this.isHealthTracker = false,
+    List<ActionDef>? actions,
     super.organizers,
     super.categories,
     super.tags,
     super.createdAt,
     super.updatedAt,
     super.obsidianPath,
-  });
+  }) : actions = actions ?? [];
 
   @override
   String get type => 'tracker_definition';
@@ -184,6 +186,9 @@ class TrackerDefinition extends ContentObject {
     frontmatter['description'] = description;
     frontmatter['sections'] = sections.map((e) => e.toMap()).toList();
     if (isHealthTracker) frontmatter['is_health_tracker'] = true;
+    if (actions.isNotEmpty) {
+      frontmatter['actions'] = actions.map((action) => action.toJson()).toList();
+    }
     
     final buffer = StringBuffer();
     if (description != null && description!.isNotEmpty) {
@@ -226,6 +231,12 @@ class TrackerDefinition extends ContentObject {
     tracker.description = frontmatter['description'] as String?;
     tracker.sections = _parseSections(frontmatter['sections'], body);
     tracker.isHealthTracker = frontmatter['is_health_tracker'] as bool? ?? false;
+    if (frontmatter['actions'] is Iterable) {
+      tracker.actions = (frontmatter['actions'] as Iterable)
+          .whereType<Map>()
+          .map((action) => ActionDef.fromJson(Map<String, dynamic>.from(action)))
+          .toList();
+    }
     debugPrint('Tracker sections: ${tracker.sections.length}');
     return tracker;
   }

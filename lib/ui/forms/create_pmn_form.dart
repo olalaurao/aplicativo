@@ -44,9 +44,7 @@ class _CreatePmnFormState extends ConsumerState<CreatePmnForm> {
   }
 
   String _getWeekString() {
-    // Basic week string format YYYY-WNN
-    int dayOfYear = int.parse(DateFormat('D').format(_startDate));
-    int woy =  ((dayOfYear - _startDate.weekday + 10) / 7).floor();
+    final woy = JournalEntry.isoWeekNumber(_startDate);
     return '${_startDate.year}-W${woy.toString().padLeft(2, '0')}';
   }
 
@@ -58,6 +56,7 @@ class _CreatePmnFormState extends ConsumerState<CreatePmnForm> {
     final weekStr = _getWeekString();
     
     final pmn = widget.existingPmn?.copyWith(
+      id: JournalEntry.pmnIdFromDate(_startDate),
       plus: plusList,
       minus: minusList,
       next: nextList,
@@ -66,7 +65,7 @@ class _CreatePmnFormState extends ConsumerState<CreatePmnForm> {
       dateRangeEnd: _endDate,
       referencedDates: [_startDate, _endDate],
     ) ?? JournalEntry(
-      id: 'pmn-$weekStr',
+      id: JournalEntry.pmnIdFromDate(_startDate),
       title: 'PMN $weekStr',
       body: '',
       date: DateTime.now(),

@@ -34,6 +34,7 @@ import '../widgets/citrine_chart.dart';
 import '../widgets/tracker_metric_card.dart';
 import '../widgets/rich_text_editor.dart';
 import '../widgets/outline_editor.dart';
+import '../widgets/property_grid.dart';
 import '../widgets/collection_view.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../../models/note_model.dart';
@@ -241,43 +242,37 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             ),
           ),
 
-          // ─── Properties Card ───
+          // ─── Properties Grid ───
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-              child: Container(
-                decoration: AppTheme.cardDecoration(context),
-                child: Column(
-                  children: [
-                    if (object is! Resource) ...[
-                      _divider(),
-                      _buildPropertyRow(
+              child: PropertyGrid(
+                items: [
+                  if (object is! Resource)
+                    PropertyGridItem(
+                      label: 'Status',
+                      value: _getStatus(object),
+                      onTap: () => _onPropertyTap(
                         context,
+                        ref,
                         'Status',
                         _getStatus(object),
-                        onTap: () => _onPropertyTap(
-                          context,
-                          ref,
-                          'Status',
-                          _getStatus(object),
-                        ),
                       ),
-                    ],
-                    _divider(),
-                    _buildPropertyRow(
-                      context,
-                      'Created',
-                      DateFormat('EEE, d MMM, yyyy').format(object.createdAt),
                     ),
-                    _divider(),
-                    _buildPropertyRow(
-                      context,
-                      'Modified',
-                      DateFormat('EEE, d MMM, yyyy').format(object.updatedAt),
-                    ),
-                    ..._buildTypeSpecificProperties(context, ref),
-                  ],
-                ),
+                  PropertyGridItem(
+                    label: 'Created',
+                    value: DateFormat(
+                      'EEE, d MMM, yyyy',
+                    ).format(object.createdAt),
+                  ),
+                  PropertyGridItem(
+                    label: 'Modified',
+                    value: DateFormat(
+                      'EEE, d MMM, yyyy',
+                    ).format(object.updatedAt),
+                  ),
+                  ..._buildTypeSpecificProperties(context, ref),
+                ],
               ),
             ),
           ),
@@ -672,15 +667,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
-  Widget _divider() {
-    return const Divider(
-      height: 1,
-      indent: 16,
-      endIndent: 16,
-      color: AppColors.divider,
-    );
-  }
-
   List<ContentObject> _conflictGroupFor(
     ContentObject current,
     Map<String, List<ContentObject>> conflicts,
@@ -777,13 +763,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       'project': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
       'person': ['edit', 'change_type', 'merge_note', 'delete'],
       'resource': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
-      'entry': [
-        'edit',
-        'change_type',
-        'save_template',
-        'delete',
-        'obsidian',
-      ],
+      'entry': ['edit', 'change_type', 'save_template', 'delete', 'obsidian'],
       'goal': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
     };
 
@@ -920,52 +900,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
-  Widget _buildPropertyRow(
-    BuildContext context,
-    String label,
-    String value, {
-    VoidCallback? onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const Spacer(),
-            Expanded(
-              child: Text(
-                value,
-                textAlign: TextAlign.right,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: onTap != null ? AppColors.primary : null,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (onTap != null)
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 16,
-                color: AppColors.primary,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _buildTypeSpecificProperties(
+  List<PropertyGridItem> _buildTypeSpecificProperties(
     BuildContext context,
     WidgetRef ref,
   ) {
@@ -973,19 +908,15 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       final task = object as Task;
       return [
         ..._buildLinkedGoogleEventRows(context, task),
-        _divider(),
-        _buildPropertyRow(
-          context,
-          'Priority',
-          task.priority.name.toUpperCase(),
+        PropertyGridItem(
+          label: 'Priority',
+          value: task.priority.name.toUpperCase(),
           onTap: () => _showTaskPriorityPicker(context, ref, task),
         ),
         if (task.endDate != null) ...[
-          _divider(),
-          _buildPropertyRow(
-            context,
-            'Due Date',
-            DateFormat('MMM d, yyyy').format(task.endDate!),
+          PropertyGridItem(
+            label: 'Due Date',
+            value: DateFormat('MMM d, yyyy').format(task.endDate!),
             onTap: () => _showTaskDueDatePicker(context, ref, task),
           ),
         ],
@@ -994,13 +925,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     if (object is Habit) {
       final habit = object as Habit;
       return [
-        _divider(),
-        _buildPropertyRow(context, 'Streak', '${habit.streak} days'),
-        _divider(),
-        _buildPropertyRow(
-          context,
-          'Days Since',
-          habit.daysSinceLastCompletion == 0
+        PropertyGridItem(label: 'Streak', value: '${habit.streak} days'),
+        PropertyGridItem(
+          label: 'Days Since',
+          value: habit.daysSinceLastCompletion == 0
               ? 'Today'
               : '${habit.daysSinceLastCompletion} days ago',
         ),
@@ -1010,18 +938,14 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       final project = object as Project;
       return [
         ..._buildLinkedGoogleEventRows(context, project),
-        _divider(),
-        _buildPropertyRow(
-          context,
-          'State',
-          project.projectState.name.toUpperCase(),
+        PropertyGridItem(
+          label: 'State',
+          value: project.projectState.name.toUpperCase(),
           onTap: () => _showProjectStatePicker(context, ref, project),
         ),
-        _divider(),
-        _buildPropertyRow(
-          context,
-          'Priority',
-          project.projectPriority.name.toUpperCase(),
+        PropertyGridItem(
+          label: 'Priority',
+          value: project.projectPriority.name.toUpperCase(),
           onTap: () => _showProjectPriorityPicker(context, ref, project),
         ),
       ];
@@ -1029,19 +953,15 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     if (object is Person) {
       final person = object as Person;
       return [
-        _divider(),
-        _buildPropertyRow(
-          context,
-          'Priority',
-          person.contactPriority.name.toUpperCase(),
+        PropertyGridItem(
+          label: 'Priority',
+          value: person.contactPriority.name.toUpperCase(),
           onTap: () => _showPersonPriorityPicker(context, ref, person),
         ),
         if (person.contactFrequency != null) ...[
-          _divider(),
-          _buildPropertyRow(
-            context,
-            'Frequency',
-            'Every ${person.contactFrequency!.inDays} days',
+          PropertyGridItem(
+            label: 'Frequency',
+            value: 'Every ${person.contactFrequency!.inDays} days',
             onTap: () => _showFrequencyPicker(context, ref, person),
           ),
         ],
@@ -1051,27 +971,20 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       final entry = object as JournalEntry;
       final mood = _moodForEntry(entry);
       return [
-        _divider(),
-        _buildPropertyRow(
-          context,
-          'Date',
-          DateFormat('EEE, d MMM, yyyy').format(entry.date),
+        PropertyGridItem(
+          label: 'Date',
+          value: DateFormat('EEE, d MMM, yyyy').format(entry.date),
         ),
-        _divider(),
-        _buildPropertyRow(
-          context,
-          'Time',
-          DateFormat('HH:mm').format(entry.date),
+        PropertyGridItem(
+          label: 'Time',
+          value: DateFormat('HH:mm').format(entry.date),
         ),
         if (mood != null) ...[
-          _divider(),
-          _buildPropertyRow(context, 'Mood', '${mood.emoji} ${mood.title}'),
+          PropertyGridItem(label: 'Mood', value: '${mood.emoji} ${mood.title}'),
         ] else if (entry.moodSlug != null && entry.moodSlug!.isNotEmpty) ...[
-          _divider(),
-          _buildPropertyRow(
-            context,
-            'Mood',
-            '${_fallbackMoodEmoji(entry.moodSlug!)} ${entry.moodSlug}',
+          PropertyGridItem(
+            label: 'Mood',
+            value: '${_fallbackMoodEmoji(entry.moodSlug!)} ${entry.moodSlug}',
           ),
         ],
       ];
@@ -1079,39 +992,31 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     if (object is Resource) {
       final resource = object as Resource;
       return [
-        _divider(),
-        _buildPropertyRow(
-          context,
-          'Status',
-          resource.status.name.toUpperCase(),
+        PropertyGridItem(
+          label: 'Status',
+          value: resource.status.name.toUpperCase(),
           onTap: () => _showResourceStatusPicker(context, ref, resource),
         ),
-        _divider(),
-        _buildPropertyRow(context, 'Author', resource.author ?? 'Unknown'),
-        _divider(),
-        _buildPropertyRow(context, 'Year', resource.year?.toString() ?? 'N/A'),
-        _divider(),
-        _buildPropertyRow(
-          context,
-          'Pages',
-          resource.pages?.toString() ?? 'N/A',
+        PropertyGridItem(label: 'Author', value: resource.author ?? 'Unknown'),
+        PropertyGridItem(
+          label: 'Year',
+          value: resource.year?.toString() ?? 'N/A',
         ),
-        _divider(),
-        _buildPropertyRow(
-          context,
-          'Category',
-          resource.category ?? 'Uncategorized',
+        PropertyGridItem(
+          label: 'Pages',
+          value: resource.pages?.toString() ?? 'N/A',
         ),
-        _divider(),
-        _buildPropertyRow(
-          context,
-          'Read Date',
-          resource.readDate != null
+        PropertyGridItem(
+          label: 'Category',
+          value: resource.category ?? 'Uncategorized',
+        ),
+        PropertyGridItem(
+          label: 'Read Date',
+          value: resource.readDate != null
               ? DateFormat('MMM d, yyyy').format(resource.readDate!)
               : 'Not set',
         ),
-        _divider(),
-        _buildPropertyRow(context, 'Rating', '${resource.rating}/5'),
+        PropertyGridItem(label: 'Rating', value: '${resource.rating}/5'),
       ];
     }
     if (object is Goal) {
@@ -1147,35 +1052,29 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
       return [
         ..._buildLinkedGoogleEventRows(context, goal),
-        _divider(),
-        _buildPropertyRow(
-          context,
-          'Estado',
-          goal.state.name.toUpperCase(),
+        PropertyGridItem(
+          label: 'Estado',
+          value: goal.state.name.toUpperCase(),
           onTap: () => _showGoalStatePicker(context, ref, goal),
         ),
-        _divider(),
-        _buildPropertyRow(
-          context,
-          'Tipo',
-          goal.goalType == GoalType.repeating ? 'Recorrente' : 'Pontual',
+        PropertyGridItem(
+          label: 'Tipo',
+          value: goal.goalType == GoalType.repeating ? 'Recorrente' : 'Pontual',
         ),
-        _divider(),
-        _buildPropertyRow(context, 'Progresso', '${(progress * 100).toInt()}%'),
+        PropertyGridItem(
+          label: 'Progresso',
+          value: '${(progress * 100).toInt()}%',
+        ),
         if (goal.deadline != null) ...[
-          _divider(),
-          _buildPropertyRow(
-            context,
-            'Prazo',
-            DateFormat('d MMM yyyy').format(goal.deadline!),
+          PropertyGridItem(
+            label: 'Prazo',
+            value: DateFormat('d MMM yyyy').format(goal.deadline!),
           ),
         ],
         if (goal.startDate != null) ...[
-          _divider(),
-          _buildPropertyRow(
-            context,
-            'Home',
-            DateFormat('d MMM yyyy').format(goal.startDate!),
+          PropertyGridItem(
+            label: 'Home',
+            value: DateFormat('d MMM yyyy').format(goal.startDate!),
           ),
         ],
       ];
@@ -1184,7 +1083,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     return [];
   }
 
-  List<Widget> _buildLinkedGoogleEventRows(
+  List<PropertyGridItem> _buildLinkedGoogleEventRows(
     BuildContext context,
     Object source,
   ) {
@@ -1218,11 +1117,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final label = [title ?? 'Evento Google', ?dateLabel].join(' · ');
 
     return [
-      _divider(),
-      _buildPropertyRow(
-        context,
-        'Evento Google',
-        label,
+      PropertyGridItem(
+        label: 'Evento Google',
+        value: label,
         onTap: url == null || url.isEmpty
             ? null
             : () => launchUrl(
@@ -1536,7 +1433,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 16),
-                ...goal.kpis.map((kpi) => _buildKPICard(context, ref, kpi)),
+                ...goal.kpis.map(
+                  (kpi) => _buildKPICard(context, ref, goal, kpi),
+                ),
                 const SizedBox(height: 24),
                 const Text(
                   'Sub-metas / Checklist',
@@ -1561,22 +1460,20 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             child: Column(
               children: [
                 if (resource.coverImage != null)
-                  Container(
-                    height: 200,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      image: DecorationImage(
-                        image: NetworkImage(resource.coverImage!),
-                        fit: BoxFit.cover,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 220),
+                      child: AspectRatio(
+                        aspectRatio: 1 / 1.414,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.network(
+                            resource.coverImage!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                          ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 const SizedBox(height: 24),
@@ -1586,20 +1483,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (resource.coverImage != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 24),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.network(
-                              resource.coverImage!,
-                              width: double.infinity,
-                              fit: BoxFit.contain, // Not cropped
-                              errorBuilder: (_, _, _) =>
-                                  const SizedBox.shrink(),
-                            ),
-                          ),
-                        ),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -3708,7 +3591,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
   }
 
-  Widget _buildKPICard(BuildContext context, WidgetRef ref, KPI kpi) {
+  Widget _buildKPICard(
+    BuildContext context,
+    WidgetRef ref,
+    Goal goal,
+    KPI kpi,
+  ) {
     final habits = ref.watch(habitsProvider);
     final trackerRecords = ref.watch(trackingRecordsProvider);
     final entries = ref.watch(allEntriesProvider);
@@ -3760,7 +3648,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: const Text(
-                    '✓ Atingido',
+                    'Atingido',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -3769,16 +3657,42 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   ),
                 )
               else
-                Text(
-                  '${currentValue.toInt()} / ${kpi.targetValue.toInt()}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
+                Flexible(
+                  child: Text(
+                    '${currentValue.toInt()} / ${kpi.targetValue.toInt()}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
                   ),
                 ),
             ],
           ),
+          if (kpi.sourceType == KPISourceType.manualQuantity) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _incrementManualKpi(ref, goal, kpi, 1),
+                    child: const Text('+1'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () =>
+                        _showManualKpiIncrementDialog(context, ref, goal, kpi),
+                    child: const Text('+N'),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           Text(
             kpi.sourceType.label,
@@ -3803,6 +3717,83 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         ],
       ),
     );
+  }
+
+  Future<void> _showManualKpiIncrementDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Goal goal,
+    KPI kpi,
+  ) async {
+    final controller = TextEditingController(text: '1');
+    final amount = await showDialog<double>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Incrementar KPI'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+            ],
+            decoration: const InputDecoration(
+              labelText: 'Quantidade',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final parsed = double.tryParse(controller.text.trim());
+                Navigator.pop(dialogContext, parsed);
+              },
+              child: const Text('Adicionar'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    if (amount == null || amount <= 0) return;
+    await _incrementManualKpi(ref, goal, kpi, amount);
+  }
+
+  Future<void> _incrementManualKpi(
+    WidgetRef ref,
+    Goal goal,
+    KPI kpi,
+    double amount,
+  ) async {
+    final updatedKpis = goal.kpis.map((candidate) {
+      if (candidate.id != kpi.id) return candidate;
+      final nextValue = candidate.currentValue + amount;
+      return KPI(
+        id: candidate.id,
+        title: candidate.title,
+        sourceType: candidate.sourceType,
+        calculationMode: candidate.calculationMode,
+        sourceId: candidate.sourceId,
+        fieldId: candidate.fieldId,
+        targetValue: candidate.targetValue,
+        currentValue: nextValue,
+        startDate: candidate.startDate,
+        endDate: candidate.endDate,
+        displayType: candidate.displayType,
+        completed: nextValue >= candidate.targetValue,
+        autoCompleteAction: candidate.autoCompleteAction,
+      );
+    }).toList();
+
+    await ref
+        .read(vaultProvider.notifier)
+        .updateObject(goal.copyWith(kpis: updatedKpis));
+    HapticFeedback.lightImpact();
   }
 
   Widget _buildSubtaskList(

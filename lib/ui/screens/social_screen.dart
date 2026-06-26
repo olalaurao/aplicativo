@@ -986,10 +986,13 @@ class _SocialTimelineCardState extends ConsumerState<_SocialTimelineCard> {
   }
 
   String _objectWikiLink(dynamic object) {
-    final fileName = object.obsidianFileName?.toString().trim() ?? '';
-    final title = object.title?.toString().trim() ?? '';
-    final target = fileName.isNotEmpty ? fileName : title;
-    return '[[${target.isEmpty ? object.id : target}]]';
+    final target = object.obsidianFileName?.toString().trim() ?? '';
+    final slug = object.slug?.toString().trim() ?? '';
+    final chosen = target.isNotEmpty ? target : slug;
+    if (chosen.isNotEmpty) {
+      return '[[$chosen]]';
+    }
+    return '[[${slug.isNotEmpty ? slug : object.id}]]';
   }
 
   void _checkVisibility() {

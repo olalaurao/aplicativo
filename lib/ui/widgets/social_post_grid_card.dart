@@ -66,7 +66,11 @@ class SocialPostGridCard extends StatelessWidget {
                       SocialPlatformBadge(platform: post.platform, fontSize: 9),
                       if (post.socialRefs.isNotEmpty) ...[
                         const SizedBox(width: 4),
-                        const Icon(Icons.link_rounded, size: 12, color: Colors.white70),
+                        const Icon(
+                          Icons.link_rounded,
+                          size: 12,
+                          color: Colors.white70,
+                        ),
                       ],
                     ],
                   ),
@@ -273,6 +277,7 @@ Color socialPlatformColor(SocialPlatform platform) {
     SocialPlatform.pinterest => AppColors.error,
     SocialPlatform.youtube => AppColors.error,
     SocialPlatform.twitter => AppColors.info,
+    SocialPlatform.reddit => AppColors.warning,
     SocialPlatform.other => AppColors.primary,
   };
 }
@@ -286,6 +291,7 @@ IconData socialPlatformIcon(SocialPlatform platform) {
     SocialPlatform.instagram => Icons.camera_alt_outlined,
     SocialPlatform.tiktok => Icons.music_note_rounded,
     SocialPlatform.twitter => Icons.alternate_email_rounded,
+    SocialPlatform.reddit => Icons.forum_rounded,
     SocialPlatform.other => Icons.link_rounded,
   };
 }
@@ -299,6 +305,7 @@ String platformLabel(SocialPlatform platform) {
     SocialPlatform.pinterest => 'Pinterest',
     SocialPlatform.youtube => 'YouTube',
     SocialPlatform.twitter => 'Twitter',
+    SocialPlatform.reddit => 'Reddit',
     SocialPlatform.other => 'Outro',
   };
 }

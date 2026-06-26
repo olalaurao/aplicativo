@@ -1569,18 +1569,19 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     if (_endDate == null && _stage != TaskStage.idea) {
       final shouldGoToBacklog = await showDialog<bool>(
         context: context,
+        barrierDismissible: false,
         builder: (context) => AlertDialog(
-          title: const Text('No date set'),
-          content: const Text('Move this task to Backlog?'),
+          title: const Text('Sem data definida'),
+          content: const Text('Onde você quer colocar esta task?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Keep in list'),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Backlog'),
             ),
             TextButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(context, false),
               child: const Text(
-                'Go to Backlog',
+                'Hoje',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
@@ -1589,7 +1590,15 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       );
       if (!mounted) return;
       if (shouldGoToBacklog == true) {
-        setState(() => _stage = TaskStage.idea);
+        setState(() => _stage = TaskStage.backlog);
+      } else if (shouldGoToBacklog == false) {
+        final now = DateTime.now();
+        setState(() {
+          _endDate = DateTime(now.year, now.month, now.day);
+          _stage = TaskStage.todo;
+        });
+      } else {
+        return;
       }
     }
 

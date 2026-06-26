@@ -796,3 +796,23 @@ Exemplo real encontrado neste projeto:
 ---
 
 *Esta regra se aplica a toda análise, independentemente do que foi perguntado. Se o agente está lendo um arquivo para qualquer motivo e encontra um desses padrões, ele alerta.*
+
+---
+
+## Complementos do gap 2026-06-24
+
+### Tema global
+
+- O tema persistente agora depende de `themeMode` e `activeThemeId` em `settingsProvider`.
+- `themeProvider` é a camada responsável por transformar preferências em `ThemeData`.
+- A tela `appearance_screen.dart` deve ser tratada como a interface principal para troca de tema e modo claro/escuro.
+
+### Property grid
+
+- Resumos de propriedades em telas de detalhe devem usar `ui/widgets/property_grid.dart`.
+- Prefira células curtas, com título, valor e ação opcional, em vez de listas longas de `ListTile` com divisórias.
+
+### Diagnósticos
+
+- Use a chave persistida `vaultPath` ao sincronizar o destino dos crash reports.
+- A exportação agregada da tela de diagnósticos deve continuar simples e rápida, priorizando cópia consolidada para área de transferência.

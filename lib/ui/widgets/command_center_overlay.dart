@@ -11,6 +11,8 @@ import '../../providers/history_provider.dart';
 import '../../providers/systems_provider.dart';
 import '../../models/content_object.dart';
 import '../../models/note_model.dart';
+import '../../models/journal_entry.dart';
+import '../../models/task_model.dart';
 import '../../models/organizer_model.dart';
 import '../../models/system_model.dart';
 import '../../models/calendar_session.dart';
@@ -211,13 +213,16 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
 
     // Próximas Sessões: upcoming (date after yesterday), top 3
     final now = DateTime.now();
-    final upcomingSessions = sessions
-        .where((s) =>
-            s.date.isAfter(now.subtract(const Duration(days: 1))) &&
-            s.state != CalendarSessionState.completed &&
-            s.state != CalendarSessionState.cancelled)
-        .toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+    final upcomingSessions =
+        sessions
+            .where(
+              (s) =>
+                  s.date.isAfter(now.subtract(const Duration(days: 1))) &&
+                  s.state != CalendarSessionState.completed &&
+                  s.state != CalendarSessionState.cancelled,
+            )
+            .toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
     final nextSessions = upcomingSessions.take(3).toList();
 
     // Notes sorted by updated at
@@ -241,11 +246,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
     Map<String, List<ContentObject>> groupedResults = {};
     if (isSearching) {
       final matched = allObjects
-          .where((o) {
-            final titleMatch = o.title.toLowerCase().contains(query);
-            // Also search in body snippet if available
-            return titleMatch;
-          })
+          .where((object) => _matchesQuery(object, query))
           .take(50)
           .toList();
       for (final obj in matched) {
@@ -255,17 +256,18 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
         }
       }
     }
-
     return Shortcuts(
       shortcuts: {
         LogicalKeySet(LogicalKeyboardKey.escape): const _CloseIntent(),
       },
       child: Actions(
         actions: {
-          _CloseIntent: CallbackAction<_CloseIntent>(onInvoke: (_) {
-            _close();
-            return null;
-          }),
+          _CloseIntent: CallbackAction<_CloseIntent>(
+            onInvoke: (_) {
+              _close();
+              return null;
+            },
+          ),
         },
         child: Scaffold(
           backgroundColor: Colors.transparent,
@@ -283,7 +285,9 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                     child: Container(
-                      color: AppTheme.surfaceColor(context).withValues(alpha: 0.6),
+                      color: AppTheme.surfaceColor(
+                        context,
+                      ).withValues(alpha: 0.6),
                     ),
                   ),
                 ),
@@ -378,7 +382,8 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => const CreateEntryForm(),
+                                          builder: (_) =>
+                                              const CreateEntryForm(),
                                         ),
                                       );
                                     },
@@ -392,7 +397,8 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => const CreateTaskForm(),
+                                          builder: (_) =>
+                                              const CreateTaskForm(),
                                         ),
                                       );
                                     },
@@ -406,7 +412,8 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => const CreateTrackerForm(),
+                                          builder: (_) =>
+                                              const CreateTrackerForm(),
                                         ),
                                       );
                                     },
@@ -420,7 +427,8 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => const CreateSystemForm(),
+                                          builder: (_) =>
+                                              const CreateSystemForm(),
                                         ),
                                       );
                                     },
@@ -453,6 +461,27 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
         ),
       ),
     );
+  }
+
+  bool _matchesQuery(ContentObject object, String query) {
+    if (object.title.toLowerCase().contains(query)) return true;
+    if (object.aliases.any((alias) => alias.toLowerCase().contains(query))) {
+      return true;
+    }
+    final snippet = object.snippet;
+    if (snippet != null && snippet.toLowerCase().contains(query)) return true;
+
+    String body = '';
+    if (object is Note) {
+      body = object.body;
+    } else if (object is JournalEntry) {
+      body = object.body;
+    } else if (object is Task) {
+      body = object.notes.join('\n');
+    }
+    if (body.isEmpty) return false;
+    final preview = body.length > 200 ? body.substring(0, 200) : body;
+    return preview.toLowerCase().contains(query);
   }
 
   Widget _buildQuickAction(
@@ -507,16 +536,13 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
       padding: const EdgeInsets.only(bottom: 24),
       children: [
         // ── Recentes (dismissible) ──
-        if (recent.isNotEmpty)
-          _buildRecentSection(recent, history),
+        if (recent.isNotEmpty) _buildRecentSection(recent, history),
 
         // ── Systems (quick-run chips) ──
-        if (topSystems.isNotEmpty)
-          _buildSystemsSection(topSystems),
+        if (topSystems.isNotEmpty) _buildSystemsSection(topSystems),
 
         // ── Próximas Sessões ──
-        if (nextSessions.isNotEmpty)
-          _buildSessionsSection(nextSessions),
+        if (nextSessions.isNotEmpty) _buildSessionsSection(nextSessions),
 
         // ── Notas Recentes ──
         if (notes.isNotEmpty)
@@ -564,7 +590,9 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: recent.map((obj) {
-                final histEntry = history.where((h) => h.id == obj.id).firstOrNull;
+                final histEntry = history
+                    .where((h) => h.id == obj.id)
+                    .firstOrNull;
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Dismissible(
@@ -579,7 +607,11 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                       ),
                       alignment: Alignment.topCenter,
                       padding: const EdgeInsets.only(top: 12),
-                      child: const Icon(Icons.close_rounded, color: AppColors.error, size: 18),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        color: AppColors.error,
+                        size: 18,
+                      ),
                     ),
                     child: _buildObjectChip(obj),
                   ),
@@ -748,13 +780,15 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
       } catch (_) {}
     }
 
-    final isToday = session.date.day == DateTime.now().day &&
+    final isToday =
+        session.date.day == DateTime.now().day &&
         session.date.month == DateTime.now().month &&
         session.date.year == DateTime.now().year;
 
     final dateLabel = isToday
         ? 'Hoje ${session.timeOfDay ?? ""}'.trim()
-        : '${DateFormat('d/M').format(session.date)} ${session.timeOfDay ?? ""}'.trim();
+        : '${DateFormat('d/M').format(session.date)} ${session.timeOfDay ?? ""}'
+              .trim();
 
     return InkWell(
       onTap: () => _openObject(session),
@@ -776,7 +810,10 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                 session.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
             const SizedBox(width: 8),

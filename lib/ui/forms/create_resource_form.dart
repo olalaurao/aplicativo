@@ -1,8 +1,10 @@
 // lib/ui/forms/create_resource_form.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/resource_model.dart';
 import '../../models/shared_types.dart';
+import '../../services/resource_metadata_service.dart';
 import '../theme.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/organizer_selector_field.dart';
@@ -11,10 +13,12 @@ import '../../providers/vault_provider.dart';
 
 class CreateResourceForm extends ConsumerStatefulWidget {
   final String? initialTitle;
+  final String? initialUrl;
   final Resource? existingResource;
   const CreateResourceForm({
     super.key,
     this.initialTitle,
+    this.initialUrl,
     this.existingResource,
   });
 
@@ -35,6 +39,10 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
   ResourceStatus _status = ResourceStatus.toConsume;
   int _rating = 0;
   List<OrganizerReference> _organizers = [];
+  bool _isFetchingUrl = false;
+  String? _fetchError;
+  String? _sourceUrl;
+  String? _sourceName;
 
   @override
   void initState() {
@@ -73,6 +81,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
       _rating = resource.rating;
       _readDate = resource.readDate;
       _organizers = List.from(resource.organizers);
+      _sourceUrl = resource.sourceUrl;
     } else {
       final defaultType = ref
           .read(settingsProvider)
@@ -80,6 +89,10 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
           .where((type) => type.trim().isNotEmpty)
           .firstOrNull;
       if (defaultType != null) _resourceType = defaultType;
+    }
+
+    if (widget.existingResource == null && widget.initialUrl != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fetchFromUrl());
     }
   }
 
@@ -109,7 +122,9 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Descartar alterações?'),
-            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
+            content: const Text(
+              'Você possui alterações não salvas. Deseja sair mesmo assim?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -127,188 +142,224 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
           Navigator.pop(context, result);
         }
       },
-      child:  Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            pinned: true,
-            leading: IconButton(
-              icon: const Icon(Icons.close_rounded),
-              onPressed: () => Navigator.pop(context),
-            ),
-            title: const Text(
-              'Resource',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-            ),
-            centerTitle: true,
-          ),
-
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: _titleController,
-                    onChanged: (_) => setState(() {}),
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: 'Resource Title',
-                      hintStyle: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textMuted,
-                        letterSpacing: -0.5,
-                      ),
-                      border: InputBorder.none,
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        _buildTypeRow(),
-                        const Divider(height: 16),
-                        _buildRow(
-                          'Author',
-                          _authorController,
-                          hint: 'Author name',
-                        ),
-                        const Divider(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildRow(
-                                'Year',
-                                _yearController,
-                                hint: 'YYYY',
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: _buildRow(
-                                'Pages',
-                                _pagesController,
-                                hint: '0',
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 16),
-                        _buildRow(
-                          'Category',
-                          _categoryController,
-                          hint: 'Genre or category',
-                        ),
-                        const Divider(height: 16),
-                        _buildRow(
-                          'Cover URL',
-                          _coverUrlController,
-                          hint: 'https://...',
-                        ),
-                        const Divider(height: 16),
-                        _buildStatusRow(),
-                        const Divider(height: 16),
-                        _buildReadDateRow(),
-                        const Divider(height: 16),
-                        _buildRatingRow(),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // âÂ”Â€âÂ”Â€âÂ”Â€ Organizers âÂ”Â€âÂ”Â€âÂ”Â€
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 4,
-                    ),
-                    child: OrganizerSelectorField(
-                      selectedOrganizers: _organizers,
-                      onChanged: (val) => setState(() => _organizers = val),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'SYNOPSIS & HIGHLIGHTS',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textMuted,
-                            letterSpacing: 1.0,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _synopsisController,
-                          maxLines: null,
-                          minLines: 5,
-                          style: const TextStyle(fontSize: 14),
-                          decoration: const InputDecoration(
-                            hintText:
-                                'Synopsis or notes... Use markdown # * [[]]',
-                            border: InputBorder.none,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              pinned: true,
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.pop(context),
               ),
+              title: const Text(
+                'Resource',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
+              centerTitle: true,
             ),
-          ),
-        ],
-      ),
-
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-          child: SizedBox(
-            height: 52,
-            child: FilledButton(
-              onPressed: hasTitle ? _saveResource : null,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.warning,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+            if (_isFetchingUrl)
+              const SliverToBoxAdapter(child: LinearProgressIndicator()),
+            if (_fetchError != null)
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Erro ao buscar metadados: $_fetchError',
+                    style: const TextStyle(
+                      color: AppColors.error,
+                      fontSize: 13,
+                    ),
+                  ),
                 ),
               ),
-              child: Text(
-                widget.existingResource == null
-                    ? 'Add Resource'
-                    : 'Save Resource',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+            if (_sourceUrl != null && !_isFetchingUrl && _fetchError == null)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  child: _buildSourceBanner(),
+                ),
+              ),
+
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _titleController,
+                      onChanged: (_) => setState(() {}),
+                      style: const TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
+                      ),
+                      decoration: const InputDecoration(
+                        hintText: 'Resource Title',
+                        hintStyle: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textMuted,
+                          letterSpacing: -0.5,
+                        ),
+                        border: InputBorder.none,
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          _buildTypeRow(),
+                          const Divider(height: 16),
+                          _buildRow(
+                            'Author',
+                            _authorController,
+                            hint: 'Author name',
+                          ),
+                          const Divider(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildRow(
+                                  'Year',
+                                  _yearController,
+                                  hint: 'YYYY',
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _buildRow(
+                                  'Pages',
+                                  _pagesController,
+                                  hint: '0',
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 16),
+                          _buildRow(
+                            'Category',
+                            _categoryController,
+                            hint: 'Genre or category',
+                          ),
+                          const Divider(height: 16),
+                          _buildRow(
+                            'Cover URL',
+                            _coverUrlController,
+                            hint: 'https://...',
+                            trailing: IconButton(
+                              onPressed: _pasteCoverUrl,
+                              icon: const Icon(
+                                Icons.content_paste_rounded,
+                                size: 18,
+                              ),
+                              tooltip: 'Colar URL',
+                            ),
+                          ),
+                          const Divider(height: 16),
+                          _buildStatusRow(),
+                          const Divider(height: 16),
+                          _buildReadDateRow(),
+                          const Divider(height: 16),
+                          _buildRatingRow(),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // âÂ”Â€âÂ”Â€âÂ”Â€ Organizers âÂ”Â€âÂ”Â€âÂ”Â€
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      child: OrganizerSelectorField(
+                        selectedOrganizers: _organizers,
+                        onChanged: (val) => setState(() => _organizers = val),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'SYNOPSIS & HIGHLIGHTS',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textMuted,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _synopsisController,
+                            maxLines: null,
+                            minLines: 5,
+                            style: const TextStyle(fontSize: 14),
+                            decoration: const InputDecoration(
+                              hintText:
+                                  'Synopsis or notes... Use markdown # * [[]]',
+                              border: InputBorder.none,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+            child: SizedBox(
+              height: 52,
+              child: FilledButton(
+                onPressed: hasTitle ? _saveResource : null,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.warning,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: Text(
+                  widget.existingResource == null
+                      ? 'Add Resource'
+                      : 'Save Resource',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
           ),
         ),
       ),
-    ));
+    );
   }
 
   Widget _buildTypeRow() {
@@ -417,6 +468,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
     TextEditingController controller, {
     String? hint,
     TextInputType? keyboardType,
+    Widget? trailing,
   }) {
     return Row(
       children: [
@@ -442,7 +494,75 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
             ),
           ),
         ),
+        if (trailing != null) ...[const SizedBox(width: 4), trailing],
       ],
+    );
+  }
+
+  Widget _buildSourceBanner() {
+    final coverUrl = _coverUrlController.text.trim();
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        children: [
+          if (coverUrl.isNotEmpty)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                coverUrl,
+                width: 42,
+                height: 56,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+            )
+          else
+            Container(
+              width: 42,
+              height: 56,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.auto_awesome_rounded,
+                color: AppColors.primary,
+              ),
+            ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Dados importados de ${_sourceName ?? 'uma fonte externa'}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _sourceUrl ?? '',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textMutedColor(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(onPressed: () {}, child: const Text('Editar manualmente')),
+        ],
+      ),
     );
   }
 
@@ -505,6 +625,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
       category: _categoryController.text.trim(),
       readDate: _readDate,
       coverImage: coverUrl.isEmpty ? null : coverUrl,
+      sourceUrl: _sourceUrl,
       obsidianPath: widget.existingResource?.obsidianPath ?? '',
       organizers: _organizers,
       categories: widget.existingResource?.categories,
@@ -542,5 +663,74 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
         uri.isAbsolute &&
         (uri.scheme == 'http' || uri.scheme == 'https') &&
         uri.host.isNotEmpty;
+  }
+
+  Future<void> _fetchFromUrl() async {
+    final url = widget.initialUrl?.trim() ?? '';
+    if (url.isEmpty) return;
+
+    setState(() {
+      _isFetchingUrl = true;
+      _fetchError = null;
+    });
+
+    try {
+      final draft = await ResourceMetadataService.fetchMetadata(url);
+      if (!mounted) return;
+      setState(() {
+        _isFetchingUrl = false;
+        _sourceUrl = draft.sourceUrl ?? url;
+        _sourceName = draft.sourceName;
+        if ((draft.title ?? '').trim().isNotEmpty) {
+          _titleController.text = draft.title!.trim();
+        }
+        if ((draft.author ?? '').trim().isNotEmpty) {
+          _authorController.text = draft.author!.trim();
+        }
+        if ((draft.synopsis ?? '').trim().isNotEmpty) {
+          _synopsisController.text = draft.synopsis!.trim();
+        }
+        if ((draft.coverUrl ?? '').trim().isNotEmpty) {
+          _coverUrlController.text = draft.coverUrl!.trim();
+        }
+        if (draft.year != null) {
+          _yearController.text = draft.year.toString();
+        }
+        if (draft.pages != null) {
+          _pagesController.text = draft.pages.toString();
+        }
+        if ((draft.category ?? '').trim().isNotEmpty) {
+          _categoryController.text = draft.category!.trim();
+        }
+        if ((draft.resourceType ?? '').trim().isNotEmpty) {
+          _resourceType = _normalizeResourceType(draft.resourceType!);
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isFetchingUrl = false;
+        _fetchError = e.toString();
+      });
+    }
+  }
+
+  String _normalizeResourceType(String value) {
+    final trimmed = value.trim();
+    final configured = ref.read(settingsProvider).resourceTypeFilters;
+    final match = configured.firstWhere(
+      (type) => type.toLowerCase() == trimmed.toLowerCase(),
+      orElse: () => '',
+    );
+    return match.isNotEmpty ? match : 'General';
+  }
+
+  Future<void> _pasteCoverUrl() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text?.trim() ?? '';
+    if (!_isValidCoverUrl(text)) return;
+    setState(() {
+      _coverUrlController.text = text;
+    });
   }
 }

@@ -59,6 +59,8 @@ class AppSettings {
   final String sleepInDate;
   final String reviewDailyTemplateId;
   final String accentColor;
+  final String themeMode;
+  final String activeThemeId;
   final bool nlpTaskParsingEnabled;
   final String dailyNoteIdentifier;
   final String dailyNoteDateFormat;
@@ -68,21 +70,22 @@ class AppSettings {
   final String tiktokResolverApiKey;
   final Map<String, String> folderPaths;
   // ── Idea capture settings ──
-  final String ideaStrategy;   // 'tag' | 'folder' | 'any_note'
-  final String ideaTag;        // default: 'idea'
-  final String ideaFolder;     // default: 'notes/ideas'
+  final String ideaStrategy; // 'tag' | 'folder' | 'any_note'
+  final String ideaTag; // default: 'idea'
+  final String ideaFolder; // default: 'notes/ideas'
 
   // ── User identity ──
-  final String? userName;     // displayed in greeting on Home screen
+  final String? userName; // displayed in greeting on Home screen
 
   // ── Saved filters ──
   final List<Map<String, dynamic>> savedFiltersRaw; // persisted as JSON list
 
   // ── Integrations ──
-  final String? huggingFaceToken;  // Whisper / HuggingFace API token (E11)
+  final String? huggingFaceToken; // Whisper / HuggingFace API token (E11)
 
   // ── Conflict suppression ──
-  final Map<String, DateTime> suppressedConflicts; // slug → suppressed date (E2)
+  final Map<String, DateTime>
+  suppressedConflicts; // slug → suppressed date (E2)
 
   // ── Recent Searches ──
   final List<String> recentSearches;
@@ -115,6 +118,8 @@ class AppSettings {
     this.sleepInDate = '',
     this.reviewDailyTemplateId = '',
     this.accentColor = '#F97316',
+    this.themeMode = 'system',
+    this.activeThemeId = 'citrine',
     this.nlpTaskParsingEnabled = true,
     this.dailyNoteIdentifier = 'filename_format',
     this.dailyNoteDateFormat = 'yyyy-MM-dd',
@@ -198,6 +203,8 @@ class AppSettings {
     String? sleepInDate,
     String? reviewDailyTemplateId,
     String? accentColor,
+    String? themeMode,
+    String? activeThemeId,
     bool? nlpTaskParsingEnabled,
     String? dailyNoteIdentifier,
     String? dailyNoteDateFormat,
@@ -256,6 +263,9 @@ class AppSettings {
       sleepInDate: sleepInDate ?? this.sleepInDate,
       reviewDailyTemplateId:
           reviewDailyTemplateId ?? this.reviewDailyTemplateId,
+      accentColor: accentColor ?? this.accentColor,
+      themeMode: themeMode ?? this.themeMode,
+      activeThemeId: activeThemeId ?? this.activeThemeId,
       nlpTaskParsingEnabled:
           nlpTaskParsingEnabled ?? this.nlpTaskParsingEnabled,
       dailyNoteIdentifier: dailyNoteIdentifier ?? this.dailyNoteIdentifier,
@@ -299,8 +309,8 @@ class AppSettings {
 class SettingsNotifier extends StateNotifier<AppSettings> {
   final SharedPreferences _prefs;
   SettingsNotifier(SharedPreferences prefs)
-      : _prefs = prefs,
-        super(_buildFromPrefs(prefs));
+    : _prefs = prefs,
+      super(_buildFromPrefs(prefs));
 
   static AppSettings _buildFromPrefs(SharedPreferences prefs) {
     final rulesJson = prefs.getString('autoCategoryRules');
@@ -371,6 +381,8 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       sleepInDate: prefs.getString('sleepInDate') ?? '',
       reviewDailyTemplateId: prefs.getString('reviewDailyTemplateId') ?? '',
       accentColor: prefs.getString('accentColor') ?? '#F97316',
+      themeMode: prefs.getString('themeMode') ?? 'system',
+      activeThemeId: prefs.getString('activeThemeId') ?? 'citrine',
       nlpTaskParsingEnabled: prefs.getBool('nlpTaskParsingEnabled') ?? true,
       dailyNoteIdentifier:
           prefs.getString('dailyNoteIdentifier') ?? 'filename_format',
@@ -418,7 +430,8 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
         if (raw == null) return const <String, DateTime>{};
         try {
           return (json.decode(raw) as Map<String, dynamic>).map(
-            (k, v) => MapEntry(k, DateTime.parse(v as String)));
+            (k, v) => MapEntry(k, DateTime.parse(v as String)),
+          );
         } catch (_) {
           return const <String, DateTime>{};
         }
@@ -560,6 +573,25 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> updateAccentColor(String value) async {
     await _prefs.setString('accentColor', value);
     state = state.copyWith(accentColor: value);
+  }
+
+  Future<void> updateThemeMode(String value) async {
+    final normalized = switch (value) {
+      'light' => 'light',
+      'dark' => 'dark',
+      _ => 'system',
+    };
+    await _prefs.setString('themeMode', normalized);
+    state = state.copyWith(themeMode: normalized);
+  }
+
+  Future<void> updateActiveTheme({
+    required String themeId,
+    required String accentColor,
+  }) async {
+    await _prefs.setString('activeThemeId', themeId);
+    await _prefs.setString('accentColor', accentColor);
+    state = state.copyWith(activeThemeId: themeId, accentColor: accentColor);
   }
 
   Future<void> updateAutoSync(bool value) async {
@@ -852,7 +884,9 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> suppressConflict(String slug) async {
     final next = Map<String, DateTime>.from(state.suppressedConflicts)
       ..[slug] = DateTime.now();
-    final encoded = json.encode(next.map((k, v) => MapEntry(k, v.toIso8601String())));
+    final encoded = json.encode(
+      next.map((k, v) => MapEntry(k, v.toIso8601String())),
+    );
     await _prefs.setString('suppressedConflicts', encoded);
     state = state.copyWith(suppressedConflicts: next);
   }

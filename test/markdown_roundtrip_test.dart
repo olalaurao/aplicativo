@@ -64,7 +64,10 @@ void main() {
         slug: 'launch',
         title: 'Launch',
       );
-      final parsed = OrganizerReference.fromWikiLink(reference.toWikiLink(), defaultType: 'project');
+      final parsed = OrganizerReference.fromWikiLink(
+        reference.toWikiLink(),
+        defaultType: 'project',
+      );
 
       expect(reference.toWikiLink(), '[[launch]]');
       expect(parsed.type, 'project');
@@ -134,6 +137,7 @@ void main() {
             {'title': 'Plan day', 'completed': true},
           ],
           habits: const {'hydrate': 3},
+          habitLabels: const {'hydrate': 'Hydrate'},
           trackers: const {
             'sleep': {'hours': 7.5},
           },
@@ -148,7 +152,7 @@ void main() {
 
         expect(entries.single['body'], 'Started well');
         expect(tasks.single['completed'], isTrue);
-        expect(body, contains('[[hydrate]]'));
+        expect(body, contains('- [x] Hydrate (3)'));
         expect(body, contains('hours: 7.5'));
         expect(pomodoros.single['title'], 'Focus');
       },
@@ -244,7 +248,7 @@ Texto original.
             reflection: 'Went great, learned a lot.',
             hypothesisCorrect: true,
             endedReason: 'goal_achieved',
-          )
+          ),
         ],
       );
 
@@ -262,7 +266,10 @@ Texto original.
       expect(parsed.endsAt, pact.endsAt);
       expect(parsed.pactOutcome, PactOutcome.persist);
       expect(parsed.previousCycles, hasLength(1));
-      expect(parsed.previousCycles.first.reflection, 'Went great, learned a lot.');
+      expect(
+        parsed.previousCycles.first.reflection,
+        'Went great, learned a lot.',
+      );
       expect(parsed.previousCycles.first.hypothesisCorrect, isTrue);
       expect(parsed.previousCycles.first.endedReason, 'goal_achieved');
     });
@@ -331,7 +338,7 @@ Texto original.
         MarkdownParser.parseFrontmatter(projectMarkdown),
         MarkdownParser.extractBody(projectMarkdown),
       );
-      expect(parsedProject.priority, TaskPriority.high);
+      expect(parsedProject.projectPriority, TaskPriority.high);
       expect(parsedProject.taskLinks, contains('task-a'));
 
       final goal = Goal(

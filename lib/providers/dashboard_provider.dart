@@ -15,22 +15,12 @@ class DashboardNotifier extends AsyncNotifier<List<DashboardBlock>> {
     if (jsonStr != null) {
       try {
         final List<dynamic> decoded = jsonDecode(jsonStr);
-        final saved = decoded.map((item) => DashboardBlock.fromMap(item)).toList();
-        return _withRequiredNativeBlocks(saved);
+        return decoded.map((item) => DashboardBlock.fromMap(item)).toList();
       } catch (e) {
-        // Fallback to default if decoding fails
-        return _defaultBlocks;
+        return [];
       }
     }
-    return _defaultBlocks;
-  }
-
-  static List<DashboardBlock> _withRequiredNativeBlocks(List<DashboardBlock> saved) {
-    final ids = saved.map((block) => block.id).toSet();
-    final required = _defaultBlocks
-        .where((block) => block.id == 'home-calendar' || block.id == 'home-area' || block.id == 'home-pomodoro-week')
-        .where((block) => !ids.contains(block.id));
-    return [...saved, ...required];
+    return [];
   }
 
   static final List<DashboardBlock> _defaultBlocks = [
@@ -72,6 +62,12 @@ class DashboardNotifier extends AsyncNotifier<List<DashboardBlock>> {
       type: BlockType.shoppingList,
       title: 'Lista de Mercado',
       order: 4,
+    ),
+    DashboardBlock(
+      id: 'home-pacts',
+      type: BlockType.pactToday,
+      title: 'Pacts Hoje',
+      order: 5,
     ),
   ];
 
@@ -181,64 +177,70 @@ class DashboardNotifier extends AsyncNotifier<List<DashboardBlock>> {
       order: 18,
     ),
     DashboardBlock(
+      id: 'pact-today',
+      type: BlockType.pactToday,
+      title: 'Pacts Hoje',
+      order: 19,
+    ),
+    DashboardBlock(
       id: 'analysis-trend',
       type: BlockType.analysisTrend,
       title: 'Insights',
-      order: 19,
+      order: 20,
     ),
     DashboardBlock(
       id: 'habit-trend',
       type: BlockType.habitTrend,
       title: 'Atividade de Habits',
-      order: 20,
+      order: 21,
     ),
     DashboardBlock(
       id: 'journal-quick-add',
       type: BlockType.journalQuickAdd,
       title: 'Quick Entry',
-      order: 21,
+      order: 22,
     ),
     DashboardBlock(
       id: 'time-blocking',
       type: BlockType.timeBlocking,
       title: 'Time Blocks',
-      order: 22,
+      order: 23,
     ),
     DashboardBlock(
       id: 'photos',
       type: BlockType.photos,
       title: 'Fotos',
-      order: 23,
+      order: 24,
     ),
     DashboardBlock(
       id: 'custom-markdown',
       type: BlockType.customMarkdown,
       title: 'Markdown',
-      order: 24,
+      order: 25,
     ),
     DashboardBlock(
       id: 'organizer-summary',
       type: BlockType.organizerSummary,
       title: 'Filtro',
-      order: 25,
+      order: 26,
     ),
     DashboardBlock(
       id: 'quotes',
       type: BlockType.quotes,
       title: 'Quote',
-      order: 26,
+      order: 27,
     ),
     DashboardBlock(
       id: 'system-quick-run',
       type: BlockType.systemQuickRun,
       title: 'Systems',
-      order: 27,
+      order: 28,
     ),
     DashboardBlock(
       id: 'energy-map',
       type: BlockType.energyMap,
       title: 'Energy Map',
-      order: 28,
+      order: 29,
     ),
   ];
 
@@ -326,6 +328,12 @@ class DashboardNotifier extends AsyncNotifier<List<DashboardBlock>> {
     final current = state.valueOrNull ?? [];
     state = AsyncData(current.where((block) => block.id != id).toList());
     await _save();
+  }
+
+  Future<void> clearAll() async {
+    state = const AsyncData([]);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefKey);
   }
 }
 

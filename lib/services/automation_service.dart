@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/habit_model.dart';
 import '../models/shared_types.dart';
 import '../models/journal_entry.dart';
@@ -40,6 +41,20 @@ class AutomationService {
     }
   }
 
+  static Future<void> executeTrackerActions(
+    dynamic ref,
+    TrackerDefinition tracker,
+    TrackingRecord record,
+  ) async {
+    for (final action in tracker.actions) {
+      if (action.trigger == 'tracking_record_saved' ||
+          action.trigger == 'tracker_record_saved' ||
+          action.trigger == 'record_saved') {
+        await _executeActionDef(ref, action, tracker.title, record.date);
+      }
+    }
+  }
+
   static Future<void> _executeAction(
     Ref ref,
     ActionDef action,
@@ -50,7 +65,7 @@ class AutomationService {
   }
 
   static Future<void> _executeActionDef(
-    Ref ref,
+    dynamic ref,
     ActionDef action,
     String sourceTitle,
     DateTime date,
@@ -73,7 +88,7 @@ class AutomationService {
         await tasksNotifier.addTask(
           Task(
             title: 'Acompanhamento: $sourceTitle',
-            notes: ['Task criada automaticamente após concluir/atingir a meta.'],
+            notes: ['Tarefa criada automaticamente após concluir/atingir a meta.'],
             startDate: DateTime.now(),
             stage: TaskStage.todo,
           ),
@@ -94,7 +109,7 @@ class AutomationService {
         break;
 
       case 'add_text_note':
-        // Cria uma Text Note vinculada automaticamente.
+        // Cria uma nota de texto vinculada automaticamente.
         // targetNoteTitle pode vir em action.params['title'].
         final notesNotifier = ref.read(notesProvider.notifier);
         await notesNotifier.addNote(
@@ -107,10 +122,41 @@ class AutomationService {
         break;
 
       case 'add_collection_item':
-        // Adiciona item a uma Collection Note especificada.
-        // Requer action.params['collection_note_id'] ou action.targetNoteId.
-        // TODO: implementar append de item quando o notesProvider expor esse método.
-        debugPrint('[AutomationService] add_collection_item: targetId=${action.params?["collection_note_id"]}');
+        final targetId =
+            action.params?['collection_note_id']?.toString() ??
+            action.params?['target_note_id']?.toString() ??
+            action.params?['target_id']?.toString();
+        if (targetId == null || targetId.isEmpty) {
+          debugPrint('[AutomationService] add_collection_item sem destino.');
+          break;
+        }
+
+        final notes = ref.read(notesProvider);
+        final collection = notes.where((note) {
+          return note.subtype == NoteSubtype.collection &&
+              (note.id == targetId ||
+                  note.slug == targetId ||
+                  note.title == targetId);
+        }).firstOrNull;
+        if (collection == null) {
+          debugPrint(
+            '[AutomationService] Nota de coleção não encontrada: $targetId',
+          );
+          break;
+        }
+
+        final itemText =
+            action.params?['item']?.toString().trim().isNotEmpty == true
+            ? action.params!['item'].toString().trim()
+            : sourceTitle;
+        final nextBody = [
+          collection.body.trimRight(),
+          if (collection.body.trim().isNotEmpty) '',
+          '- $itemText',
+        ].join('\n');
+        await ref.read(notesProvider.notifier).updateNote(
+              collection.copyWith(body: nextBody),
+            );
         break;
 
       case 'view_statistics':
@@ -118,17 +164,22 @@ class AutomationService {
         // Ações de navegação pura — devem ser tratadas na camada de UI via
         // callback de navegação injetado. AutomationService não conhece o
         // contexto de roteamento; registrar apenas para rastreamento.
-        debugPrint('[AutomationService] ${action.type}: targetId=${action.params?["target_id"]}');
+        debugPrint('[AutomationService] ${action.type}: destino=${action.params?["target_id"]}');
         break;
 
       case 'launch_url':
-        // Abre URL externa. Requer url_launcher (confirmar pubspec.yaml).
         final url = action.params?['url'] as String?;
         if (url != null && url.isNotEmpty) {
-          // ignore: avoid_print
-          debugPrint('[AutomationService] launch_url: $url');
-          // TODO: await launchUrl(Uri.parse(url)) quando url_launcher estiver
-          // confirmado como dependência ativa.
+          final uri = Uri.tryParse(url);
+          if (uri != null) {
+            final launched = await launchUrl(
+              uri,
+              mode: LaunchMode.externalApplication,
+            );
+            if (!launched) {
+              debugPrint('[AutomationService] launch_url falhou: $url');
+            }
+          }
         }
         break;
     }
@@ -198,7 +249,7 @@ class AutomationService {
 
     final notificationService = NotificationService();
     for (final pact in expiredPacts) {
-      debugPrint('[PactChecker] Found expired pact: ${pact.title}');
+      debugPrint('[PactChecker] Pacto vencido encontrado: ${pact.title}');
       await notificationService.showImmediateNotification(
         id: pact.id.hashCode,
         title: 'Pacto Expirado: ${pact.displayTitle}',
@@ -281,7 +332,7 @@ class AutomationService {
                 final action = ActionDef.fromJson(kpi.autoCompleteAction!);
                 await _executeActionDef(ref, action, kpi.title, DateTime.now());
               } catch (e) {
-                debugPrint('Failed to execute KPI autocomplete action: $e');
+                debugPrint('Falha ao executar ação automática do KPI: $e');
               }
             }
           }
@@ -299,19 +350,15 @@ class AutomationService {
   static Future<void> checkKPIGoals(Ref ref, Goal goal) async {
     if (goal.state != GoalStatus.active) return;
 
-    // If all KPIs are met, mark as completed
     if (goal.kpis.isNotEmpty &&
         goal.kpis.every(
           (k) => k.completed || k.currentValue >= k.targetValue,
         )) {
-      goal.state = GoalStatus.completed;
-      await ref.read(goalsProvider.notifier).updateGoal(goal);
-
-      // Optional: Show notification or trigger action
       await NotificationService().showImmediateNotification(
         id: goal.id.hashCode,
-        title: 'Meta atingida!',
-        body: 'Parabéns! Você alcançou todos os alvos de "${goal.title}".',
+        title: 'KPIs atingidos',
+        body:
+            'Todos os KPIs de "${goal.title}" foram atingidos. Revise a meta para concluir.',
       );
     }
   }

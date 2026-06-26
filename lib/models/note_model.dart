@@ -14,7 +14,6 @@ class Note extends ContentObject {
   bool isChecklist;
   String? schedulerSlug;
   bool showInPlanner;
-  List<String> links; // WikiLink strings e.g. '[[some-note]]'
 
   Note({
     super.id,
@@ -27,10 +26,10 @@ class Note extends ContentObject {
     this.schedulerSlug,
     this.showInPlanner = false,
     List<String>? socialRefs,
-    List<String>? links,
     super.organizers,
     super.categories,
     super.tags,
+    super.links,
     super.reminders,
     super.createdAt,
     super.updatedAt,
@@ -38,8 +37,7 @@ class Note extends ContentObject {
     super.pinned,
     super.order,
     super.obsidianPath,
-  }) : socialRefs = socialRefs ?? [],
-       links = links ?? [];
+  }) : socialRefs = socialRefs ?? [];
 
   @override
   String get type => 'note';

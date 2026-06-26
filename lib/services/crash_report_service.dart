@@ -35,6 +35,10 @@ class CrashReportService {
       final library = details.library ?? 'unknown';
       final context = details.context?.toDescription() ?? '';
       logEvent('flutter_error library=$library context=$context');
+      final message = details.exception.toString();
+      if (message.contains('A RenderFlex overflowed')) {
+        unawaited(logOverflow(details: details.toString(), library: library));
+      }
       _handleError(
         details.exception,
         details.stack ?? StackTrace.empty,
@@ -90,7 +94,13 @@ class CrashReportService {
       final now = DateTime.now();
       final timestampStr = DateFormat('yyyy-MM-dd_HH-mm-ss').format(now);
       final filename = '${timestampStr}_$kind.md';
-      final reportContent = await _buildReport(kind, now, error, stackTrace, extra: extra);
+      final reportContent = await _buildReport(
+        kind,
+        now,
+        error,
+        stackTrace,
+        extra: extra,
+      );
       await _writeReport(filename, reportContent);
     } catch (e) {
       debugPrint('[CrashReport] Error writing crash report: $e');
@@ -129,6 +139,34 @@ class CrashReportService {
     }
   }
 
+  Future<void> logOverflow({
+    required String details,
+    required String library,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final timestampStr = DateFormat('yyyy-MM-dd_HH-mm-ss_SSS').format(now);
+      final filename = '${timestampStr}_overflow.md';
+      final report =
+          '''---
+type: overflow
+created_at: ${now.toIso8601String()}
+library: $library
+route: $_currentRoute
+---
+
+# RenderFlex Overflow
+
+```text
+$details
+```
+''';
+      await _writeReport(filename, report);
+    } catch (error) {
+      debugPrint('[CrashReport] Error writing overflow report: $error');
+    }
+  }
+
   Future<String> _buildReport(
     String kind,
     DateTime createdAt,
@@ -159,7 +197,9 @@ class CrashReportService {
     sb.writeln('| Kind | $kind |');
     sb.writeln('| Time | ${createdAt.toLocal()} |');
     sb.writeln('| App version | ${_appVersion ?? 'unknown'} |');
-    sb.writeln('| Platform | ${Platform.operatingSystem} ${Platform.operatingSystemVersion} |');
+    sb.writeln(
+      '| Platform | ${Platform.operatingSystem} ${Platform.operatingSystemVersion} |',
+    );
     sb.writeln('| Dart version | ${Platform.version} |');
     sb.writeln('| Route | $_currentRoute |');
     for (final entry in extra.entries) {
@@ -251,7 +291,9 @@ class CrashReportService {
       final dir = Directory('${docDir.path}/diagnostics/crash_reports');
       if (!await dir.exists()) return [];
       final files = dir.listSync().whereType<File>().toList();
-      files.sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+      files.sort(
+        (a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()),
+      );
       return files;
     } catch (_) {
       return [];

@@ -12,6 +12,7 @@ enum SocialPlatform {
   pinterest,
   youtube,
   twitter,
+  reddit,
   other,
 }
 
@@ -214,7 +215,7 @@ class SocialPost extends ContentObject {
       _stringValue(frontmatter['posted_at']) ?? '',
     );
     post.socialRefs = _stringList(frontmatter['social_refs']);
-    
+
     if (frontmatter['places'] is List) {
       post.places = (frontmatter['places'] as List)
           .map((p) => PlaceRef.fromMap(p as Map<String, dynamic>))

@@ -3,6 +3,7 @@ import 'content_object.dart';
 import 'shared_types.dart';
 import 'reminder_config.dart';
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 
 enum JournalEntryType { standard, fieldNote, pmn }
 
@@ -71,39 +72,73 @@ class JournalEntry extends ContentObject {
          updatedAt: updatedAt ?? createdAt ?? date,
        );
 
-  static String _entryTypeToString(JournalEntryType t) => switch (t) {
-    JournalEntryType.standard  => 'standard',
+  static String entryTypeToString(JournalEntryType t) => switch (t) {
+    JournalEntryType.standard => 'standard',
     JournalEntryType.fieldNote => 'field_note',
-    JournalEntryType.pmn       => 'pmn',
+    JournalEntryType.pmn => 'pmn',
   };
+
+  static int isoWeekNumber(DateTime date) {
+    final dayOfYear = int.parse(DateFormat('D').format(date));
+    final weekday = date.weekday;
+    return ((dayOfYear - weekday + 10) / 7).floor();
+  }
+
+  static String pmnIdFromDate(DateTime startDate) {
+    final weekNumber = isoWeekNumber(startDate);
+    return 'pmn-${startDate.year}-W${weekNumber.toString().padLeft(2, '0')}';
+  }
 
   @override
   String get type => 'entry';
 
   @override
+  DateTime? get baseTime => date;
+
+  @override
   String toMarkdown() {
     final frontmatter = toBaseMap();
-    frontmatter['date'] = date.toIso8601String();
-    if (timeOfDay != null) frontmatter['time'] = timeOfDay;
+    frontmatter['date'] =
+        '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+    final resolvedTime =
+        timeOfDay ??
+        ((date.hour != 0 || date.minute != 0)
+            ? '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'
+            : null);
+    if (resolvedTime != null) frontmatter['time_of_day'] = resolvedTime;
     if (location != null) frontmatter['location'] = location;
     if (templateId != null) frontmatter['template_id'] = templateId;
     if (photos.isNotEmpty) frontmatter['photos'] = photos;
     if (feelings != null) frontmatter['feelings'] = feelings;
-    
-    frontmatter['entry_type'] = _entryTypeToString(entryType);
-    
+
+    frontmatter['entry_type'] = entryTypeToString(entryType);
+
     if (entryType == JournalEntryType.fieldNote) {
       if (category != null) frontmatter['category'] = category;
       if (energyValue != null) frontmatter['energy_value'] = energyValue;
       if (text != null) frontmatter['text'] = text;
     } else if (entryType == JournalEntryType.pmn) {
       if (week != null) frontmatter['week'] = week;
-      if (dateRangeStart != null) frontmatter['date_range_start'] = dateRangeStart?.toIso8601String().split('T').first;
-      if (dateRangeEnd != null) frontmatter['date_range_end'] = dateRangeEnd?.toIso8601String().split('T').first;
-      
+      if (dateRangeStart != null) {
+        frontmatter['date_range_start'] = dateRangeStart
+            ?.toIso8601String()
+            .split('T')
+            .first;
+      }
+      if (dateRangeEnd != null) {
+        frontmatter['date_range_end'] = dateRangeEnd
+            ?.toIso8601String()
+            .split('T')
+            .first;
+      }
+
       final Set<String> refDatesStr = {};
       if (referencedDates.isNotEmpty) {
-        refDatesStr.addAll(referencedDates.map((d) => d.toIso8601String().split('T').first));
+        refDatesStr.addAll(
+          referencedDates.map((d) => d.toIso8601String().split('T').first),
+        );
       }
       if (dateRangeStart != null && dateRangeEnd != null) {
         var curr = dateRangeStart!;
@@ -116,7 +151,7 @@ class JournalEntry extends ContentObject {
       if (refDatesStr.isNotEmpty) {
         frontmatter['referenced_dates'] = refDatesStr.toList()..sort();
       }
-      
+
       if (pactRefs.isNotEmpty) frontmatter['pact_refs'] = pactRefs;
     }
 
@@ -161,13 +196,35 @@ class JournalEntry extends ContentObject {
     Map<String, dynamic> frontmatter,
     String body,
   ) {
-    final rawDate = frontmatter['date']?.toString();
-    final parsedDate = rawDate == null ? null : DateTime.tryParse(rawDate);
-    if (rawDate != null && parsedDate == null) {
+    final rawDate = frontmatter['date']?.toString() ?? '';
+    var parsedDate = DateTime.tryParse(rawDate) ?? DateTime.now();
+    final rawTime =
+        frontmatter['time_of_day']?.toString() ??
+        frontmatter['timeOfDay']?.toString() ??
+        frontmatter['time']?.toString() ??
+        '';
+    if (rawTime.isNotEmpty) {
+      final parts = rawTime.split(':');
+      if (parts.length >= 2) {
+        final hour = int.tryParse(parts[0]) ?? 0;
+        final minute = int.tryParse(parts[1]) ?? 0;
+        parsedDate = DateTime(
+          parsedDate.year,
+          parsedDate.month,
+          parsedDate.day,
+          hour,
+          minute,
+        );
+      }
+    }
+    if (rawDate.isNotEmpty && DateTime.tryParse(rawDate) == null) {
       debugPrint('Invalid journal entry date in frontmatter: $rawDate');
     }
-    
-    final entryTypeStr = frontmatter['entry_type']?.toString().replaceAll('_', '').toLowerCase();
+
+    final entryTypeStr = frontmatter['entry_type']
+        ?.toString()
+        .replaceAll('_', '')
+        .toLowerCase();
     JournalEntryType type = JournalEntryType.standard;
     if (entryTypeStr == 'fieldnote') type = JournalEntryType.fieldNote;
     if (entryTypeStr == 'pmn') type = JournalEntryType.pmn;
@@ -175,27 +232,40 @@ class JournalEntry extends ContentObject {
     final entry = JournalEntry(
       title: frontmatter['title'] as String?,
       body: body,
-      date: parsedDate ?? DateTime.fromMillisecondsSinceEpoch(0),
-      timeOfDay: frontmatter['time']?.toString(),
+      date: parsedDate,
+      timeOfDay: rawTime.isEmpty ? null : rawTime,
       entryType: type,
     );
     entry.loadBaseMap(frontmatter);
 
     if (type == JournalEntryType.pmn && frontmatter['id'] == null) {
-      final weekStr = frontmatter['week']?.toString() ?? '';
-      final weekNum = int.tryParse(weekStr);
       final startStr = frontmatter['date_range_start']?.toString();
       final startDate = startStr != null ? DateTime.tryParse(startStr) : null;
-      final year = startDate?.year ?? entry.date.year;
-      if (weekNum != null) {
-        entry.id = 'pmn-$year-W${weekNum.toString().padLeft(2, '0')}';
+      if (startDate != null) {
+        entry.id = pmnIdFromDate(startDate);
+      } else {
+        final weekStr = frontmatter['week']?.toString() ?? '';
+        final weekNum =
+            int.tryParse(weekStr) ??
+            int.tryParse(
+              RegExp(r'W(\d{2})').firstMatch(weekStr)?.group(1) ?? '',
+            );
+        final year = entry.date.year;
+        if (weekNum != null) {
+          entry.id = 'pmn-$year-W${weekNum.toString().padLeft(2, '0')}';
+        }
       }
     }
 
-    final moodLineMatch = RegExp(r'^mood::\s*(.*)$', multiLine: true).firstMatch(body);
+    final moodLineMatch = RegExp(
+      r'^mood::\s*(.*)$',
+      multiLine: true,
+    ).firstMatch(body);
     if (moodLineMatch != null) {
       final val = moodLineMatch.group(1)!;
-      final wikiMatch = RegExp(r'\[\[(.*?)\]\]').allMatches(val).map((m) => m.group(1)!).toList();
+      final wikiMatch = RegExp(
+        r'\[\[(.*?)\]\]',
+      ).allMatches(val).map((m) => m.group(1)!).toList();
       entry.moodSlug = wikiMatch.isEmpty ? null : wikiMatch.join(', ');
     } else {
       entry.moodSlug = frontmatter['mood']?.toString();
@@ -210,7 +280,7 @@ class JournalEntry extends ContentObject {
     } else if (rawPhotos is String && rawPhotos.trim().isNotEmpty) {
       entry.photos = [rawPhotos.trim()];
     }
-    
+
     if (type == JournalEntryType.fieldNote) {
       entry.category = frontmatter['category']?.toString();
       final ev = frontmatter['energy_value'];
@@ -224,17 +294,20 @@ class JournalEntry extends ContentObject {
       if (start != null) entry.dateRangeStart = DateTime.tryParse(start);
       final end = frontmatter['date_range_end']?.toString();
       if (end != null) entry.dateRangeEnd = DateTime.tryParse(end);
-      
+
       final refDates = frontmatter['referenced_dates'];
       if (refDates is List) {
-        entry.referencedDates = refDates.map((d) => DateTime.tryParse(d.toString())).whereType<DateTime>().toList();
+        entry.referencedDates = refDates
+            .map((d) => DateTime.tryParse(d.toString()))
+            .whereType<DateTime>()
+            .toList();
       }
-      
+
       final pRefs = frontmatter['pact_refs'];
       if (pRefs is List) {
         entry.pactRefs = pRefs.map((r) => r.toString()).toList();
       }
-      
+
       // Parse lists from body
       entry.plus = _extractListFromBody(body, 'Plus');
       entry.minus = _extractListFromBody(body, 'Minus');
@@ -243,7 +316,7 @@ class JournalEntry extends ContentObject {
 
     return entry;
   }
-  
+
   static List<String> _extractListFromBody(String body, String section) {
     final list = <String>[];
     final sections = body.split(RegExp('^## ', multiLine: true));
@@ -263,6 +336,7 @@ class JournalEntry extends ContentObject {
   }
 
   JournalEntry copyWith({
+    String? id,
     String? body,
     DateTime? date,
     String? timeOfDay,
@@ -294,7 +368,7 @@ class JournalEntry extends ContentObject {
     List<String>? next,
   }) {
     return JournalEntry(
-      id: id,
+      id: id ?? this.id,
       title: title ?? this.title,
       body: body ?? this.body,
       date: date ?? this.date,

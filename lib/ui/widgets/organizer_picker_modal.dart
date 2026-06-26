@@ -514,7 +514,7 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
                                     selected.add(
                                       OrganizerReference(
                                         type: obj.type,
-                                        slug: obj.id,
+                                        slug: obj.slug,
                                         title: obj.title,
                                       ),
                                     );

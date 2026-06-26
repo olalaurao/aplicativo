@@ -414,16 +414,16 @@ class AppTheme {
           fontWeight: FontWeight.w700,
         ),
       ),
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         type: BottomNavigationBarType.fixed,
         backgroundColor: AppColors.darkSurface,
         selectedItemColor: AppColors.accent,
         unselectedItemColor: AppColors.navInactive,
-        selectedLabelStyle: const TextStyle(
+        selectedLabelStyle: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
-        unselectedLabelStyle: const TextStyle(
+        unselectedLabelStyle: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w500,
         ),

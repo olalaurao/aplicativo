@@ -68,7 +68,6 @@ import '../widgets/steering_sheet.dart';
 import '../../services/markdown_parser.dart';
 import '../../providers/settings_provider.dart';
 
-
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -83,6 +82,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   bool _isEditMode = false;
   bool _commandCenterOpenedThisScroll = false;
+  DateTime? _lastCommandCenterCheck;
   final TextEditingController _quickAddController = TextEditingController();
   final TextEditingController _quickTaskController = TextEditingController();
 
@@ -152,12 +152,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final habits = ref.read(habitsProvider);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final expiredPacts = habits.where((h) =>
-        h.habitMode == HabitMode.pact &&
-        h.status == HabitStatus.active &&
-        h.endsAt != null &&
-        h.endsAt!.isBefore(today) &&
-        h.pactOutcome == null).toList();
+    final expiredPacts = habits
+        .where(
+          (h) =>
+              h.habitMode == HabitMode.pact &&
+              h.status == HabitStatus.active &&
+              h.endsAt != null &&
+              h.endsAt!.isBefore(today) &&
+              h.pactOutcome == null,
+        )
+        .toList();
 
     if (expiredPacts.isNotEmpty) {
       final pactToReview = expiredPacts.first;
@@ -180,7 +184,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       _submitQuickAdd(payload);
     } else if (action == 'quick_task_text' && payload != null) {
       _submitQuickTask(payload);
-    } else if (action == 'open' && payload != null && payload.startsWith('steering_sheet?id=')) {
+    } else if (action == 'open' &&
+        payload != null &&
+        payload.startsWith('steering_sheet?id=')) {
       final id = payload.replaceFirst('steering_sheet?id=', '');
       final habits = ref.read(habitsProvider);
       final pact = habits.where((h) => h.id == id).firstOrNull;
@@ -205,19 +211,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     return dashboardAsync.when(
       data: (allBlocks) {
-        final dashboardBlocks = allBlocks
-            .where((b) => b.visible || _isEditMode)
-            .toList()
-          ..sort((a, b) => a.order.compareTo(b.order));
+        final dashboardBlocks =
+            allBlocks.where((b) => b.visible || _isEditMode).toList()
+              ..sort((a, b) => a.order.compareTo(b.order));
 
         if (dashboardBlocks.isEmpty) {
-          return const Center(
-            child: Text(
-              'O Dashboard está vazio.\nAdicione blocos pelas Configurações.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textMuted),
-            ),
-          );
+          return _buildEmptyDashboard();
         }
 
         return Scaffold(
@@ -231,11 +230,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
           body: NotificationListener<ScrollNotification>(
             onNotification: (notification) {
-              if (notification.metrics.pixels >= 0) _commandCenterOpenedThisScroll = false;
+              if (notification.metrics.pixels >= 0) {
+                _commandCenterOpenedThisScroll = false;
+              }
               if (notification.metrics.pixels < -140 &&
-                  notification is ScrollUpdateNotification && notification.dragDetails != null &&
-                  !_commandCenterOpenedThisScroll &&
-                  ModalRoute.of(context)?.isCurrent == true) {
+                  notification is ScrollUpdateNotification &&
+                  notification.dragDetails != null &&
+                  !_commandCenterOpenedThisScroll) {
+                final now = DateTime.now();
+                final checkedRecently =
+                    _lastCommandCenterCheck != null &&
+                    now.difference(_lastCommandCenterCheck!) <
+                        const Duration(milliseconds: 500);
+                if (checkedRecently) return false;
+                _lastCommandCenterCheck = now;
+                if (ModalRoute.of(context)?.isCurrent != true) return false;
                 _commandCenterOpenedThisScroll = true;
                 showCommandCenter(context);
               }
@@ -250,129 +259,159 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   parent: BouncingScrollPhysics(),
                 ),
                 slivers: [
-                // ─── Header ───
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Expanded(child: _buildGreeting(context, ref)),
-                          Row(mainAxisSize: MainAxisSize.min, children: [
-                            _buildSyncIndicator(ref),
-                            if (_isEditMode) IconButton(icon: const Icon(Icons.add_box_rounded, color: AppColors.primary), tooltip: 'Add widget', onPressed: () => _showAddWidgetSheet(context)),
-                            IconButton(icon: Icon(_isEditMode ? Icons.check_rounded : Icons.tune_rounded, color: _isEditMode ? AppColors.primary : AppColors.textMuted), onPressed: () => setState(() => _isEditMode = !_isEditMode)),
-                          ]),
-                        ]),
-                        if (_isEditMode)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              'Drag to reorder or tap ⋯ to configure',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.primary.withValues(alpha: 0.8),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // ─── Blocks ───
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                  sliver: _isEditMode
-                      ? SliverReorderableList(
-                          itemCount: dashboardBlocks.length,
-                          itemBuilder: (context, index) {
-                            final block = dashboardBlocks[index];
-                            return ReorderableDelayedDragStartListener(
-                              key: ValueKey(block.id),
-                              index: index,
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: Stack(
-                                  children: [
-                                    _buildBlock(block),
-                                    Positioned(
-                                      top: 0,
-                                      right: 0,
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          _editModeButton(
-                                            icon: block.visible
-                                                ? Icons.visibility_rounded
-                                                : Icons.visibility_off_rounded,
-                                            color: block.visible
-                                                ? AppColors.primary
-                                                : AppColors.textMuted,
-                                            onTap: () => ref
-                                                .read(
-                                                  dashboardProvider.notifier,
-                                                )
-                                                .toggleVisibility(block.id),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          _editModeButton(
-                                            icon: Icons.close_rounded,
-                                            color: AppColors.error,
-                                            onTap: () => ref
-                                                .read(
-                                                  dashboardProvider.notifier,
-                                                )
-                                                .removeBlock(block.id),
-                                          ),
-                                        ],
+                  // ─── Header ───
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: _buildGreeting(context, ref)),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _buildSyncIndicator(ref),
+                                  if (_isEditMode)
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.add_box_rounded,
+                                        color: AppColors.primary,
                                       ),
+                                      tooltip: 'Add widget',
+                                      onPressed: () =>
+                                          _showAddWidgetSheet(context),
                                     ),
-                                  ],
+                                  IconButton(
+                                    icon: Icon(
+                                      _isEditMode
+                                          ? Icons.check_rounded
+                                          : Icons.tune_rounded,
+                                      color: _isEditMode
+                                          ? AppColors.primary
+                                          : AppColors.textMuted,
+                                    ),
+                                    onPressed: () => setState(
+                                      () => _isEditMode = !_isEditMode,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          if (_isEditMode)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                'Drag to reorder or tap ⋯ to configure',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.8,
+                                  ),
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            );
-                          },
-                          onReorder: (oldIndex, newIndex) {
-                            ref
-                                .read(dashboardProvider.notifier)
-                                .reorderBlocks(oldIndex, newIndex);
-                          },
-                        )
-                      : MediaQuery.of(context).size.width > 600
-                      ? SliverGrid(
-                          gridDelegate:
-                              const SliverGridDelegateWithMaxCrossAxisExtent(
-                                maxCrossAxisExtent: 450,
-                                mainAxisSpacing: 16,
-                                crossAxisSpacing: 16,
-                                mainAxisExtent: 260,
-                              ),
-                          delegate: SliverChildBuilderDelegate((
-                            context,
-                            index,
-                          ) {
-                            return _buildBlock(dashboardBlocks[index]);
-                          }, childCount: dashboardBlocks.length),
-                        )
-                      : SliverList(
-                          delegate: SliverChildBuilderDelegate((
-                            context,
-                            index,
-                          ) {
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 16),
-                              child: _buildBlock(dashboardBlocks[index]),
-                            );
-                          }, childCount: dashboardBlocks.length),
-                        ),
-                ),
-              ],
-            ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // ─── Blocks ───
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                    sliver: _isEditMode
+                        ? SliverReorderableList(
+                            itemCount: dashboardBlocks.length,
+                            itemBuilder: (context, index) {
+                              final block = dashboardBlocks[index];
+                              return ReorderableDelayedDragStartListener(
+                                key: ValueKey(block.id),
+                                index: index,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: Stack(
+                                    children: [
+                                      _buildBlock(block),
+                                      Positioned(
+                                        top: 0,
+                                        right: 0,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            _editModeButton(
+                                              icon: block.visible
+                                                  ? Icons.visibility_rounded
+                                                  : Icons
+                                                        .visibility_off_rounded,
+                                              color: block.visible
+                                                  ? AppColors.primary
+                                                  : AppColors.textMuted,
+                                              onTap: () => ref
+                                                  .read(
+                                                    dashboardProvider.notifier,
+                                                  )
+                                                  .toggleVisibility(block.id),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            _editModeButton(
+                                              icon: Icons.close_rounded,
+                                              color: AppColors.error,
+                                              onTap: () => ref
+                                                  .read(
+                                                    dashboardProvider.notifier,
+                                                  )
+                                                  .removeBlock(block.id),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                            onReorder: (oldIndex, newIndex) {
+                              ref
+                                  .read(dashboardProvider.notifier)
+                                  .reorderBlocks(oldIndex, newIndex);
+                            },
+                          )
+                        : MediaQuery.of(context).size.width > 600
+                        ? SliverGrid(
+                            gridDelegate:
+                                const SliverGridDelegateWithMaxCrossAxisExtent(
+                                  maxCrossAxisExtent: 450,
+                                  mainAxisSpacing: 16,
+                                  crossAxisSpacing: 16,
+                                  mainAxisExtent: 260,
+                                ),
+                            delegate: SliverChildBuilderDelegate((
+                              context,
+                              index,
+                            ) {
+                              return _buildBlock(dashboardBlocks[index]);
+                            }, childCount: dashboardBlocks.length),
+                          )
+                        : SliverList(
+                            delegate: SliverChildBuilderDelegate((
+                              context,
+                              index,
+                            ) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: _buildBlock(dashboardBlocks[index]),
+                              );
+                            }, childCount: dashboardBlocks.length),
+                          ),
+                  ),
+                ],
+              ),
             ), // Close RefreshIndicator
           ),
         );
@@ -383,20 +422,73 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildGreeting(BuildContext context, WidgetRef ref) {
-    final hour     = DateTime.now().hour;
-    final greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
-    final name     = ref.watch(settingsProvider).userName ?? '';
-    final dateStr  = DateFormat("EEEE, d 'de' MMMM", 'pt_BR').format(DateTime.now());
+  Widget _buildEmptyDashboard() {
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text('Dashboard'),
+        centerTitle: true,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.transparent,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_box_rounded, color: AppColors.primary),
+            tooltip: 'Add widget',
+            onPressed: () => _showAddWidgetSheet(context),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: EmptyStateView(
+          icon: Icons.dashboard_customize_rounded,
+          headline: 'Empty dashboard',
+          subhead: 'Tap + to add blocks',
+          actionButton: FilledButton.icon(
+            onPressed: () => _showAddWidgetSheet(context),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add block'),
+          ),
+        ),
+      ),
+    );
+  }
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('$greeting${name.isNotEmpty ? ", $name" : ""}',
-        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800,
-          color: AppTheme.textPrimaryColor(context))),
-      const SizedBox(height: 2),
-      Text(dateStr, style: TextStyle(fontSize: 13,
-        color: AppTheme.textMutedColor(context), fontWeight: FontWeight.w500)),
-    ]);
+  Widget _buildGreeting(BuildContext context, WidgetRef ref) {
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? 'Bom dia'
+        : hour < 18
+        ? 'Boa tarde'
+        : 'Boa noite';
+    final name = ref.watch(settingsProvider.select((s) => s.userName)) ?? '';
+    final dateStr = DateFormat(
+      "EEEE, d 'de' MMMM",
+      'pt_BR',
+    ).format(DateTime.now());
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$greeting${name.isNotEmpty ? ", $name" : ""}',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.textPrimaryColor(context),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          dateStr,
+          style: TextStyle(
+            fontSize: 13,
+            color: AppTheme.textMutedColor(context),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildDashboardSkeleton() {
@@ -492,6 +584,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           'type': BlockType.dailyGoal,
           'title': 'Daily Goal',
           'icon': Icons.auto_awesome_rounded,
+        },
+        {
+          'type': BlockType.pactToday,
+          'title': 'Pacts Hoje',
+          'icon': Icons.flag_circle_rounded,
         },
       ],
       'Planning': [
@@ -877,14 +974,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       icon: Icons.account_tree_rounded,
       onAdd: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => SystemDetailScreen(system: SystemDefinition(title: 'Novo System'))),
+        MaterialPageRoute(
+          builder: (_) => SystemDetailScreen(
+            system: SystemDefinition(title: 'Novo System'),
+          ),
+        ),
       ),
       child: systems.isEmpty
           ? Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
                 'Nenhum System criado ainda.',
-                style: TextStyle(color: AppTheme.textMutedColor(context), fontSize: 13),
+                style: TextStyle(
+                  color: AppTheme.textMutedColor(context),
+                  fontSize: 13,
+                ),
               ),
             )
           : Column(
@@ -899,11 +1003,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.account_tree_rounded, color: AppColors.primary, size: 16),
+                    child: const Icon(
+                      Icons.account_tree_rounded,
+                      color: AppColors.primary,
+                      size: 16,
+                    ),
                   ),
                   title: Text(
                     system.title,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -914,25 +1025,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     overflow: TextOverflow.ellipsis,
                   ),
                   trailing: IconButton(
-                    icon: const Icon(Icons.play_arrow_rounded, color: AppColors.primary, size: 20),
+                    icon: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
                     tooltip: 'Executar',
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => SystemDetailScreen(system: system)),
+                      MaterialPageRoute(
+                        builder: (_) => SystemDetailScreen(system: system),
+                      ),
                     ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => SystemDetailScreen(system: system)),
+                    MaterialPageRoute(
+                      builder: (_) => SystemDetailScreen(system: system),
+                    ),
                   ),
                 );
               }).toList(),
             ),
     );
   }
-
 
   Widget _buildDailyGoalBlock() {
     final tasks = ref.watch(tasksProvider);
@@ -1246,7 +1364,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       allHighlights.addAll(hls.map((h) => (text: h.text, source: r.title)));
     }
 
-    final customQuotes = (block.metadata['quotes'] as List<dynamic>?)
+    final customQuotes =
+        (block.metadata['quotes'] as List<dynamic>?)
             ?.map((e) => e.toString())
             .toList() ??
         <String>[];
@@ -1255,10 +1374,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final dayIndex = today.day + today.month * 31;
 
     final quote = customQuotes.isNotEmpty
-        ? (text: customQuotes[dayIndex % customQuotes.length], source: 'Personalizado')
+        ? (
+            text: customQuotes[dayIndex % customQuotes.length],
+            source: 'Personalizado',
+          )
         : (allHighlights.isEmpty
-            ? (text: 'The best way to predict the future is to create it.', source: 'Peter Drucker')
-            : allHighlights[dayIndex % allHighlights.length]);
+              ? (
+                  text: 'The best way to predict the future is to create it.',
+                  source: 'Peter Drucker',
+                )
+              : allHighlights[dayIndex % allHighlights.length]);
 
     return _buildCard(
       title: block.title.isNotEmpty ? block.title : 'Destaque do dia',
@@ -1279,7 +1404,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           const SizedBox(height: 8),
           Text(
             '— ${quote.source}',
-            style: TextStyle(fontSize: 12, color: AppTheme.textMutedColor(context)),
+            style: TextStyle(
+              fontSize: 12,
+              color: AppTheme.textMutedColor(context),
+            ),
           ),
         ],
       ),
@@ -1302,7 +1430,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             children: [
               Center(
                 child: Container(
-                  width: 40, height: 4,
+                  width: 40,
+                  height: 4,
                   decoration: BoxDecoration(
                     color: AppColors.textMuted.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(2),
@@ -1313,8 +1442,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               Row(
                 children: [
                   const Expanded(
-                    child: Text('Pool de Citações',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                    child: Text(
+                      'Pool de Citações',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                   TextButton.icon(
                     onPressed: () {
@@ -1338,7 +1472,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             ElevatedButton(
                               onPressed: () {
                                 if (ctrl.text.trim().isNotEmpty) {
-                                  setModalState(() => localQuotes.add(ctrl.text.trim()));
+                                  setModalState(
+                                    () => localQuotes.add(ctrl.text.trim()),
+                                  );
                                 }
                                 Navigator.pop(dialogCtx);
                               },
@@ -1367,8 +1503,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       style: const TextStyle(fontSize: 13),
                     ),
                     trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
-                      onPressed: () => setModalState(() => localQuotes.removeAt(i)),
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        size: 18,
+                        color: AppColors.error,
+                      ),
+                      onPressed: () =>
+                          setModalState(() => localQuotes.removeAt(i)),
                     ),
                   ),
                 ),
@@ -1606,7 +1747,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Text(
             'Nenhum pacto ativo para hoje',
-            style: TextStyle(color: AppTheme.textMutedColor(context), fontSize: 13),
+            style: TextStyle(
+              color: AppTheme.textMutedColor(context),
+              fontSize: 13,
+            ),
           ),
         ),
       );
@@ -1633,10 +1777,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           int dayCount = 0;
           if (habit.startedAt != null) {
             final todayDate = DateTime(today.year, today.month, today.day);
-            final startedAtDate = DateTime(habit.startedAt!.year, habit.startedAt!.month, habit.startedAt!.day);
+            final startedAtDate = DateTime(
+              habit.startedAt!.year,
+              habit.startedAt!.month,
+              habit.startedAt!.day,
+            );
             dayCount = todayDate.difference(startedAtDate).inDays + 1;
             if (habit.endsAt != null) {
-              final endsAtDate = DateTime(habit.endsAt!.year, habit.endsAt!.month, habit.endsAt!.day);
+              final endsAtDate = DateTime(
+                habit.endsAt!.year,
+                habit.endsAt!.month,
+                habit.endsAt!.day,
+              );
               remainingDays = endsAtDate.difference(todayDate).inDays;
             }
           }
@@ -1644,7 +1796,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           return InkWell(
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => UniversalDetailView(object: habit)),
+              MaterialPageRoute(
+                builder: (_) => UniversalDetailView(object: habit),
+              ),
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1655,7 +1809,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     activeColor: color,
                     onChanged: (val) {
                       HapticFeedback.lightImpact();
-                      ref.read(habitsProvider.notifier).toggleHabit(habit, today);
+                      ref
+                          .read(habitsProvider.notifier)
+                          .toggleHabit(habit, today);
                     },
                   ),
                   const SizedBox(width: 8),
@@ -1668,8 +1824,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: isCompleted ? AppTheme.textMutedColor(context) : AppTheme.textPrimaryColor(context),
-                            decoration: isCompleted ? TextDecoration.lineThrough : null,
+                            color: isCompleted
+                                ? AppTheme.textMutedColor(context)
+                                : AppTheme.textPrimaryColor(context),
+                            decoration: isCompleted
+                                ? TextDecoration.lineThrough
+                                : null,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1689,7 +1849,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ),
                   if (habit.endsAt != null)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
@@ -2377,7 +2540,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         title: 'Last Metric',
         icon: Icons.show_chart_rounded,
         onAdd: () => showCreateMenu(context),
-        child: EmptyStateView(icon: Icons.track_changes_rounded, headline: 'Nenhum entry ainda', isSmall: true),
+        child: const EmptyStateView(
+          icon: Icons.track_changes_rounded,
+          headline: 'Nenhum entry ainda',
+          isSmall: true,
+        ),
       );
     }
 
@@ -2427,7 +2594,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       title: 'Contatos Pendings',
       icon: Icons.people_alt_rounded,
       child: people.isEmpty
-          ? EmptyStateView(icon: Icons.people_outline, headline: 'Nenhum contato pendente', isSmall: true)
+          ? const EmptyStateView(
+              icon: Icons.people_outline,
+              headline: 'Nenhum contato pendente',
+              isSmall: true,
+            )
           : Column(
               children: people
                   .take(2)
@@ -2486,7 +2657,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       icon: Icons.book_rounded,
       onAdd: () => showCreateMenu(context),
       child: current == null
-          ? EmptyStateView(icon: Icons.bookmark_border_rounded, headline: 'Nenhum recurso', isSmall: true)
+          ? const EmptyStateView(
+              icon: Icons.bookmark_border_rounded,
+              headline: 'Nenhum recurso',
+              isSmall: true,
+            )
           : ObjectActionWrapper(
               object: current,
               child: ListTile(
@@ -2538,7 +2713,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final habits = ref.watch(habitsProvider);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final activeHabits = habits.where((h) => h.status == HabitStatus.active).toList();
+    final activeHabits = habits
+        .where((h) => h.status == HabitStatus.active)
+        .toList();
 
     // Calculate per-habit consistency over last 30 days
     double totalConsistency = 0;
@@ -2582,7 +2759,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     } else if (completedToday == activeHabits.length) {
       motivationText = 'All habits done today! 🏆 Great effort!';
     } else {
-      motivationText = 'You\'ve got $completedToday/${activeHabits.length} habits done today.';
+      motivationText =
+          'You\'ve got $completedToday/${activeHabits.length} habits done today.';
     }
 
     return _buildCard(
@@ -2600,10 +2778,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 avgConsistency >= 0.7
                     ? AppColors.habitGreen
                     : avgConsistency >= 0.4
-                        ? AppColors.primary
-                        : AppColors.error,
+                    ? AppColors.primary
+                    : AppColors.error,
               ),
-              _buildSimpleStat('Total streaks', '$totalStreak', AppColors.warning),
+              _buildSimpleStat(
+                'Total streaks',
+                '$totalStreak',
+                AppColors.warning,
+              ),
               _buildSimpleStat(
                 'Today',
                 '$completedToday/${activeHabits.length}',
@@ -2621,8 +2803,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.emoji_events_rounded,
-                      color: AppColors.primary, size: 18),
+                  const Icon(
+                    Icons.emoji_events_rounded,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -2681,7 +2866,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final habits = ref.watch(habitsProvider);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final activeHabits = habits.where((h) => h.status == HabitStatus.active).toList();
+    final activeHabits = habits
+        .where((h) => h.status == HabitStatus.active)
+        .toList();
     final habitCount = activeHabits.length;
 
     // Count successful completions per day for the last 28 days
@@ -2993,14 +3180,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
 
     // Get the TimeBlocks belonging to the active theme
-    final activeBlocks = activeTheme == null
-        ? <TimeBlock>[]
-        : allTimeBlocks
-            .where((b) => activeTheme.blockIds.contains(b.id))
-            .toList()
+    final activeBlocks =
+        activeTheme == null
+              ? <TimeBlock>[]
+              : allTimeBlocks
+                    .where((b) => activeTheme.blockIds.contains(b.id))
+                    .toList()
           ..sort((a, b) {
-            final aStart = a.timeRanges.isEmpty ? 0 : a.timeRanges.first.startHour * 60 + a.timeRanges.first.startMinute;
-            final bStart = b.timeRanges.isEmpty ? 0 : b.timeRanges.first.startHour * 60 + b.timeRanges.first.startMinute;
+            final aStart = a.timeRanges.isEmpty
+                ? 0
+                : a.timeRanges.first.startHour * 60 +
+                      a.timeRanges.first.startMinute;
+            final bStart = b.timeRanges.isEmpty
+                ? 0
+                : b.timeRanges.first.startHour * 60 +
+                      b.timeRanges.first.startMinute;
             return aStart.compareTo(bStart);
           });
 
@@ -3009,66 +3203,78 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       icon: Icons.view_day_rounded,
       onConfigure: () => context.push('/day-themes'),
       child: activeTheme == null
-          ? EmptyStateView(icon: Icons.calendar_today_rounded, headline: 'Sem tema hoje', isSmall: true)
+          ? const EmptyStateView(
+              icon: Icons.calendar_today_rounded,
+              headline: 'Sem tema hoje',
+              isSmall: true,
+            )
           : activeBlocks.isEmpty
-              ? const Text(
-                  'Tema sem blocos de tempo configurados',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-                )
-              : Column(
-                  children: activeBlocks.map((block) {
-                    final blockColor = block.color != null
-                        ? Color(int.tryParse('FF${block.color!.replaceAll('#', '')}', radix: 16) ?? 0xFFFFB000)
-                        : AppColors.primary;
-                    final rangeText = block.timeRanges.isEmpty
-                        ? 'Sem horário'
-                        : block.timeRanges
-                            .map((r) =>
-                                '${r.startHour.toString().padLeft(2, '0')}:${r.startMinute.toString().padLeft(2, '0')}–${r.endHour.toString().padLeft(2, '0')}:${r.endMinute.toString().padLeft(2, '0')}')
-                            .join(' | ');
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 4,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: blockColor,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  block.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                Text(
-                                  rangeText,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textMuted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+          ? const Text(
+              'Tema sem blocos de tempo configurados',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+            )
+          : Column(
+              children: activeBlocks.map((block) {
+                final blockColor = block.color != null
+                    ? Color(
+                        int.tryParse(
+                              'FF${block.color!.replaceAll('#', '')}',
+                              radix: 16,
+                            ) ??
+                            0xFFFFB000,
+                      )
+                    : AppColors.primary;
+                final rangeText = block.timeRanges.isEmpty
+                    ? 'Sem horário'
+                    : block.timeRanges
+                          .map(
+                            (r) =>
+                                '${r.startHour.toString().padLeft(2, '0')}:${r.startMinute.toString().padLeft(2, '0')}–${r.endHour.toString().padLeft(2, '0')}:${r.endMinute.toString().padLeft(2, '0')}',
+                          )
+                          .join(' | ');
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: blockColor,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
-                    );
-                  }).toList(),
-                ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              block.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              rangeText,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
     );
   }
 
@@ -3127,7 +3333,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       (b) => b?.type == BlockType.customMarkdown,
       orElse: () => null,
     );
-    final content = block?.metadata['content'] as String? ??
+    final content =
+        block?.metadata['content'] as String? ??
         '**Lembretes:**\n- Beber água\n- Alongar a cada hora';
 
     return _buildCard(
@@ -3830,10 +4037,7 @@ extension on _HomeScreenState {
             children: weekDays.map((day) {
               final minutes = workSessions
                   .where((session) => _isSameDay(session.date, day))
-                  .fold<int>(
-                    0,
-                    (sum, session) => sum + session.minutesWorked,
-                  );
+                  .fold<int>(0, (sum, session) => sum + session.minutesWorked);
               final height = maxMinutes == 0
                   ? 6.0
                   : 8.0 + (minutes / maxMinutes) * 52.0;
@@ -4743,14 +4947,11 @@ extension on _HomeScreenState {
       for (var i = 0; i < 7; i++)
         DateFormat('E').format(startOfWeek.add(Duration(days: i))): 0,
     };
-    for (final session in history.where(
-      (s) => !s.date.isBefore(startOfWeek),
-    )) {
+    for (final session in history.where((s) => !s.date.isBefore(startOfWeek))) {
       taskMinutes[session.title] =
           (taskMinutes[session.title] ?? 0) + session.minutesWorked;
       final dayKey = DateFormat('E').format(session.date);
-      dayMinutes[dayKey] =
-          (dayMinutes[dayKey] ?? 0) + session.minutesWorked;
+      dayMinutes[dayKey] = (dayMinutes[dayKey] ?? 0) + session.minutesWorked;
     }
 
     final sortedTasks = taskMinutes.entries.toList()

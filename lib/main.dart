@@ -14,6 +14,7 @@ import 'package:quick_actions/quick_actions.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'ui/theme.dart';
 import 'models/task_model.dart';
@@ -22,10 +23,12 @@ import 'models/template_model.dart';
 import 'models/content_object.dart';
 import 'providers/vault_provider.dart';
 import 'providers/settings_provider.dart';
+import 'providers/theme_provider.dart';
 import 'providers/widget_sync_provider.dart';
 import 'services/sync_manager.dart';
 import 'services/crash_report_service.dart';
 import 'services/notification_service.dart';
+import 'services/resource_metadata_service.dart';
 import 'services/widget_service.dart';
 import 'services/permission_service.dart';
 import 'services/pomodoro_bg_service.dart';
@@ -40,6 +43,7 @@ import 'ui/forms/create_task_form.dart';
 import 'ui/forms/create_habit_form.dart';
 import 'ui/screens/shopping_list_screen.dart';
 import 'ui/forms/create_note_form.dart';
+import 'ui/forms/create_resource_form.dart';
 import 'ui/forms/create_template_form.dart';
 import 'ui/screens/organize_screen.dart';
 import 'ui/screens/more_screen.dart';
@@ -152,51 +156,73 @@ Future<void> _handleWidgetToggleUri(
 }
 
 void main() async {
-  runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
-    await initializeDateFormatting('pt_BR');
-    if (Platform.isAndroid || Platform.isIOS) {
-      await HomeWidget.registerInteractivityCallback(
-        homeWidgetInteractiveCallback,
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      await initializeDateFormatting('pt_BR');
+      if (Platform.isAndroid || Platform.isIOS) {
+        await HomeWidget.registerInteractivityCallback(
+          homeWidgetInteractiveCallback,
+        );
+      }
+      // #region agent log
+      await _emitAgentDebugLog(
+        location: 'main.dart:main',
+        hypothesisId: 'H1',
+        message: 'main_enter',
+        data: {'platform': Platform.operatingSystem},
       );
-    }
-    // #region agent log
-    await _emitAgentDebugLog(
-      location: 'main.dart:main',
-      hypothesisId: 'H1',
-      message: 'main_enter',
-      data: {'platform': Platform.operatingSystem},
-    );
-    // #endregion
+      // #endregion
 
-    if (Platform.isWindows || Platform.isLinux) {
-      sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
-    }
+      if (Platform.isWindows || Platform.isLinux) {
+        sqfliteFfiInit();
+        databaseFactory = databaseFactoryFfi;
+      }
 
-    // Load SharedPreferences BEFORE runApp so SettingsNotifier has real values
-    // from the very first build â€” eliminates the double-build of allObjectsProvider.
-    final prefs = await SharedPreferences.getInstance();
-    
-    // Initialize CrashReportService
-    await CrashReportService.instance.init(vaultPath: prefs.getString('vault_path'));
+      // Load SharedPreferences BEFORE runApp so SettingsNotifier has real values
+      // from the very first build â€” eliminates the double-build of allObjectsProvider.
+      final prefs = await SharedPreferences.getInstance();
 
-    final container = ProviderContainer(
-      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-    );
+      // Initialize CrashReportService
+      await CrashReportService.instance.init(
+        vaultPath: prefs.getString('vaultPath'),
+      );
 
-    runApp(
-      UncontrolledProviderScope(
-        container: container,
-        child: BootstrapApp(container: container),
-      ),
-    );
-  }, (error, stack) {
-    debugPrint('[ZonedGuarded] Unhandled error: $error');
-    CrashReportService.instance.logEvent('zone_error ${error.runtimeType}: $error');
-    // Note: PlatformDispatcher.onError handles most async errors;
-    // this catches synchronous top-level errors that slip through.
-  });
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        await windowManager.ensureInitialized();
+        const windowOptions = WindowOptions(
+          minimumSize: Size(900, 600),
+          size: Size(1280, 820),
+          center: true,
+          title: 'Citrine',
+          titleBarStyle: TitleBarStyle.normal,
+        );
+        await windowManager.waitUntilReadyToShow(windowOptions, () async {
+          await windowManager.show();
+          await windowManager.focus();
+        });
+      }
+
+      final container = ProviderContainer(
+        overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+      );
+
+      runApp(
+        UncontrolledProviderScope(
+          container: container,
+          child: BootstrapApp(container: container),
+        ),
+      );
+    },
+    (error, stack) {
+      debugPrint('[ZonedGuarded] Unhandled error: $error');
+      CrashReportService.instance.logEvent(
+        'zone_error ${error.runtimeType}: $error',
+      );
+      // Note: PlatformDispatcher.onError handles most async errors;
+      // this catches synchronous top-level errors that slip through.
+    },
+  );
 }
 
 class BootstrapApp extends StatefulWidget {
@@ -227,7 +253,9 @@ class _BootstrapAppState extends State<BootstrapApp> {
         unawaited(_checkPendingWidgetUriFromNative());
         // 1.4 — check person contacts on resume (moved out of PeopleNotifier.build)
         unawaited(
-          widget.container.read(peopleProvider.notifier).checkPersonContactsNow(),
+          widget.container
+              .read(peopleProvider.notifier)
+              .checkPersonContactsNow(),
         );
       },
     );
@@ -287,7 +315,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
       return;
     }
     await ReceiveSharingIntent.instance.reset();
-    _openSharedSocialUrl(url);
+    _openSharedUrl(url);
   }
 
   String? _extractSharedUrl(List<SharedMediaFile> files) {
@@ -308,7 +336,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
       final text = await channel.invokeMethod<String>('getAndClearSharedText');
       final url = _extractUrlFromText(text);
       if (url != null) {
-        _openSharedSocialUrl(url);
+        _openSharedUrl(url);
       }
     } catch (error) {
       debugPrint('Native share intent check failed: $error');
@@ -337,7 +365,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
     return match?.group(0)?.trim().replaceFirst(RegExp(r'[),.;]+$'), '');
   }
 
-  void _openSharedSocialUrl(String url) {
+  void _openSharedUrl(String url) {
     _pendingSharedUrl = url;
     _tryOpenPendingSharedUrl();
   }
@@ -358,6 +386,12 @@ class _BootstrapAppState extends State<BootstrapApp> {
     }
 
     _pendingSharedUrl = null;
+    if (ResourceMetadataService.isResourceUrl(url)) {
+      navigator.push(
+        MaterialPageRoute(builder: (_) => CreateResourceForm(initialUrl: url)),
+      );
+      return;
+    }
     navigator.push(
       MaterialPageRoute(builder: (_) => CreateSocialPostForm(initialUrl: url)),
     );
@@ -463,7 +497,7 @@ Future<void> _initApp(ProviderContainer container) async {
   // Update CrashReportService with the real vault path now that vault has loaded
   try {
     final prefs = container.read(sharedPreferencesProvider);
-    final vp = prefs.getString('vault_path') ?? '';
+    final vp = prefs.getString('vaultPath') ?? '';
     if (vp.isNotEmpty) {
       CrashReportService.instance.setVaultPath(vp);
       CrashReportService.instance.logEvent('vault_loaded');
@@ -509,12 +543,16 @@ Future<void> _initApp(ProviderContainer container) async {
       final habits = container.read(habitsProvider);
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      final expiredPacts = habits.where((h) =>
-          h.habitMode == HabitMode.pact &&
-          h.status == HabitStatus.active &&
-          h.endsAt != null &&
-          h.endsAt!.isBefore(today) &&
-          h.pactOutcome == null).toList();
+      final expiredPacts = habits
+          .where(
+            (h) =>
+                h.habitMode == HabitMode.pact &&
+                h.status == HabitStatus.active &&
+                h.endsAt != null &&
+                h.endsAt!.isBefore(today) &&
+                h.pactOutcome == null,
+          )
+          .toList();
 
       for (final pact in expiredPacts) {
         debugPrint('[PactChecker] Found expired pact: ${pact.title}');
@@ -628,16 +666,20 @@ final _shellNavigatorKey = GlobalKey<NavigatorState>();
 /// NavigatorObserver that keeps CrashReportService updated with the current route.
 class _CrashRouteObserver extends NavigatorObserver {
   void _track(Route<dynamic>? route) {
-    final name = route?.settings.name ?? route?.runtimeType.toString() ?? 'unknown';
+    final name =
+        route?.settings.name ?? route?.runtimeType.toString() ?? 'unknown';
     CrashReportService.instance.setCurrentRoute(name);
   }
 
   @override
-  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => _track(route);
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _track(route);
   @override
-  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => _track(previousRoute);
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _track(previousRoute);
   @override
-  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) => _track(newRoute);
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) =>
+      _track(newRoute);
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -828,11 +870,7 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
-    // 2.3 — only rebuild when accentColor changes, not on any settings update
-    final accentHex = ref.watch(settingsProvider.select((s) => s.accentColor));
-    final accentColor = Color(
-      int.parse('ff${accentHex.replaceFirst('#', '')}', radix: 16),
-    );
+    final themeBundle = ref.watch(themeProvider);
     // Initialize widget sync listener
     ref.watch(widgetSyncProvider);
 
@@ -840,9 +878,9 @@ class MyApp extends ConsumerWidget {
       child: MaterialApp.router(
         title: 'Citrine',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.getLightTheme(accentColor),
-        darkTheme: AppTheme.getDarkTheme(accentColor),
-        themeMode: ThemeMode.system,
+        theme: themeBundle.lightTheme,
+        darkTheme: themeBundle.darkTheme,
+        themeMode: themeBundle.themeMode,
         routerConfig: router,
         localizationsDelegates: const [
           GlobalMaterialLocalizations.delegate,

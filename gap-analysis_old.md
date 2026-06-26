@@ -1,4 +1,7262 @@
-=============================================================
+================================================================================
+GAP ANALYSIS — ADENDO V2 (Phases 12–16 consolidadas)
+Audiência: agente de IA com acesso total ao repositório.
+Origem: auditoria linha a linha do código real (lib/models/*.dart — 35
+        arquivos, 100% lidos — mais leitura completa de
+        obsidian_service.dart, vault_provider.dart, markdown_parser.dart,
+        dataview_generator.dart, system_model.dart, scheduler.dart, e 6
+        arquivos de UI: triple_check_sheet.dart, steering_sheet.dart,
+        create_menu_sheet.dart, command_center_overlay.dart, habit_row.dart,
+        type_signatures_screen.dart) comparada item a item com
+        guidelines.md (App Guidelines V4) e com o GAP ANALYSIS original
+        (Phases 1–11).
+Convenção: igual ao documento original — cada tarefa é FILE + ACTION +
+        ANCHOR + INSTRUCTION, autocontida (as correções entre tarefas já
+        foram fundidas no texto; não é necessário voltar a nenhuma Phase
+        12–16 separada, este documento já as substitui).
+
+STATUS DE EXECUÇÃO (2026-06-25):
+  • Decisão 0.3: manter Idea/Inbox/Event/ShoppingList como extensões legadas
+    ativas por compatibilidade de produto, sem removê-las nesta rodada.
+  • TIER 0 e TIER 1 foram revalidados contra o código atual; itens já
+    implementados foram marcados no próprio item para evitar retrabalho.
+
+────────────────────────────────────────────────────────────────────────────────
+⚠ COMO ESTE DOCUMENTO SE RELACIONA COM O GAP ANALYSIS ORIGINAL (Phases 1–11)
+────────────────────────────────────────────────────────────────────────────────
+O GAP ANALYSIS original (Phases 1–11) foi escrito sem ler o código-fonte
+real — foi derivado por inferência a partir da guidelines.md e de uma
+inspeção parcial. Esta auditoria (Phases 12–16, consolidadas aqui) LEU o
+código real, arquivo por arquivo, e encontrou:
+
+  (a) Vários itens das Phases 1–11 CONFIRMADOS como corretos e necessários
+      (ex.: Phase 9 Tasks 9.A.6–9.A.9, 9.B.1, 9.C.10; Phase 11 Tasks
+      11.1–11.4) — implementá-los como estão escritos.
+
+  (b) Pelo menos 2 itens das Phases 1–11 com a LOCALIZAÇÃO/CLASSE ERRADA
+      (apontavam para um arquivo ou nome de símbolo que não existe no
+      código real). Esses foram corrigidos aqui (ver TIER 1 e TIER 2 —
+      procurar "SUBSTITUI A PHASE 9").
+
+  (c) Achados TOTALMENTE NOVOS, nunca mencionados nas Phases 1–11, vários
+      deles P0 (bloqueiam compilação ou inutilizam features inteiras em
+      runtime mesmo que pareçam "prontas" na UI).
+
+  ESTE ADENDO (Phases 12–16) TEM PRIORIDADE DE IMPLEMENTAÇÃO MAIOR QUE O
+  GAP ANALYSIS ORIGINAL. Motivo: as Phases 1–11 originais assumem, em
+  vários pontos, uma base de código que SIMPLESMENTE NÃO EXISTE como
+  escrito (ex.: assumem que `Habit` já tem campos de Pact; assumem que
+  `Task` já tem `TripleCheck`; assumem uma classe `SchedulerRuleType` que
+  não existe). Se alguém tentar implementar a Phase 9, por exemplo, ANTES
+  de aplicar o TIER 0 deste documento, vai encontrar erros de compilação
+  ou comportamento inconsistente que não fazem sentido sem este contexto.
+
+  ORDEM RECOMENDADA DE EXECUÇÃO GERAL:
+    1. Este documento (Adendo V2) — TIER 0, depois TIER 1.
+    2. GAP ANALYSIS original, Phases 1–11 (na ordem em que já estão).
+    3. Este documento (Adendo V2) — TIER 2 e TIER 3.
+  (Itens do TIER 1 deste adendo tocam arquivos centrais — vault_provider.dart,
+  obsidian_service.dart, habit_model.dart, task_model.dart — que a Phase 9
+  original também edita. Aplicar o TIER 0/1 primeiro evita retrabalho.)
+
+================================================================================
+LISTA DE PRIORIDADE DE IMPLEMENTAÇÃO (visão geral)
+================================================================================
+
+TIER 0 — BLOQUEADORES DE COMPILAÇÃO (fazer primeiro, sem exceção):
+  0.1  Habit: adicionar todo o subsistema Pact (campos ausentes que a UI
+       já usa em produção — steering_sheet.dart E habit_row.dart)
+  0.2  Task: adicionar classe TripleCheck (campo ausente que
+       triple_check_sheet.dart já usa em produção)
+  0.3  DECISÃO DE PRODUTO necessária antes de seguir: o que fazer com
+       Idea/Inbox/Event/ShoppingList (tipos fora da spec V4)
+
+TIER 1 — INTEGRIDADE DE DADOS DO VAULT (núcleo de parsing/storage):
+  1.1  Estrutura de pastas: `app/` flat como default, não pasta-por-tipo
+       (3 arquivos precisam mudar juntos: obsidian_service.dart,
+       vault_provider.dart, dataview_generator.dart)
+  1.2  PMN (`daily/YYYY-MM-WNN.md`) é invisível ao app — corrigir regex
+  1.3  Field Note/PMN: entry_type nunca é lido pelo parser principal
+  1.4  `type: system` e `type: calendar_session` ausentes do dispatcher
+       central — viram Note genérica com organizador placeholder bugado
+  1.5  Habit completions gravadas aninhadas (`habits:`) em vez de chaves
+       planas na raiz do frontmatter — quebra todo Dataview de exemplo
+  1.6  Daily note template não gera o formato canônico (tags, mood_*,
+       esqueleto de seções)
+  1.7  IDs são UUID aleatório; WikiLinks devem usar slug estável
+  1.8  OrganizerReference.toWikiLink() grava "[[tipo/slug]]" em vez de
+       "[[slug]]" — quebra backlinks nativos do Obsidian em todo o vault
+
+TIER 2 — FEATURES INCOMPLETAS (P1):
+  2.1  PomodoroSession não persiste em lugar nenhum
+  2.2  KPI: taxonomia incompatível, falta auto-complete e botão "+N"
+  2.3  Dashboard: falta painel pact_today; dashboard_panel.dart morto
+  2.4  Combined Analysis: faltam campos de normalização/dimensão; falta
+       bloco do plugin Obsidian Charts (o bloco Tracker já existe)
+  2.5  Conflict Detection (Object Identification) não existe em lugar
+       nenhum do app
+  2.6  Command Center: faltam seções Systems/Próximas Sessões; busca não
+       agrupa por tipo
+  2.7  Scheduler: serialização camelCase em vez de snake_case (local
+       correto: SchedulerRule.repeatType, não "SchedulerRuleType")
+  2.8  Auto-categoria "[[people]]" nunca aplicada a Person; outras 4
+       entidades ganham auto-categorias que a spec não pede
+  2.9  Falta hook "checar Pacts vencidos a cada abertura do app"
+  2.10 Subtasks de Task não usam sintaxe do Tasks Plugin do Obsidian
+  2.11 Índice Dataview de mood usa campo antigo de 1 dimensão
+  2.12 Faltam índices Dataview de Systems e Pacts
+  2.13 Sistema de Actions: só 2 dos 7 tipos implementados; falta trigger
+       de Tracker (só Habit dispara hoje)
+  2.14 Strings em inglês misturadas com o resto do app em português
+       (automation_service.dart)
+  2.15 checkKPIGoals() auto-completa o Goal inteiro sem confirmação —
+       comportamento não documentado na spec (decisão de produto)
+
+CONFIRMADO FUNCIONANDO (sem gap): `AutomationService.checkPersonContacts()`
+  implementa corretamente o "Scheduler automático" de Person da PARTE 8
+  (cria Task "Contatar [Nome]" via detecção de menção/backlink) — não
+  precisa de nenhuma ação.
+
+TIER 3 — POLIMENTO E DETALHES (P2):
+  3.1  ContentObject sem campo `links` universal
+  3.2  Project sem campo `scheduler`
+  3.3  Person sem campo `notes`
+  3.4  Snapshot sem `photos`; `subject` não é WikiLink real
+  3.5  ReminderConfig.ringOnSilent com default errado
+  3.6  Triple Check Sheet: botões de ação são stubs vazios; sem proteção
+       de dismiss; sem validação; sem modo batch/read-only
+  3.7  Steering Sheet: sem botão X; sem validação por etapa; default de
+       duração errado
+  3.8  FAB: falta card "System"; "Sessão" abre Pomodoro em vez de
+       Calendar Session
+  3.9  create_system_form.dart não existe — impossível criar System pela UI
+  3.10 Object Identification: tradução de tipos incompleta (faltam
+       system/tracker/entry/reminder)
+  3.11 Corpo da daily note (seção ## Habits) usa WikiLink em vez do
+       título do habit
+  3.12 SystemDefinition.scheduler é extensão não documentada
+
+COBERTURA: este adendo leu 100% dos models e leitura profunda de 6
+  serviços/providers centrais + 6 widgets/telas de UI. NÃO leu ainda:
+  automation_service.dart, notification_service.dart, scheduler_service.dart,
+  sync_manager.dart, google_drive_sync_service.dart, os ~24 arquivos de
+  lib/ui/forms/, e a maior parte de lib/ui/screens/ e lib/ui/widgets/.
+  Tratar como uma Phase 17+ futura, depois de TIER 0–2 estarem implementados.
+
+================================================================================
+TIER 0 — BLOQUEADORES DE COMPILAÇÃO
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+0.1 — HABIT: ADICIONAR TODO O SUBSISTEMA PACT
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/habit_model.dart
+ACTION: EDIT
+STATUS: CONCLUÍDO — `HabitMode`, `PactOutcome`, `PactCycle`, campos Pact,
+  `displayTitle`, copyWith e serialização/leitura simétrica já existem.
+
+POR QUE É P0: lib/ui/widgets/steering_sheet.dart E lib/ui/widgets/habit_row.dart
+  (dois arquivos de UI usados em produção) já referenciam, hoje:
+  widget.habit.startedAt, widget.habit.endsAt, widget.habit.previousCycles,
+  widget.habit.hypothesis, widget.habit.displayTitle, widget.habit.habitMode,
+  HabitMode.pact, e constroem PactCycle(...) / usam PactOutcome.persist
+  /.pause/.pivot — NENHUM desses símbolos existe em habit_model.dart hoje
+  (a classe Habit só tem: description, color, icon, completionUnit,
+  dailyGoal, slots, schedulers, linkedTrackerSlug, timeBlock,
+  completionHistory, actions, status, habitStartDate, priority, streak,
+  isNegative, inputType). Ou o projeto não compila, ou esses dois widgets
+  são código morto e a feature Pact inteira (Steering Sheet, badge "PACT",
+  Pact no Planner, dashboard pact_today) não funciona de fato.
+
+ADD enums:
+  enum HabitMode { habit, pact }
+  enum PactOutcome { persist, pause, pivot }
+
+ADD classe:
+  class PactCycle {
+    final DateTime startedAt;
+    final DateTime endsAt;
+    final PactOutcome outcome;
+    final String? reflection;
+    final bool? hypothesisCorrect;
+    final String? endedReason;
+
+    PactCycle({
+      required this.startedAt,
+      required this.endsAt,
+      required this.outcome,
+      this.reflection,
+      this.hypothesisCorrect,
+      this.endedReason,
+    });
+
+    Map<String, dynamic> toMap() => {
+      'started_at': startedAt.toIso8601String().split('T').first,
+      'ends_at': endsAt.toIso8601String().split('T').first,
+      'outcome': outcome.name,
+      if (reflection != null) 'reflection': reflection,
+      if (hypothesisCorrect != null) 'hypothesis_correct': hypothesisCorrect,
+      if (endedReason != null) 'ended_reason': endedReason,
+    };
+
+    factory PactCycle.fromMap(Map<String, dynamic> map) => PactCycle(
+      startedAt: DateTime.tryParse(map['started_at']?.toString() ?? '') ?? DateTime.now(),
+      endsAt: DateTime.tryParse(map['ends_at']?.toString() ?? '') ?? DateTime.now(),
+      outcome: PactOutcome.values.firstWhere(
+        (e) => e.name == map['outcome'], orElse: () => PactOutcome.pause),
+      reflection: map['reflection']?.toString(),
+      hypothesisCorrect: map['hypothesis_correct'] as bool?,
+      endedReason: map['ended_reason']?.toString(),
+    );
+  }
+
+ADD fields à classe Habit (Regra 3 do guidelines: habit_mode ausente →
+  tratar como `habit`):
+  HabitMode habitMode = HabitMode.habit;
+  String? curiosityQuestion;
+  String? hypothesis;
+  DateTime? startedAt;
+  DateTime? endsAt;
+  PactOutcome? pactOutcome;
+  List<PactCycle> previousCycles = [];
+
+EDIT construtor: adicionar os 7 parâmetros acima com defaults
+  (habitMode = HabitMode.habit, previousCycles = const []).
+
+ADD getter:
+  String get displayTitle => title;
+
+EDIT copyWith(): adicionar os 7 novos parâmetros.
+
+EDIT toMarkdown(): ADD (apenas quando habitMode == HabitMode.pact):
+    frontmatter['habit_mode'] = habitMode.name;
+    if (habitMode == HabitMode.pact) {
+      if (curiosityQuestion != null) frontmatter['curiosity_question'] = curiosityQuestion;
+      if (hypothesis != null) frontmatter['hypothesis'] = hypothesis;
+      if (startedAt != null) frontmatter['started_at'] = startedAt!.toIso8601String().split('T').first;
+      if (endsAt != null) frontmatter['ends_at'] = endsAt!.toIso8601String().split('T').first;
+      frontmatter['pact_outcome'] = pactOutcome?.name;
+      frontmatter['previous_cycles'] = previousCycles.map((c) => c.toMap()).toList();
+    }
+
+EDIT fromMarkdown(): ADD leitura simétrica (Regra 3 — default `habit`):
+    final rawMode = frontmatter['habit_mode']?.toString() ?? 'habit';
+    habit.habitMode = HabitMode.values.firstWhere(
+      (m) => m.name == rawMode, orElse: () => HabitMode.habit);
+    habit.curiosityQuestion = frontmatter['curiosity_question']?.toString();
+    habit.hypothesis = frontmatter['hypothesis']?.toString();
+    if (frontmatter['started_at'] != null) {
+      habit.startedAt = DateTime.tryParse(frontmatter['started_at'].toString());
+    }
+    if (frontmatter['ends_at'] != null) {
+      habit.endsAt = DateTime.tryParse(frontmatter['ends_at'].toString());
+    }
+    if (frontmatter['pact_outcome'] != null) {
+      habit.pactOutcome = PactOutcome.values.firstWhereOrNull(
+        (e) => e.name == frontmatter['pact_outcome']);
+    }
+    if (frontmatter['previous_cycles'] is List) {
+      habit.previousCycles = (frontmatter['previous_cycles'] as List)
+          .whereType<Map>()
+          .map((c) => PactCycle.fromMap(Map<String, dynamic>.from(c)))
+          .toList();
+    }
+  (usar `firstWhereOrNull` de package:collection, ou implementar
+  manualmente um try/catch retornando null, já que `firstWhere` puro do
+  Dart não aceita `orElse: () => null` em enum não-nullable.)
+
+VALIDAÇÃO: depois de aplicar, rodar `flutter analyze` e confirmar que
+  steering_sheet.dart e habit_row.dart não têm mais nenhum erro de símbolo
+  não resolvido.
+
+────────────────────────────────────────────────────────────────────────────────
+0.2 — TASK: ADICIONAR CLASSE TripleCheck
+────────────────────────────────────────────────────────────────────────────────
+FILE: lib/models/task_model.dart
+ACTION: EDIT
+STATUS: CONCLUÍDO — `TripleCheckAnswer`, `TripleCheck`, `Task.tripleCheck`,
+  `TaskStage.backlog` e `linkedSystem` já existem; `flutter analyze` não
+  reporta símbolos ausentes em `triple_check_sheet.dart`.
+
+POR QUE É P0: lib/ui/widgets/triple_check_sheet.dart já referencia, em
+  produção: widget.task.tripleCheck, TripleCheckAnswer (enum .yes/.unsure
+  /.no), TripleCheck(head:, heart:, hand:, diagnosis:, checkedAt:), e
+  widget.task.copyWith(tripleCheck: tc) — nenhum desses símbolos existe em
+  task_model.dart hoje.
+
+ADD enum:
+  enum TripleCheckAnswer { yes, unsure, no }
+
+ADD classe:
+  class TripleCheck {
+    final TripleCheckAnswer head;
+    final TripleCheckAnswer heart;
+    final TripleCheckAnswer hand;
+    final String diagnosis;
+    final DateTime checkedAt;
+
+    TripleCheck({
+      required this.head,
+      required this.heart,
+      required this.hand,
+      required this.diagnosis,
+      required this.checkedAt,
+    });
+
+    // Regra 7 do guidelines + diagnóstico derivado single-value (head >
+    // heart > hand em ordem de prioridade — "incerto" conta como bloqueio).
+    String? get blocker {
+      if (head != TripleCheckAnswer.yes) return 'head';
+      if (heart != TripleCheckAnswer.yes) return 'heart';
+      if (hand != TripleCheckAnswer.yes) return 'hand';
+      return null;
+    }
+
+    Map<String, dynamic> toMap() => {
+      'head': head == TripleCheckAnswer.yes,
+      'heart': heart == TripleCheckAnswer.yes,
+      'hand': hand == TripleCheckAnswer.yes,
+      'blocker': blocker,
+      'diagnosis': diagnosis,
+      'checked_at': checkedAt.toIso8601String(),
+    };
+
+    factory TripleCheck.fromMap(Map<String, dynamic> map) {
+      TripleCheckAnswer fromBool(dynamic v) =>
+          v == true ? TripleCheckAnswer.yes : TripleCheckAnswer.no;
+      return TripleCheck(
+        head: fromBool(map['head']),
+        heart: fromBool(map['heart']),
+        hand: fromBool(map['hand']),
+        diagnosis: map['diagnosis']?.toString() ?? '',
+        checkedAt: DateTime.tryParse(map['checked_at']?.toString() ?? '') ?? DateTime.now(),
+      );
+    }
+  }
+  NOTA: ao serializar, "incerto" (unsure) vira `false` no frontmatter
+  (booleano puro, igual a "no") — perda de fidelidade aceita e documentada
+  aqui, pois a spec grava head/heart/hand como booleanos puros no exemplo
+  de frontmatter.
+
+ADD field à classe Task: `TripleCheck? tripleCheck;`
+EDIT construtor: adicionar `this.tripleCheck,`.
+EDIT copyWith(): adicionar `TripleCheck? tripleCheck` — como `copyWith`
+  precisa também conseguir LIMPAR o campo de propósito (ex.: "Re-executar
+  diagnóstico"), adicionar um parâmetro extra:
+  `bool clearTripleCheck = false`, e usar
+  `tripleCheck: clearTripleCheck ? null : (tripleCheck ?? this.tripleCheck)`.
+
+EDIT toMarkdown(): ADD
+  if (tripleCheck != null) frontmatter['triple_check'] = tripleCheck!.toMap();
+  // Regra 7: ausente → nunca exibir badge nem diagnóstico.
+
+EDIT fromMarkdown(): ADD
+  if (frontmatter['triple_check'] is Map) {
+    task.tripleCheck = TripleCheck.fromMap(
+      Map<String, dynamic>.from(frontmatter['triple_check'] as Map));
+  }
+
+TAMBÉM NESTE ARQUIVO — confirmar/adicionar (já estava correto na Phase 9
+  Task 9.B.1, reconfirmado por leitura direta): `TaskStage` precisa incluir
+  `backlog`. Enum atual é `{idea, todo, inProgress, pending, finalized}` —
+  ADD `backlog` (posição recomendada: logo após `idea`, antes de `todo`).
+
+ADD também (já especificado na Phase 9 Task 9.B.2, reconfirmado ausente
+  por leitura direta): campo `String? linkedSystem;` na classe Task, com
+  leitura/escrita simétrica em toMarkdown()/fromMarkdown()/copyWith()
+  (chave de frontmatter: `linked_system`).
+
+DEPOIS de aplicar 0.1 e 0.2: editar lib/ui/widgets/triple_check_sheet.dart
+  para não precisar mais calcular `blocker` manualmente (a classe já deriva
+  via `tc.blocker`) e rodar `flutter analyze` para confirmar zero erros.
+
+────────────────────────────────────────────────────────────────────────────────
+0.3 — DECISÃO DE PRODUTO: Idea / Inbox / Event / ShoppingList (tipos fora
+      da spec V4)
+────────────────────────────────────────────────────────────────────────────────
+STATUS: DECIDIDO — OPÇÃO B. Manter Idea/Inbox/Event/ShoppingList como
+  extensões legadas/ativas nesta rodada, porque há models, providers, telas
+  e formulários existentes. Não remover nem migrar automaticamente agora.
+
+SEVERIDADE: P0 (arquitetural) — decisão precisa ser tomada ANTES do TIER 1,
+  porque a Task 1.4 (dispatcher central) e a Task 1.1 (estrutura de pastas)
+  dependem de saber se esses 4 tipos continuam existindo ou são migrados.
+
+EVIDÊNCIA: guidelines V4, PARTE 1.2, enumera EXATAMENTE 9 tipos de
+  conteúdo e 10 de organizador. "Regra 1 — Este documento anula todas as
+  versões anteriores." O código tem, com type/model/tela próprios:
+  • lib/models/idea_model.dart (`type: idea`) + ideas_screen.dart — a
+    spec já cobre esse caso com `Task.stage: idea`.
+  • lib/models/inbox_model.dart (`type: inbox`) + inbox_screen.dart — sem
+    equivalente na V4.
+  • lib/models/event_model.dart (`type: event`) — sobrepõe quase 100% com
+    CalendarSession (que a Phase 9 Task 9.A.6 manda criar do zero, sem
+    nunca mencionar migrar Event).
+  • lib/models/shopping_list_model.dart (`type: shopping_list`) +
+    shopping_list_screen.dart + shopping_list_block.dart — sem
+    equivalente na V4.
+
+OPÇÃO A (recomendada — conformidade estrita): migrar e remover os 4:
+  1. Idea → Task com `stage: idea`. Campos sem equivalente direto (horizon,
+     convertedToType/Id) viram tags/organizers ou ficam em `notes`. Apagar
+     idea_model.dart, ideas_screen.dart, IdeaStatus, IdeaHorizon.
+  2. Inbox → migrar para Task (`stage: idea`/`backlog`) ou Note. Remover
+     inbox_model.dart, inbox_screen.dart.
+  3. Event → consolidar com CalendarSession (Task 1.4 abaixo cria o
+     model): mapear startDatetime→date+timeOfDay, endDatetime→endTime,
+     googleEventId→linkedGoogleEventId, etc. Migrar arquivos `type: event`
+     existentes no vault para `type: calendar_session` (migração one-shot
+     no carregamento). Remover event_model.dart e toda tela/form que cria
+     `type: event`.
+  4. ShoppingList → sem equivalente direto. Opções: Tracker com
+     InputFieldType.checklist, ou Note subtipo Collection. Decidir e
+     migrar; ou OPÇÃO B abaixo.
+
+OPÇÃO B (se o produto realmente precisa desses 4 recursos): atualizar o
+  PRÓPRIO guidelines.md, PARTE 1.2, incluindo-os formalmente como
+  extensões da V4, com seção de especificação própria (propriedades,
+  storage, UI) no mesmo padrão dos outros 9 objetos.
+
+QUALQUER QUE SEJA A ESCOLHA: documentar a decisão no topo deste arquivo de
+  gap analysis antes de prosseguir, porque ela muda o conteúdo exato das
+  Tasks 1.1 e 1.4 abaixo (se Event for mantido, a Task 1.4 precisa também
+  adicionar um dispatch para `type: event`, por exemplo).
+
+================================================================================
+TIER 1 — INTEGRIDADE DE DADOS DO VAULT
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+1.1 — ESTRUTURA DE PASTAS: `app/` FLAT COMO PADRÃO (não pasta-por-tipo)
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `_ensureVaultFolders()` usa `app/daily/moods/analyses`
+  e pastas técnicas; defaults de escrita caem em `app` salvo exceções e
+  índices Dataview usam `FROM "app"` por tipo.
+
+SEVERIDADE: P0 — viola a PARTE 1.1 da guidelines, base de toda a
+  arquitetura de Object Identification. Confirmado em 3 arquivos
+  independentes que concordam entre si (não é bug isolado, é o
+  comportamento real e consistente do app hoje).
+
+EVIDÊNCIA:
+  • obsidian_service.dart, `_ensureVaultFolders()`: cria incondicionalmente
+    daily, habits, trackers, tasks, notes, moods, projects, people,
+    organizers/areas, organizers/projects, organizers/activities,
+    organizers/people, organizers/places, organizers/labels, resources,
+    social, sessions, _attachments, _deleted. SEM `app/`, SEM `_conflicts/`.
+  • vault_provider.dart, `VaultNotifier._defaultFolderForSignature()`:
+    roteia escrita por tipo: task→tasks, habit→habits, goal→goals,
+    note→notes, resource→resources, social_post→social,
+    person→organizers/people, project→organizers/projects,
+    area→organizers/areas, activity→organizers/activities,
+    place→organizers/places, label→organizers/labels, organizer→organizers,
+    tracker_definition/tracker_record→trackers, reminder→reminders,
+    time_block→time_blocks, day_theme→day_themes, template→templates,
+    snapshot→snapshots. (mood_definition→moods e combined_analysis→analyses
+    ESTÃO CORRETOS — são exceções fixas da spec, NÃO mexer nesses dois.)
+  • dataview_generator.dart: os 6 índices auto-gerados (`tasks/index.md`,
+    `habits/index.md`, `goals/index.md`, `notes/index.md`,
+    `social/index.md`, `daily/mood-index.md`) têm `FROM "tasks"` /
+    `FROM "habits"` / etc. hardcoded.
+
+  Spec (PARTE 1.1 + PARTE 20): default é `app/` flat para TODOS os tipos,
+  exceto as exceções fixas `daily/`, `moods/`, `analyses/`,
+  `_attachments/`, `_deleted/`, `_conflicts/`. Pasta-por-tipo só deveria
+  existir quando o usuário CONFIGURA isso em Object Identification (Regra
+  12: "o app nunca presume localização por tipo").
+
+FILE: lib/services/obsidian_service.dart
+ACTION: EDIT
+ANCHOR: `_ensureVaultFolders()`, lista `folders`.
+REPLACE por:
+  const folders = [
+    'app',
+    'daily',
+    'moods',
+    'analyses',
+    '_attachments',
+    '_deleted',
+    '_conflicts',
+  ];
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+ANCHOR: `VaultNotifier._defaultFolderForSignature()`.
+REPLACE o corpo inteiro por:
+  String _defaultFolderForSignature(String type) {
+    return switch (type) {
+      'mood_definition'   => 'moods',
+      'combined_analysis' => 'analyses',
+      _ => 'app',
+    };
+  }
+  (`_writeObject()` já dá prioridade a uma `TypeSignature` de pasta
+  configurada pelo usuário antes de cair nesse default — não precisa
+  mexer em `prepareForSave`.)
+
+FILE: lib/services/dataview_generator.dart
+ACTION: EDIT
+  1. Trocar em TODAS as 5 queries Dataview + a query DataviewJS de
+     `_writeHabitsIndex()`:
+       `FROM "tasks"`  → `FROM "app" WHERE type = "task"`
+       `FROM "habits"` → `FROM "app" WHERE type = "habit"`
+       `FROM "goals"`  → `FROM "app" WHERE type = "goal"`
+       `FROM "notes"`  → `FROM "app" WHERE type = "note"`
+       `FROM "social"` → `FROM "app" WHERE type = "social_post"`
+       `dv.pages('"habits"')` → `dv.pages('"app"').where(p => p.type === "habit")`
+  2. MELHOR: gerar a cláusula FROM dinamicamente a partir de Object
+     Identification em vez de hardcoded:
+       String _fromClauseFor(String type, Settings settings) {
+         final sig = settings.typeSignatures[type];
+         if (sig?.markerType == MarkerType.folder && sig?.value.isNotEmpty == true) {
+           return 'FROM "${sig!.value}"';
+         }
+         return 'FROM "app" WHERE type = "$type"';
+       }
+     Requer passar `Settings` para os métodos `_writeXxxIndex()` (já são
+     métodos de instância de `DataviewGenerator`, só precisam receber
+     `Settings` via construtor ou parâmetro).
+
+MIGRAÇÃO: não é necessário mover arquivos já existentes nas pastas antigas
+  — `AllObjectsNotifier` escaneia o vault inteiro recursivamente e decide
+  o tipo pelo `type` do frontmatter (ver Task 1.4), não pela pasta física,
+  exceto quando há `TypeSignature` de pasta configurada. O pior caso é
+  apenas: arquivos novos vão para `app/`, arquivos antigos continuam nas
+  pastas antigas — ambos continuam sendo lidos normalmente.
+
+────────────────────────────────────────────────────────────────────────────────
+1.2 — PMN (`daily/YYYY-MM-WNN.md`) É INVISÍVEL AO APP
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `AllObjectsNotifier` detecta `daily/YYYY-MM-WNN.md`,
+  cria `JournalEntryType.pmn`, lê metadados PMN e usa
+  `MarkdownParser.parsePmnSections()`.
+
+SEVERIDADE: P0 — a feature de revisão semanal (Plus/Minus/Next) é gravada
+  corretamente no disco mas NUNCA mais lida de volta.
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+ANCHOR: dentro de `AllObjectsNotifier.build()`, bloco:
+    final isDaily = relativePath.split('/').contains('daily');
+    ...
+    if (isDaily || type == 'daily_note') {
+      final dateMatch = RegExp(r'(\d{4}-\d{2}-\d{2})').firstMatch(relativePath);
+      if (dateMatch != null) { ... }
+      // hoje: se dateMatch for null (caso de um PMN "YYYY-MM-WNN"), nada
+      // acontece — o arquivo é descartado silenciosamente.
+    } else { ... }
+
+REPLACE a checagem por:
+    final pmnMatch = RegExp(r'(\d{4})-(\d{2})-W(\d{2})').firstMatch(relativePath);
+    final isPmnFile = pmnMatch != null && relativePath.split('/').contains('daily');
+
+    if (isPmnFile) {
+      // Processar como PMN — ver passo abaixo.
+      final entry = JournalEntry(
+        id: frontmatter['id']?.toString() ?? stableIdFor(relativePath),
+        body: '', // PMN não usa `body` solto — usa plus/minus/next no corpo.
+        date: DateTime.tryParse(frontmatter['date_range_start']?.toString() ?? '') ?? DateTime.now(),
+        title: 'PMN ${frontmatter['week'] ?? ''}',
+        entryType: JournalEntryType.pmn, // depende do field entryType existir em JournalEntry
+        obsidianPath: relativePath,
+      );
+      entry.week = frontmatter['week']?.toString();
+      entry.dateRangeStart = DateTime.tryParse(frontmatter['date_range_start']?.toString() ?? '');
+      entry.dateRangeEnd = DateTime.tryParse(frontmatter['date_range_end']?.toString() ?? '');
+      entry.referencedDates = (frontmatter['referenced_dates'] as List? ?? [])
+          .map((d) => d.toString()).toList();
+      entry.pactRefs = (frontmatter['pact_refs'] as List? ?? [])
+          .map((p) => p.toString()).toList();
+      final pmnSections = MarkdownParser.parsePmnSections(body); // criar este método (ver abaixo)
+      entry.plus = pmnSections['plus'] ?? [];
+      entry.minus = pmnSections['minus'] ?? [];
+      entry.next = pmnSections['next'] ?? [];
+      results.add(entry);
+    } else if (isDaily || type == 'daily_note') {
+      final dateMatch = RegExp(r'(\d{4}-\d{2}-\d{2})').firstMatch(relativePath);
+      if (dateMatch != null) { ... (lógica já existente, inalterada) ... }
+    } else { ... (lógica já existente, inalterada) ... }
+
+  (Os nomes exatos de campo em `JournalEntry` — `week`, `dateRangeStart`,
+  `dateRangeEnd`, `referencedDates`, `pactRefs`, `plus`, `minus`, `next` —
+  precisam ser conferidos/adicionados ao model `JournalEntry`
+  individualmente se ainda não existirem; ver Task 1.3 abaixo, que já
+  assume essa adição.)
+
+FILE: lib/services/markdown_parser.dart
+ACTION: ADD método novo:
+  static Map<String, List<String>> parsePmnSections(String body) {
+    final result = {'plus': <String>[], 'minus': <String>[], 'next': <String>[]};
+    final sectionRegex = RegExp(r'^##\s*(Plus|Minus|Next)\s*$', multiLine: true, caseSensitive: false);
+    final matches = sectionRegex.allMatches(body).toList();
+    for (var i = 0; i < matches.length; i++) {
+      final key = matches[i].group(1)!.toLowerCase();
+      final start = matches[i].end;
+      final end = i + 1 < matches.length ? matches[i + 1].start : body.length;
+      final sectionText = body.substring(start, end);
+      final bullets = RegExp(r'^-\s*(.+)$', multiLine: true)
+          .allMatches(sectionText)
+          .map((m) => m.group(1)!.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      result[key] = bullets;
+    }
+    return result;
+  }
+
+ADD ÍNDICE em memória para o card "📋 Revisão WNN" ao abrir uma data:
+  FILE: lib/providers/vault_provider.dart
+  ADD provider:
+    final pmnByReferencedDateProvider = Provider<Map<String, List<JournalEntry>>>((ref) {
+      final all = ref.watch(allObjectsProvider).valueOrNull ?? [];
+      final map = <String, List<JournalEntry>>{};
+      for (final entry in all.whereType<JournalEntry>()) {
+        if (entry.entryType != JournalEntryType.pmn) continue;
+        for (final dateStr in entry.referencedDates) {
+          map.putIfAbsent(dateStr, () => []).add(entry);
+        }
+      }
+      return map;
+    });
+  USAR este provider em Journal/Planner/Timeline (telas ainda não
+  auditadas — ver "Cobertura" no topo) para exibir o card de revisão ao
+  abrir qualquer data referenciada por uma PMN.
+
+────────────────────────────────────────────────────────────────────────────────
+1.3 — FIELD NOTE / PMN: entry_type NUNCA É LIDO PELO PARSER PRINCIPAL
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `parseJournalEntries()` extrai `entry_type`, `category`
+  e `energy_value`; o loader propaga para `JournalEntry`.
+
+SEVERIDADE: P0 — combinado com 1.2, confirma que Field Note e PMN (2 dos 3
+  sub-modos de Entry) nunca chegam corretamente à UI em memória, mesmo
+  gravados corretamente em disco.
+
+FILE: lib/services/markdown_parser.dart
+ACTION: EDIT
+ANCHOR: `parseJournalEntries()`, dentro do loop de seções, bloco que monta
+  `entries.add({...})` — hoje só extrai time/title/body/mood/organizers/
+  hashtags/date.
+
+ADD extração de `entry_type`/`category`/`energy_value` (mesmo padrão já
+  usado para `mood::`):
+    final entryTypeMatch = RegExp(r'^entry_type:\s*(.*)$', multiLine: true).firstMatch(section);
+    final entryType = entryTypeMatch?.group(1)?.trim() ?? 'standard';
+    final categoryMatch = RegExp(r'^category:\s*(.*)$', multiLine: true).firstMatch(section);
+    final category = categoryMatch?.group(1)?.trim();
+    final energyMatch = RegExp(r'^energy_value:\s*(\d+)$', multiLine: true).firstMatch(section);
+    final energyValue = energyMatch != null ? int.tryParse(energyMatch.group(1)!) : null;
+
+  ADD ao Map retornado: `'entry_type': entryType, 'category': category,
+  'energy_value': energyValue,`. Excluir essas linhas do `body` extraído
+  (mesmo tratamento já dado a `mood::`/`organizers::`, para não vazarem
+  para dentro do corpo da entry).
+
+FILE: lib/models/journal_entry.dart
+ACTION: EDIT (caso os campos abaixo ainda não existam — conferir antes)
+ADD (se ausentes): `JournalEntryType entryType = JournalEntryType.standard;`,
+  `String? category;`, `int? energyValue;`, e para PMN: `String? week;`,
+  `DateTime? dateRangeStart;`, `DateTime? dateRangeEnd;`,
+  `List<String> referencedDates = [];`, `List<String> pactRefs = [];`,
+  `List<String> plus = [];`, `List<String> minus = [];`, `List<String> next = [];`.
+  Incluir em toMarkdown()/fromMarkdown()/copyWith() seguindo o mesmo
+  padrão de serialização já usado nos outros campos do model. (Esta task
+  depende/complementa a Phase 9 Task 9.A.1 e 9.A.2 originais do GAP
+  ANALYSIS — que corrigem bugs de serialização do `entryType` já
+  presumindo que o campo existe; aplicar PRIMEIRO esta adição de campo, se
+  ele ainda não existir, antes da Phase 9.A.1/9.A.2.)
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+ANCHOR: construção do `JournalEntry` dentro de `AllObjectsNotifier.build()`
+  (branch de daily note normal, não-PMN).
+ADD: `entryType:` mapeado de `data['entry_type']` (string → enum), e,
+  quando `field_note`, propagar `category`/`energyValue` lidos de
+  `data['category']`/`data['energy_value']`.
+
+────────────────────────────────────────────────────────────────────────────────
+1.4 — `type: system` E `type: calendar_session` AUSENTES DO DISPATCHER
+      CENTRAL
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — dispatcher carrega `SystemDefinition` e
+  `CalendarSession`; fallback genérico de `Note` não injeta organizador
+  placeholder.
+
+SEVERIDADE: P0 — mesmo com o model de System corrigido e CalendarSession
+  criado (Phase 9 Tasks 9.A.3/9.A.6), nenhum dos dois jamais carregaria
+  corretamente, porque o dispatcher nem tenta reconhecê-los.
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+ANCHOR: dentro de `AllObjectsNotifier.build()`, a cadeia `if (type ==
+  'task') {...} else if (type == 'habit') {...} else if ...` (cobre hoje:
+  task, habit, project, person, organizer/area/activity/place/label,
+  resource, social_post, goal, note, tracker_definition, mood_definition,
+  reminder, tracker_record, combined_analysis, snapshot, time_block,
+  day_theme, template — falta system e calendar_session).
+
+ADD, antes do `else` final (fallback genérico):
+  } else if (type == 'system') {
+    // ATENÇÃO: SystemDefinition.fromMarkdown tem 3 parâmetros posicionais
+    // (frontmatter, body, filePath) — diferente do padrão de 2 parâmetros
+    // usado pelos outros tipos. NÃO usar `..obsidianPath =` depois.
+    obj = SystemDefinition.fromMarkdown(frontmatter, body, relativePath);
+  } else if (type == 'calendar_session') {
+    obj = CalendarSession.fromMarkdown(frontmatter, body)
+      ..obsidianPath = relativePath;
+    // (depende da Phase 9 Task 9.A.6 já ter criado este model/factory.)
+  }
+
+ANCHOR: o `else` final (fallback genérico) — hoje cria:
+    obj = Note(
+      id: stableId,
+      title: frontmatter['title'] ?? fallbackTitle,
+      body: body,
+      subtype: NoteSubtype.text,
+      organizers: [
+        shared_types.OrganizerReference(type: 'person', slug: 'placeholder', title: 'placeholder'),
+      ],
+    )..obsidianPath = relativePath;
+  Este `OrganizerReference` hardcoded ("placeholder") parece resíduo de
+  debug esquecido — qualquer arquivo de tipo não reconhecido herda um
+  organizador fantasma, poluindo listagens de People/Organizers.
+
+REPLACE por:
+    obj = Note(
+      id: stableId,
+      title: frontmatter['title'] ?? fallbackTitle,
+      body: body,
+      subtype: NoteSubtype.text,
+    )..obsidianPath = relativePath;
+  (sem `organizers:` — `loadBaseMap()`, chamado logo depois, já popula
+  `organizers` a partir do frontmatter real do arquivo, se houver.)
+
+(SE a decisão da Task 0.3 for manter `Event` como tipo válido — OPÇÃO B —
+adicionar aqui também um `else if (type == 'event') { obj =
+Event.fromMarkdown(...) }`. Se a decisão for OPÇÃO A — migrar Event para
+CalendarSession — não é necessário, mas garantir que a migração one-shot
+rode ANTES deste dispatcher processar o vault, ou arquivos `type: event`
+antigos cairão no fallback genérico de Note até a migração rodar.)
+
+────────────────────────────────────────────────────────────────────────────────
+1.5 — HABIT COMPLETIONS: CHAVES PLANAS NO FRONTMATTER, NÃO ANINHADAS SOB
+      `habits:`
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — toggle/registro gravam chaves planas no frontmatter,
+  parser lê formato plano com retrocompatibilidade e há migração one-shot
+  de `habits:` aninhado.
+
+SEVERIDADE: P0 — quebra TODAS as queries Dataview de exemplo da própria
+  guidelines.
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+ANCHOR: `HabitsNotifier.toggleHabit()` E `HabitsNotifier.recordHabitValue()`
+  — ambos fazem `frontmatter['habits'] = habitsMap;`.
+
+REPLACE (nos dois métodos) por:
+    // Regra/PARTE 20: completions ficam como chaves PLANAS na raiz do
+    // frontmatter, uma por habit slug — nunca aninhadas sob 'habits'.
+    for (final entry in habitsMap.entries) {
+      frontmatter[entry.key] = entry.value;
+    }
+    frontmatter.remove('habits');
+
+FILE: lib/services/markdown_parser.dart
+ACTION: EDIT
+ANCHOR: `parseHabitCompletions()` — hoje só lê `frontmatter['habits']`
+  como fallback secundário; precisa virar o caminho PRIMÁRIO.
+REPLACE por:
+    static Map<String, dynamic> parseHabitCompletions(Map<String, dynamic> frontmatter) {
+      final habits = <String, dynamic>{};
+      final systemKeys = {
+        'date', 'tags', 'type', 'id', 'title', 'trackers',
+        'habit_completions', 'target', 'status', 'priority', 'archived',
+        'day_theme', 'mood_pleasantness', 'mood_energy', 'mood_label',
+        'mood_emoji', 'habits',
+      };
+      frontmatter.forEach((key, value) {
+        if (!systemKeys.contains(key) &&
+            (value is bool || value is num || value is List)) {
+          habits[key] = value;
+        }
+      });
+      // Fallback de retrocompatibilidade com vaults gravados no formato
+      // antigo (aninhado).
+      if (frontmatter['habits'] is Map) {
+        (frontmatter['habits'] as Map).forEach((k, v) {
+          habits.putIfAbsent(k.toString(), () => v);
+        });
+      }
+      return habits;
+    }
+
+ADD migração one-shot (gatear por SharedPreferences
+  `daily_note_habits_migration_done`): no carregamento inicial do vault,
+  para cada `daily/YYYY-MM-DD.md` cujo frontmatter tenha a chave `habits:`
+  (Map), promover cada entrada para o nível raiz e remover a chave
+  `habits:`, reescrevendo o arquivo.
+
+────────────────────────────────────────────────────────────────────────────────
+1.6 — DAILY NOTE TEMPLATE NÃO GERA O FORMATO CANÔNICO
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — template gera `tags: [daily]`, campos `mood_*`,
+  hábitos ativos como chaves planas e seções canônicas.
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+ANCHOR: função `getDailyNoteTemplate(String dateStr, List<DayTheme> dayThemes)`
+  (nível de arquivo, não dentro de classe) — hoje gera apenas:
+    '---\ndate: $dateStr\ntype: daily_note\nday_theme: $themeSlug\n---\n\n# $dateStr\n'
+  sem tags, sem mood_*, sem esqueleto de seções.
+
+REPLACE por:
+    String getDailyNoteTemplate(String dateStr, List<DayTheme> dayThemes,
+        {List<Habit> activeHabits = const []}) {
+      const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      final parsedDate = DateTime.tryParse(dateStr) ?? DateTime.now();
+      final dayName = weekDayNames[parsedDate.weekday - 1];
+      final activeTheme = dayThemes.cast<DayTheme?>().firstWhere(
+        (theme) => theme?.daysOfWeek.contains(dayName) ?? false,
+        orElse: () => null,
+      );
+      final themeSlug = activeTheme?.id ?? '';
+      final habitKeys = activeHabits.map((h) => '${h.slug}: false').join('\n');
+      return '---\n'
+          'date: $dateStr\n'
+          'type: daily_note\n'
+          'tags: [daily]\n'
+          '${themeSlug.isNotEmpty ? 'day_theme: $themeSlug\n' : ''}'
+          '${habitKeys.isNotEmpty ? '$habitKeys\n' : ''}'
+          'mood_pleasantness:\n'
+          'mood_energy:\n'
+          'mood_label:\n'
+          'mood_emoji:\n'
+          '---\n\n'
+          '# $dateStr\n\n'
+          '## Journal Entries\n\n'
+          '## Habits\n\n'
+          '## Trackers\n\n'
+          '## Pomodoros\n';
+    }
+  (campo `day_theme:` é uma extensão não documentada na spec — mantida
+  aqui condicionalmente só quando há tema ativo, por compatibilidade; se
+  preferir remover por completo, é uma decisão de produto separada e de
+  baixo risco.)
+
+ATUALIZAR todos os 5+ pontos de chamada já identificados
+  (`HabitsNotifier.toggleHabit`, `HabitsNotifier.recordHabitValue`,
+  `JournalNotifier.addEntry`, `JournalNotifier.updateEntry`,
+  `JournalNotifier.deleteEntry`) para passar
+  `activeHabits: ref.read(habitsProvider).where((h) => h.status == HabitStatus.active).toList()`.
+
+────────────────────────────────────────────────────────────────────────────────
+1.7 — IDs DE OBJETOS SÃO UUID ALEATÓRIO; WIKILINKS DEVEM USAR SLUG ESTÁVEL
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — IDs UUID permanecem internos; gravação usa path/slug
+  estável, `_writeObject()` resolve colisões `-2/-3`, e WikiLinks auditados
+  não usam UUID como fallback quando há slug.
+
+FILE: lib/models/content_object.dart
+ACTION: EDIT (decisão arquitetural — aplicar com cuidado)
+
+EVIDÊNCIA: `id = id ?? const Uuid().v4()` — todo objeto sem id explícito
+  ganha um UUID v4 aleatório. Mas TODOS os exemplos de frontmatter da spec
+  usam ids legíveis e estáveis derivados do título (`id:
+  "task-comprar-equipamento"`, `id: "escrever-100-palavras"`), e WikiLinks
+  como `linked_system: "[[system-publicar-instagram]]"` e a chave de
+  completion de habit na daily note (Task 1.5 acima) usam esse mesmo
+  slug — nunca o UUID interno.
+
+ACTION:
+  1. PADRONIZAR: todo WikiLink gravado no vault (organizers, links,
+     linked_system, linked_task, linked_goal, parent_task, pact_refs,
+     participants, places, e a chave de completion de habit na daily
+     note) DEVE usar `ContentObject.slug` (derivado do título, estável,
+     legível) — NUNCA `ContentObject.id` (UUID interno, conforme Regra 11:
+     "IDs são internos. Nunca exibir ao usuário").
+  2. AUDITAR todo lugar do código que hoje grava `obj.id` dentro de um
+     WikiLink ou nome de arquivo (buscar por `obj.id` próximo de `'[['`
+     ou em `obsidianFileName`/chamadas de `writeFile` em
+     obsidian_service.dart e em todos os `toMarkdown()`) e trocar para
+     `obj.slug`.
+  3. RESOLVER colisão de slug (dois títulos iguais geram o mesmo slug):
+     em `VaultNotifier._writeObject()` / `MarkdownParser.prepareForSave()`,
+     ao gravar um novo arquivo, se `slug.md` já existir E pertencer a um
+     `id` diferente do objeto sendo salvo, sufixar com `-2`, `-3`, etc.
+     antes de escrever.
+  4. `id` (UUID) continua existindo apenas como chave primária interna em
+     memória (para encontrar o objeto certo numa lista após editar o
+     título, que mudaria o slug). NUNCA gravar o `id` UUID em nenhum
+     WikiLink do vault.
+
+────────────────────────────────────────────────────────────────────────────────
+1.8 — OrganizerReference.toWikiLink() GRAVA "[[tipo/slug]]" EM VEZ DE
+      "[[slug]]"
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `OrganizerReference.toWikiLink()` grava `[[slug]]` e
+  `fromWikiLink()` mantém retrocompatibilidade com `[[tipo/slug]]`.
+
+SEVERIDADE: P0 — quebra backlinks nativos do Obsidian em TODO o vault
+  (organizers de todo objeto, e a linha `organizers::` gerada dentro de
+  cada Journal Entry pelo `generateDailyNoteBody()`).
+
+FILE: lib/models/shared_types.dart
+ACTION: EDIT
+ANCHOR: método `toWikiLink()` em `OrganizerReference` — hoje:
+  `String toWikiLink() => type == 'label' ? '[[$slug]]' : '[[$type/$slug]]';`
+
+REPLACE por:
+  String toWikiLink() => '[[$slug]]';
+
+MANTER `fromWikiLink()` tratando ambos os formatos (com e sem `tipo/`)
+  para retrocompatibilidade de leitura. ADD migração one-shot: ao carregar
+  qualquer WikiLink de `organizers`/`links`/`participants`/`places` que
+  contenha `/`, reescrever o arquivo sem o prefixo de tipo na próxima vez
+  que for salvo (não precisa ser proativo/imediato — corrigir
+  lazily/gradualmente conforme os arquivos são reescritos no uso normal).
+
+================================================================================
+TIER 2 — FEATURES INCOMPLETAS (P1)
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+2.1 — PomodoroSession NÃO PERSISTE EM LUGAR NENHUM
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `PomodoroSession` tem estado/durações/blocos, grava
+  bloco em `## Pomodoros` da daily note ao completar/cancelar sessão,
+  enfileira sync e o loader reparseia essas sessões para memória.
+
+FILE: lib/models/pomodoro_session.dart
+ACTION: REWRITE
+
+EVIDÊNCIA: model atual só tem taskTitle, startTime, duration (Duration
+  única), pomodoroType, completed, linkedOrganizerRef opcional, e
+  `toMarkdown() => ''`. Spec (PARTE 7) exige work/short/long break
+  duration configuráveis, long_break_after_blocks, blocks_completed/
+  minutes_worked/minutes_break derivados, state (scheduled|active|paused|
+  completed|cancelled), linked_item (WikiLink para qualquer objeto), e
+  armazenamento na daily note sob `## Pomodoros`.
+
+REESCREVER:
+  enum PomodoroState { scheduled, active, paused, completed, cancelled }
+
+  class PomodoroSession extends ContentObject {
+    String? linkedItemSlug;
+    DateTime date;
+    int workDuration = 25;
+    int shortBreakDuration = 5;
+    int longBreakDuration = 20;
+    int longBreakAfterBlocks = 4;
+    int blocksCompleted = 0;
+    int minutesWorked = 0;
+    int minutesBreak = 0;
+    PomodoroState state = PomodoroState.scheduled;
+
+    ... construtor ...
+
+    @override
+    String get type => 'pomodoro_session';
+
+    String toDailyNoteBlock() {
+      final hh = date.hour.toString().padLeft(2, '0');
+      final mm = date.minute.toString().padLeft(2, '0');
+      final buf = StringBuffer()
+        ..writeln('### $hh:$mm — $title');
+      if (linkedItemSlug != null) buf.writeln('- Linked: [[$linkedItemSlug]]');
+      buf
+        ..writeln('- Blocos: $blocksCompleted')
+        ..writeln('- Tempo trabalhado: $minutesWorked min')
+        ..writeln('- Tempo de pausa: $minutesBreak min');
+      return buf.toString();
+    }
+
+    @override
+    String toMarkdown() => ''; // não é standalone — embutido na daily note
+
+    factory PomodoroSession.fromDailyNoteBlock(String block, DateTime day) {
+      // Regex linha a linha: ### HH:MM — title / - Linked: [[slug]] /
+      // - Blocos: N / - Tempo trabalhado: N min / - Tempo de pausa: N min
+      ...
+    }
+  }
+
+CONECTAR à persistência: localizar pomodoro_provider.dart e
+  pomodoro_bg_service.dart (não auditados ainda — ver "Cobertura") e, ao
+  completar/cancelar uma sessão, gravar o bloco em `## Pomodoros` da daily
+  note do dia (mesmo padrão incremental de leitura/escrita já usado para
+  habit completions na Task 1.5). Sem isso, o histórico de Pomodoro nunca
+  sobrevive a um restart nem aparece na Organizer Detail View (PARTE 23.8,
+  item "Pomodoro" na Timeline Section).
+
+────────────────────────────────────────────────────────────────────────────────
+2.2 — KPI: TAXONOMIA INCOMPATÍVEL; FALTA AUTO-COMPLETE E BOTÃO "+N"
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `KPISourceType` foi reduzido aos 8 tipos da spec,
+  `calculationMode` e `autoCompleteAction` existem, há migração dos valores
+  legados, `AutomationService.updateAllKPIs()` dispara ação ao atingir meta
+  e a UI de detalhe da meta tem incremento manual `+1/+N` para
+  `manualQuantity`.
+
+FILE: lib/models/kpi_model.dart
+ACTION: EDIT
+
+EVIDÊNCIA: spec define 8 `source_types` exatos: subtasks, tracker_field,
+  habit, collection, entry, time_spent, manual_quantity, others. Model
+  atual (`KPISourceType`) tem 24 valores granulares pré-fixados
+  (habitCompletionCount, habitStreak, trackerFieldSum, trackerFieldMax,
+  goalSubtaskCompletion, moodAverage, etc.), com labels que misturam
+  português e inglês na mesma string. Falta `autoCompleteAction`
+  (spec: "quando current_value >= target_value, acionada ação
+  configurada") e botão de incremento rápido "+N" para manual_quantity.
+
+ACTION:
+  1. Realinhar `KPISourceType` para os 8 valores exatos:
+     subtasks, trackerField, habit, collection, entry, timeSpent,
+     manualQuantity, others. Persistir como `source_type` snake_case.
+  2. ADD `String? calculationMode` para granularidade dentro de cada
+     source_type (ex.: habit → 'streak'|'successful_days'|
+     'total_completions'; trackerField → 'sum'|'average'|'count'|'max'|'min').
+  3. ADD `Map<String,dynamic>? autoCompleteAction` (mesma forma de ActionDef
+     em shared_types.dart), disparado quando `currentValue >= targetValue`
+     muda de false→true.
+  4. Corrigir todas as labels para português consistente.
+  5. Migração: mapear os 24 valores antigos para (novo source_type,
+     calculationMode) na leitura, preservando dados existentes.
+  6. ADD botão "+N" inline na UI de KPI (tracker_metric_card.dart ou
+     equivalente — não auditado ainda) quando source_type == manualQuantity.
+
+ACHADO ADICIONAL (lib/services/kpi_engine.dart, lido por completo): o
+  motor de cálculo é AINDA MENOS completo do que a taxonomia do model
+  sugere. De 24 valores de `KPISourceType`, `calculateKPIValue()` só
+  calcula 12 (habitCompletionCount, habitStreak, habitSuccessRate,
+  trackerFieldSum/Average/Max/Min, moodAverage, entryCount,
+  collectionItemCount, customNumericInput, plannerTaskDuration — este
+  último é um stub que sempre `return 0`). Os outros 11 valores do enum
+  (goalSubtaskCompletion, goalProgressPercentage, plannerTaskCount,
+  plannerOverdueCount, journalWordCount, moodTrend, photoCount,
+  commentCount, reflectionLength, organizerAssociationCount,
+  timeSpentInCategory) caem no `default: return 0;` — ou seja, são tipos
+  que existem no enum e provavelmente aparecem como opção selecionável na
+  UI de criação de KPI, mas SEMPRE retornam 0 silenciosamente, sem
+  nenhum erro ou aviso ao usuário. Qualquer KPI configurado com um desses
+  11 tipos nunca vai progredir.
+
+  TAMBÉM CONFIRMADO: `KPISourceType.moodAverage` usa
+  `m?.numericValue.toDouble()` — o campo ANTIGO de 1 dimensão de
+  `MoodDefinition` (Phase 9 Task 9.A.8 está reescrevendo `MoodDefinition`
+  para o sistema de 2 eixos `pleasantness`/`energy`, REMOVENDO
+  `numericValue`). Isso significa que aplicar a Task 9.A.8 SEM
+  atualizar `kpi_engine.dart` simultaneamente QUEBRA a compilação deste
+  arquivo (referência a campo removido). ADICIONAR EXPLICITAMENTE à
+  Phase 9 Task 9.A.8: ao remover `numericValue` de `MoodDefinition`,
+  editar `KPIEngine.calculateKPIValue()` no case `moodAverage` para usar
+  `m?.pleasantness.toDouble()` (ou expor a dimensão escolhida via
+  `kpi.calculationMode`, reaproveitando o campo já proposto no item 2
+  acima — ex.: `calculationMode == 'energy' ? m.energy : m.pleasantness`).
+
+FILE: lib/services/kpi_engine.dart
+ACTION: EDIT — implementar os 11 cases faltantes (ou removê-los do enum
+  se decidir que não são necessários — decisão de produto), e corrigir o
+  case `moodAverage` conforme acima.
+
+CORREÇÃO (lib/services/automation_service.dart, lido por completo): o
+  "auto-complete" NÃO está 100% ausente como dito acima — `AutomationService.
+  updateAllKPIs()` já implementa `if (!kpi.completed && newValue >=
+  kpi.targetValue) { kpi.completed = true; ...
+  NotificationService().showImmediateNotification(...) }`. O que falta de
+  fato é só a parte "ação CONFIGURADA": hoje a única ação ao bater a meta
+  é uma notificação genérica hardcoded — não há como o usuário escolher,
+  por KPI, qual das 7 ações (PARTE 6) disparar. Ajustar o item 3 acima: o
+  campo `autoCompleteAction` deve ser lido e executado dentro de
+  `updateAllKPIs()`, reaproveitando o dispatcher genérico de ações criado
+  na Task 2.13 abaixo (generalizado para aceitar um `ActionDef` vindo de
+  um KPI, não só de um Habit).
+
+────────────────────────────────────────────────────────────────────────────────
+2.13 — SISTEMA DE ACTIONS: SÓ 2 DOS 7 TIPOS DA SPEC ESTÃO IMPLEMENTADOS;
+       FALTA TRIGGER DE TRACKER (só Habit dispara hoje); 1 tipo extra não
+       documentado ("create_task")
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — dispatcher executa `add_entry`, `add_tracking_record`,
+  `add_text_note`, `add_collection_item`, `view_statistics`, `view_item` e
+  `launch_url`; `create_task` foi mantido como extensão legada. Trackers
+  agora têm `actions` serializadas e `saveTrackerRecord()` dispara triggers
+  `tracking_record_saved`/`tracker_record_saved`/`record_saved`.
+
+FILE: lib/services/automation_service.dart
+ACTION: EDIT
+
+EVIDÊNCIA (lido por completo): `_executeAction()` (dispatcher central de
+  Actions) só implementa um `switch (action.type)` com 3 cases:
+  `'add_entry'` (✓ existe na spec), `'add_tracking_record'` (✓ existe na
+  spec), e `'create_task'` (✗ NÃO é um dos 7 tipos da PARTE 6 — extensão
+  não documentada). FALTAM os outros 4 tipos da spec: `add_text_note`,
+  `add_collection_item`, `view_statistics`, `view_item`, `launch_url`
+  (esse último é o 5º que falta — recontando: faltam 5 dos 7, sobram 2
+  implementados + 1 extra não documentado).
+
+  Além disso, `executeHabitSlotActions`/`executeHabitActions` só são
+  chamados a partir do fluxo de Habit (confirmado em vault_provider.dart,
+  Task 1.x). A spec (PARTE 6) define 3 eventos de trigger, não 2: "(1)
+  Completar qualquer slot individual de um habit, (2) Completar o goal
+  diário de um habit, (3) Salvar um tracking record." NÃO existe nenhum
+  método `executeTrackerActions`/equivalente disparado ao salvar um
+  TrackingRecord — Trackers, hoje, nunca disparam nenhuma Action, apesar
+  de `TrackerSection`/`InputField` poderem ter `actions` configuradas
+  (CONFERIR se o model de Tracker realmente expõe esse campo — não
+  confirmado nesta leitura específica de automation_service.dart).
+
+ACTION:
+  1. ADD os 5 cases faltantes a `_executeAction()`:
+       case 'add_text_note': // abre/cria uma Text Note vinculada
+         final notesNotifier = ref.read(notesProvider.notifier);
+         await notesNotifier.addNote(Note(
+           title: 'Nota automática: ${habit.displayTitle}',
+           body: '',
+           subtype: NoteSubtype.text,
+         ));
+         break;
+       case 'add_collection_item':
+         // requer action.targetCollectionNoteId (ADD esse campo a ActionDef
+         // se ainda não existir) — adicionar um CollectionItem vazio/
+         // pré-preenchido na Collection Note especificada.
+         break;
+       case 'view_statistics':
+         // navegação pura — não tem efeito de dados; deve ser tratado na
+         // CAMADA DE UI (não em automation_service.dart), recebendo um
+         // callback de navegação. Documentar a divisão de responsabilidade.
+         break;
+       case 'view_item':
+         // idem — navegação para action.targetItemId; tratar na UI.
+         break;
+       case 'launch_url':
+         // usar package:url_launcher já presente no projeto (confirmar em
+         // pubspec.yaml) para abrir action.targetUrl.
+         await launchUrl(Uri.parse(action.targetUrl ?? ''));
+         break;
+  2. RENOMEAR ou remover `'create_task'`: já que não é um tipo documentado,
+     decidir (mesma lógica de decisão de produto da Task 0.3): manter como
+     extensão documentada no guidelines.md, ou remover.
+  3. ADD `static Future<void> executeTrackerActions(Ref ref,
+     TrackerDefinition tracker, TrackingRecord record) async { ... }`,
+     iterando as Actions configuradas nos InputFields do tracker que foram
+     preenchidos neste record, chamando o mesmo `_executeAction` (adaptado
+     para aceitar um contexto genérico em vez de só `Habit habit, DateTime
+     date` — trocar a assinatura de `_executeAction` para receber um
+     `String contextTitle` e `DateTime contextDate` genéricos em vez de
+     `Habit habit`).
+  4. CHAMAR esse novo método no provider de TrackingRecord (`saveTrackerRecord()`
+     em vault_provider.dart) logo após salvar o record.
+
+────────────────────────────────────────────────────────────────────────────────
+2.14 — INCONSISTÊNCIA DE IDIOMA: STRINGS EM INGLÊS MISTURADAS COM O RESTO
+       DO APP EM PORTUGUÊS
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — strings restantes de `automation_service.dart` foram
+  normalizadas para PT-BR.
+
+SEVERIDADE: P2 — visível ao usuário final, mas não quebra funcionalidade.
+
+EVIDÊNCIA: lib/services/automation_service.dart tem várias strings
+  voltadas ao usuário final em inglês, contrastando com o resto do app
+  (confirmado em português em toda a guidelines e em todos os outros
+  arquivos lidos): `'Automatic: Habit "..." completed.'`, `'Habit
+  Completion'`, `'Acompanhamento: ...'` (esse já em português, inconsistente
+  com os vizinhos), `'Task created automatically after completing the
+  habit.'`, `'Task created automatically from the configured contact
+  frequency.'` (em inglês, enquanto o texto análogo `'Contatar ${person.title}'`
+  está em português), `'KPI atingido'` (português, correto) vs `'Goal
+  Reached!'`/`'Congratulations! You reached every target for "..."'` (inglês).
+  Esse mesmo padrão de mistura PT/EN já foi notado de forma isolada na
+  Phase 12 (Task 12.B.2, labels de KPISourceType) — agora confirma-se que
+  é um problema mais amplo, presente em pelo menos 2 arquivos distintos.
+
+FILE: lib/services/automation_service.dart
+ACTION: EDIT — traduzir todas as strings voltadas ao usuário para
+  português, revisando: o texto de entry automática ao completar habit, o
+  título "Habit Completion", as 2 notas automáticas de Task ("Task created
+  automatically..." → "Task criada automaticamente..."), e as 2 strings
+  de notificação de Goal ("Goal Reached!"/"Congratulations!..." →
+  "Meta atingida!"/"Parabéns! Você alcançou todos os alvos de '...'.").
+
+────────────────────────────────────────────────────────────────────────────────
+2.15 — `checkKPIGoals()` AUTO-COMPLETA O GOAL INTEIRO QUANDO TODOS OS KPIs
+       BATEM A META — COMPORTAMENTO NÃO DOCUMENTADO NA SPEC
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — decisão aplicada: não auto-completar a meta pai. O app
+  notifica que todos os KPIs foram atingidos e deixa a conclusão da meta
+  como ação explícita do usuário.
+
+SEVERIDADE: P2 — extensão de comportamento, não um bug, mas muda o
+  `state` de um Goal automaticamente sem confirmação do usuário, o que
+  pode surpreender (ex.: usuário queria manter o Goal "active" por mais
+  tempo mesmo com os KPIs batidos, para acompanhamento contínuo).
+
+EVIDÊNCIA: `AutomationService.checkKPIGoals()` muda
+  `goal.state = GoalStatus.completed` automaticamente quando
+  `goal.kpis.every((k) => k.completed || k.currentValue >= k.targetValue)`.
+  A spec (PARTE: KPI) só descreve "auto-complete" no nível de KPI
+  individual disparando uma ação configurada — não descreve o Goal pai
+  mudando de estado sozinho.
+
+ACTION: DECISÃO DE PRODUTO — manter esse comportamento como extensão
+  documentada formalmente no guidelines.md (com uma forma de o usuário
+  desativar isso por Goal, ex.: `goal.autoCompleteWhenKpisHit: bool`), ou
+  trocar por uma notificação/sugestão não-destrutiva ("Todos os KPIs desta
+  meta foram atingidos — marcar como concluída?") em vez de mudar o estado
+  silenciosamente.
+
+────────────────────────────────────────────────────────────────────────────────
+2.3 — DASHBOARD: FALTA PAINEL pact_today; dashboard_panel.dart MORTO
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `BlockType.pactToday` existe, é renderizado no
+  dashboard, aparece nos blocos padrão e no modal de adicionar widgets.
+  `dashboard_panel.dart` foi mantido apenas como deprecated para referência
+  histórica, sem uso funcional.
+
+FILE: lib/models/dashboard_block.dart
+ACTION: EDIT
+ADD ao enum BlockType: `pactToday,` — renderização: lista de Habits com
+  `habitMode == HabitMode.pact && status == active`, cada linha com
+  checkbox de check-in de hoje + badge "dias restantes" (`endsAt - hoje`).
+
+FILE: lib/models/dashboard_panel.dart
+ACTION: DELETE (ou @Deprecated) — este arquivo define um SEGUNDO enum
+  `PanelType` com só 7 valores e uma classe `DashboardPanel` paralela e
+  incompatível com `DashboardBlock` (30 tipos, a implementação realmente
+  usada). Confirmar com `grep -r "PanelType\|DashboardPanel(" lib/` que
+  não há uso real antes de remover.
+
+────────────────────────────────────────────────────────────────────────────────
+2.4 — COMBINED ANALYSIS: CAMPOS FALTANDO; FALTA BLOCO DO PLUGIN OBSIDIAN
+      CHARTS (o bloco Tracker JÁ EXISTE)
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `MetricSource` tem `dimension/axis/showEmojiMarkers/
+  valueMapping`, `AnalysisChart` tem `normalization`,
+  `CombinedAnalysis` tem `defaultDateRange`, o form trata dimensão de mood
+  e `_writeObject()` anexa blocos Obsidian Tracker e Charts.
+
+FILE: lib/models/analysis_model.dart
+ACTION: EDIT
+  1. ADD a `MetricSource`: `String? dimension` ('pleasantness'|'energy',
+     null para fontes não-mood), `String axis` ('left'|'right', default
+     'left'), `bool showEmojiMarkers` (default false), `Map<String,num>?
+     valueMapping`.
+  2. ADD a `AnalysisChart`: `String normalization` ('none'|'dual_axis'|
+     'normalize_0_1', default 'dual_axis' quando há mood + tracker juntos).
+  3. ADD `DateTimeRange? defaultDateRange` a `CombinedAnalysis`.
+  4. Exigir `dimension` não-nulo na validação do form quando
+     `MetricType.mood` (mood sempre precisa de pleasantness OU energy
+     explícito).
+
+CORREÇÃO IMPORTANTE (achado original estava incompleto): o bloco do
+  plugin Obsidian TRACKER (```tracker, exemplo da PARTE 11) JÁ É gerado
+  dinamicamente — `VaultNotifier._writeObject()` em vault_provider.dart
+  chama `DataviewGenerator.generateTrackerPluginBlock(object)` para todo
+  `CombinedAnalysis` e anexa como seção `## Obsidian Tracker`. NÃO
+  duplicar esse trabalho. O que REALMENTE falta é só o bloco do plugin
+  Obsidian CHARTS (```chart, o outro exemplo da PARTE 11/PARTE 20) — isso
+  nunca é gerado em lugar nenhum (nem em `CombinedAnalysis.toMarkdown()`,
+  que só emite um comentário placeholder, nem em `_writeObject()`).
+
+FILE: lib/services/dataview_generator.dart
+ACTION: ADD método `generateChartsPluginBlock(CombinedAnalysis analysis)`
+  gerando:
+    ```chart
+    type: line
+    labels: [...]
+    series:
+      - title: ...
+        data: [...]
+    width: 80%
+    beginAtZero: false
+    ```
+  (dados reais extraídos do período corrente da análise).
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+ANCHOR: `VaultNotifier._writeObject()`, branch `else if (object is
+  CombinedAnalysis)` — ADD, junto ao bloco Tracker já existente, uma
+  segunda seção `## Obsidian Charts` usando o novo
+  `generateChartsPluginBlock`.
+
+FILE: lib/models/analysis_model.dart
+ACTION: EDIT — remover/condicionar o comentário placeholder em
+  `toMarkdown()` (`// Gráfico renderizado dinamicamente pelo Citrine`) já
+  que o bloco real passa a ser gerado externamente por `_writeObject`.
+
+────────────────────────────────────────────────────────────────────────────────
+2.5 — CONFLICT DETECTION (OBJECT IDENTIFICATION) NÃO EXISTE
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — existem `object_conflicts_screen.dart`,
+  `typeConflictedObjectsProvider`, flags `hasTypeConflict/conflictReason`
+  em `ContentObject`, marcação no loader e badge/entrada no menu Mais.
+
+FILE: lib/ui/screens/object_conflicts_screen.dart
+ACTION: CREATE (arquivo não existe)
+
+EVIDÊNCIA: guidelines, PARTE 1.1 + PARTE 21: "Se um objeto tem atributos
+  que apontam para tipos conflitantes..., o app exibe ⚠️ ao lado do título
+  em TODAS as telas onde aparece, e o objeto aparece na página 'Conflitos'
+  (menu Mais)." `type_signatures_screen.dart` (a tela de Object
+  Identification, lida por completo) não tem NENHUMA lógica de detecção
+  de conflito nem link para tal página. `sync_conflicts_screen.dart` trata
+  só de conflitos de SINCRONIZAÇÃO (merge do Google Drive) — conceito
+  diferente.
+
+ACTION:
+  1. CREATE a tela: lista objetos cujo `type` resolvido por Object
+     Identification diverge de outro atributo do arquivo (ex.: está na
+     pasta configurada para `task` mas tem `type: area` no frontmatter).
+     Cada linha: ícone + título + explicação textual + ação de resolução.
+  2. Acessível via menu "Mais".
+  3. Implementar detecção durante o parsing do vault
+     (`AllObjectsNotifier.build()`): comparar o tipo resolvido pela Object
+     Identification contra o `type` literal do frontmatter; se divergirem,
+     marcar um novo campo em memória `bool hasTypeConflict` +
+     `String? conflictReason` (em ContentObject, ou num provider paralelo
+     `conflictedObjectsProvider` para não poluir o model base).
+  4. ADD badge ⚠️ compartilhado (`ConflictBadge(visible: obj.hasTypeConflict)`)
+     reaproveitado em todas as listagens/detail views do app.
+
+────────────────────────────────────────────────────────────────────────────────
+2.6 — COMMAND CENTER: FALTAM SEÇÕES SYSTEMS/PRÓXIMAS SESSÕES; BUSCA NÃO
+      AGRUPA POR TIPO
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — ações rápidas incluem Novo System, há seções Systems
+  e Próximas Sessões, busca agrupa por tipo com limite por grupo e cobre
+  título/aliases/snippet/body, Escape fecha o overlay e Recentes usa
+  swipe-to-remove com undo.
+
+FILE: lib/ui/widgets/command_center_overlay.dart
+ACTION: EDIT
+
+EVIDÊNCIA (lido por completo, vs PARTE 23.9):
+  1. Ações rápidas hoje: "Nova Entrada"/"Nova Task"/"Novo Registro"/"Nova
+     Nota" — a 4ª deveria ser "Novo System".
+  2. Não existe seção "Systems" (3 chips de quick-run com tap→bottom sheet
+     Via C e long-press→detail view).
+  3. Não existe seção "Próximas Sessões" (Calendar Sessions) — código
+     mostra "Próximas Tasks" por deadline em vez disso.
+  4. Busca é `o.title.contains(query)` plano — sem agrupar por tipo
+     (header de grupo, máx. 4 por grupo) nem pesquisar aliases/body.
+  5. Sem fechar por tecla Escape.
+  6. Chips de "Recentes" sem swipe-to-remove + undo snackbar.
+
+ACTION:
+  1. Trocar 4º botão para "Novo System" → CreateSystemForm (Task 3.9).
+  2. ADD seção Systems: novo provider `topSystemsProvider` (3 com maior
+     `run_count` derivado); chips horizontais "▶ nome"; tap→quick-run (Via
+     C); long-press→detail view.
+  3. ADD seção Próximas Sessões: baseada em `calendarSessionsProvider`
+     (Phase 9 Task 9.A.7), `date.isAfter(now)`, top 3, dot colorido =
+     `session.color`.
+  4. Reescrever busca: agrupar `searchResults` por `obj.type`, header por
+     grupo, truncar em 4 por grupo; também testar contra aliases (mood) e
+     primeiros 200 caracteres do corpo quando disponível.
+  5. ADD `Shortcuts`/`Actions` capturando `LogicalKeyboardKey.escape` → `_close()`.
+  6. ADD `Dismissible`/swipe horizontal nos chips de "Recentes",
+     removendo de `historyProvider` + `SnackBar` com "Undo".
+
+────────────────────────────────────────────────────────────────────────────────
+2.7 — SCHEDULER: SERIALIZAÇÃO camelCase EM VEZ DE snake_case
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `RepeatTypeX.specName/fromSpecName` existe,
+  `SchedulerRule.toMap()` grava snake_case e `fromMap()` lê snake_case e
+  camelCase legado.
+
+FILE: lib/models/scheduler.dart
+ACTION: EDIT
+
+CORREÇÃO DE LOCALIZAÇÃO (a Phase 9 Task 9.C.4 original apontava para uma
+  classe `SchedulerRuleType`/campo `ruleType` que NÃO existe; a estrutura
+  real, lida diretamente, é `Scheduler.rules: List<SchedulerRule>`, cada
+  `SchedulerRule.repeatType: RepeatType`, com `'repeat_type': repeatType.name`
+  gravando "numberOfDays" em vez de "number_of_days").
+
+  `RepeatType` tem 13 valores: os 11 da spec + 2 extras
+  (`daysOfTheme`, `daysWithBlock` — extensão não documentada, decisão de
+  produto igual à Task 0.3/OPÇÃO B: documentar ou remover).
+
+ADD extension:
+  extension RepeatTypeX on RepeatType {
+    String get specName => switch (this) {
+      RepeatType.numberOfDays            => 'number_of_days',
+      RepeatType.daysOfWeek              => 'days_of_week',
+      RepeatType.numberOfWeeks           => 'number_of_weeks',
+      RepeatType.numberOfMonths          => 'number_of_months',
+      RepeatType.numberOfHours           => 'number_of_hours',
+      RepeatType.daysAfterLastStart      => 'days_after_last_start',
+      RepeatType.daysAfterLastEnd        => 'days_after_last_end',
+      RepeatType.numberOfDaysPerPeriod   => 'days_per_period',
+      RepeatType.linkedItemAppears       => 'linked_item_appears',
+      RepeatType.nDaysAfterLinkedItem    => 'n_days_after_linked_item',
+      RepeatType.firstBusinessDayOfMonth => 'first_business_day_of_month',
+      RepeatType.daysOfTheme             => 'days_of_theme',
+      RepeatType.daysWithBlock           => 'days_with_block',
+    };
+    static RepeatType fromSpecName(String s) => RepeatType.values.firstWhere(
+      (t) => t.specName == s || t.name == s, orElse: () => RepeatType.numberOfDays);
+  }
+
+EDIT `SchedulerRule.toMap()`: `'repeat_type': repeatType.specName,`
+EDIT `SchedulerRule.fromMap()`: `repeatType: RepeatTypeX.fromSpecName(map['repeat_type']?.toString() ?? ''),`
+
+  (Esta task SUBSTITUI integralmente a Phase 9 Task 9.C.4 original — não
+  aplicar a versão antiga, ela referencia símbolos inexistentes.)
+
+────────────────────────────────────────────────────────────────────────────────
+2.8 — AUTO-CATEGORIA "[[people]]" NUNCA APLICADA A Person; OUTRAS 4
+      ENTIDADES GANHAM AUTO-CATEGORIAS QUE A SPEC NÃO PEDE
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `PeopleNotifier.addPerson()` aplica `[[people]]`.
+  As demais auto-categorias foram mantidas como extensão legada por
+  compatibilidade, mesma decisão de produto da Task 0.3.
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+
+EVIDÊNCIA: `PeopleNotifier.addPerson()` NÃO adiciona nenhuma categoria
+  automática (spec PARTE 8: "categories — auto-inclui [[people]]" —
+  ausente). Já `OrganizersNotifier.addOrganizer()` adiciona
+  `'[[organizers]]'`, `TrackersNotifier.addTracker()` adiciona
+  `'[[trackers]]'`, `SnapshotsNotifier.addSnapshot()` adiciona
+  `'[[snapshots]]'`, e `saveTrackerRecord()` adiciona
+  `'[[tracker_records]]'` — NENHUM desses 4 é pedido pela spec.
+
+ACTION:
+  1. ADD em `PeopleNotifier.addPerson()`, antes de persistir:
+       if (!person.categories.contains('[[people]]')) {
+         person.categories.add('[[people]]');
+       }
+  2. Para Organizer/Tracker/Snapshot/TrackingRecord: REMOVER essas
+     auto-categorias (recomendado — não têm base na spec e poluem o
+     frontmatter sem benefício funcional comprovado), OU documentar
+     formalmente como extensão no guidelines.md (decisão de produto, igual
+     à Task 0.3/OPÇÃO B).
+
+────────────────────────────────────────────────────────────────────────────────
+2.9 — FALTA HOOK "CHECAR PACTS VENCIDOS A CADA ABERTURA DO APP"
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `HabitsNotifier.build()` chama
+  `AutomationService.checkPactExpirations()` e o serviço notifica pacts
+  ativos vencidos sem `pactOutcome`.
+
+FILE: lib/providers/vault_provider.dart + lib/services/automation_service.dart
+ACTION: ADD
+
+EVIDÊNCIA: spec (PARTE 2 OBJETO 4 + PARTE 22 #14): comparar `ends_at` com
+  hoje para Habits `habit_mode: pact`, `status: active`; se vencido e
+  `pact_outcome == null`, agendar notificação de Steering Sheet. O padrão
+  equivalente já existe e funciona para People
+  (`PeopleNotifier.build()` chama `AutomationService.checkPersonContacts()`
+  via `Future.microtask`) mas NÃO tem equivalente para Habits/Pacts.
+
+ACTION: replicar o padrão de People para Habits:
+  class HabitsNotifier extends Notifier<List<Habit>> {
+    @override
+    List<Habit> build() {
+      final habits = ref.watch(objectsByTypeProvider('habit')).cast<Habit>();
+      if (habits.isNotEmpty) {
+        Future.microtask(() => AutomationService.checkPactExpirations(ref, habits));
+      }
+      return habits;
+    }
+    ...
+  }
+  E implementar `AutomationService.checkPactExpirations()` (novo método),
+  espelhando `checkPersonContacts()`: filtrar `habitMode == HabitMode.pact
+  && status == HabitStatus.active && endsAt != null &&
+  !endsAt!.isAfter(DateTime.now()) && pactOutcome == null`, agendar a
+  notificação/trigger da Steering Sheet para cada um.
+  (DEPENDE da Task 0.1 — campos de Pact em Habit — já terem sido aplicados.)
+
+────────────────────────────────────────────────────────────────────────────────
+2.10 — SUBTASKS NÃO USAM SINTAXE DO TASKS PLUGIN DO OBSIDIAN
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `Subtask` possui `dueDate` e `priority`; `Task.toMarkdown()`
+  grava checklist com `[due:: ...]` e `[priority:: ...]`; o parser lê esses
+  campos de volta.
+
+FILE: lib/models/task_model.dart (escrita) + lib/models/shared_types.dart
+      (classe Subtask) + lib/services/markdown_parser.dart (leitura)
+ACTION: EDIT
+
+EVIDÊNCIA: guidelines PARTE 21: "Tasks em daily notes e nos arquivos de
+  task usam sintaxe do Tasks Plugin: `- [ ] Título [due:: 2024-12-31]
+  [priority:: high]`." `Task.toMarkdown()` escreve subtasks sem nenhum
+  campo inline; `MarkdownParser.parseSubtasks()` usa um regex que captura
+  tudo após o checkbox como texto cru, sem extrair `[chave:: valor]`.
+
+ACTION:
+  1. lib/models/shared_types.dart, classe `Subtask`: ADD `DateTime?
+     dueDate;` e `TaskPriority? priority;`.
+  2. lib/models/task_model.dart, `toMarkdown()`: ao serializar cada
+     subtask, anexar sintaxe inline quando aplicável:
+       String renderSubtaskLine(Subtask s) {
+         final check = s.completed ? '[x]' : '[ ]';
+         final title = s.slug != null ? '[[${s.slug!}]]' : s.title;
+         final fields = StringBuffer();
+         if (s.dueDate != null) {
+           fields.write(' [due:: ${s.dueDate!.toIso8601String().split('T').first}]');
+         }
+         if (s.priority != null && s.priority != TaskPriority.none) {
+           fields.write(' [priority:: ${s.priority!.name}]');
+         }
+         return '- $check $title$fields';
+       }
+  3. lib/services/markdown_parser.dart, `parseSubtasks()`: extrair `[due::
+     ...]` e `[priority:: ...]` do texto capturado, populando os novos
+     campos de `Subtask`. Aplicar o mesmo tratamento em
+     `parseTasksFromDailyNote()` (mesma sintaxe de checklist na seção
+     `## Tasks` da daily note).
+
+────────────────────────────────────────────────────────────────────────────────
+2.11 — ÍNDICE DATAVIEW DE MOOD USA CAMPO ANTIGO DE 1 DIMENSÃO
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `_writeMoodIndex()` usa `mood_emoji`,
+  `mood_label`, `mood_pleasantness` e `mood_energy`.
+
+FILE: lib/services/dataview_generator.dart
+ACTION: EDIT
+ANCHOR: `_writeMoodIndex()` — hoje `TABLE mood AS "Humor"... WHERE mood`.
+  Depende da Phase 9 Tasks 9.A.8 (MoodDefinition 2 eixos) e 9.C.11
+  (gravação dos 4 campos de mood na daily note) já terem sido aplicadas.
+REPLACE por:
+    ```dataview
+    TABLE mood_emoji AS "😊", mood_label AS "Humor", mood_pleasantness AS "Agradabilidade", mood_energy AS "Energia", date AS "Data"
+    FROM "daily"
+    WHERE type = "daily_note" AND mood_label
+    SORT file.name DESC
+    LIMIT 30
+    ```
+  (idêntico ao exemplo "Humor tendência" já presente na PARTE 20 da
+  guidelines).
+
+────────────────────────────────────────────────────────────────────────────────
+2.12 — FALTAM ÍNDICES DATAVIEW DE SYSTEMS E PACTS
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `regenerateAll()` chama `_writeSystemsIndex()` e
+  `_writePactsIndex()`, ambos usando `FROM "app"`.
+
+FILE: lib/services/dataview_generator.dart
+ACTION: ADD `_writeSystemsIndex()` e `_writePactsIndex()`, registrados em
+  `regenerateAll()`, usando as queries já prontas na PARTE 20:
+    -- Systems por frequência
+    TABLE trigger AS "Quando", run_count AS "Execuções", estimated_minutes AS "Estimado"
+    FROM "app" WHERE type = "system"
+    SORT run_count DESC
+
+    -- Todos os pacts ativos
+    TABLE ends_at AS "Termina", hypothesis AS "Hipótese"
+    FROM "app" WHERE type = "habit" AND habit_mode = "pact" AND status = "active"
+    SORT ends_at ASC
+  (já usando `FROM "app"`, consistente com a Task 1.1/2.x — não usar
+  `FROM "systems"` nem `FROM "habits"`.)
+
+================================================================================
+TIER 3 — POLIMENTO E DETALHES (P2)
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+3.1 — ContentObject SEM CAMPO `links` UNIVERSAL
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `ContentObject.links` existe, é serializado em
+  `toBaseMap()`/`loadBaseMap()`, e `Note` não mantém mais um campo `links`
+  duplicado fora da base.
+
+FILE: lib/models/content_object.dart
+ACTION: EDIT — ADD `List<String> links = [];` na base (PARTE 16 + PARTE 20
+  "Frontmatter Universal" listam `links:` como comum a TODOS os tipos).
+  Incluir em `toBaseMap()`/`loadBaseMap()`. Depois, remover/redirecionar
+  campos `links`/`socialRefs` duplicados específicos de Task/System/
+  SocialPost para usar o campo base, evitando duas fontes de verdade.
+
+────────────────────────────────────────────────────────────────────────────────
+3.2 — Project SEM CAMPO `scheduler`
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `Project.scheduler` foi adicionado com serialização,
+  parsing e API específica `copyProjectWith()`. `SchedulerService` agora tem
+  `shouldRestartScheduledProject()` para a regra de reinício sem mutação
+  silenciosa de vault em views de leitura.
+
+FILE: lib/models/project_model.dart
+ACTION: EDIT — ADD `Scheduler? scheduler;` (spec PARTE 10: "projeto
+  recorre/reinicia no schedule"). Incluir em toMarkdown/fromMarkdown/
+  copyWith. Implementar a lógica de "reiniciar" o projeto quando o
+  scheduler dispara em scheduler_service.dart (não auditado ainda).
+
+────────────────────────────────────────────────────────────────────────────────
+3.3 — Person SEM CAMPO `notes`
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `Person.notes` foi adicionado e persiste como corpo do
+  markdown, com leitura em `fromMarkdown()` e preservação no `copyWith()`.
+
+FILE: lib/models/people_model.dart
+ACTION: EDIT — ADD `String? notes;` (spec PARTE 8 lista `notes` entre as
+  propriedades de Person). Incluir em toMarkdown/fromMarkdown
+  (recomendado: como corpo do markdown, não frontmatter).
+
+────────────────────────────────────────────────────────────────────────────────
+3.4 — Snapshot SEM `photos`; `subject` NÃO É WIKILINK REAL
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `Snapshot.photos` foi adicionado; snapshots gravam
+  `subject: [[...]]` com retrocompatibilidade para `parent_id`; parsing de
+  data/KPI agora é tolerante a formatos reais do frontmatter.
+
+FILE: lib/models/snapshot_model.dart
+ACTION: EDIT
+  1. ADD `List<String> photos = [];`.
+  2. Renomear/gravar `parentId` como WikiLink (`'[[${parentId}]]'`) sob a
+     chave `subject` no frontmatter, não `parent_id` cru.
+  3. Avaliar generalizar `kpiValues: Map<String,double>` para
+     `Map<String,dynamic> stateData` (spec: "state_data — estado
+     serializado", genérico) — manter `kpiValues` como getter de
+     conveniência se quiser preservar compatibilidade.
+
+────────────────────────────────────────────────────────────────────────────────
+3.5 — ReminderConfig.ringOnSilent COM DEFAULT ERRADO
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — default do construtor e fallback de `fromMap()` agora é
+  `ringOnSilent: true`.
+
+FILE: lib/models/reminder_config.dart
+ACTION: EDIT — `this.ringOnSilent = false,` → `this.ringOnSilent = true,`
+  (spec PARTE 13: "tocar mesmo no silencioso (default: sim)", relevante
+  quando `type == NotificationType.alarm`).
+
+────────────────────────────────────────────────────────────────────────────────
+3.6 — TRIPLE CHECK SHEET: BOTÕES STUB; SEM PROTEÇÃO DE DISMISS; SEM
+      VALIDAÇÃO; SEM MODO BATCH/READ-ONLY
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — o sheet ganhou modo read-only com "Re-executar
+  diagnóstico", suporte a fila batch no título, `PopScope` para bloquear
+  fechamento com diagnóstico não salvo, ações reais para editar tarefa e
+  registrar pedido de ajuda, e save bloqueado quando read-only.
+
+FILE: lib/ui/widgets/triple_check_sheet.dart
+ACTION: EDIT
+
+EVIDÊNCIA (lido por completo, vs PARTE 23.5):
+  1. `_openEditTask()` é literalmente `Navigator.of(context).pop();` — os
+     botões "Reformular"/"Criar subtarefas"/"Adicionar dependência"/"Pedir
+     ajuda" fecham o sheet e não fazem mais nada.
+  2. Sem `PopScope`/proteção contra fechar sem salvar (spec: vibrar +
+     shake ao tentar fechar sem diagnóstico salvo).
+  3. Sem modo batch (PMN → "Tasks paradas" → "Task N de M").
+  4. Sem modo read-only para reabrir diagnóstico já salvo.
+
+ACTION:
+  1. Implementar cada ação de fato: "Reformular"/"Criar subtarefas"/
+     "Adicionar dependência" → navegar para CreateTaskForm já com o campo
+     relevante focado; "Pedir ajuda" → abrir picker de People.
+  2. Envolver com `PopScope(canPop: _saved, onPopInvoked: ... haptic +
+     shake quando !_saved)`.
+  3. ADD parâmetro `List<Task>? batchQueue`; quando presente, mostrar
+     "Task N de M" e avançar automaticamente ao salvar.
+  4. ADD parâmetro `bool readOnly = false`; abrir read-only quando vindo
+     do badge ⚠ do card (não do menu ⋯), com botão "Re-executar diagnóstico".
+
+────────────────────────────────────────────────────────────────────────────────
+3.7 — STEERING SHEET: SEM BOTÃO X; SEM VALIDAÇÃO POR ETAPA; DEFAULT DE
+      DURAÇÃO ERRADO
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — header tem botão X com confirmação, etapa 1/2 bloqueia
+  avanço sem dados obrigatórios, duração usa campo numérico livre e inicia
+  com a duração original do ciclo quando disponível.
+
+FILE: lib/ui/widgets/steering_sheet.dart
+ACTION: EDIT
+
+EVIDÊNCIA (lido por completo, vs PARTE 23.6):
+  1. Sem botão X/fechar com confirmação ("Sair"/"Continuar revisão").
+  2. Etapa 1: "Avançar" nunca desabilitado mesmo com texto vazio.
+  3. Etapa 2: "Avançar" nunca desabilitado sem os 2 radios selecionados.
+  4. `_persistDays`: dropdown fixo [7,14,21,30,60,90] default 30, em vez
+     de campo numérico livre com default = duração original do ciclo.
+
+ACTION:
+  1. ADD `IconButton(icon: Icons.close)` no header → `showDialog` com
+     "Você pode revisar depois..." + "Sair"/"Continuar revisão".
+  2. `onPressed` Etapa 1 → `_reflectionController.text.trim().isNotEmpty ? _nextStep : null`.
+  3. `onPressed` Etapa 2 → `(_hypothesisEvaluation != null && _endedReason != null) ? _nextStep : null`.
+  4. Trocar dropdown por `TextField` numérico, inicializado com:
+     `_persistDays = (widget.habit.endsAt != null && widget.habit.startedAt != null)
+        ? widget.habit.endsAt!.difference(widget.habit.startedAt!).inDays : 30;`
+
+────────────────────────────────────────────────────────────────────────────────
+3.8 — FAB: FALTA CARD "SYSTEM"; "SESSÃO" ABRE POMODORO EM VEZ DE CALENDAR
+      SESSION
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `create_menu_sheet.dart` já contém card "System" que
+  abre `CreateSystemForm`, e "Nova sessão" abre `CreateCalendarSessionForm`
+  em vez de Pomodoro.
+
+FILE: lib/ui/widgets/create_menu_sheet.dart
+ACTION: EDIT (substitui/complementa a Phase 9 Task 9.B.6 original)
+
+EVIDÊNCIA: grid atual ("Capture"/"Criar") não tem nenhum card para criar
+  System; card "Sessão" abre `PomodoroScreen` direto em vez de um form de
+  Calendar Session; card "Journal" abre direto CreateEntryForm sem
+  sub-menu Entrada completa/Observação rápida/PMN.
+
+ACTION: ao reestruturar para as 4 abas Journal/Plan/Record/Note (Phase 9
+  Task 9.B.6), garantir explicitamente:
+  1. Aba "Note" inclui "⚙️ System" → CreateSystemForm (Task 3.9).
+  2. Aba "Plan" → "Session" abre CreateCalendarSessionForm (Phase 9 Task
+     9.C.2), NÃO PomodoroScreen.
+  3. Aba "Journal" → "Entry" abre segmented control Entrada completa/
+     Observação rápida ANTES de abrir qualquer form.
+
+────────────────────────────────────────────────────────────────────────────────
+3.9 — NÃO EXISTE lib/ui/forms/create_system_form.dart
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `lib/ui/forms/create_system_form.dart` existe e cobre
+  título, gatilho, tempo estimado, steps/substeps, organizadores, descrição
+  e scheduler opcional.
+
+FILE: lib/ui/forms/create_system_form.dart
+ACTION: CREATE (confirmado ausente — todos os outros 24
+  `create_*_form.dart` existem, este não)
+
+ACTION: criar conforme PARTE 23.7 + PARTE 2 OBJETO 9: título, campo
+  Trigger, tempo estimado, lista de steps (texto + estimativa + substeps),
+  organizadores/tags, notas, botão "✨ Estruturar com IA" (auditar se já
+  existe alguma chamada à API da Anthropic em outro form do app antes de
+  decidir a implementação dessa parte — não confirmado nesta auditoria).
+
+────────────────────────────────────────────────────────────────────────────────
+3.10 — OBJECT IDENTIFICATION: TRADUÇÃO DE TIPOS INCOMPLETA
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `_translateType()` cobre `system`, `tracker`, `entry`,
+  `reminder`, `social_post`, `mood_definition` e corrige labels em inglês
+  restantes como `calendar_session`, `task`, `habit`, `note`, `resource` e
+  `person`.
+
+FILE: lib/ui/screens/type_signatures_screen.dart
+ACTION: EDIT
+ANCHOR: `_translateType()` — cobre task, idea, habit, project, goal,
+  calendar_session ("Calendar Event", inglês), note, resource, person,
+  area, activity, place, label, organizer. Faltam: system, tracker, entry,
+  reminder, social_post, mood_definition.
+ADD ao switch: 'system'→'Sistema', 'tracker'→'Rastreador',
+  'entry'→'Entrada de Diário', 'reminder'→'Lembrete',
+  'social_post'→'Post Social', 'mood_definition'→'Definição de Humor'.
+CORRIGIR 'calendar_session'→'Sessão de Calendário' (remover inglês).
+REMOVER 'idea' quando a Task 0.3 for resolvida.
+
+────────────────────────────────────────────────────────────────────────────────
+3.11 — CORPO DA DAILY NOTE (## Habits) USA WIKILINK EM VEZ DO TÍTULO DO
+       HABIT
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `generateDailyNoteBody()` aceita `habitLabels` e
+  `pactHabitSlugs`; o `VaultNotifier` passa os hábitos carregados para
+  renderizar títulos legíveis e sufixo `← pact` em vez de `[[slug]]`.
+
+FILE: lib/services/markdown_parser.dart
+ACTION: EDIT
+ANCHOR: `generateDailyNoteBody()`, bloco `if (habits.isNotEmpty)` — escreve
+  `'- $status [[$slug]]$details'`. Exemplo da spec usa o TÍTULO em texto
+  puro: `- [x] Meditar (Slot 1: 08:00)` / `- [x] Escrever 100 palavras ←
+  pact`.
+ACTION:
+  1. Mudar assinatura de `generateDailyNoteBody()` para também receber
+     `List<Habit> habitDefs` (ou `Map<String,String> slugToTitle`) e usar
+     `habit.title` na renderização em vez do slug.
+  2. ADD sufixo " ← pact" quando `habit.habitMode == HabitMode.pact`
+     (depende da Task 0.1).
+  3. Opcional: incluir rótulo do slot ("Slot 1: 08:00") lendo de
+     `habit.slots` pelo índice usado no toggle.
+
+────────────────────────────────────────────────────────────────────────────────
+3.12 — SystemDefinition.scheduler É EXTENSÃO NÃO DOCUMENTADA
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — extensão documentada em `guidelines.md`; `CreateSystemForm`
+  já expõe/persiste scheduler opcional em `SystemDefinition.scheduler`.
+
+FILE: lib/models/system_model.dart
+ACTION: DECISÃO — campo `Scheduler? scheduler` não está na PARTE 2 OBJETO
+  9 da spec. Documentar formalmente no guidelines.md como extensão
+  ("Systems podem ter um Scheduler opcional para execução recorrente") ou
+  remover se não houver UI conectada (conferir quando create_system_form.dart
+  — Task 3.9 — for criado).
+
+================================================================================
+COBERTURA E PRÓXIMOS PASSOS (Phase 17+, depois de TIER 0–2 implementados)
+================================================================================
+
+Lido integralmente nesta auditoria: todos os 35 models de lib/models/;
+lib/services/obsidian_service.dart, markdown_parser.dart,
+dataview_generator.dart, automation_service.dart, kpi_engine.dart;
+lib/models/system_model.dart, scheduler.dart; ~90% de
+lib/providers/vault_provider.dart (cortado em `importExistingVault()`);
+lib/ui/widgets/triple_check_sheet.dart, steering_sheet.dart,
+create_menu_sheet.dart, command_center_overlay.dart, habit_row.dart;
+lib/ui/screens/type_signatures_screen.dart.
+
+NÃO auditado ainda (recomendado para uma Phase 17 futura, DEPOIS de TIER
+0–2 estarem implementados e validados com `flutter analyze` + `flutter test`):
+  • Restante de vault_provider.dart (`importExistingVault`,
+    `updateObject`/`deleteObject` completos de VaultNotifier).
+  • lib/services/notification_service.dart, scheduler_service.dart
+    (implementação real dos 11+2 tipos de regra), sync_manager.dart,
+    sync_queue_service.dart, google_drive_sync_service.dart,
+    backup_service.dart.
+  • Todos os 24 arquivos de lib/ui/forms/ (nenhum lido diretamente —
+    inclui create_habit_form.dart, crítico para confirmar a UI de criação/
+    edição de Pact depois da Task 0.1).
+  • A maior parte de lib/ui/screens/ (~55 arquivos) e lib/ui/widgets/
+    (~65 arquivos) — incluindo mood_chart_widget.dart, analysis_calendar.dart,
+    mood_settings_screen.dart, system_detail_screen.dart, e a confirmação
+    de que combined_analysis_screen.dart realmente não existe (não está
+    na listagem de arquivos do projeto, apesar de a PARTE 23.4 descrever
+    uma tela dedicada inteira).
+
+================================================================================
+END OF GAP ANALYSIS — ADENDO V2 (Phases 12–16 consolidadas)
+================================================================================
+
+
+GAP ANALYSIS v1
+Audience: AI coding agent with full repo access
+Convention: every instruction is an atomic, unambiguous action on a specific
+            file + location. No explanations unless they prevent a mistake.
+================================================================================
+
+HOW TO READ THIS DOCUMENT
+  ► FILE: path from repo root
+  ► ACTION: CREATE | EDIT | ADD_FIELD | ADD_METHOD | REPLACE | DELETE
+  ► ANCHOR: exact class/method/line to locate before acting
+  ► INSTRUCTION: what to write / change
+  Each task is self-contained. Do them in PHASE order — later phases depend
+  on earlier ones.
+
+PACKAGE DEPENDENCIES — add to pubspec.yaml before starting:
+  flutter_colorpicker: ^1.1.0
+  package_info_plus: ^8.0.0
+  google_fonts: ^6.2.1   ← already present; confirm
+  path_provider: ^2.1.0  ← already present; confirm
+
+================================================================================
+PHASE 1 — THEME SYSTEM
+Goal: replace hardcoded AppColors with a runtime-switchable ThemeData
+      driven by a persisted AppThemeConfig model + ThemeProvider.
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 1.1 — CREATE lib/models/app_theme_config.dart
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO/EQUIVALENTE — `lib/models/app_theme_config.dart` existe
+  com presets e cor de acento; a arquitetura atual usa presets leves por
+  `SettingsProvider`, não temas customizados JSON completos do v1 antigo.
+
+FILE: lib/models/app_theme_config.dart
+ACTION: CREATE (file does not exist)
+
+Create a pure-Dart class AppThemeConfig with:
+
+FIELDS (all required, no nullable):
+  String id
+  String name
+  bool isPreset          // preset=true → cannot be deleted by user
+  // Light mode ARGB ints (store as int, convert with Color(value))
+  int lightPrimary       // default 0xFFFFB000
+  int lightSecondary     // default 0xFF0EA5E9
+  int lightSurface       // default 0xFFFFFFFF
+  int lightBackground    // default 0xFFF8F9FB
+  int lightTextPrimary   // default 0xFF1A1D26
+  // Dark mode ARGB ints
+  int darkPrimary        // default 0xFFFFB000
+  int darkSecondary      // default 0xFF0EA5E9
+  int darkSurface        // default 0xFF1A1C25
+  int darkBackground     // default 0xFF0F1117
+  int darkTextPrimary    // default 0xFFF3F4F6
+  // Font
+  String fontFamily      // default 'Inter'
+
+METHODS:
+
+  factory AppThemeConfig.fromJson(Map<String,dynamic> j) → reads all fields,
+    uses int.tryParse fallback to defaults listed above.
+
+  Map<String,dynamic> toJson() → returns all fields as JSON-safe map.
+
+  ThemeData toThemeData(Brightness brightness) →
+    final isPrimary = brightness == Brightness.dark;
+    final primary   = Color(isPrimary ? darkPrimary   : lightPrimary);
+    final secondary = Color(isPrimary ? darkSecondary : lightSecondary);
+    final surface   = Color(isPrimary ? darkSurface   : lightSurface);
+    final bg        = Color(isPrimary ? darkBackground: lightBackground);
+    final txtPri    = Color(isPrimary ? darkTextPrimary: lightTextPrimary);
+    return ThemeData(
+      brightness: brightness,
+      colorScheme: ColorScheme(
+        brightness: brightness,
+        primary: primary,
+        onPrimary: Colors.white,
+        secondary: secondary,
+        onSecondary: Colors.white,
+        surface: surface,
+        onSurface: txtPri,
+        background: bg,
+        onBackground: txtPri,
+        error: const Color(0xFFEF4444),
+        onError: Colors.white,
+      ),
+      scaffoldBackgroundColor: bg,
+      cardColor: surface,
+      dividerColor: brightness == Brightness.dark
+          ? const Color(0xFF2D3040) : const Color(0xFFE5E7EB),
+      textTheme: GoogleFonts.getTextTheme(fontFamily),
+      useMaterial3: true,
+    );
+
+  static List<AppThemeConfig> get presets → returns 5 hardcoded presets:
+    id='citrine',   name='Citrine',   isPreset=true  → use existing AppColors values
+    id='ocean',     name='Oceano',    isPreset=true
+      light: primary=0xFF0284C7, secondary=0xFF0EA5E9, surface=0xFFFFFFFF,
+             bg=0xFFF0F9FF, textPrimary=0xFF0C4A6E
+      dark:  primary=0xFF38BDF8, secondary=0xFF7DD3FC, surface=0xFF0C1A2E,
+             bg=0xFF060D1A, textPrimary=0xFFE0F2FE
+    id='forest',    name='Floresta',  isPreset=true
+      light: primary=0xFF16A34A, secondary=0xFF22C55E, surface=0xFFFFFFFF,
+             bg=0xFFF0FDF4, textPrimary=0xFF14532D
+      dark:  primary=0xFF4ADE80, secondary=0xFF86EFAC, surface=0xFF0D1F14,
+             bg=0xFF061009, textPrimary=0xFFDCFCE7
+    id='dusk',      name='Anoitecer', isPreset=true
+      light: primary=0xFF7C3AED, secondary=0xFFA78BFA, surface=0xFFFFFFFF,
+             bg=0xFFFAF5FF, textPrimary=0xFF3B0764
+      dark:  primary=0xFFA78BFA, secondary=0xFFDDD6FE, surface=0xFF1A0F2E,
+             bg=0xFF0D0618, textPrimary=0xFFEDE9FE
+    id='minimal',   name='Minimalista', isPreset=true
+      light: primary=0xFF18181B, secondary=0xFF52525B, surface=0xFFFFFFFF,
+             bg=0xFFFAFAFA, textPrimary=0xFF09090B
+      dark:  primary=0xFFFAFAFA, secondary=0xFFA1A1AA, surface=0xFF18181B,
+             bg=0xFF09090B, textPrimary=0xFFFAFAFA
+    All presets use fontFamily='Inter'.
+
+IMPORTS NEEDED: flutter/material.dart, google_fonts/google_fonts.dart
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 1.2 — CREATE lib/providers/theme_provider.dart
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO/EQUIVALENTE — `theme_provider.dart` existe e expõe
+  `themeProvider`, `availableThemesProvider` e `activeThemeConfigProvider`,
+  convertendo `themeMode/activeThemeId` persistidos em `SettingsProvider`
+  para `ThemeData` light/dark.
+
+FILE: lib/providers/theme_provider.dart
+ACTION: CREATE (file does not exist)
+
+Dependencies: shared_preferences (via sharedPreferencesProvider from
+              lib/providers/settings_provider.dart), AppThemeConfig.
+
+STATE CLASS: AppThemeState
+  final List<AppThemeConfig> themes   // presets + user-saved
+  final String activeThemeId          // default 'citrine'
+  final String themeMode              // 'auto' | 'light' | 'dark', default 'auto'
+
+  AppThemeConfig get activeTheme →
+    themes.firstWhere((t) => t.id == activeThemeId,
+                      orElse: () => AppThemeConfig.presets.first)
+
+  ThemeMode get flutterThemeMode →
+    themeMode == 'light' ? ThemeMode.light :
+    themeMode == 'dark'  ? ThemeMode.dark  : ThemeMode.system
+
+NOTIFIER CLASS: ThemeNotifier extends Notifier<AppThemeState>
+  PREFS KEYS:
+    'theme_active_id'   → String
+    'theme_mode'        → String ('auto'|'light'|'dark')
+    'theme_saved_list'  → JSON String of List<Map>
+
+  build() →
+    prefs = ref.read(sharedPreferencesProvider)
+    savedJson = prefs.getString('theme_saved_list')
+    userThemes = savedJson != null
+        ? (jsonDecode(savedJson) as List).map(AppThemeConfig.fromJson).toList()
+        : <AppThemeConfig>[]
+    return AppThemeState(
+      themes: [...AppThemeConfig.presets, ...userThemes],
+      activeThemeId: prefs.getString('theme_active_id') ?? 'citrine',
+      themeMode: prefs.getString('theme_mode') ?? 'auto',
+    )
+
+  void activateTheme(String id) →
+    prefs.setString('theme_active_id', id)
+    state = state.copyWith(activeThemeId: id)
+
+  void setThemeMode(String mode) →   // 'auto'|'light'|'dark'
+    prefs.setString('theme_mode', mode)
+    state = state.copyWith(themeMode: mode)
+
+  void saveTheme(AppThemeConfig theme) →
+    userThemes = state.themes.where((t) => !t.isPreset).toList()
+    updated = [...userThemes, theme]
+    prefs.setString('theme_saved_list', jsonEncode(updated.map((t)=>t.toJson()).toList()))
+    state = state.copyWith(themes: [...AppThemeConfig.presets, ...updated])
+    activateTheme(theme.id)
+
+  void updateTheme(AppThemeConfig theme) →
+    userThemes = state.themes.where((t) => !t.isPreset).toList()
+    updated = userThemes.map((t) => t.id == theme.id ? theme : t).toList()
+    prefs.setString('theme_saved_list', jsonEncode(updated.map((t)=>t.toJson()).toList()))
+    state = state.copyWith(themes: [...AppThemeConfig.presets, ...updated])
+
+  void deleteTheme(String id) →
+    // Guard: cannot delete presets
+    if (AppThemeConfig.presets.any((p) => p.id == id)) return
+    userThemes = state.themes.where((t) => !t.isPreset && t.id != id).toList()
+    prefs.setString('theme_saved_list', jsonEncode(userThemes.map((t)=>t.toJson()).toList()))
+    var newActiveId = state.activeThemeId
+    if (newActiveId == id) newActiveId = 'citrine'
+    state = state.copyWith(
+      themes: [...AppThemeConfig.presets, ...userThemes],
+      activeThemeId: newActiveId,
+    )
+
+  void duplicateTheme(String id) →
+    source = state.themes.firstWhere((t) => t.id == id)
+    copy = source.toJson()
+    copy['id'] = DateTime.now().millisecondsSinceEpoch.toString()
+    copy['name'] = 'Cópia de ${source.name}'
+    copy['isPreset'] = false
+    saveTheme(AppThemeConfig.fromJson(copy))
+
+PROVIDER:
+  final themeProvider = NotifierProvider<ThemeNotifier, AppThemeState>(
+      ThemeNotifier.new);
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 1.3 — EDIT lib/main.dart — connect ThemeProvider to MaterialApp
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `main.dart` consome `themeProvider` e conecta
+  `theme`, `darkTheme` e `themeMode` no `MaterialApp`.
+
+FILE: lib/main.dart
+ACTION: EDIT
+
+ANCHOR: locate the class that returns MaterialApp (search for 'MaterialApp(')
+  It is inside CitrineApp or _CitrineAppState (ConsumerWidget/ConsumerStatefulWidget).
+
+CHANGE 1 — add import at top of file:
+  import 'providers/theme_provider.dart';
+  import 'models/app_theme_config.dart';
+
+CHANGE 2 — inside the build() that contains MaterialApp, before the return:
+  final themeState = ref.watch(themeProvider);
+
+CHANGE 3 — replace the existing theme:/darkTheme:/themeMode: arguments:
+  BEFORE (approximate — find exact):
+    theme: ThemeData(...),      // or ThemeData.light()
+    darkTheme: ThemeData(...),  // or ThemeData.dark()
+
+  AFTER:
+    theme:     themeState.activeTheme.toThemeData(Brightness.light),
+    darkTheme: themeState.activeTheme.toThemeData(Brightness.dark),
+    themeMode: themeState.flutterThemeMode,
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 1.4 — EDIT lib/ui/theme.dart — remove dynamic colors, keep semantic only
+────────────────────────────────────────────────────────────────────────────────
+STATUS: DECIDIDO — não aplicado literalmente. O app mantém `AppTheme`/
+  `AppColors` como compatibilidade central do design system atual, enquanto
+  `themeProvider` injeta acento e modo no `ThemeData`. Remover esses helpers
+  agora causaria refatoração massiva fora do escopo e conflita com as
+  diretrizes atuais do projeto.
+
+FILE: lib/ui/theme.dart
+ACTION: EDIT
+
+DELETE these static const fields from AppColors (they are now in ThemeData):
+  primary, primaryLight, primaryDark, accent, secondary, secondaryLight,
+  background, surface, cardFill, surfaceVariant,
+  darkBackground, darkSurface, darkCardFill,
+  textPrimary, textSecondary, textMuted, textOnPrimary,
+  darkTextPrimary, darkTextSecondary,
+  divider, darkDivider, navInactive
+
+KEEP these (they are semantic, never change with theme):
+  success, warning, error, info,
+  priorityHigh, priorityMedium, priorityLow,
+  habitGreen, habitBlue, habitPurple, habitOrange, habitPink
+
+EDIT cardDecoration(BuildContext context):
+  REPLACE: color: isDark ? AppColors.darkCardFill : AppColors.cardFill
+  WITH:    color: Theme.of(context).colorScheme.surface
+
+  REPLACE: color: isDark ? Colors.white.withValues(alpha:0.05) : Colors.black.withValues(alpha:0.03)
+  WITH:    color: Theme.of(context).colorScheme.outline.withValues(alpha: isDark ? 0.08 : 0.06)
+
+EDIT cardDecorationFlat(BuildContext context):
+  REPLACE: color: isDark ? AppColors.darkCardFill : AppColors.cardFill
+  WITH:    color: Theme.of(context).colorScheme.surface
+
+  REPLACE border color reference to AppColors.darkDivider / AppColors.divider
+  WITH:    Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)
+
+EDIT sectionHeaderStyle:
+  REPLACE: color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary
+  WITH:    color: Theme.of(context).colorScheme.onBackground
+
+DELETE static methods: backgroundColor, surfaceColor, cardFillColor,
+  surfaceVariantColor, textPrimaryColor, textSecondaryColor, textMutedColor
+  → They are replaced by colorScheme.* calls at call-sites (see TASK 1.5).
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 1.5 — GLOBAL FIND-AND-REPLACE for AppColors dynamic refs
+────────────────────────────────────────────────────────────────────────────────
+STATUS: DECIDIDO — não executar substituição global mecânica. A regra atual
+  do projeto permite `AppTheme`/`AppColors`; substituições serão feitas por
+  demanda quando cada tela for tocada, preservando compatibilidade visual.
+
+Run these replacements across ALL .dart files in lib/:
+
+  AppColors.primary           → Theme.of(context).colorScheme.primary
+  AppColors.secondary         → Theme.of(context).colorScheme.secondary
+  AppColors.background        → Theme.of(context).colorScheme.background
+  AppColors.surface           → Theme.of(context).colorScheme.surface
+  AppColors.cardFill          → Theme.of(context).colorScheme.surface
+  AppColors.surfaceVariant    → Theme.of(context).colorScheme.surfaceVariant
+  AppColors.darkBackground    → Theme.of(context).colorScheme.background
+  AppColors.darkSurface       → Theme.of(context).colorScheme.surface
+  AppColors.darkCardFill      → Theme.of(context).colorScheme.surface
+  AppColors.textPrimary       → Theme.of(context).colorScheme.onBackground
+  AppColors.textSecondary     → Theme.of(context).colorScheme.onBackground.withValues(alpha:0.6)
+  AppColors.textMuted         → Theme.of(context).colorScheme.onBackground.withValues(alpha:0.38)
+  AppColors.darkTextPrimary   → Theme.of(context).colorScheme.onBackground
+  AppColors.darkTextSecondary → Theme.of(context).colorScheme.onBackground.withValues(alpha:0.6)
+  AppColors.divider           → Theme.of(context).colorScheme.outline.withValues(alpha:0.3)
+  AppColors.darkDivider       → Theme.of(context).colorScheme.outline.withValues(alpha:0.2)
+  AppColors.navInactive       → Theme.of(context).colorScheme.onBackground.withValues(alpha:0.4)
+  AppColors.textOnPrimary     → Theme.of(context).colorScheme.onPrimary
+  AppColors.primaryLight      → Theme.of(context).colorScheme.primary.withValues(alpha:0.7)
+  AppColors.primaryDark       → Theme.of(context).colorScheme.primary
+  AppColors.accent            → Theme.of(context).colorScheme.primary
+  AppColors.secondaryLight    → Theme.of(context).colorScheme.secondary.withValues(alpha:0.7)
+  AppTheme.backgroundColor(context)    → Theme.of(context).colorScheme.background
+  AppTheme.surfaceColor(context)       → Theme.of(context).colorScheme.surface
+  AppTheme.cardFillColor(context)      → Theme.of(context).colorScheme.surface
+  AppTheme.surfaceVariantColor(context)→ Theme.of(context).colorScheme.surfaceVariant
+  AppTheme.textPrimaryColor(context)   → Theme.of(context).colorScheme.onBackground
+  AppTheme.textSecondaryColor(context) → Theme.of(context).colorScheme.onBackground.withValues(alpha:0.6)
+  AppTheme.textMutedColor(context)     → Theme.of(context).colorScheme.onBackground.withValues(alpha:0.38)
+
+NOTE: In const contexts where context is unavailable (e.g. const TextStyle),
+  remove const keyword and use Theme.of(context) normally.
+  In widgets that don't receive BuildContext, add context parameter or
+  use Theme.of(navigatorKey.currentContext!) only as last resort.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 1.6 — REWRITE lib/ui/screens/appearance_screen.dart
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO/EQUIVALENTE — `AppearanceScreen` não é mais stub: permite
+  escolher modo Sistema/Claro/Escuro e tema ativo, persistindo em
+  `SettingsProvider` e aplicando imediatamente via `themeProvider`.
+
+FILE: lib/ui/screens/appearance_screen.dart
+ACTION: REPLACE entirely (current file is a non-functional stub — see below)
+
+CURRENT FILE (confirmed by code read):
+  Shows 6 colored circles (_Swatch) with no onTap.
+  No provider connection. No persistence. Completely inert.
+
+NEW FILE STRUCTURE — AppearanceScreen is a ConsumerStatefulWidget.
+
+STATE:
+  AppThemeConfig? _editingTheme   // null = not in edit mode
+  String _editSection             // which color picker is open: '' | 'lightPrimary' | etc.
+
+BUILD — returns Scaffold with ListView containing these sections in order:
+
+  SECTION A — MODO (SegmentedButton or 3 tappable chips)
+    Options: 'auto' (Sistema), 'light' (Claro), 'dark' (Escuro)
+    Current selection: ref.watch(themeProvider).themeMode
+    onTap: ref.read(themeProvider.notifier).setThemeMode(value)
+
+  SECTION B — PRESETS / TEMAS SALVOS
+    Header row: Text('Temas') + TextButton('+ Novo', onPressed: _startNewTheme)
+    SingleChildScrollView horizontal containing one _ThemePresetCard per theme:
+      _ThemePresetCard fields: AppThemeConfig theme, bool isActive
+      Appearance: Container 120×80, borderRadius 16
+        - 3 color circles (primary/secondary/surface of current system brightness)
+        - Text(theme.name) below
+        - Border 2px primary color if isActive
+      onTap: ref.read(themeProvider.notifier).activateTheme(theme.id)
+      onLongPress (non-preset only): showModalBottomSheet with options:
+        'Editar'     → _startEditTheme(theme)
+        'Duplicar'   → ref.read(themeProvider.notifier).duplicateTheme(theme.id)
+        'Deletar'    → confirm dialog → ref.read(themeProvider.notifier).deleteTheme(theme.id)
+
+  SECTION C — COLOR EDITOR (AnimatedSize, only visible when _editingTheme != null)
+    Title row: Text('Editando: ${_editingTheme?.name}')
+    For each of the 5 color roles, show a _ColorRoleRow:
+      _ColorRoleRow(label, lightColorInt, darkColorInt, onLightTap, onDarkTap)
+      Appearance: Row with label + two 40×40 tappable color squares (☀️ and 🌙)
+      onTap for each square: show _ColorPickerSheet(initialColor, onChanged)
+        _ColorPickerSheet: uses flutter_colorpicker ColorPicker widget
+          + TextField for hex input (controller prefilled with hex string)
+          + onColorChanged: calls setState to update _editingTheme's field
+
+    The 5 roles (fieldName in AppThemeConfig, label, icon):
+      lightPrimary / darkPrimary     → 'Primária' (buttons, badges)
+      lightSecondary / darkSecondary → 'Secundária' (links, chips)
+      lightSurface / darkSurface     → 'Superfície' (cards)
+      lightBackground / darkBackground → 'Fundo' (tela)
+      lightTextPrimary / darkTextPrimary → 'Texto'
+
+    Below roles: mini PREVIEW widget showing a fake card and button using
+      _editingTheme!.toThemeData(Brightness.light) and Brightness.dark side by side
+
+  SECTION D — FONTE (only visible when _editingTheme != null)
+    Text('Fonte')
+    Wrap of _FontChip for each font:
+      fonts = ['Inter', 'Lato', 'Nunito', 'Merriweather', 'Source Sans 3', 'Roboto Slab']
+      _FontChip: tappable chip showing font name rendered in that font
+        selected = _editingTheme?.fontFamily == fontName
+        onTap: setState(() => _editingTheme = _editingTheme!.copyWith(fontFamily: fontName))
+
+  SECTION E — SAVE BUTTON (only visible when _editingTheme != null)
+    TextField for theme name (controller pre-filled with _editingTheme!.name)
+    ElevatedButton('Salvar tema', onPressed: _saveEditingTheme)
+    TextButton('Cancelar', onPressed: () => setState(()=>_editingTheme=null))
+
+METHODS:
+  _startNewTheme():
+    setState(() => _editingTheme = AppThemeConfig(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: 'Meu tema',
+      isPreset: false,
+      // copy values from active theme
+      ...ref.read(themeProvider).activeTheme fields
+    ))
+
+  _startEditTheme(AppThemeConfig t):
+    setState(() => _editingTheme = t)
+
+  _saveEditingTheme():
+    final t = _editingTheme!
+    if state.themes.any((x) => x.id == t.id && !x.isPreset):
+      ref.read(themeProvider.notifier).updateTheme(t)
+    else:
+      ref.read(themeProvider.notifier).saveTheme(t)
+    setState(() => _editingTheme = null)
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 1.7 — ADD themeMode and activeThemeId to AppSettings + SettingsNotifier
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `AppSettings` possui `themeMode` e `activeThemeId`, e
+  `SettingsNotifier` persiste/atualiza ambos.
+
+FILE: lib/providers/settings_provider.dart
+ACTION: EDIT
+
+NOTE: themeMode and activeThemeId are now owned by ThemeNotifier (TASK 1.2).
+  AppSettings does NOT need them. No changes needed to AppSettings class.
+  This task is intentionally empty — the separation is already clean.
+
+================================================================================
+PHASE 2 — CRASH LOGS
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 2.1 — EDIT lib/main.dart — move CrashReportService.init() to top of main()
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `CrashReportService.instance.init()` é inicializado em
+  `main.dart` antes do carregamento do vault e recebe versão do app.
+
+FILE: lib/main.dart
+ACTION: EDIT
+
+ANCHOR: the top-level async main() function. It currently starts with:
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('pt_BR');
+  ...
+
+ADD immediately after WidgetsFlutterBinding.ensureInitialized():
+  // CRASH REPORTS — must be first, before any other await
+  PackageInfo pkgInfo;
+  try {
+    pkgInfo = await PackageInfo.fromPlatform();
+  } catch (_) {
+    pkgInfo = PackageInfo(appName:'Citrine',packageName:'',version:'unknown',buildNumber:'');
+  }
+  await CrashReportService.instance.init(appVersion: pkgInfo.version);
+
+ADD import at top of file:
+  import 'package:package_info_plus/package_info_plus.dart';
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 2.2 — EDIT lib/services/crash_report_service.dart — fix save directory
+────────────────────────────────────────────────────────────────────────────────
+STATUS: DECIDIDO — manter o padrão atual das diretrizes do projeto:
+  armazenamento interno em `diagnostics/crash_reports` e cópia no vault em
+  `_diagnostics/crash_reports`. Não migrar para `CitrineLogs/` externo nesta
+  rodada.
+
+FILE: lib/services/crash_report_service.dart
+ACTION: EDIT
+
+ANCHOR: method _writeReport(String filename, String content) — find it after
+  _buildReport(). It currently calls getApplicationDocumentsDirectory() or similar.
+
+REPLACE the directory resolution inside _writeReport with:
+  Directory? baseDir;
+  try {
+    // External storage is visible via USB file transfer on Android
+    baseDir = await getExternalStorageDirectory();
+  } catch (_) {}
+  baseDir ??= await getApplicationDocumentsDirectory();
+
+  final crashDir = Directory('${baseDir.path}/CitrineLogs/crash_reports');
+  if (!await crashDir.exists()) await crashDir.create(recursive: true);
+  final file = File('${crashDir.path}/$filename');
+  await file.writeAsString(content, flush: true);
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 2.3 — EDIT lib/ui/screens/diagnostic_reports_screen.dart — add Export All
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO/EQUIVALENTE — a tela de diagnósticos possui ação
+  "Exportar tudo"; a implementação consolida os relatórios e copia para a
+  área de transferência, evitando dependência adicional de share.
+
+FILE: lib/ui/screens/diagnostic_reports_screen.dart
+ACTION: EDIT
+
+ANCHOR: locate the AppBar actions: [] list.
+
+ADD to actions:
+  IconButton(
+    icon: const Icon(Icons.share_outlined),
+    tooltip: 'Exportar todos',
+    onPressed: _exportAll,
+  )
+
+ADD method _exportAll():
+  Future<void> _exportAll() async {
+    // Find the crash_reports directory (same path as _writeReport)
+    Directory? baseDir;
+    try { baseDir = await getExternalStorageDirectory(); } catch (_) {}
+    baseDir ??= await getApplicationDocumentsDirectory();
+    final crashDir = Directory('${baseDir.path}/CitrineLogs/crash_reports');
+    if (!await crashDir.exists()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nenhum log encontrado.')));
+      return;
+    }
+    final files = crashDir.listSync().whereType<File>().toList();
+    if (files.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nenhum log encontrado.')));
+      return;
+    }
+    // Use share_plus to share all files
+    await Share.shareXFiles(files.map((f) => XFile(f.path)).toList(),
+        subject: 'Citrine Crash Logs');
+  }
+
+ADD import: package:share_plus/share_plus.dart
+  (add share_plus: ^10.0.0 to pubspec.yaml if not present)
+
+================================================================================
+PHASE 3 — PROPERTY GRID COMPONENT
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 3.1 — CREATE lib/ui/widgets/property_grid.dart
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `property_grid.dart` existe com `PropertyGrid`,
+  `PropertyCardState`, `PropertyCard`, `_PropertyCardWidget` e `StarRating`,
+  mantendo compatibilidade com `PropertyGridItem` usado pela tela atual.
+
+FILE: lib/ui/widgets/property_grid.dart
+ACTION: CREATE (file does not exist)
+
+ENUM PropertyCardState:
+  normal, empty, overdue, dueToday, streakActive, complete
+
+CLASS PropertyCard (data class, no Widget):
+  FIELDS (all required except marked):
+    IconData icon
+    String label
+    String? value           // null → renders as empty state
+    PropertyCardState state // default: normal (derived externally, not auto)
+    Color? leftBorderColor  // for priority
+    VoidCallback? onTap
+    Widget? customChild     // overrides value text (for stars, booleans, etc.)
+
+WIDGET PropertyGrid extends StatelessWidget:
+  CONSTRUCTOR: const PropertyGrid({required List<PropertyCard> cards, Key? key})
+
+  build(context):
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 2.2,   // wider than tall — compact card
+        ),
+        itemCount: cards.length,
+        itemBuilder: (ctx, i) => _PropertyCardWidget(card: cards[i]),
+      ),
+    );
+
+WIDGET _PropertyCardWidget extends StatelessWidget:
+  CONSTRUCTOR: const _PropertyCardWidget({required PropertyCard card})
+
+  build(context):
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Background color by state
+    final bgColor = switch (card.state) {
+      PropertyCardState.empty       => cs.onBackground.withValues(alpha: isDark ? 0.06 : 0.04),
+      PropertyCardState.overdue     => const Color(0xFFEF4444).withValues(alpha: isDark ? 0.18 : 0.10),
+      PropertyCardState.dueToday    => const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.18 : 0.10),
+      PropertyCardState.streakActive=> const Color(0xFF22C55E).withValues(alpha: isDark ? 0.18 : 0.10),
+      PropertyCardState.complete    => cs.primary.withValues(alpha: 0.08),
+      _                             => cs.surface,
+    };
+
+    // Text/icon color by state
+    final contentColor = switch (card.state) {
+      PropertyCardState.empty       => cs.onBackground.withValues(alpha: 0.35),
+      PropertyCardState.overdue     => const Color(0xFFEF4444),
+      PropertyCardState.dueToday    => const Color(0xFFF59E0B),
+      PropertyCardState.streakActive=> const Color(0xFF22C55E),
+      _                             => cs.onSurface,
+    };
+
+    return GestureDetector(
+      onTap: card.onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(12),
+          border: card.leftBorderColor != null
+              ? Border(left: BorderSide(color: card.leftBorderColor!, width: 3))
+              : null,
+        ),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(children: [
+              Icon(card.icon, size: 13, color: contentColor.withValues(alpha: 0.7)),
+              const SizedBox(width: 4),
+              Flexible(child: Text(card.label,
+                style: TextStyle(fontSize: 11, color: contentColor.withValues(alpha:0.7)),
+                maxLines: 1, overflow: TextOverflow.ellipsis)),
+              // empty state: show add icon
+              if (card.state == PropertyCardState.empty)
+                Icon(Icons.add_rounded, size: 13,
+                     color: contentColor.withValues(alpha: 0.5)),
+            ]),
+            // value area
+            if (card.customChild != null)
+              card.customChild!
+            else
+              Text(
+                card.value ?? '—',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: card.state == PropertyCardState.empty
+                      ? FontWeight.w400 : FontWeight.w600,
+                  color: contentColor,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+          ],
+        ),
+      ),
+    );
+
+HELPER WIDGET StarRating (use as customChild):
+  StatelessWidget, takes double rating (0.0-5.0)
+  Shows filled/half/empty star Icons in primary color, size 14
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 3.2 — EDIT lib/ui/screens/universal_detail_view.dart — replace property cards
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `UniversalDetailView` usa `PropertyGrid` para blocos de
+  propriedades e mantém builders por tipo com células acionáveis.
+
+FILE: lib/ui/screens/universal_detail_view.dart
+ACTION: EDIT
+
+ADD import: '../widgets/property_grid.dart'
+
+The file uses a CustomScrollView with SliverToBoxAdapter children.
+Find the section where individual property cards are built for each type.
+This is typically after the title area SliverToBoxAdapter.
+
+For EACH object type, find the block that builds metadata (Criado/Modificado/
+Status/etc.) and REPLACE it with a SliverToBoxAdapter containing PropertyGrid.
+
+Use this helper method inside _UniversalDetailViewState to build cards per type:
+
+  List<PropertyCard> _buildPropertyCards(ContentObject obj, BuildContext context) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    PropertyCardState _dateState(DateTime? d) {
+      if (d == null) return PropertyCardState.empty;
+      final day = DateTime(d.year, d.month, d.day);
+      if (day.isBefore(today)) return PropertyCardState.overdue;
+      if (day == today) return PropertyCardState.dueToday;
+      return PropertyCardState.normal;
+    }
+
+    String _fmtDate(DateTime? d) =>
+        d == null ? '' : DateFormat('dd MMM yyyy', 'pt_BR').format(d);
+    String _timeAgo(DateTime? d) { /* existing timeAgo logic */ }
+
+    // TASK: remove "created" date card entirely (not useful for user)
+
+    if (obj is Task) {
+      return [
+        PropertyCard(
+          icon: Icons.flag_rounded,
+          label: 'Status',
+          value: obj.status,
+          state: obj.status == 'done' ? PropertyCardState.complete : PropertyCardState.normal,
+        ),
+        PropertyCard(
+          icon: Icons.priority_high_rounded,
+          label: 'Prioridade',
+          value: obj.priority.isEmpty ? null : obj.priority,
+          state: obj.priority.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
+          leftBorderColor: obj.priority == 'high'   ? AppColors.priorityHigh
+                         : obj.priority == 'medium' ? AppColors.priorityMedium
+                         : obj.priority == 'low'    ? AppColors.priorityLow : null,
+          onTap: () => _openEditForm(context),
+        ),
+        PropertyCard(
+          icon: Icons.calendar_today_rounded,
+          label: 'Due Date',
+          value: _fmtDate(obj.dueDate),
+          state: _dateState(obj.dueDate),
+          onTap: () => _openEditForm(context),
+        ),
+        PropertyCard(
+          icon: Icons.timer_outlined,
+          label: 'Estimativa',
+          value: obj.estimatedMinutes == 0 ? null : '${obj.estimatedMinutes}min',
+          state: obj.estimatedMinutes == 0 ? PropertyCardState.empty : PropertyCardState.normal,
+          onTap: () => _openEditForm(context),
+        ),
+        PropertyCard(
+          icon: Icons.edit_calendar_rounded,
+          label: 'Modificado',
+          value: _timeAgo(obj.modifiedAt),
+        ),
+        PropertyCard(
+          icon: Icons.repeat_rounded,
+          label: 'Recorrência',
+          value: obj.recurrenceRule.isEmpty ? null : obj.recurrenceRule,
+          state: obj.recurrenceRule.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
+          onTap: () => _openEditForm(context),
+        ),
+      ];
+    }
+
+    if (obj is Habit) {
+      return [
+        PropertyCard(icon: Icons.flag_rounded, label: 'Status', value: obj.status),
+        PropertyCard(
+          icon: Icons.repeat_rounded,
+          label: 'Frequência',
+          value: obj.frequencyLabel,
+        ),
+        PropertyCard(
+          icon: Icons.local_fire_department_rounded,
+          label: 'Sequência atual',
+          value: obj.currentStreak == 0 ? '0 dias' : '${obj.currentStreak} dias',
+          state: obj.currentStreak > 0 ? PropertyCardState.streakActive : PropertyCardState.normal,
+        ),
+        PropertyCard(
+          icon: Icons.emoji_events_rounded,
+          label: 'Melhor sequência',
+          value: '${obj.bestStreak} dias',
+        ),
+        PropertyCard(
+          icon: Icons.history_rounded,
+          label: 'Última vez',
+          value: _timeAgo(obj.lastCompletedAt),
+          state: obj.lastCompletedAt == null ? PropertyCardState.empty : PropertyCardState.normal,
+        ),
+        PropertyCard(
+          icon: Icons.edit_calendar_rounded,
+          label: 'Modificado',
+          value: _timeAgo(obj.modifiedAt),
+        ),
+      ];
+    }
+
+    if (obj is Goal) {
+      return [
+        PropertyCard(icon: Icons.flag_rounded, label: 'Status', value: obj.status),
+        PropertyCard(
+          icon: Icons.calendar_today_rounded,
+          label: 'Prazo',
+          value: _fmtDate(obj.dueDate),
+          state: _dateState(obj.dueDate),
+          onTap: () => _openEditForm(context),
+        ),
+        PropertyCard(
+          icon: Icons.trending_up_rounded,
+          label: 'Progresso',
+          value: '${obj.progressPercent.round()}%',
+          state: obj.progressPercent >= 100 ? PropertyCardState.complete : PropertyCardState.normal,
+        ),
+        PropertyCard(icon: Icons.category_rounded, label: 'Tipo', value: obj.goalType),
+        PropertyCard(icon: Icons.edit_calendar_rounded, label: 'Modificado', value: _timeAgo(obj.modifiedAt)),
+      ];
+    }
+
+    if (obj is Resource) {
+      return [
+        PropertyCard(icon: Icons.flag_rounded, label: 'Status', value: obj.status),
+        PropertyCard(icon: Icons.book_rounded, label: 'Tipo', value: obj.resourceType),
+        PropertyCard(
+          icon: Icons.person_rounded,
+          label: 'Autor',
+          value: obj.author.isEmpty ? null : obj.author,
+          state: obj.author.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
+          onTap: () => _openEditForm(context),
+        ),
+        PropertyCard(
+          icon: Icons.calendar_today_rounded,
+          label: 'Ano',
+          value: obj.year.isEmpty ? null : obj.year,
+          state: obj.year.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
+        ),
+        PropertyCard(
+          icon: Icons.category_rounded,
+          label: 'Categoria',
+          value: obj.category.isEmpty ? null : obj.category,
+          state: obj.category.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
+          onTap: () => _openEditForm(context),
+        ),
+        PropertyCard(
+          icon: Icons.event_available_rounded,
+          label: 'Data de leitura',
+          value: _fmtDate(obj.finishedAt),
+          state: obj.finishedAt == null ? PropertyCardState.empty : PropertyCardState.normal,
+          onTap: () => _openEditForm(context),
+        ),
+        PropertyCard(
+          icon: Icons.star_rounded,
+          label: 'Avaliação',
+          value: null,
+          state: obj.rating == 0 ? PropertyCardState.empty : PropertyCardState.normal,
+          customChild: obj.rating > 0
+              ? StarRating(rating: obj.rating.toDouble())
+              : null,
+          onTap: () => _openEditForm(context),
+        ),
+        PropertyCard(icon: Icons.edit_calendar_rounded, label: 'Modificado', value: _timeAgo(obj.modifiedAt)),
+      ];
+    }
+
+    if (obj is JournalEntry) {
+      return [
+        PropertyCard(icon: Icons.today_rounded, label: 'Data', value: _fmtDate(obj.date)),
+        PropertyCard(
+          icon: Icons.mood_rounded,
+          label: 'Humor',
+          value: obj.mood.isEmpty ? null : obj.mood,
+          state: obj.mood.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
+          onTap: () => _openEditForm(context),
+        ),
+        PropertyCard(icon: Icons.edit_calendar_rounded, label: 'Modificado', value: _timeAgo(obj.modifiedAt)),
+      ];
+    }
+
+    if (obj is Project) {
+      return [
+        PropertyCard(icon: Icons.flag_rounded, label: 'Status', value: obj.status),
+        PropertyCard(
+          icon: Icons.priority_high_rounded,
+          label: 'Prioridade',
+          value: obj.priority.isEmpty ? null : obj.priority,
+          state: obj.priority.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
+          leftBorderColor: obj.priority == 'high'   ? AppColors.priorityHigh
+                         : obj.priority == 'medium' ? AppColors.priorityMedium
+                         : obj.priority == 'low'    ? AppColors.priorityLow : null,
+        ),
+        PropertyCard(
+          icon: Icons.calendar_today_rounded,
+          label: 'Due Date',
+          value: _fmtDate(obj.dueDate),
+          state: _dateState(obj.dueDate),
+          onTap: () => _openEditForm(context),
+        ),
+        PropertyCard(icon: Icons.edit_calendar_rounded, label: 'Modificado', value: _timeAgo(obj.modifiedAt)),
+      ];
+    }
+
+    if (obj is Person) {
+      return [
+        PropertyCard(
+          icon: Icons.people_rounded,
+          label: 'Relação',
+          value: obj.relation.isEmpty ? null : obj.relation,
+          state: obj.relation.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
+          onTap: () => _openEditForm(context),
+        ),
+        PropertyCard(
+          icon: Icons.email_rounded,
+          label: 'Email',
+          value: obj.email.isEmpty ? null : obj.email,
+          state: obj.email.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
+          onTap: () => _openEditForm(context),
+        ),
+        PropertyCard(
+          icon: Icons.cake_rounded,
+          label: 'Aniversário',
+          value: _fmtDate(obj.birthday),
+          state: obj.birthday == null ? PropertyCardState.empty : PropertyCardState.normal,
+          onTap: () => _openEditForm(context),
+        ),
+        PropertyCard(icon: Icons.edit_calendar_rounded, label: 'Modificado', value: _timeAgo(obj.modifiedAt)),
+      ];
+    }
+
+    // Fallback for Note, Idea, Reminder, Tracker, Snapshot, Organizer:
+    return [
+      PropertyCard(icon: Icons.flag_rounded, label: 'Status',
+        value: (obj as dynamic).status ?? '', state: PropertyCardState.normal),
+      PropertyCard(icon: Icons.edit_calendar_rounded, label: 'Modificado',
+        value: _timeAgo(obj.modifiedAt)),
+    ];
+  }
+
+Then in the build() SliverList, REPLACE the old metadata section with:
+  SliverToBoxAdapter(
+    child: Column(children: [
+      const SizedBox(height: 16),
+      PropertyGrid(cards: _buildPropertyCards(object, context)),
+      const SizedBox(height: 20),
+    ]),
+  ),
+
+FIELD NAMES: The field names used above (obj.status, obj.priority, obj.dueDate,
+  obj.currentStreak, etc.) must match the actual field names in each model.
+  Read the corresponding model file before implementing each type block
+  to confirm exact field names. Use obj.fieldName — do not guess.
+
+================================================================================
+PHASE 4 — RESOURCES SCREEN
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 4.1 — EDIT lib/ui/screens/resources_screen.dart — A4 cover proportion
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — capas de Resources na estante/lista usam
+  `AspectRatio(1 / 1.414)` com fallback único.
+
+FILE: lib/ui/screens/resources_screen.dart
+ACTION: EDIT
+
+ANCHOR: locate the grid item builder (search for GridView or SliverGrid,
+  then find the child widget that renders a book/resource card).
+
+Find the image/cover widget inside the grid item. It is likely a ClipRRect or
+Container with a fixed height. REPLACE the image container with:
+
+  AspectRatio(
+    aspectRatio: 1 / 1.414,  // A4 portrait ratio
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: obj.coverUrl.isNotEmpty
+          ? Image.network(obj.coverUrl, fit: BoxFit.cover,
+              errorBuilder: (_,__,___) => _buildCoverPlaceholder(obj, context))
+          : _buildCoverPlaceholder(obj, context),
+    ),
+  )
+
+ADD helper _buildCoverPlaceholder(ResourceModel obj, BuildContext context):
+  Returns a Container with bg color derived from obj.title hashCode
+  (pick one of 6 pastel colors by index) and centered Icon(Icons.book_rounded).
+
+VERIFY: Check if the cover image is fetched twice (once as thumbnail, once
+  as full). Search the file for all references to coverUrl / cover / thumbnail.
+  If two separate Image widgets exist in the same item, DELETE the duplicate.
+  Keep only the AspectRatio one.
+
+STATUS BADGE: after the AspectRatio, add a Stack if not already present,
+  positioning in top-right corner:
+    Positioned(top:8, right:8,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal:6,vertical:3),
+        decoration: BoxDecoration(
+          color: _statusColor(obj.status).withValues(alpha:0.9),
+          borderRadius: BorderRadius.circular(6)),
+        child: Text(obj.status.toUpperCase(),
+          style: TextStyle(fontSize:10, fontWeight:FontWeight.w700,
+                           color:Colors.white)),
+      ))
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 4.2 — EDIT lib/ui/screens/universal_detail_view.dart — Resource hero cover
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — detalhe de Resource mostra uma única capa A4 antes do
+  conteúdo e remove a duplicação de imagem dentro do card.
+
+FILE: lib/ui/screens/universal_detail_view.dart
+ACTION: EDIT — Resource-specific detail layout
+
+ANCHOR: inside build() or _buildContent(), find the block that runs when
+  object is Resource (search for 'is Resource' or 'Resource').
+
+REPLACE the cover rendering at the top of that block with a SliverAppBar:
+
+  SliverAppBar(
+    expandedHeight: MediaQuery.of(context).size.width * 1.414 * 0.55,
+    // cap at 55% of screen width × A4 ratio
+    pinned: true,
+    flexibleSpace: FlexibleSpaceBar(
+      background: resource.coverUrl.isNotEmpty
+          ? Image.network(resource.coverUrl, fit: BoxFit.cover,
+              errorBuilder: (_,__,___) => _buildCoverPlaceholder(resource, context))
+          : _buildCoverPlaceholder(resource, context),
+    ),
+    // Remove back arrow from here — it's already in the outer SliverAppBar
+    automaticallyImplyLeading: false,
+  )
+
+NOTE: The outer SliverAppBar (pinned, with title=type label) is already present
+  in the build(). For Resource, hide it or merge. Simplest: for Resource type,
+  skip adding the outer type-label SliverAppBar and only add this cover one.
+  Check the conditional logic around SliverAppBar in the current build().
+
+BELOW the SliverAppBar, add in a SliverToBoxAdapter:
+  Title: Text(resource.title, fontSize: 26, fontWeight: w800)
+  Subtitle: Text('${resource.resourceType} · ${resource.category}',
+               color: colorScheme.onBackground.withValues(alpha:0.6))
+  Rating row: StarRating(rating: resource.rating.toDouble()) — tappable,
+    onTap opens a dialog to select 1-5 stars and calls the update provider.
+
+THEN: PropertyGrid via _buildPropertyCards (TASK 3.2 Resource block)
+
+================================================================================
+GUIDELINES AND AGENTS FILES
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 5.1 — UPDATE (or CREATE) guidelines.md at repo root
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO/EQUIVALENTE — `guidelines.md` documenta tema atual,
+  `PropertyGrid`, diagnósticos, Systems e importação de metadados de
+  Resources conforme a arquitetura vigente.
+
+FILE: guidelines.md (repo root)
+ACTION: ADD sections (append to existing file, or create if missing)
+
+APPEND exactly:
+
+---
+
+## DESIGN SYSTEM — COLOR USAGE (enforced after Theme System implementation)
+
+NEVER reference these in any widget file:
+  AppColors.primary · AppColors.secondary · AppColors.background
+  AppColors.surface · AppColors.cardFill · AppColors.surfaceVariant
+  AppColors.darkBackground · AppColors.darkSurface · AppColors.darkCardFill
+  AppColors.textPrimary · AppColors.textSecondary · AppColors.textMuted
+  AppColors.textOnPrimary · AppColors.darkTextPrimary · AppColors.darkTextSecondary
+  AppColors.divider · AppColors.darkDivider · AppColors.navInactive
+  AppColors.primaryLight · AppColors.primaryDark · AppColors.accent
+  AppColors.secondaryLight
+  AppTheme.backgroundColor() · AppTheme.surfaceColor() · AppTheme.cardFillColor()
+  AppTheme.surfaceVariantColor() · AppTheme.textPrimaryColor()
+  AppTheme.textSecondaryColor() · AppTheme.textMutedColor()
+
+ALWAYS use instead:
+  Theme.of(context).colorScheme.primary           → primary actions, badges
+  Theme.of(context).colorScheme.secondary         → secondary accents, chips
+  Theme.of(context).colorScheme.surface           → card backgrounds
+  Theme.of(context).colorScheme.onSurface         → text on cards
+  Theme.of(context).colorScheme.background        → scaffold/screen background
+  Theme.of(context).colorScheme.onBackground      → primary text on screen
+  Theme.of(context).colorScheme.onBackground.withValues(alpha:0.6) → secondary text
+  Theme.of(context).colorScheme.onBackground.withValues(alpha:0.38) → muted text
+  Theme.of(context).colorScheme.outline           → dividers, borders
+  Theme.of(context).colorScheme.onPrimary         → text on primary-colored buttons
+
+PERMITTED AppColors refs: priorityHigh, priorityMedium, priorityLow,
+  success, warning, error, info,
+  habitGreen, habitBlue, habitPurple, habitOrange, habitPink
+
+## DESIGN SYSTEM — OBJECT DETAIL PROPERTIES
+
+ALL detail screens use PropertyGrid (lib/ui/widgets/property_grid.dart).
+NEVER build custom metadata cards manually.
+
+PropertyCardState rules (apply when building cards):
+  value == null or ''                  → PropertyCardState.empty
+  DateTime field and date < today      → PropertyCardState.overdue
+  DateTime field and date == today     → PropertyCardState.dueToday
+  streak/count field and value > 0     → PropertyCardState.streakActive
+  completion/done status               → PropertyCardState.complete
+  otherwise                            → PropertyCardState.normal
+
+Priority leftBorderColor mapping:
+  'high'   → AppColors.priorityHigh
+  'medium' → AppColors.priorityMedium
+  'low'    → AppColors.priorityLow
+
+## DESIGN SYSTEM — RESOURCE COVERS
+
+Resource covers (books, films, etc.) are ALWAYS rendered in AspectRatio(1/1.414).
+NEVER use a fixed height or square crop for covers.
+Cover image appears ONCE per view (no thumbnail + full duplicate).
+
+## CRASH REPORTING
+
+CrashReportService.instance.init() is called as the FIRST await in main().
+Crash logs are saved to: getExternalStorageDirectory()/CitrineLogs/crash_reports/
+Logs are .md files with YAML frontmatter.
+
+---
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 5.2 — UPDATE (or CREATE) agents.md at repo root
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO/EQUIVALENTE — `agents.md` contém instruções extensas de
+  arquitetura, crash logs, revisão proativa e padrões de implementação para
+  novos objetos/telas.
+
+FILE: agents.md (repo root)
+ACTION: ADD sections (append to existing file, or create if missing)
+
+APPEND exactly:
+
+---
+
+## HOW TO READ CRASH LOGS
+
+Method A — via USB (Android, USB Debugging on):
+  adb pull /sdcard/Android/data/com.productivity.citrine/files/CitrineLogs/ ./crash_logs/
+  Then read the .md files in ./crash_logs/crash_reports/
+
+Method B — via app:
+  Settings → Diagnósticos → share icon (top-right) → choose destination
+
+Log file format:
+  YAML frontmatter: type, kind, created_at, app_version, platform, route
+  ## Context table
+  ## Error (type + message)
+  ## Dart Stack Trace
+  ## Android Thread Dump (ANR only)
+  ## Last App Events (circular buffer, last 100 events before crash)
+
+## HOW TO ADD A NEW CONTENT OBJECT TYPE
+
+1. CREATE lib/models/<name>_model.dart — extend ContentObject, implement toJson/fromJson
+2. ADD to lib/providers/vault_provider.dart — new provider + allObjectsProvider integration
+3. CREATE lib/ui/forms/create_<name>_form.dart
+4. ADD to lib/ui/screens/universal_detail_view.dart:
+   a. Import the model
+   b. Add a block in _buildPropertyCards() returning List<PropertyCard>
+   c. Use PropertyCardState rules from guidelines.md
+5. ADD to lib/ui/widgets/create_menu_sheet.dart
+6. NEVER use AppColors dynamic refs — use colorScheme.* (see guidelines.md)
+
+## HOW TO BUILD A PROPERTY GRID BLOCK FOR A NEW TYPE
+
+Read lib/ui/widgets/property_grid.dart first.
+For each metadata field, create a PropertyCard:
+  - icon: pick from Icons — prefer _rounded variants
+  - label: short string, ≤ 12 chars
+  - value: the field value as string, or null if empty/unset
+  - state: apply rules from guidelines.md
+  - leftBorderColor: set for priority fields only
+  - onTap: open edit form (call _openEditForm(context) or equivalent)
+  - customChild: use StarRating for rating fields, custom widget for booleans
+
+---
+
+================================================================================
+IMPLEMENTATION ORDER SUMMARY
+================================================================================
+
+Run phases in order. Each task within a phase can run in parallel.
+
+PHASE 1 (Theme System):
+  1.1 Create AppThemeConfig model
+  1.2 Create ThemeProvider
+  1.3 Connect to MaterialApp in main.dart
+  1.4 Refactor theme.dart
+  1.5 Global find-and-replace AppColors → colorScheme
+  1.6 Rewrite AppearanceScreen
+  (1.7 is no-op)
+
+PHASE 2 (Crash Logs):
+  2.1 Move init() to top of main()
+  2.2 Fix save directory in crash_report_service.dart
+  2.3 Add Export All to diagnostic_reports_screen.dart
+
+PHASE 3 (Property Grid):
+  3.1 Create property_grid.dart
+  3.2 Update universal_detail_view.dart
+
+PHASE 4 (Resources):
+  4.1 Fix cover in resources_screen.dart
+  4.2 Fix Resource detail in universal_detail_view.dart
+
+PHASE 5 (Docs):
+  5.1 Update guidelines.md
+  5.2 Update agents.md
+
+VERIFICATION CHECKLIST (run after each phase):
+  □ flutter analyze → 0 errors
+  □ flutter test → all pass
+  □ Hot restart → no exception on home screen
+  □ Phase 1: tap each preset in AppearanceScreen → colors change live
+  □ Phase 2: trigger a test error (throw Exception in initState of any screen) → .md file appears in CitrineLogs/
+  □ Phase 3: open any Task detail → see 2-column grid with colored states
+  □ Phase 4: open Resources screen → covers in portrait A4 proportion, no duplicate
+
+================================================================================
+END OF SPEC
+================================================================================
+
+================================================================================
+PHASE 7 — WINDOWS PARITY ANALYSIS + FIXES
+================================================================================
+
+ANALYSIS — WHAT THE CODE REVEALS ABOUT WINDOWS STATUS
+────────────────────────────────────────────────────────────────────────────────
+
+Reading app_shell.dart, adaptive_layout.dart, and the main layout reveals:
+
+STATUS: Windows is STRUCTURALLY supported (keyboard shortcuts exist in AppShell:
+  Ctrl+K, Ctrl+N, Ctrl+F, Ctrl+1-5) but has multiple functional gaps.
+
+GAP 1 — Share Intent / receive_sharing_intent is Android/iOS only
+  The entire share-from-other-app flow (main.dart _initShareIntentHandling,
+  receive_sharing_intent package) does not run on Windows. On Windows, the
+  user has no way to share a URL into the app from a browser.
+  FIX: add a clipboard auto-detect banner on Windows (same logic already used
+  in social_screen.dart's _checkClipboardUrl) but surfaced app-wide, not just
+  in the Social screen.
+
+GAP 2 — Biometric service is mobile-only
+  lib/services/biometric_service.dart uses local_auth which has no Windows
+  implementation. On Windows, biometric lock silently fails or crashes.
+  FIX: in biometric_service.dart, wrap all calls with:
+    if (!Platform.isAndroid && !Platform.isIOS) return true; // bypass on desktop
+
+GAP 3 — Notification service is mobile-only
+  flutter_local_notifications supports Windows in theory but the current code
+  uses AndroidNotificationDetails and DarwinNotificationDetails only.
+  Alarm screen / popup screen never trigger on Windows.
+  FIX: in notification_service.dart, wrap all notification scheduling with:
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return;
+  And add a Windows-native reminder: use dart:io Process.run to call
+  Windows toast via PowerShell (see TASK 7.3).
+
+GAP 4 — Google Drive sync may fail on Windows
+  The google_drive_sync_service.dart uses path_provider paths that differ on
+  Windows (%APPDATA%\Roaming vs /data/...). Vault path picker must use
+  FilePicker (already in pubspec likely) with Windows support.
+  FIX: verify getApplicationDocumentsDirectory() returns a valid Windows path.
+  Add a test: on first launch on Windows, print the resolved vault path to
+  CrashReportService event log.
+
+GAP 5 — Bottom navigation vs sidebar: already handled
+  AppShell already shows a NavigationRail for wide screens and bottom bar for
+  narrow. This is correct for Windows. No fix needed.
+
+GAP 6 — Window size / drag-to-resize not configured
+  On Windows, the app opens at a default small size with no minimum enforced.
+  FIX: in main.dart, after WidgetsFlutterBinding.ensureInitialized(), add:
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      await windowManager.ensureInitialized();
+      WindowOptions windowOptions = const WindowOptions(
+        minimumSize: Size(900, 600),
+        size: Size(1200, 800),
+        title: 'Citrine',
+      );
+      await windowManager.waitUntilReadyToShow(windowOptions, () async {
+        await windowManager.show();
+        await windowManager.focus();
+      });
+    }
+  Package needed: window_manager (add to pubspec.yaml: window_manager: ^0.4.0)
+
+GAP 7 — Social posts: save IS working on Android (confirmed by code)
+  create_social_post_form.dart calls ref.read(socialPostsProvider.notifier)
+  and OEmbedService which uses http package (cross-platform).
+  The vault write uses File I/O which works on all platforms.
+  CONCLUSION: social posts SAVE correctly on both Android and Windows.
+  The only Windows gap is the share intent trigger (GAP 1 above).
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 7.1 — EDIT lib/services/biometric_service.dart — desktop bypass
+────────────────────────────────────────────────────────────────────────────────
+STATUS: PULADO — decisão do usuário: não mexer em biometria desktop nesta rodada.
+
+FILE: lib/services/biometric_service.dart
+ACTION: EDIT
+
+ADD import at top: import 'dart:io' show Platform;
+
+ANCHOR: find the method that checks/requests biometric auth. It likely calls
+  LocalAuthentication().authenticate(...).
+
+WRAP the entire authenticate call body:
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    return true;  // No biometric on desktop — treat as authenticated
+  }
+  // ... existing mobile code continues unchanged
+
+Do the same for any method that calls LocalAuthentication().canCheckBiometrics
+  or .getAvailableBiometrics() — return [] on desktop.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 7.2 — EDIT lib/services/notification_service.dart — desktop bypass
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `NotificationService` retorna cedo no desktop para init,
+  schedule/show/cancel, evitando chamadas mobile em Windows/Linux/macOS.
+
+FILE: lib/services/notification_service.dart
+ACTION: EDIT
+
+ADD import: import 'dart:io' show Platform;
+
+ANCHOR: method init() / initialize() that calls
+  FlutterLocalNotificationsPlugin().initialize(...).
+
+WRAP entire init() body:
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    debugPrint('[NotificationService] Desktop: notifications skipped.');
+    return;
+  }
+  // ... existing mobile init unchanged
+
+ANCHOR: method scheduleReminder() / _scheduleLocal().
+WRAP entire body same way — return early on desktop.
+
+ANCHOR: method cancelNotification() / cancelAll().
+WRAP — return early on desktop (no-op is fine).
+
+This prevents crashes. Windows toast support can be added later separately.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 7.3 — EDIT lib/main.dart — window sizing for desktop
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `window_manager` foi adicionado e `main.dart` configura
+  tamanho inicial/mínimo, centralização e foco em desktop.
+
+FILE: lib/main.dart
+ACTION: EDIT
+
+ADD to pubspec.yaml (do this first):
+  window_manager: ^0.4.0
+
+ADD import to main.dart:
+  import 'dart:io' show Platform;
+  import 'package:window_manager/window_manager.dart';
+
+ANCHOR: inside main(), after WidgetsFlutterBinding.ensureInitialized()
+  and after CrashReportService.instance.init() (TASK 2.1).
+
+ADD:
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    await windowManager.ensureInitialized();
+    const windowOptions = WindowOptions(
+      minimumSize: Size(900, 600),
+      size: Size(1280, 820),
+      center: true,
+      title: 'Citrine',
+      titleBarStyle: TitleBarStyle.normal,
+    );
+    await windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
+  }
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 7.4 — EDIT lib/ui/screens/social_screen.dart — Windows clipboard banner
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO/PARCIAL — o banner de clipboard já roda sem guard mobile.
+  O FAB persistente "colar URL" foi pulado por decisão do usuário.
+
+FILE: lib/ui/screens/social_screen.dart
+ACTION: EDIT
+
+This is already done for Android via _checkClipboardUrl() in initState.
+The social screen already has the clipboard banner logic.
+
+VERIFY: _checkClipboardUrl() uses Clipboard.getData(Clipboard.kTextPlain)
+  which is cross-platform. Confirm it runs on Windows by checking there is
+  no Platform.isAndroid guard around it. If there is one, remove the guard.
+
+If no guard exists: no change needed — clipboard detection already works
+  on Windows.
+
+ADDITIONALLY — add a persistent "Paste URL" FAB on Windows:
+ANCHOR: build() method, find FloatingActionButton or FAB area.
+
+ADD a second FAB only on desktop (stack with existing FAB or replace):
+  if (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
+    Positioned(
+      bottom: 80, right: 20,
+      child: FloatingActionButton.small(
+        heroTag: 'paste_url',
+        tooltip: 'Colar URL da área de transferência',
+        child: Icon(Icons.content_paste_rounded),
+        onPressed: () async {
+          final data = await Clipboard.getData(Clipboard.kTextPlain);
+          final url = data?.text?.trim() ?? '';
+          if (url.isNotEmpty && Uri.tryParse(url)?.hasScheme == true) {
+            if (context.mounted) {
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => CreateSocialPostForm(initialUrl: url)));
+            }
+          }
+        },
+      ),
+    )
+
+================================================================================
+PHASE 8 — RESOURCE LINK SHARE (like social posts, but for books/films)
+Goal: user shares Amazon/Goodreads/IMDB/OpenLibrary URL →
+      app scrapes metadata → pre-fills CreateResourceForm → user confirms/edits → saves
+================================================================================
+
+ANALYSIS — WHAT EXISTS VS WHAT'S NEEDED
+────────────────────────────────────────────────────────────────────────────────
+WHAT EXISTS:
+  - OEmbedService: fetches OpenGraph + oEmbed for social platforms
+  - CreateResourceForm: accepts initialTitle and existingResource
+  - Resource model: has title, author, year, coverImage, synopsis, resourceType
+  - SocialPost share flow: URL → OEmbedService.fetchMetadata() → pre-filled form
+
+WHAT'S MISSING:
+  - A service that recognizes Amazon/Goodreads/IMDB/OpenLibrary URLs and knows
+    which API/scrape strategy to use for each
+  - A scraped-data → Resource mapper
+  - A "preview before save" mode in CreateResourceForm (URL-initiated flow)
+  - Share intent routing: when URL comes from system share, route to resource
+    form instead of social form based on URL pattern
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 8.1 — CREATE lib/services/resource_metadata_service.dart
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `ResourceMetadataService` existe com detecção de fontes,
+  fetch de metadados e `ResourceDraft`.
+
+FILE: lib/services/resource_metadata_service.dart
+ACTION: CREATE
+
+PURPOSE: given a URL, detect the source (Amazon, Goodreads, IMDB, OpenLibrary,
+         Google Books), fetch metadata, return a ResourceDraft.
+
+CLASS ResourceDraft (defined in this file):
+  String? title
+  String? author
+  String? resourceType    // 'Livro' | 'Filme' | 'Série' | 'General'
+  String? synopsis
+  String? coverUrl
+  int? year
+  int? pages
+  String? category
+  String? sourceUrl       // the original URL the user shared
+  String? sourceId        // e.g. IMDB tt1234567, ISBN, etc.
+  String? sourceName      // 'Amazon', 'IMDB', 'Goodreads', 'OpenLibrary'
+
+CLASS ResourceMetadataService:
+
+  static ResourceSource detectSource(String url):
+    final lower = url.toLowerCase();
+    if (lower.contains('amazon.com') || lower.contains('amazon.com.br'))
+      return ResourceSource.amazon;
+    if (lower.contains('goodreads.com'))
+      return ResourceSource.goodreads;
+    if (lower.contains('imdb.com'))
+      return ResourceSource.imdb;
+    if (lower.contains('openlibrary.org'))
+      return ResourceSource.openLibrary;
+    if (lower.contains('books.google.com') || lower.contains('play.google.com/store/books'))
+      return ResourceSource.googleBooks;
+    return ResourceSource.unknown;
+
+  static bool isResourceUrl(String url):
+    return detectSource(url) != ResourceSource.unknown;
+
+  static Future<ResourceDraft> fetchMetadata(String url):
+    final source = detectSource(url);
+    return switch (source) {
+      ResourceSource.openLibrary => _fetchOpenLibrary(url),
+      ResourceSource.googleBooks => _fetchGoogleBooks(url),
+      ResourceSource.imdb        => _fetchImdb(url),
+      ResourceSource.amazon      => _fetchViaOpenGraph(url, 'Amazon'),
+      ResourceSource.goodreads   => _fetchViaOpenGraph(url, 'Goodreads'),
+      ResourceSource.unknown     => _fetchViaOpenGraph(url, 'Web'),
+    };
+
+  // ── OpenLibrary ──────────────────────────────────────────────────────────
+  static Future<ResourceDraft> _fetchOpenLibrary(String url):
+    // Extract work ID or ISBN from URL patterns:
+    //   https://openlibrary.org/works/OL12345W
+    //   https://openlibrary.org/isbn/9780000000000
+    //   https://openlibrary.org/books/OL12345M
+
+    String? workId = RegExp(r'/works/(OL\w+)').firstMatch(url)?.group(1);
+    String? isbn   = RegExp(r'/isbn/(\d{10,13})').firstMatch(url)?.group(1);
+    String? bookId = RegExp(r'/books/(OL\w+)').firstMatch(url)?.group(1);
+
+    Map<String,dynamic>? data;
+
+    if (workId != null):
+      final resp = await http.get(
+        Uri.parse('https://openlibrary.org/works/$workId.json'));
+      if (resp.statusCode == 200) data = jsonDecode(resp.body);
+
+    else if (isbn != null):
+      final resp = await http.get(
+        Uri.parse('https://openlibrary.org/isbn/$isbn.json'));
+      if (resp.statusCode == 200):
+        data = jsonDecode(resp.body);
+        // If book record, get its work:
+        final workKey = data?['works']?[0]?['key'] as String?;
+        if (workKey != null):
+          final wResp = await http.get(
+            Uri.parse('https://openlibrary.org$workKey.json'));
+          if (wResp.statusCode == 200) data = jsonDecode(wResp.body);
+
+    else if (bookId != null):
+      final resp = await http.get(
+        Uri.parse('https://openlibrary.org/books/$bookId.json'));
+      if (resp.statusCode == 200) data = jsonDecode(resp.body);
+
+    if (data == null) return ResourceDraft(sourceUrl: url, sourceName: 'OpenLibrary');
+
+    // Extract cover
+    String? coverId;
+    final covers = data['covers'];
+    if (covers is List && covers.isNotEmpty) coverId = covers.first.toString();
+    final coverUrl = coverId != null
+        ? 'https://covers.openlibrary.org/b/id/$coverId-L.jpg'
+        : null;
+
+    // Extract author: need separate author fetch
+    String? author;
+    final authorKeys = data['authors'];
+    if (authorKeys is List && authorKeys.isNotEmpty):
+      final authorKey = (authorKeys.first['author']?['key']
+                      ?? authorKeys.first['key']) as String?;
+      if (authorKey != null):
+        final aResp = await http.get(
+          Uri.parse('https://openlibrary.org$authorKey.json'));
+        if (aResp.statusCode == 200):
+          author = jsonDecode(aResp.body)['name'] as String?;
+
+    // Extract description
+    final desc = data['description'];
+    final synopsis = desc is Map ? desc['value'] as String? : desc as String?;
+
+    // Extract year from first_publish_date
+    final yearStr = data['first_publish_date'] as String?;
+    final year = yearStr != null ? int.tryParse(yearStr.replaceAll(RegExp(r'[^0-9]'), '').substring(0,4)) : null;
+
+    return ResourceDraft(
+      title: data['title'] as String?,
+      author: author,
+      resourceType: 'Livro',
+      synopsis: synopsis,
+      coverUrl: coverUrl,
+      year: year,
+      sourceUrl: url,
+      sourceName: 'OpenLibrary',
+    );
+
+  // ── Google Books ──────────────────────────────────────────────────────────
+  static Future<ResourceDraft> _fetchGoogleBooks(String url):
+    // Extract volume ID from URL:
+    //   https://books.google.com/books?id=XXXXXXXX
+    //   https://play.google.com/store/books/details?id=XXXXXXXX
+    final id = RegExp(r'[?&]id=([^&]+)').firstMatch(url)?.group(1)
+            ?? RegExp(r'/details/[^?]+\?id=([^&]+)').firstMatch(url)?.group(1);
+
+    if (id == null) return _fetchViaOpenGraph(url, 'Google Books');
+
+    final resp = await http.get(
+      Uri.parse('https://www.googleapis.com/books/v1/volumes/$id'));
+    if (resp.statusCode != 200) return _fetchViaOpenGraph(url, 'Google Books');
+
+    final data = jsonDecode(resp.body) as Map<String,dynamic>;
+    final info = data['volumeInfo'] as Map<String,dynamic>? ?? {};
+
+    final authors = (info['authors'] as List?)?.join(', ');
+    final thumbnail = (info['imageLinks'] as Map?)?['thumbnail'] as String?;
+    // Upgrade thumbnail to larger version:
+    final coverUrl = thumbnail?.replaceAll('zoom=1', 'zoom=3')
+                              .replaceAll('&edge=curl', '')
+                              .replaceFirst('http://', 'https://');
+
+    final year = int.tryParse(
+      (info['publishedDate'] as String? ?? '').split('-').first);
+
+    return ResourceDraft(
+      title: info['title'] as String?,
+      author: authors,
+      resourceType: 'Livro',
+      synopsis: info['description'] as String?,
+      coverUrl: coverUrl,
+      year: year,
+      pages: info['pageCount'] as int?,
+      category: (info['categories'] as List?)?.first as String?,
+      sourceUrl: url,
+      sourceName: 'Google Books',
+    );
+
+  // ── IMDB ─────────────────────────────────────────────────────────────────
+  static Future<ResourceDraft> _fetchImdb(String url):
+    // Extract IMDB ID: tt followed by digits
+    final ttId = RegExp(r'/(tt\d+)').firstMatch(url)?.group(1);
+
+    // Strategy: use OpenGraph from IMDB page (no official free API)
+    final draft = await _fetchViaOpenGraph(url, 'IMDB');
+
+    // Detect type from URL:
+    //   /title/ttXXX/ → could be movie or series
+    //   URL contains /episodes → series
+    String resourceType = 'Filme';
+    if (url.toLowerCase().contains('episodes') ||
+        url.toLowerCase().contains('series')) {
+      resourceType = 'Série';
+    }
+
+    // From OpenGraph, og:title for IMDB is usually "Movie Title (Year)"
+    // Extract year from title if present:
+    String? title = draft.title;
+    int? year = draft.year;
+    if (title != null):
+      final match = RegExp(r'\((\d{4})\)$').firstMatch(title.trim());
+      if (match != null):
+        year = int.tryParse(match.group(1) ?? '');
+        title = title.replaceAll(match.group(0)!, '').trim();
+
+    // Cover: og:image from IMDB is usually the poster — use it
+    return ResourceDraft(
+      title: title,
+      author: draft.author,   // usually director from og:description
+      resourceType: resourceType,
+      synopsis: draft.synopsis,
+      coverUrl: draft.coverUrl,
+      year: year,
+      sourceUrl: url,
+      sourceId: ttId,
+      sourceName: 'IMDB',
+    );
+
+  // ── Generic OpenGraph (Amazon, Goodreads, fallback) ───────────────────────
+  static Future<ResourceDraft> _fetchViaOpenGraph(String url, String sourceName):
+    // Reuse OEmbedService._fetchOpenGraph if accessible, or replicate here.
+    // Fetch the page HTML and extract:
+    //   og:title, og:description, og:image, og:type
+    //   For Amazon: look for the JSON-LD script tag with @type Book/Movie
+    try:
+      final resp = await http.get(Uri.parse(url),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; CitrineBot/1.0)',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+        }).timeout(const Duration(seconds: 10));
+
+      if (resp.statusCode != 200) return ResourceDraft(sourceUrl: url, sourceName: sourceName);
+
+      final body = resp.body;
+
+      String? _og(String prop):
+        final match = RegExp('content=["\']([^"\']*)["\']',caseSensitive:false)
+          .firstMatch(RegExp('<meta[^>]*property=["\']og:$prop["\'][^>]*>',
+                             caseSensitive:false, dotAll:true).firstMatch(body)?.group(0) ?? '');
+        return match?.group(1);
+
+      String? _meta(String name):
+        final match = RegExp('content=["\']([^"\']*)["\']',caseSensitive:false)
+          .firstMatch(RegExp('<meta[^>]*name=["\']$name["\'][^>]*>',
+                             caseSensitive:false, dotAll:true).firstMatch(body)?.group(0) ?? '');
+        return match?.group(1);
+
+      // Try JSON-LD for richer data (Amazon, Goodreads use it)
+      Map<String,dynamic>? jsonLd;
+      final ldMatch = RegExp(
+        r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+        caseSensitive:false, dotAll:true).firstMatch(body);
+      if (ldMatch != null):
+        try: jsonLd = jsonDecode(ldMatch.group(1)!.trim());
+        catch (_): {}
+
+      final title = _og('title') ?? jsonLd?['name'] as String?
+                  ?? _meta('title');
+      final desc  = _og('description') ?? jsonLd?['description'] as String?
+                  ?? _meta('description');
+      final image = _og('image') ?? jsonLd?['image'] as String?;
+      final author = jsonLd?['author']?['name'] as String?
+                  ?? jsonLd?['author'] as String?;
+
+      // Detect resource type from JSON-LD @type or og:type
+      final ldType = (jsonLd?['@type'] as String? ?? '').toLowerCase();
+      String resourceType = 'General';
+      if (ldType.contains('book')) resourceType = 'Livro';
+      else if (ldType.contains('movie')) resourceType = 'Filme';
+      else if (ldType.contains('tvseries') || ldType.contains('series')) resourceType = 'Série';
+      // If sourceName gives a hint:
+      if (resourceType == 'General' && sourceName == 'Goodreads') resourceType = 'Livro';
+      if (resourceType == 'General' && sourceName == 'IMDB') resourceType = 'Filme';
+
+      // Year from JSON-LD datePublished or dateCreated
+      final dateStr = jsonLd?['datePublished'] as String?
+                   ?? jsonLd?['dateCreated'] as String?;
+      final year = dateStr != null ? int.tryParse(dateStr.split('-').first) : null;
+
+      return ResourceDraft(
+        title: title,
+        author: author,
+        resourceType: resourceType,
+        synopsis: desc,
+        coverUrl: image,
+        year: year,
+        sourceUrl: url,
+        sourceName: sourceName,
+      );
+    catch (e):
+      return ResourceDraft(sourceUrl: url, sourceName: sourceName);
+
+ENUM ResourceSource:
+  amazon, goodreads, imdb, openLibrary, googleBooks, unknown
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 8.2 — EDIT lib/ui/forms/create_resource_form.dart — add URL-initiated mode
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `CreateResourceForm` aceita `initialUrl`, busca metadados,
+  mostra estado de importação e preenche campos editáveis.
+
+FILE: lib/ui/forms/create_resource_form.dart
+ACTION: EDIT
+
+ADD constructor parameter:
+  final String? initialUrl;    // when set, fetch metadata on init and pre-fill
+
+EDIT initState():
+  ANCHOR: the block after `if (widget.existingResource != null) { ... }`
+
+  ADD at the end of initState():
+    if (widget.existingResource == null && widget.initialUrl != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fetchFromUrl());
+    }
+
+ADD field to state:
+  bool _isFetchingUrl = false;
+  String? _fetchError;
+  String? _sourceUrl;
+  String? _sourceName;
+
+ADD method _fetchFromUrl():
+  Future<void> _fetchFromUrl() async {
+    final url = widget.initialUrl!.trim();
+    setState(() { _isFetchingUrl = true; _fetchError = null; });
+    try {
+      final draft = await ResourceMetadataService.fetchMetadata(url);
+      if (!mounted) return;
+      setState(() {
+        _isFetchingUrl = false;
+        _sourceUrl = draft.sourceUrl;
+        _sourceName = draft.sourceName;
+        if (draft.title != null) _titleController.text = draft.title!;
+        if (draft.author != null) _authorController.text = draft.author!;
+        if (draft.synopsis != null) _synopsisController.text = draft.synopsis!;
+        if (draft.coverUrl != null) _coverUrlController.text = draft.coverUrl!;
+        if (draft.year != null) _yearController.text = draft.year.toString();
+        if (draft.pages != null) _pagesController.text = draft.pages.toString();
+        if (draft.category != null) _categoryController.text = draft.category!;
+        if (draft.resourceType != null) _resourceType = draft.resourceType!;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _isFetchingUrl = false; _fetchError = e.toString(); });
+    }
+  }
+
+EDIT build() — ADD loading banner and metadata preview:
+  ANCHOR: inside the CustomScrollView slivers list, after SliverAppBar.
+
+  ADD as first SliverToBoxAdapter:
+
+  if (_isFetchingUrl)
+    SliverToBoxAdapter(child: LinearProgressIndicator()),
+
+  if (_fetchError != null)
+    SliverToBoxAdapter(child: Container(
+      margin: EdgeInsets.fromLTRB(20,8,20,0),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha:0.10),
+        borderRadius: BorderRadius.circular(10)),
+      child: Text('Erro ao buscar metadados: $_fetchError',
+        style: TextStyle(color: AppColors.error, fontSize:13)),
+    )),
+
+  if (_sourceUrl != null && !_isFetchingUrl && _fetchError == null)
+    SliverToBoxAdapter(child: _buildSourceBanner()),
+
+ADD method _buildSourceBanner():
+  Builds a small banner showing:
+    "📚 Dados importados de $_sourceName"
+    + a small icon of the cover (if coverUrlController has value)
+    + TextButton "Editar manualmente" that does nothing (form is already editable)
+  Appearance: Container with primary.withValues(alpha:0.08) background,
+    Row with source icon + text + optional thumbnail preview
+
+ALSO EDIT the save method (_saveResource or equivalent):
+  ANCHOR: find where Resource is created from form fields and passed to provider.
+  ADD to the Resource object: if _sourceUrl != null, store it somewhere.
+  OPTION: add to Resource.tags: ['source:$_sourceUrl'] — this preserves the link
+  in the vault without needing a new field. OR add a new field sourceUrl to
+  Resource model (see TASK 8.3).
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 8.3 — EDIT lib/models/resource_model.dart — add sourceUrl field
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `Resource.sourceUrl` existe, serializa em `source_url`,
+  lê do frontmatter e é preservado no `copyWith()`.
+
+FILE: lib/models/resource_model.dart
+ACTION: EDIT
+
+ADD field:
+  String? sourceUrl;    // original URL from Amazon/IMDB/etc. that seeded this resource
+
+EDIT constructor: add optional parameter String? sourceUrl
+
+EDIT toMarkdown():
+  ANCHOR: frontmatter map building.
+  ADD: if (sourceUrl != null) frontmatter['source_url'] = sourceUrl;
+
+EDIT fromMarkdown():
+  ANCHOR: after resource.loadBaseMap(frontmatter)
+  ADD: resource.sourceUrl = _stringValue(frontmatter['source_url']);
+
+EDIT copyWith(): add String? sourceUrl parameter and include in returned Resource.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 8.4 — EDIT main.dart share intent routing — route resource URLs differently
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — URLs compartilhadas de resource abrem
+  `CreateResourceForm(initialUrl)`; demais URLs seguem para SocialPost.
+
+FILE: lib/main.dart
+ACTION: EDIT
+
+ANCHOR: method _openSharedSocialUrl(String url) or _handleSharedMedia()
+  This is the method called when a URL arrives from the share intent.
+  Currently it always opens CreateSocialPostForm.
+
+REPLACE the logic with:
+  Future<void> _handleSharedUrl(String url) async {
+    final nav = _navigatorKey?.currentState;
+    if (nav == null || !nav.mounted) return;
+
+    // Route to resource form if it's a book/movie URL
+    if (ResourceMetadataService.isResourceUrl(url)) {
+      nav.push(MaterialPageRoute(
+        builder: (_) => CreateResourceForm(initialUrl: url),
+      ));
+    } else {
+      // Existing social post flow
+      nav.push(MaterialPageRoute(
+        builder: (_) => CreateSocialPostForm(initialUrl: url),
+      ));
+    }
+  }
+
+REPLACE all call sites of _openSharedSocialUrl(url) with _handleSharedUrl(url).
+ADD import: import 'services/resource_metadata_service.dart';
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 8.5 — EDIT lib/ui/screens/resources_screen.dart — add clipboard/paste button
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — Resources checa clipboard, mostra banner de importação e
+  possui ação "Importar link".
+
+FILE: lib/ui/screens/resources_screen.dart
+ACTION: EDIT
+
+ANCHOR: locate initState() or the build() method.
+
+ADD initState() with clipboard check (mirrors social_screen.dart pattern):
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkClipboardUrl());
+  }
+
+ADD method _checkClipboardUrl():
+  Future<void> _checkClipboardUrl() async {
+    if (!mounted) return;
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text?.trim() ?? '';
+    if (text.isEmpty) return;
+    final uri = Uri.tryParse(text);
+    if (uri == null || !uri.hasScheme) return;
+    if (!ResourceMetadataService.isResourceUrl(text)) return;
+
+    // Show snackbar banner with "Importar [Amazon/Goodreads/IMDB]?"
+    final source = ResourceMetadataService.detectSource(text);
+    final sourceName = source.name; // 'amazon', 'goodreads', etc.
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showMaterialBanner(MaterialBanner(
+      content: Text('Link de $sourceName detectado. Importar como resource?'),
+      leading: const Icon(Icons.link_rounded),
+      actions: [
+        TextButton(
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+            Navigator.push(context, MaterialPageRoute(
+              builder: (_) => CreateResourceForm(initialUrl: text)));
+          },
+          child: const Text('Importar'),
+        ),
+        TextButton(
+          onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+          child: const Text('Ignorar'),
+        ),
+      ],
+    ));
+  }
+
+ALSO ADD a "+" FAB action "Importar link":
+  ANCHOR: FloatingActionButton or SpeedDial in the build().
+  ADD a second action "Importar link" (paste icon) that does:
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final url = data?.text?.trim() ?? '';
+    if (url.isNotEmpty) {
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => CreateResourceForm(initialUrl: url)));
+    } else {
+      // Show a text input dialog to paste/type the URL
+      _showUrlInputDialog(context);
+    }
+
+ADD _showUrlInputDialog(BuildContext context):
+  showDialog with a TextField for URL input + "Buscar" button that pushes
+  CreateResourceForm(initialUrl: urlController.text.trim()).
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 8.6 — UPDATE guidelines.md — resource metadata patterns
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `guidelines.md` documenta Resource metadata import,
+  roteamento e persistência em `Resource.sourceUrl`.
+
+FILE: guidelines.md (repo root)
+ACTION: APPEND
+
+APPEND:
+
+---
+
+## RESOURCE METADATA IMPORT
+
+URL routing rule (in _handleSharedUrl):
+  ResourceMetadataService.isResourceUrl(url) == true → CreateResourceForm(initialUrl:)
+  else → CreateSocialPostForm(initialUrl:)
+
+ResourceMetadataService.detectSource() priority order:
+  openLibrary → googleBooks → imdb → amazon → goodreads → unknown
+
+Cover URLs: always use HTTPS. For OpenLibrary, use size suffix -L.jpg (large).
+  For Google Books, replace zoom=1 with zoom=3 and remove &edge=curl.
+  Never store thumbnail-size cover URLs — always resolve to the largest available.
+
+ResourceDraft → Resource mapping:
+  draft.resourceType must be one of: 'Livro', 'Filme', 'Série', 'Podcast',
+  'Artigo', 'Curso', 'General' — match existing settingsProvider.resourceTypeFilters.
+  If no match, default to 'General'.
+
+sourceUrl is stored in Resource.sourceUrl field (not in tags).
+  Do not use tags for source tracking.
+
+Clipboard check in ResourcesScreen runs once per initState.
+  Do NOT re-run on every build() — only in initState postFrameCallback.
+
+---
+
+## WINDOWS / DESKTOP PARITY RULES
+
+Always wrap with Platform.isWindows/isMacOS/isLinux guard:
+  - Any LocalAuthentication call → return true (bypass)
+  - Any FlutterLocalNotificationsPlugin call → return (no-op)
+  - Any receive_sharing_intent call → skip entirely
+
+On desktop, share intent is replaced by clipboard detection.
+  Every screen that has a share-triggered flow must also have
+  a clipboard-paste button/banner for Windows users.
+
+Window minimum size: 900×600. Default size: 1280×820.
+  Set in main() via window_manager before runApp().
+
+---
+
+================================================================================
+PHASE 7 + 8 IMPLEMENTATION ORDER
+================================================================================
+
+PHASE 7 (Windows Parity) — run in order:
+  7.1  biometric_service.dart — desktop bypass
+  7.2  notification_service.dart — desktop bypass
+  7.3  main.dart — window_manager setup
+  7.4  social_screen.dart — verify clipboard works on Windows, add paste FAB
+
+PHASE 8 (Resource Link Share) — run in order:
+  8.1  Create resource_metadata_service.dart (+ ResourceDraft class + ResourceSource enum)
+  8.2  Edit create_resource_form.dart — add initialUrl param + _fetchFromUrl()
+  8.3  Edit resource_model.dart — add sourceUrl field
+  8.4  Edit main.dart — _handleSharedUrl() routing to resource vs social form
+  8.5  Edit resources_screen.dart — clipboard banner + paste button
+  8.6  Append to guidelines.md
+
+VERIFICATION CHECKLIST — Phase 7:
+  □ flutter analyze → 0 errors on Windows target
+  □ Run on Windows: biometric lock screen bypassed, app continues normally
+  □ Run on Windows: app starts at 1280×820, cannot resize below 900×600
+  □ Run on Windows: Social screen shows paste FAB
+  □ Run on Windows: copy a YouTube URL → Social screen shows clipboard banner
+
+VERIFICATION CHECKLIST — Phase 8:
+  □ ResourceMetadataService.detectSource('https://openlibrary.org/works/OL1234') == openLibrary
+  □ ResourceMetadataService.detectSource('https://www.imdb.com/title/tt1234567') == imdb
+  □ ResourceMetadataService.isResourceUrl('https://instagram.com/p/abc') == false
+  □ Share an OpenLibrary URL → CreateResourceForm opens with title+author+cover pre-filled
+  □ Share a YouTube URL → CreateSocialPostForm opens (not resource form)
+  □ Share an IMDB URL → CreateResourceForm opens, resourceType == 'Filme'
+  □ Share a Goodreads URL → CreateResourceForm opens, resourceType == 'Livro'
+  □ In ResourcesScreen: copy Amazon book URL to clipboard → banner appears
+  □ Tap "Importar" → form opens pre-filled
+  □ Save → Resource persists in vault with sourceUrl in frontmatter
+  □ On Windows: copy Goodreads URL → Resources screen clipboard banner works
+
+================================================================================
+END OF PHASES 7 + 8
+================================================================================
+
+
+================================================================================
+PHASE 9 — GUIDELINES V3 CONFORMANCE FIXES
+Source: diff analysis of guidelines_v3_final.md vs. current codebase.
+Severity labels: P0=data corruption/crash | P1=missing feature | P2=mismatch
+Each task has FILE + ACTION + ANCHOR + exact instructions. Implement in order.
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+SPRINT 9-A  ·  P0 FIXES — implement these before anything else
+────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.A.1 — FIX entry_type serialization bug
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `JournalEntry.entryTypeToString()` grava `field_note` sem
+  underscore inicial e `ObsidianService.fixEntryTypeMigration()` corrige legado.
+
+FILE: lib/models/journal_entry.dart
+ACTION: EDIT
+
+PROBLEM: toMarkdown() uses:
+  frontmatter['entry_type'] = entryType.name
+    .replaceAll(RegExp(r'([A-Z])'), r'_\1').toLowerCase();
+This produces '_field_note' (leading underscore) instead of 'field_note'.
+
+ANCHOR: find the line containing replaceAll(RegExp(r'([A-Z])'), inside toMarkdown().
+
+REPLACE that single expression with:
+  frontmatter['entry_type'] = _entryTypeToString(entryType);
+
+ADD private helper method to the class (outside toMarkdown):
+  static String _entryTypeToString(JournalEntryType t) => switch (t) {
+    JournalEntryType.standard  => 'standard',
+    JournalEntryType.fieldNote => 'field_note',
+    JournalEntryType.pmn       => 'pmn',
+  };
+
+VERIFY fromMarkdown() already strips underscores before comparing — confirmed
+  in the diff. No change needed to fromMarkdown().
+
+ALSO ADD a migration helper (call once at app startup after vault load):
+  In lib/services/obsidian_service.dart, add method fixEntryTypeMigration():
+    Scans all files where type==journal_entry (or type==entry).
+    If frontmatter contains entry_type starting with '_':
+      strips the leading underscore and rewrites the file.
+    Log each fix to CrashReportService as an info event, not an error.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.A.2 — FIX JournalEntry.date to preserve time component
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `fromMarkdown()` mescla data com `time_of_day`/`time`;
+  `toMarkdown()` grava data canônica e `time_of_day`; `baseTime` usa `date`.
+
+FILE: lib/models/journal_entry.dart
+ACTION: EDIT
+
+PROBLEM: JournalEntry.date is set from frontmatter['date'] which is a date-only
+  string (e.g. "2026-05-19"). The time lives in a separate field timeOfDay
+  (String "08:30"). They are never merged, so baseTime has no hour component
+  and Timeline ordering by time-of-day is broken.
+
+ANCHOR: find fromMarkdown() method. Find where date and timeOfDay are set.
+
+REPLACE the date assignment block with:
+  // Parse the date-only field
+  final rawDate = frontmatter['date']?.toString() ?? '';
+  DateTime parsedDate = DateTime.tryParse(rawDate) ?? DateTime.now();
+
+  // Merge timeOfDay into the date if present
+  final rawTime = frontmatter['time_of_day']?.toString()
+               ?? frontmatter['timeOfDay']?.toString()
+               ?? '';
+  if (rawTime.isNotEmpty) {
+    final parts = rawTime.split(':');
+    if (parts.length >= 2) {
+      final hour   = int.tryParse(parts[0]) ?? 0;
+      final minute = int.tryParse(parts[1]) ?? 0;
+      parsedDate = DateTime(
+        parsedDate.year, parsedDate.month, parsedDate.day, hour, minute);
+    }
+  }
+  entry.date = parsedDate;
+
+ALSO EDIT toMarkdown():
+  ANCHOR: find where date is written to frontmatter.
+  REPLACE:
+    frontmatter['date'] = date.toIso8601String().split('T')[0];
+  WITH:
+    frontmatter['date'] = '${date.year.toString().padLeft(4,'0')}'
+        '-${date.month.toString().padLeft(2,'0')}'
+        '-${date.day.toString().padLeft(2,'0')}';
+    if (date.hour != 0 || date.minute != 0) {
+      frontmatter['time_of_day'] =
+          '${date.hour.toString().padLeft(2,'0')}:${date.minute.toString().padLeft(2,'0')}';
+    }
+
+ALSO EDIT baseTime getter:
+  ANCHOR: @override DateTime? get baseTime
+  REPLACE body with: return date; // now has time component when set
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.A.3 — FIX System: make run_count / last_run / average_minutes derived
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `toMarkdown()` não persiste os campos derivados e
+  `SystemsNotifier._deriveSystemStats()` calcula a partir das tasks vinculadas.
+
+FILE: lib/models/system_model.dart
+ACTION: EDIT
+
+PROBLEM: toMarkdown() writes run_count, last_run, average_minutes directly to
+  frontmatter, violating spec rule "always derived, never written directly."
+
+ANCHOR: find in toMarkdown() the lines:
+  map['run_count'] = runCount;
+  if (lastRun != null) map['last_run'] = lastRun!.toIso8601String();
+  map['average_minutes'] = averageMinutes;
+
+DELETE those three lines from toMarkdown(). Do not replace them.
+
+The fields runCount, lastRun, averageMinutes should remain as in-memory
+  computed properties, NOT persisted. They are derived from the Task history
+  linked to this System (tasks with linked_system == this system's id).
+
+ADD comment above those fields in the class:
+  // Derived fields — never persisted. Computed from linked Task history.
+  // See SystemsProvider._deriveSystemStats() for calculation logic.
+
+IN lib/providers/systems_provider.dart (or wherever SystemsProvider lives):
+  Add method _deriveSystemStats(System system, List<Task> allTasks):
+    final linked = allTasks.where(
+      (t) => t.linkedSystem == system.id && t.stage == TaskStage.finalized);
+    system.runCount = linked.length;
+    system.lastRun  = linked.isEmpty ? null
+        : linked.map((t) => t.updatedAt).reduce((a,b) => a.isAfter(b)?a:b);
+    if (linked.isNotEmpty) {
+      final totalMin = linked
+          .where((t) => t.estimatedMinutes > 0)
+          .map((t) => t.estimatedMinutes)
+          .fold(0, (a,b) => a+b);
+      system.averageMinutes = linked.isEmpty ? 0 : totalMin ~/ linked.length;
+    }
+  Call _deriveSystemStats() after loading all objects, not on every read.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.A.4 — FIX JournalEntry.type: 'journal_entry' → 'entry'
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `JournalEntry.type` retorna `entry` e a migração corrige
+  frontmatter legado `journal_entry`.
+
+FILE: lib/models/journal_entry.dart
+ACTION: EDIT
+
+ANCHOR: @override String get type => 'journal_entry';
+
+REPLACE with: @override String get type => 'entry';
+
+MIGRATION: in obsidian_service.dart fixEntryTypeMigration() (TASK 9.A.1),
+  also rewrite any file where frontmatter['type'] == 'journal_entry'
+  to 'entry' (same single-pass scan, no second loop needed).
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.A.5 — ADD goal_mode field to Goal model
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `GoalMode`, `goalMode`, `objective`, `strategy` e
+  `phases` existem com serialização, parsing e `copyWith()`.
+
+FILE: lib/models/goal_model.dart
+ACTION: EDIT
+
+ADD enum (top of file, before class):
+  enum GoalMode { standard, plan }
+
+ADD fields to Goal class:
+  GoalMode goalMode;        // default: GoalMode.standard (Regra 5)
+  String? objective;        // plan mode only
+  String? strategy;         // plan mode only
+  List<String> phases;      // plan mode only, default []
+
+EDIT constructor: add parameters with defaults:
+  this.goalMode = GoalMode.standard,
+  this.objective,
+  this.strategy,
+  List<String>? phases,
+  ...
+  : phases = phases ?? [],
+
+EDIT toMarkdown():
+  ADD: frontmatter['goal_mode'] = goalMode.name;
+  ADD (plan only): if (goalMode == GoalMode.plan) {
+    if (objective != null) frontmatter['objective'] = objective;
+    if (strategy  != null) frontmatter['strategy']  = strategy;
+    if (phases.isNotEmpty) frontmatter['phases']     = phases;
+  }
+
+EDIT fromMarkdown():
+  ADD after loadBaseMap():
+    final rawMode = frontmatter['goal_mode']?.toString() ?? 'standard';
+    goal.goalMode = GoalMode.values.firstWhere(
+      (m) => m.name == rawMode, orElse: () => GoalMode.standard);
+    goal.objective = frontmatter['objective'] as String?;
+    goal.strategy  = frontmatter['strategy']  as String?;
+    goal.phases    = List<String>.from(frontmatter['phases'] as List? ?? []);
+
+EDIT copyWith(): add goalMode, objective, strategy, phases parameters.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.A.6 — CREATE CalendarSession model
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `calendar_session.dart` existe com modelo, markdown,
+  parsing e `copyWith()`.
+
+FILE: lib/models/calendar_session.dart
+ACTION: CREATE (file does not exist)
+
+enum CalendarSessionState { scheduled, inProgress, completed, backlog, cancelled }
+
+class CalendarSession extends ContentObject:
+  FIELDS:
+    DateTime date
+    CalendarSessionState state       // default: scheduled
+    String? timeOfDay                // "HH:MM"
+    int duration                     // minutes, default 60
+    String? endTime                  // "HH:MM" (computed or set)
+    bool multiDay                    // default false
+    String? linkedTaskId             // WikiLink slug to Task
+    String? linkedGoalId             // WikiLink slug to Goal
+    List<String> subtasks            // inline subtask titles
+    String? note
+    String? color
+    List<String> places
+    List<String> participants
+    String? linkedGoogleEventId
+    String? linkedGoogleEventTitle
+    DateTime? linkedGoogleEventDate
+    String? linkedGoogleEventUrl
+    // timer — stored as minutes worked int
+    int timerMinutesWorked
+    bool backlog                     // default false
+
+  @override String get type => 'calendar_session';
+
+  @override String toMarkdown():
+    build frontmatter map from all fields using naming convention:
+      state.name for state (e.g. 'in_progress')
+      'time_of_day' for timeOfDay
+      'end_time' for endTime
+      'multi_day' for multiDay
+      'linked_task' for linkedTaskId (as WikiLink: '[[SLUG]]')
+      'linked_goal' for linkedGoalId (as WikiLink: '[[SLUG]]')
+      'linked_google_event_id' etc.
+      'timer_minutes_worked' for timerMinutesWorked
+    body = note ?? ''
+    Call generateMarkdown(frontmatter, body)
+
+  factory CalendarSession.fromMarkdown(Map frontmatter, String body):
+    Read all fields. State default: scheduled if absent.
+    WikiLink fields: strip [[ ]] to get slug.
+
+  CalendarSession copyWith(...): standard pattern.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.A.7 — REGISTER CalendarSession in vault loader
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — loader reconhece `calendar_session`,
+  `calendarSessionsProvider` existe e o FAB abre `CreateCalendarSessionForm`.
+
+FILE: lib/providers/vault_provider.dart  (or lib/services/obsidian_service.dart)
+ACTION: EDIT
+
+ANCHOR: find the switch/if-else that dispatches on frontmatter['type'] to build
+  ContentObjects (e.g. case 'task': return Task.fromMarkdown(...)).
+
+ADD case:
+  case 'calendar_session':
+    return CalendarSession.fromMarkdown(frontmatter, body);
+
+ADD provider (same pattern as tasksProvider, habitsProvider etc.):
+  final calendarSessionsProvider = Provider<List<CalendarSession>>((ref) {
+    final all = ref.watch(allObjectsProvider).valueOrNull ?? [];
+    return all.whereType<CalendarSession>().toList();
+  });
+
+ADD to create_menu_sheet.dart (TASK 9.C.1 handles FAB restructure; ensure
+  CalendarSession is included in the Plan tab).
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.A.8 — REWRITE MoodDefinition model — 2-axis system
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `MoodDefinition` usa quadrante, pleasantness, energy,
+  source/hidden/aliases/order e possui 48 system moods.
+
+FILE: lib/models/mood_model.dart
+ACTION: REWRITE
+
+NOTE: This is the largest P0. The current 1D model (numericValue) must become
+  a 2-axis model (pleasantness 1–5, energy 1–5, quadrant). Existing mood data
+  in vault files uses mood:: [[calm]] inline wikilinks — these are PRESERVED.
+  The migration risk is low because mood definitions are a separate layer.
+
+REPLACE entire file content with:
+
+enum MoodQuadrant { red, yellow, green, blue }
+enum MoodSource { system, user }
+
+class MoodDefinition:
+  FIELDS (all match guidelines exactly):
+    String id                     // slug: 'calm', 'anxious'
+    MoodSource source             // system | user
+    bool hidden                   // default false
+    String label                  // PT label: "Calma"
+    String? labelEn               // EN label: "Calm" (system only)
+    String? description           // 1–2 sentences
+    String emoji
+    MoodQuadrant quadrant
+    int pleasantness              // 1–5
+    int energy                    // 1–5
+    String color                  // hex of quadrant color
+    List<String> aliases          // Obsidian native aliases
+    int order                     // for picker sorting
+
+  @override String get type => 'mood_definition';
+
+  @override String toMarkdown():
+    Only write file if source == MoodSource.user OR if this is a lazy-create
+    of a system mood (first-time registration — see below).
+    Frontmatter: all fields using snake_case keys.
+    aliases: write as native Obsidian aliases array.
+    body: description (or empty string).
+
+  factory MoodDefinition.fromMarkdown(Map frontmatter, String body):
+    Read all fields. source default: system. hidden default: false.
+    aliases: List<String>.from(frontmatter['aliases'] ?? []).
+    quadrant: MoodQuadrant.values.firstWhere(
+      (q) => q.name == frontmatter['quadrant'], orElse: () => MoodQuadrant.blue).
+    description: frontmatter['description'] as String? ?? body.trim().
+
+  static Color quadrantColor(MoodQuadrant q) => switch (q) {
+    MoodQuadrant.red    => const Color(0xFFEF5350),
+    MoodQuadrant.yellow => const Color(0xFFFFA726),
+    MoodQuadrant.green  => const Color(0xFF66BB6A),
+    MoodQuadrant.blue   => const Color(0xFF42A5F5),
+  };
+
+  // The 48 system moods — hardcoded in memory, not from files
+  static List<MoodDefinition> get systemMoods => [
+    // RED quadrant (12)
+    MoodDefinition(id:'enraged',    source:MoodSource.system, label:'Enfurecida',    labelEn:'Enraged',    emoji:'😡', quadrant:MoodQuadrant.red,    pleasantness:1, energy:5, color:'#EF5350', order:1,  aliases:['enraged','enfurecida']),
+    MoodDefinition(id:'panicked',   source:MoodSource.system, label:'Em pânico',     labelEn:'Panicked',   emoji:'😱', quadrant:MoodQuadrant.red,    pleasantness:1, energy:5, color:'#EF5350', order:2,  aliases:['panicked','em panico','panico']),
+    MoodDefinition(id:'livid',      source:MoodSource.system, label:'Furiosa',       labelEn:'Livid',      emoji:'🤬', quadrant:MoodQuadrant.red,    pleasantness:1, energy:5, color:'#EF5350', order:3,  aliases:['livid','furiosa']),
+    MoodDefinition(id:'furious',    source:MoodSource.system, label:'Raivosa',       labelEn:'Furious',    emoji:'😤', quadrant:MoodQuadrant.red,    pleasantness:1, energy:5, color:'#EF5350', order:4,  aliases:['furious','raivosa']),
+    MoodDefinition(id:'terrified',  source:MoodSource.system, label:'Aterrorizada',  labelEn:'Terrified',  emoji:'😨', quadrant:MoodQuadrant.red,    pleasantness:1, energy:5, color:'#EF5350', order:5,  aliases:['terrified','aterrorizada']),
+    MoodDefinition(id:'shocked',    source:MoodSource.system, label:'Chocada',       labelEn:'Shocked',    emoji:'😳', quadrant:MoodQuadrant.red,    pleasantness:1, energy:5, color:'#EF5350', order:6,  aliases:['shocked','chocada']),
+    MoodDefinition(id:'anxious',    source:MoodSource.system, label:'Ansiosa',       labelEn:'Anxious',    emoji:'😰', quadrant:MoodQuadrant.red,    pleasantness:2, energy:4, color:'#EF5350', order:7,  aliases:['anxious','ansiosa']),
+    MoodDefinition(id:'stressed',   source:MoodSource.system, label:'Estressada',    labelEn:'Stressed',   emoji:'😖', quadrant:MoodQuadrant.red,    pleasantness:2, energy:4, color:'#EF5350', order:8,  aliases:['stressed','estressada']),
+    MoodDefinition(id:'frustrated', source:MoodSource.system, label:'Frustrada',     labelEn:'Frustrated', emoji:'😣', quadrant:MoodQuadrant.red,    pleasantness:2, energy:4, color:'#EF5350', order:9,  aliases:['frustrated','frustrada']),
+    MoodDefinition(id:'agitated',   source:MoodSource.system, label:'Agitada',       labelEn:'Agitated',   emoji:'😬', quadrant:MoodQuadrant.red,    pleasantness:2, energy:4, color:'#EF5350', order:10, aliases:['agitated','agitada']),
+    MoodDefinition(id:'irritated',  source:MoodSource.system, label:'Irritada',      labelEn:'Irritated',  emoji:'😒', quadrant:MoodQuadrant.red,    pleasantness:2, energy:4, color:'#EF5350', order:11, aliases:['irritated','irritada']),
+    MoodDefinition(id:'jittery',    source:MoodSource.system, label:'Nervosa',       labelEn:'Jittery',    emoji:'😵', quadrant:MoodQuadrant.red,    pleasantness:2, energy:4, color:'#EF5350', order:12, aliases:['jittery','nervosa']),
+    // YELLOW quadrant (12)
+    MoodDefinition(id:'ecstatic',   source:MoodSource.system, label:'Eufórica',      labelEn:'Ecstatic',   emoji:'🤩', quadrant:MoodQuadrant.yellow, pleasantness:5, energy:5, color:'#FFA726', order:13, aliases:['ecstatic','euforica']),
+    MoodDefinition(id:'elated',     source:MoodSource.system, label:'Radiante',      labelEn:'Elated',     emoji:'😄', quadrant:MoodQuadrant.yellow, pleasantness:5, energy:5, color:'#FFA726', order:14, aliases:['elated','radiante']),
+    MoodDefinition(id:'excited',    source:MoodSource.system, label:'Empolgada',     labelEn:'Excited',    emoji:'😃', quadrant:MoodQuadrant.yellow, pleasantness:5, energy:4, color:'#FFA726', order:15, aliases:['excited','empolgada']),
+    MoodDefinition(id:'enthusiastic',source:MoodSource.system,label:'Entusiasmada',  labelEn:'Enthusiastic',emoji:'🙌',quadrant:MoodQuadrant.yellow, pleasantness:5, energy:4, color:'#FFA726', order:16, aliases:['enthusiastic','entusiasmada']),
+    MoodDefinition(id:'energized',  source:MoodSource.system, label:'Energizada',    labelEn:'Energized',  emoji:'⚡', quadrant:MoodQuadrant.yellow, pleasantness:4, energy:5, color:'#FFA726', order:17, aliases:['energized','energizada']),
+    MoodDefinition(id:'happy',      source:MoodSource.system, label:'Feliz',         labelEn:'Happy',      emoji:'😊', quadrant:MoodQuadrant.yellow, pleasantness:5, energy:4, color:'#FFA726', order:18, aliases:['happy','feliz']),
+    MoodDefinition(id:'joyful',     source:MoodSource.system, label:'Alegre',        labelEn:'Joyful',     emoji:'😁', quadrant:MoodQuadrant.yellow, pleasantness:5, energy:4, color:'#FFA726', order:19, aliases:['joyful','alegre']),
+    MoodDefinition(id:'upbeat',     source:MoodSource.system, label:'Animada',       labelEn:'Upbeat',     emoji:'😀', quadrant:MoodQuadrant.yellow, pleasantness:4, energy:4, color:'#FFA726', order:20, aliases:['upbeat','animada']),
+    MoodDefinition(id:'inspired',   source:MoodSource.system, label:'Inspirada',     labelEn:'Inspired',   emoji:'✨', quadrant:MoodQuadrant.yellow, pleasantness:4, energy:4, color:'#FFA726', order:21, aliases:['inspired','inspirada']),
+    MoodDefinition(id:'motivated',  source:MoodSource.system, label:'Motivada',      labelEn:'Motivated',  emoji:'💪', quadrant:MoodQuadrant.yellow, pleasantness:4, energy:4, color:'#FFA726', order:22, aliases:['motivated','motivada']),
+    MoodDefinition(id:'optimistic', source:MoodSource.system, label:'Otimista',      labelEn:'Optimistic', emoji:'🌟', quadrant:MoodQuadrant.yellow, pleasantness:4, energy:4, color:'#FFA726', order:23, aliases:['optimistic','otimista']),
+    MoodDefinition(id:'proud',      source:MoodSource.system, label:'Orgulhosa',     labelEn:'Proud',      emoji:'🥹', quadrant:MoodQuadrant.yellow, pleasantness:4, energy:4, color:'#FFA726', order:24, aliases:['proud','orgulhosa']),
+    // GREEN quadrant (12)
+    MoodDefinition(id:'calm',       source:MoodSource.system, label:'Calma',         labelEn:'Calm',       emoji:'😌', quadrant:MoodQuadrant.green,  pleasantness:5, energy:2, color:'#66BB6A', order:25, aliases:['calm','calma','tranquila']),
+    MoodDefinition(id:'content',    source:MoodSource.system, label:'Satisfeita',    labelEn:'Content',    emoji:'🙂', quadrant:MoodQuadrant.green,  pleasantness:5, energy:2, color:'#66BB6A', order:26, aliases:['content','satisfeita']),
+    MoodDefinition(id:'peaceful',   source:MoodSource.system, label:'Em paz',        labelEn:'Peaceful',   emoji:'🕊️',quadrant:MoodQuadrant.green,  pleasantness:5, energy:1, color:'#66BB6A', order:27, aliases:['peaceful','em paz','paz']),
+    MoodDefinition(id:'serene',     source:MoodSource.system, label:'Serena',        labelEn:'Serene',     emoji:'🌿', quadrant:MoodQuadrant.green,  pleasantness:5, energy:1, color:'#66BB6A', order:28, aliases:['serene','serena']),
+    MoodDefinition(id:'grateful',   source:MoodSource.system, label:'Grata',         labelEn:'Grateful',   emoji:'🤍', quadrant:MoodQuadrant.green,  pleasantness:5, energy:2, color:'#66BB6A', order:29, aliases:['grateful','grata']),
+    MoodDefinition(id:'relaxed',    source:MoodSource.system, label:'Relaxada',      labelEn:'Relaxed',    emoji:'😮‍💨',quadrant:MoodQuadrant.green, pleasantness:4, energy:1, color:'#66BB6A', order:30, aliases:['relaxed','relaxada']),
+    MoodDefinition(id:'comfortable',source:MoodSource.system, label:'Confortável',   labelEn:'Comfortable',emoji:'🛋️',quadrant:MoodQuadrant.green,  pleasantness:4, energy:2, color:'#66BB6A', order:31, aliases:['comfortable','confortavel']),
+    MoodDefinition(id:'at_ease',    source:MoodSource.system, label:'À vontade',     labelEn:'At ease',    emoji:'😴', quadrant:MoodQuadrant.green,  pleasantness:4, energy:1, color:'#66BB6A', order:32, aliases:['at_ease','a vontade','vontade']),
+    MoodDefinition(id:'balanced',   source:MoodSource.system, label:'Equilibrada',   labelEn:'Balanced',   emoji:'⚖️', quadrant:MoodQuadrant.green,  pleasantness:4, energy:2, color:'#66BB6A', order:33, aliases:['balanced','equilibrada']),
+    MoodDefinition(id:'loving',     source:MoodSource.system, label:'Amorosa',       labelEn:'Loving',     emoji:'🥰', quadrant:MoodQuadrant.green,  pleasantness:5, energy:2, color:'#66BB6A', order:34, aliases:['loving','amorosa']),
+    MoodDefinition(id:'thoughtful', source:MoodSource.system, label:'Reflexiva',     labelEn:'Thoughtful', emoji:'🌙', quadrant:MoodQuadrant.green,  pleasantness:4, energy:2, color:'#66BB6A', order:35, aliases:['thoughtful','reflexiva']),
+    MoodDefinition(id:'secure',     source:MoodSource.system, label:'Segura',        labelEn:'Secure',     emoji:'🏡', quadrant:MoodQuadrant.green,  pleasantness:4, energy:2, color:'#66BB6A', order:36, aliases:['secure','segura']),
+    // BLUE quadrant (12)
+    MoodDefinition(id:'sad',        source:MoodSource.system, label:'Triste',        labelEn:'Sad',        emoji:'😢', quadrant:MoodQuadrant.blue,   pleasantness:1, energy:2, color:'#42A5F5', order:37, aliases:['sad','triste']),
+    MoodDefinition(id:'depressed',  source:MoodSource.system, label:'Deprimida',     labelEn:'Depressed',  emoji:'😞', quadrant:MoodQuadrant.blue,   pleasantness:1, energy:1, color:'#42A5F5', order:38, aliases:['depressed','deprimida']),
+    MoodDefinition(id:'hopeless',   source:MoodSource.system, label:'Sem esperança', labelEn:'Hopeless',   emoji:'😔', quadrant:MoodQuadrant.blue,   pleasantness:1, energy:1, color:'#42A5F5', order:39, aliases:['hopeless','sem esperanca']),
+    MoodDefinition(id:'lonely',     source:MoodSource.system, label:'Solitária',     labelEn:'Lonely',     emoji:'🥺', quadrant:MoodQuadrant.blue,   pleasantness:1, energy:2, color:'#42A5F5', order:40, aliases:['lonely','solitaria']),
+    MoodDefinition(id:'bored',      source:MoodSource.system, label:'Entediada',     labelEn:'Bored',      emoji:'😑', quadrant:MoodQuadrant.blue,   pleasantness:2, energy:1, color:'#42A5F5', order:41, aliases:['bored','entediada']),
+    MoodDefinition(id:'disconnected',source:MoodSource.system,label:'Desconectada',  labelEn:'Disconnected',emoji:'🌫️',quadrant:MoodQuadrant.blue,   pleasantness:2, energy:1, color:'#42A5F5', order:42, aliases:['disconnected','desconectada']),
+    MoodDefinition(id:'exhausted',  source:MoodSource.system, label:'Exausta',       labelEn:'Exhausted',  emoji:'😩', quadrant:MoodQuadrant.blue,   pleasantness:1, energy:1, color:'#42A5F5', order:43, aliases:['exhausted','exausta']),
+    MoodDefinition(id:'discouraged',source:MoodSource.system, label:'Desanimada',    labelEn:'Discouraged',emoji:'😪', quadrant:MoodQuadrant.blue,   pleasantness:2, energy:2, color:'#42A5F5', order:44, aliases:['discouraged','desanimada']),
+    MoodDefinition(id:'disappointed',source:MoodSource.system,label:'Decepcionada',  labelEn:'Disappointed',emoji:'😕',quadrant:MoodQuadrant.blue,   pleasantness:2, energy:2, color:'#42A5F5', order:45, aliases:['disappointed','decepcionada']),
+    MoodDefinition(id:'numb',       source:MoodSource.system, label:'Anestesiada',   labelEn:'Numb',       emoji:'😶', quadrant:MoodQuadrant.blue,   pleasantness:2, energy:1, color:'#42A5F5', order:46, aliases:['numb','anestesiada']),
+    MoodDefinition(id:'melancholic',source:MoodSource.system, label:'Melancólica',   labelEn:'Melancholic',emoji:'🌧️',quadrant:MoodQuadrant.blue,   pleasantness:2, energy:2, color:'#42A5F5', order:47, aliases:['melancholic','melancolica']),
+    MoodDefinition(id:'defeated',   source:MoodSource.system, label:'Derrotada',     labelEn:'Defeated',   emoji:'😓', quadrant:MoodQuadrant.blue,   pleasantness:1, energy:2, color:'#42A5F5', order:48, aliases:['defeated','derrotada']),
+  ];
+
+CONSTRUCTOR: all fields required except aliases (default []) and description.
+  Do NOT use const — emoji multi-char sequences are not const in Dart.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.A.9 — CREATE MoodProvider with lazy-file logic
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `MoodsNotifier.ensureMoodFileExists()` cria arquivos de
+  mood sob demanda.
+
+FILE: lib/providers/mood_provider.dart
+ACTION: CREATE (replaces any existing mood provider)
+
+STATE: MoodState
+  final List<MoodDefinition> allMoods  // system + user merged
+  // "all" = system moods with user overrides (hidden, aliases) applied
+  //        + user-created moods
+  List<MoodDefinition> get visibleMoods =>
+    allMoods.where((m) => !m.hidden).toList()..sort((a,b) => a.order.compareTo(b.order));
+  List<MoodDefinition> get byQuadrant(MoodQuadrant q) =>
+    visibleMoods.where((m) => m.quadrant == q).toList();
+
+NOTIFIER: MoodNotifier extends Notifier<MoodState>:
+
+  build():
+    // Load system moods as base
+    final systemMoods = Map.fromEntries(
+      MoodDefinition.systemMoods.map((m) => MapEntry(m.id, m)));
+
+    // Load user overrides from vault (moods/*.md files)
+    final vaultMoods = ref.read(allObjectsProvider).valueOrNull ?? [];
+    for (final obj in vaultMoods.whereType<MoodDefinition>()) {
+      if (obj.source == MoodSource.system && systemMoods.containsKey(obj.id)) {
+        // Apply user overrides to system mood: only hidden + aliases are editable
+        systemMoods[obj.id] = systemMoods[obj.id]!.copyWith(
+          hidden:  obj.hidden,
+          aliases: obj.aliases,
+        );
+      } else if (obj.source == MoodSource.user) {
+        systemMoods[obj.id] = obj;  // user moods: full replacement
+      }
+    }
+    return MoodState(allMoods: systemMoods.values.toList());
+
+  // Resolve a wikilink slug or alias to a MoodDefinition
+  MoodDefinition? resolve(String slugOrAlias):
+    final lower = slugOrAlias.toLowerCase();
+    return state.allMoods.firstWhere(
+      (m) => m.id == lower ||
+             m.aliases.map((a) => a.toLowerCase()).contains(lower),
+      orElse: () => null,
+    );
+
+  // Called when a mood is logged for the first time (lazy file creation)
+  Future<void> ensureMoodFileExists(String moodId):
+    final mood = state.allMoods.firstWhere((m) => m.id == moodId,
+      orElse: () => null);
+    if (mood == null) return;
+    // Check if file already exists in vault
+    final obsidian = ref.read(obsidianServiceProvider);
+    final path = 'moods/${mood.id}.md';
+    if (await obsidian.fileExists(path)) return;
+    // Create the file lazily
+    await obsidian.writeFile(path, mood.toMarkdown());
+
+  // Toggle hidden for any mood (system: only hidden editable; user: full edit)
+  Future<void> setHidden(String moodId, bool hidden):
+    final idx = state.allMoods.indexWhere((m) => m.id == moodId);
+    if (idx < 0) return;
+    final updated = state.allMoods[idx].copyWith(hidden: hidden);
+    state = state.copyWith(allMoods: [...state.allMoods]..[idx] = updated);
+    if (updated.source == MoodSource.system):
+      await ensureMoodFileExists(moodId);
+    // Write updated hidden field to file
+    final obsidian = ref.read(obsidianServiceProvider);
+    await obsidian.writeFile('moods/${moodId}.md', updated.toMarkdown());
+
+  Future<void> saveUserMood(MoodDefinition mood):
+    // mood.source must be MoodSource.user
+    final existing = state.allMoods.indexWhere((m) => m.id == mood.id);
+    List<MoodDefinition> updated = [...state.allMoods];
+    if (existing >= 0) updated[existing] = mood;
+    else updated.add(mood);
+    state = state.copyWith(allMoods: updated);
+    final obsidian = ref.read(obsidianServiceProvider);
+    await obsidian.writeFile('moods/${mood.id}.md', mood.toMarkdown());
+
+PROVIDER:
+  final moodProvider = NotifierProvider<MoodNotifier, MoodState>(MoodNotifier.new);
+
+────────────────────────────────────────────────────────────────────────────────
+SPRINT 9-B  ·  P1 FIXES — high impact, implement after Sprint A
+────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.B.1 — ADD TaskStage.backlog to enum + modal on save without date
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `TaskStage.backlog` existe e `CreateTaskForm` direciona
+  tasks sem data para Backlog ou Hoje.
+
+FILE: lib/models/task_model.dart
+ACTION: EDIT
+
+ANCHOR: enum TaskStage { idea, todo, inProgress, pending, finalized }
+ADD backlog after idea:
+  enum TaskStage { idea, backlog, todo, inProgress, pending, finalized }
+
+SERIALIZATION: TaskStage.backlog.name == 'backlog' — no special handling needed.
+
+FILE: lib/ui/forms/create_task_form.dart
+ACTION: EDIT
+
+ANCHOR: the save/submit method (search for 'tasksProvider.notifier' or
+  'ref.read(tasksProvider').
+
+ADD before saving: check if end_date (dueDate / endDate) is null.
+  If null: show modal dialog:
+    showDialog(context: context, barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: const Text('Sem data definida'),
+        content: const Text('Onde você quer colocar esta task?'),
+        actions: [
+          TextButton(
+            child: const Text('Backlog'),
+            onPressed: () {
+              Navigator.pop(context);
+              _stage = TaskStage.backlog;
+              _saveTask();
+            }),
+          TextButton(
+            child: const Text('Hoje'),
+            onPressed: () {
+              Navigator.pop(context);
+              _endDate = DateTime.now();
+              _stage = TaskStage.todo;
+              _saveTask();
+            }),
+        ],
+      ));
+  If endDate is set: call _saveTask() directly without modal.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.B.2 — ADD linked_system field to Task model
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `Task.linkedSystem` existe, persiste em `linked_system`,
+  lê do frontmatter e entra no `copyWith()`.
+
+FILE: lib/models/task_model.dart
+ACTION: EDIT
+
+ADD field: String? linkedSystem;  // slug of System that generated this task
+
+EDIT toMarkdown():
+  ADD: frontmatter['linked_system'] = linkedSystem; // null is fine — writes null
+
+EDIT fromMarkdown():
+  ADD: task.linkedSystem = _stringValue(frontmatter['linked_system']);
+
+EDIT copyWith(): add String? linkedSystem parameter.
+
+USAGE: in SystemsProvider when running a system (creating a task from system),
+  set linkedSystem = system.slug on the created Task.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.B.3 — ADD TimeBlock.energyLevel field
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `TimeBlock.energyLevel` existe, serializa em
+  `energy_level`, lê do mapa e a timeline aplica tint visual.
+
+FILE: lib/models/day_theme_model.dart
+ACTION: EDIT
+
+ADD enum (top of file):
+  enum EnergyLevel { high, medium, low }
+
+ANCHOR: class TimeBlock { ... }
+ADD field: EnergyLevel? energyLevel;  // null = not set
+
+EDIT TimeBlock constructor: add EnergyLevel? energyLevel parameter.
+
+EDIT TimeBlock.toMap():
+  ADD: if (energyLevel != null) map['energy_level'] = energyLevel!.name;
+
+EDIT TimeBlock.fromMap():
+  ADD: energyLevel: EnergyLevel.values.cast<EnergyLevel?>().firstWhere(
+    (e) => e?.name == (map['energy_level'] as String?),
+    orElse: () => null);
+
+Energy Map tints (for Planner rendering — add to lib/ui/screens/planner_screen.dart):
+  ANCHOR: find where TimeBlock background color is computed in the planner.
+  ADD: if timeBlock.energyLevel != null, overlay the block background with:
+    high   → Color(0xFF4CAF50).withValues(alpha: 0.08)
+    medium → Color(0xFFFFC107).withValues(alpha: 0.08)
+    low    → Color(0xFFFF7043).withValues(alpha: 0.08)
+  This is ADDITIVE — apply on top of the block's normal background color.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.B.4 — FIX Habit completions storage: write to daily note, not habit body
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — completions são gravadas/lidas em chaves planas da daily
+  note, com migrações para formatos antigos.
+
+NOTE: This is a significant architecture change. Implement carefully.
+
+CURRENT BEHAVIOR: Habit.toMarkdown() writes `## History` with checkbox lines
+  into the habit file itself.
+
+TARGET BEHAVIOR (spec): completions stored in daily note frontmatter as:
+  meditar: true
+  agua: 6
+  (key = habit slug, value = boolean or count)
+
+STEP 1 — STOP writing completions in habit file:
+  FILE: lib/models/habit_model.dart
+  ANCHOR: toMarkdown() — find where ## History or completion_history is written.
+  REMOVE the ## History section from the body output.
+  REMOVE completion_history from frontmatter (if present).
+  ADD comment: // Completions stored in daily note frontmatter per spec.
+
+STEP 2 — WRITE completions to daily note:
+  FILE: lib/providers/vault_provider.dart (or wherever completeHabit() lives)
+  ANCHOR: the method that records a completion (completeHabit / logCompletion).
+
+  AFTER the existing completion logic, ADD:
+    // Write completion to daily note frontmatter
+    await _writeToDailyNote(date, habit.slug, value);
+
+  ADD method _writeToDailyNote(DateTime date, String habitSlug, dynamic value):
+    // Build path: 'daily/YYYY-MM-DD.md'
+    final path = 'daily/${date.year.toString().padLeft(4,'0')}'
+                 '-${date.month.toString().padLeft(2,'0')}'
+                 '-${date.day.toString().padLeft(2,'0')}.md';
+    final obsidian = ref.read(obsidianServiceProvider);
+    Map<String,dynamic> frontmatter = {};
+    String body = '';
+    if (await obsidian.fileExists(path)):
+      final content = await obsidian.readFile(path);
+      final parsed  = parseFrontmatter(content);  // use existing parser
+      frontmatter   = parsed.frontmatter;
+      body          = parsed.body;
+    else:
+      // Create new daily note with canonical frontmatter
+      frontmatter = {
+        'date': '${date.year}-${date.month.toString().padLeft(2,'0')}'
+                '-${date.day.toString().padLeft(2,'0')}',
+        'type': 'daily_note',
+        'tags': ['daily'],
+      };
+    // Set habit value
+    frontmatter[habitSlug] = value; // true for boolean, int for count
+    await obsidian.writeFile(path, generateMarkdown(frontmatter, body));
+
+STEP 3 — READ completions from daily note:
+  FILE: lib/services/obsidian_service.dart (or vault_provider.dart)
+  ANCHOR: the startup parsing algorithm. Find where daily notes are loaded.
+
+  In the daily note parsing loop, AFTER extracting date:
+    // Extract habit completions: any frontmatter key that matches a known habit slug
+    final habitSlugs = ref.read(habitsProvider).map((h) => h.slug).toSet();
+    for (final key in frontmatter.keys) {
+      if (habitSlugs.contains(key)) {
+        final value = frontmatter[key];
+        // Register as HabitCompletion in memory
+        _registerCompletion(habitSlug: key, date: date, value: value);
+      }
+    }
+
+  ADD _registerCompletion(): updates the in-memory CompletionRecord list for
+    the corresponding Habit. Does NOT write to any file — read-only here.
+
+STEP 4 — MIGRATION: convert existing ## History entries to daily note format:
+  FILE: lib/services/obsidian_service.dart
+  ADD method migrateHabitCompletionsToDailyNotes():
+    For each habit file that has a ## History section:
+      Parse the checkbox lines: - [x] YYYY-MM-DD or - [ ] YYYY-MM-DD
+      For each [x] line: call _writeToDailyNote(date, habit.slug, true)
+      Remove ## History section from the habit file body
+      Rewrite the habit file
+    Call this once at startup (after vault load), gated by a
+    SharedPreferences key 'habit_completion_migration_done'.
+    Set the key to true after completion so it runs only once.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.B.5 — FIX Organizer types: add task/goal/habit/tracker
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `OrganizerType` inclui task/goal/habit/tracker e
+  Organizer persiste state/priority com leitura retrocompatível.
+
+FILE: lib/models/organizer_model.dart
+ACTION: EDIT
+
+ANCHOR: enum OrganizerType { area, project, activity, label, person, place }
+
+REPLACE with:
+  enum OrganizerType {
+    area, project, activity,
+    task, goal, habit, tracker,
+    label, person, place
+  }
+
+SERIALIZATION: enum.name values match the spec lowercase strings exactly.
+  No special mapping needed.
+
+ALSO ADD fields to Organizer class for project-type organizers:
+  String? state;      // active | paused | completed (for project type)
+  String? priority;   // none | low | medium | high (for project type)
+
+EDIT toMarkdown(): include state and priority if not null.
+EDIT fromMarkdown(): read state and priority.
+EDIT copyWith(): add state and priority.
+
+EDIT Organizer.type getter:
+  ANCHOR: @override String get type => 'organizer';
+  CHANGE to: @override String get type => organizerType.name;
+  // This makes type: area, type: project, etc. in frontmatter.
+
+IMPORTANT: update fromMarkdown() in organizer to handle both old format
+  (type: organizer + organizer_type: area) and new format (type: area):
+    final typeStr = frontmatter['type']?.toString() ?? '';
+    final subtypeStr = frontmatter['organizer_type']?.toString() ?? typeStr;
+    org.organizerType = OrganizerType.values.firstWhere(
+      (t) => t.name == subtypeStr, orElse: () => OrganizerType.label);
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.B.6 — RESTRUCTURE FAB create_menu_sheet.dart — 4-tab spec layout
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `CreateMenuSheet` usa abas Journal/Plan/Record/Note com
+  os itens da spec, incluindo Calendar Session, Backlog e System.
+
+FILE: lib/ui/widgets/create_menu_sheet.dart
+ACTION: EDIT — restructure tabs
+
+CURRENT: 2 tabs (Capture + Criar) with mixed items.
+TARGET: 4 tabs per spec: Journal | Plan | Record | Note
+
+Tab structure (spec-exact):
+  TAB 1 — Journal:
+    Entry (ícone: edit_note)
+    Field Note (ícone: bolt)
+    PMN — Revisão Semanal (ícone: calendar_view_week)
+
+  TAB 2 — Plan:
+    Task (ícone: check_circle_outline)
+    Goal (ícone: flag_outlined)
+    Session — Calendar Session (ícone: event_outlined)
+    Reminder (ícone: alarm)
+    Backlog — creates Task with stage=backlog (ícone: inbox_outlined)
+
+  TAB 3 — Record:
+    Tracking Record (ícone: bar_chart)
+
+  TAB 4 — Note:
+    Text Note (ícone: description_outlined)
+    Outline Note (ícone: format_list_bulleted)
+    Collection Note (ícone: table_chart_outlined)
+    System (ícone: settings_outlined)
+
+IMPLEMENTATION: rewrite the TabBar + TabBarView inside the modal bottom sheet.
+  Keep the existing navigation logic (how each item opens its form) — only
+  change the tab structure and item grouping.
+
+  Items that already have forms: link to existing form widgets.
+  Items that are new (CalendarSession): link to CreateCalendarSessionForm
+    (create this form in TASK 9.C.2).
+
+NOTE: items from the old "Capture" tab that are NOT in the spec tabs
+  (Foto/scan, Post social, PMN was in old Capture) should be moved to the
+  appropriate new tab or removed if not spec-conformant.
+  Social Post is NOT in the spec FAB — remove from FAB, keep accessible
+  from Social screen only.
+
+────────────────────────────────────────────────────────────────────────────────
+SPRINT 9-C  ·  P2 FIXES + NEW FORMS
+────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.C.1 — FIX daily note template to match canonical format
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `getDailyNoteTemplate()` gera frontmatter canônico,
+`tags: [daily]`, campos `mood_*`, hábitos planos e seções da daily note.
+
+FILE: lib/providers/vault_provider.dart (or obsidian_service.dart)
+ACTION: EDIT
+
+ANCHOR: method getDailyNoteTemplate() or equivalent that generates the initial
+  content for a new daily/YYYY-MM-DD.md file.
+
+REPLACE the template output with exactly:
+  String getDailyNoteTemplate(DateTime date, List<Habit> activeHabits):
+    final dateStr = '${date.year}-${date.month.toString().padLeft(2,'0')}'
+                    '-${date.day.toString().padLeft(2,'0')}';
+    final habitKeys = activeHabits.map((h) => '${h.slug}: false').join('\n');
+    return '''---
+date: $dateStr
+type: daily_note
+tags: [daily]
+
+$habitKeys
+
+mood_pleasantness:
+mood_energy:
+mood_label:
+mood_emoji:
+---
+
+# $dateStr
+
+## Journal Entries
+
+## Habits
+
+${activeHabits.map((h) => '- [ ] ${h.title}').join('\n')}
+
+## Trackers
+
+## Pomodoros
+''';
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.C.2 — CREATE lib/ui/forms/create_calendar_session_form.dart
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `CreateCalendarSessionForm` existe e salva sessões via
+provider.
+
+FILE: lib/ui/forms/create_calendar_session_form.dart
+ACTION: CREATE
+
+Mirrors the structure of create_task_form.dart but for CalendarSession.
+
+FIELDS IN FORM:
+  title (required TextField)
+  date (DatePicker, default today)
+  timeOfDay (TimePicker, optional)
+  duration (int field, default 60, unit: minutos)
+  state (segmented: scheduled | backlog | in_progress | completed | cancelled)
+  linkedTask (UniversalSearchPicker filtering for Task objects)
+  linkedGoal (UniversalSearchPicker filtering for Goal objects)
+  note (multiline TextField, optional)
+  color (AppColorPicker widget)
+  organizers (OrganizerSelectorField)
+  multiDay (toggle)
+
+SAVE logic:
+  Creates CalendarSession from form fields.
+  Calls ref.read(calendarSessionsProvider.notifier).add(session).
+  Navigator.pop(context).
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.C.3 — CREATE lib/ui/widgets/mood_picker.dart — 2-step quadrant picker
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `MoodPicker` existe com escolha por quadrante e mood.
+
+FILE: lib/ui/widgets/mood_picker.dart
+ACTION: CREATE
+
+PURPOSE: 2-step mood picker. Step 1: quadrant selection. Step 2: specific mood.
+  Used in journal entry form and daily check-in.
+
+WIDGET: MoodPicker extends ConsumerStatefulWidget
+  CONSTRUCTOR params:
+    MoodDefinition? initialMood
+    void Function(MoodDefinition) onSelected
+
+  STATE:
+    int _step = 1;   // 1 = quadrant, 2 = specific mood
+    MoodQuadrant? _selectedQuadrant;
+
+  build(context):
+    final moodState = ref.watch(moodProvider);
+    if (_step == 1): return _buildQuadrantStep(context, moodState);
+    else:            return _buildMoodStep(context, moodState);
+
+  _buildQuadrantStep(context, moodState):
+    // 2×2 grid of quadrant buttons
+    Column children:
+      Text('Como você está?', style: sectionHeader)
+      SizedBox(height:16)
+      GridView 2×2:
+        for each MoodQuadrant in [red, yellow, green, blue]:
+          _QuadrantCard(
+            quadrant: q,
+            color: MoodDefinition.quadrantColor(q),
+            label: _quadrantLabel(q),   // 'Alta energia / Desagradável' etc.
+            moodCount: moodState.byQuadrant(q).length,
+            onTap: () => setState(() {
+              _selectedQuadrant = q;
+              _step = 2;
+            }),
+          )
+
+  _buildMoodStep(context, moodState):
+    final moods = moodState.byQuadrant(_selectedQuadrant!);
+    Column:
+      Row [BackButton → step=1] + Text(quadrant label)
+      Expanded ListView of _MoodRow:
+        for each mood in moods:
+          ListTile(
+            leading: Text(mood.emoji, style: TextStyle(fontSize:28)),
+            title: Text(mood.label),
+            subtitle: mood.description != null
+                ? Text(mood.description!, maxLines:2, style: muted) : null,
+            selected: initialMood?.id == mood.id,
+            onTap: () {
+              ref.read(moodProvider.notifier).ensureMoodFileExists(mood.id);
+              widget.onSelected(mood);
+            },
+          )
+
+QUADRANT LABELS (use in _quadrantLabel()):
+  red    → 'Alta energia · Desagradável'
+  yellow → 'Alta energia · Agradável'
+  green  → 'Baixa energia · Agradável'
+  blue   → 'Baixa energia · Desagradável'
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.C.4 — FIX Scheduler enum serialization (camelCase → snake_case)
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `RepeatTypeX.specName/fromSpecName` grava snake_case e lê
+camelCase legado.
+
+FILE: lib/models/scheduler.dart
+ACTION: EDIT
+
+PROBLEM: enum SchedulerRuleType values like linkedItemAppears and
+  nDaysAfterLinkedItem serialize as camelCase via .name. Spec expects
+  snake_case: linked_item_appears, n_days_after_linked_item.
+
+ANCHOR: enum SchedulerRuleType { ... linkedItemAppears, nDaysAfterLinkedItem ... }
+
+ADD extension on SchedulerRuleType:
+  extension SchedulerRuleTypeX on SchedulerRuleType {
+    String get specName => switch (this) {
+      SchedulerRuleType.numberOfDays          => 'number_of_days',
+      SchedulerRuleType.daysOfWeek            => 'days_of_week',
+      SchedulerRuleType.numberOfWeeks         => 'number_of_weeks',
+      SchedulerRuleType.numberOfMonths        => 'number_of_months',
+      SchedulerRuleType.numberOfHours         => 'number_of_hours',
+      SchedulerRuleType.daysAfterLastStart    => 'days_after_last_start',
+      SchedulerRuleType.daysAfterLastEnd      => 'days_after_last_end',
+      SchedulerRuleType.daysPerPeriod         => 'days_per_period',
+      SchedulerRuleType.linkedItemAppears     => 'linked_item_appears',
+      SchedulerRuleType.nDaysAfterLinkedItem  => 'n_days_after_linked_item',
+      SchedulerRuleType.firstBusinessDayOfMonth => 'first_business_day_of_month',
+      _ => name, // passthrough for any non-spec extras
+    };
+
+    static SchedulerRuleType fromSpecName(String s) =>
+      SchedulerRuleType.values.firstWhere(
+        (t) => t.specName == s || t.name == s,
+        orElse: () => SchedulerRuleType.numberOfDays);
+  }
+
+EDIT Scheduler.toMap() (or toJson()):
+  REPLACE: 'rule_type': ruleType.name
+  WITH:    'rule_type': ruleType.specName
+
+EDIT Scheduler.fromMap():
+  REPLACE: SchedulerRuleType.values.firstWhere((t) => t.name == map['rule_type'])
+  WITH:    SchedulerRuleTypeX.fromSpecName(map['rule_type']?.toString() ?? '')
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.C.5 — FIX TripleCheck.blocker serialization
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `TripleCheck.primaryBlocker` grava um blocker primário
+único.
+
+FILE: lib/models/task_model.dart  (or wherever TripleCheck is defined)
+ACTION: EDIT
+
+PROBLEM: 'blocker': blockers.join(',') produces "head,heart" (multi-value).
+  Spec defines blocker as a single string: the PRIMARY blocker.
+
+ANCHOR: find class TripleCheck or the triple_check map building in Task.toMarkdown().
+  Find the line: 'blocker': blockers.join(',')  (or similar multi-value join)
+
+REPLACE with: 'blocker': _primaryBlocker(),
+
+ADD method _primaryBlocker():
+  // Returns the first false check as the primary blocker, or null if all pass
+  if (!head)  return 'head';
+  if (!heart) return 'heart';
+  if (!hand)  return 'hand';
+  return null;
+
+EDIT fromMarkdown(): blocker field is a single string — no change needed to
+  reading, but ensure it's read as String? not List.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.C.6 — FIX PMN id format
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — PMNs sem id recebem `pmn-YYYY-WNN` por semana ISO.
+
+FILE: lib/models/journal_entry.dart  (or wherever PMN is created)
+ACTION: EDIT
+
+ANCHOR: find where id is generated for PMN entries. It currently uses UUID.
+
+For PMN type only (entry_type == pmn), set id to:
+  'pmn-${dateRangeStart.year}-W${weekNumber.toString().padLeft(2,'0')}'
+
+Where weekNumber is the ISO week number of dateRangeStart.
+Add helper:
+  static int _isoWeekNumber(DateTime date):
+    // ISO 8601 week: Mon-Sun, first week has Jan 4
+    final dayOfYear = int.parse(DateFormat('D').format(date));
+    final weekday   = date.weekday; // 1=Mon, 7=Sun
+    return ((dayOfYear - weekday + 10) / 7).floor();
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.C.7 — ADD missing fields: Note.links, JournalEntry.feelings
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — links ficam centralizados em `ContentObject.links`; 
+`JournalEntry.feelings` existe no model/form.
+
+
+FILE: lib/models/note_model.dart
+ACTION: EDIT
+ADD field: List<String> links;  // WikiLink strings e.g. '[[some-note]]'
+EDIT constructor: List<String>? links, → : links = links ?? [],
+EDIT toMarkdown(): if (links.isNotEmpty) frontmatter['links'] = links;
+EDIT fromMarkdown(): note.links = List<String>.from(frontmatter['links'] as List? ?? []);
+EDIT copyWith(): add List<String>? links parameter.
+
+FILE: lib/models/journal_entry.dart
+ACTION: EDIT
+ADD field: String? feelings;
+EDIT toMarkdown(): if (feelings != null) frontmatter['feelings'] = feelings;
+EDIT fromMarkdown(): entry.feelings = frontmatter['feelings'] as String?;
+EDIT copyWith(): add String? feelings parameter.
+ADD to create_entry_form.dart: optional TextField for 'feelings' below the
+  mood picker, label 'Sentimentos (opcional)', placeholder 'Ex: leveza, tensão no peito'.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.C.8 — FIX NoteSubtype: remove 'routine' (not in spec)
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `NoteSubtype` contém `text/outline/collection` e fallback
+de parsing cai para `text`.
+
+FILE: lib/models/note_model.dart
+ACTION: EDIT
+
+ANCHOR: enum NoteSubtype { text, outline, collection, routine }
+
+REMOVE 'routine' from the enum:
+  enum NoteSubtype { text, outline, collection }
+
+MIGRATION: in obsidian_service.dart startup scan, if a note file has
+  note_subtype: routine in frontmatter → treat as NoteSubtype.text (graceful
+  fallback, do NOT rewrite the file automatically — user may have custom data).
+
+SEARCH all files for NoteSubtype.routine references and replace with
+  NoteSubtype.text (with a TODO comment explaining the decision).
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.C.9 — ADD Reminder.checkboxes, time_block, habit_reminder fields
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `Reminder` tem checkboxes, timeBlock e habitReminder, com
+compatibilidade `time_block_id`.
+
+FILE: lib/models/reminder_model.dart
+ACTION: EDIT
+
+ADD fields:
+  List<String> checkboxes;    // list of checkbox item titles
+  String? timeBlock;          // slug of linked TimeBlock (spec: 'time_block')
+  bool habitReminder;         // true if this reminder belongs to a habit
+
+EDIT constructor: add parameters with defaults:
+  List<String>? checkboxes,
+  this.timeBlock,
+  this.habitReminder = false,
+  → : checkboxes = checkboxes ?? [],
+
+EDIT toMarkdown():
+  if (checkboxes.isNotEmpty) frontmatter['checkboxes'] = checkboxes;
+  if (timeBlock != null) frontmatter['time_block'] = timeBlock;
+  frontmatter['habit_reminder'] = habitReminder;
+
+EDIT fromMarkdown():
+  reminder.checkboxes = List<String>.from(frontmatter['checkboxes'] as List? ?? []);
+  reminder.timeBlock  = frontmatter['time_block'] as String?;
+  reminder.habitReminder = frontmatter['habit_reminder'] as bool? ?? false;
+
+RENAME existing timeBlockId field to timeBlock for spec conformance.
+  Update all call sites. (Global search: timeBlockId → timeBlock)
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.C.10 — FIX folderPaths in vault loader (Object Identification)
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — loader prioriza `settings.folderPaths` e deduplica antes
+do scan geral; escrita também respeita folderPaths.
+
+FILE: lib/services/obsidian_service.dart  (or vault_provider.dart)
+ACTION: EDIT
+
+PROBLEM: AppSettings.folderPaths (Map<String,String>) is defined but never
+  consulted by the vault loader. Spec Rule 12: Object Identification is
+  sovereign — user-configured folder takes priority over defaults.
+
+ANCHOR: find the startup scan loop where files are discovered (likely a
+  recursive directory walk starting from vaultPath).
+
+CHANGE the file discovery logic:
+  // Build effective folder map from settings
+  final folderPaths = ref.read(settingsProvider).folderPaths;
+  // folderPaths keys: object type strings ('task','habit','goal',etc.)
+  // folderPaths values: subfolder paths relative to vaultPath
+
+  // For each object type, if folderPaths has an entry, scan THAT folder first
+  // Objects found in the designated folder are authoritative for that type.
+  // The default app/ folder scan still runs for types not in folderPaths.
+
+  // Implementation:
+  final Set<String> scannedPaths = {};
+  for (final entry in folderPaths.entries) {
+    final typeKey  = entry.key;   // e.g. 'task'
+    final folderPath = path.join(vaultPath, entry.value);
+    if (await Directory(folderPath).exists()) {
+      await _scanFolder(folderPath, expectedType: typeKey, scannedPaths: scannedPaths);
+    }
+  }
+  // Scan default app/ for remaining objects (not in scannedPaths already)
+  await _scanFolder(path.join(vaultPath, 'app'), scannedPaths: scannedPaths);
+
+ADD _scanFolder(String folder, {String? expectedType, required Set<String> scannedPaths}):
+  Lists all .md files in folder recursively.
+  For each file not already in scannedPaths:
+    Add to scannedPaths.
+    Parse frontmatter.
+    Dispatch to appropriate ContentObject factory.
+    If expectedType != null and parsed type != expectedType: log warning
+      to CrashReportService (not an error — Obsidian files can move).
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 9.C.11 — ADD mood daily note fields write on mood registration
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — add/update `JournalEntry` com mood garante arquivo mood e
+grava quatro campos no frontmatter daily.
+
+FILE: lib/providers/vault_provider.dart  (or mood_provider.dart)
+ACTION: EDIT
+
+When user selects a mood (via MoodPicker, TASK 9.C.3), call:
+  Future<void> registerMood(DateTime date, MoodDefinition mood):
+    // 1. Lazy-create mood file if system mood and first use
+    await ref.read(moodProvider.notifier).ensureMoodFileExists(mood.id);
+
+    // 2. Write 4 mood fields to daily note frontmatter
+    final path = _dailyNotePath(date);
+    await _updateDailyNoteFrontmatter(path, {
+      'mood_pleasantness': mood.pleasantness,
+      'mood_energy':       mood.energy,
+      'mood_label':        mood.label,
+      'mood_emoji':        mood.emoji,
+    });
+
+    // 3. Write mood:: [[slug]] inline in the journal entry body
+    //    (this is handled by JournalEntry.toMarkdown(), not here)
+
+ADD _updateDailyNoteFrontmatter(String path, Map<String,dynamic> fields):
+  Reads existing daily note (or creates new one via getDailyNoteTemplate).
+  Merges fields into frontmatter.
+  Rewrites file.
+
+================================================================================
+PHASE 9 — IMPLEMENTATION ORDER
+================================================================================
+
+Run in this exact order (each sprint depends on the previous):
+
+SPRINT 9-A (P0 — data integrity):
+  9.A.1  Fix entry_type serialization (leading underscore bug)
+  9.A.2  Fix JournalEntry.date + time merge
+  9.A.3  Fix System: remove run_count/last_run/average_minutes from toMarkdown()
+  9.A.4  Fix JournalEntry.type: 'journal_entry' → 'entry'
+  9.A.5  Add GoalMode enum + goal_mode to Goal model
+  9.A.6  Create CalendarSession model
+  9.A.7  Register CalendarSession in vault loader + provider
+  9.A.8  Rewrite MoodDefinition model (2-axis, 48 system moods)
+  9.A.9  Create MoodProvider with lazy file creation
+
+SPRINT 9-B (P1 — missing features):
+  9.B.1  Add TaskStage.backlog + save-without-date modal
+  9.B.2  Add linked_system to Task
+  9.B.3  Add TimeBlock.energyLevel + planner energy tints
+  9.B.4  Fix habit completions → daily note (3-step: stop, write, migrate)  9.B.5  Fix OrganizerType enum + Organizer.type getter
+  9.B.6  Restructure FAB to 4-tab spec layout
+
+SPRINT 9-C (P2 — conformance details):
+  9.C.1  Fix daily note template (canonical format with tags + mood fields)
+  9.C.2  Create CreateCalendarSessionForm
+  9.C.3  Create MoodPicker widget (2-step)
+  9.C.4  Fix Scheduler enum serialization (camelCase → snake_case)
+  9.C.5  Fix TripleCheck.blocker (single value)
+  9.C.6  Fix PMN id format (pmn-YYYY-WNN)
+  9.C.7  Add Note.links, JournalEntry.feelings
+  9.C.8  Remove NoteSubtype.routine
+  9.C.9  Add Reminder.checkboxes, time_block, habit_reminder
+  9.C.10 Fix folderPaths in vault loader (Object Identification)
+  9.C.11 Add mood daily note fields on registration
+
+VERIFICATION CHECKLIST — Phase 9:
+  □ flutter analyze → 0 errors
+  □ field_note entry saved → frontmatter has entry_type: field_note (no leading _)
+  □ entry type field → frontmatter has type: entry (not journal_entry)
+  □ JournalEntry created at 08:30 → baseTime has hour=8, minute=30
+  □ System with 3 completed runs → run_count NOT in .md file; derived at runtime = 3
+  □ Goal fromMarkdown with no goal_mode → goalMode == GoalMode.standard (Regra 5)
+  □ CalendarSession.toMarkdown() → type: calendar_session in output
+  □ MoodDefinition.systemMoods.length == 48
+  □ moodProvider.resolve('calma') returns MoodDefinition with id='calm'
+  □ Task saved without end_date → modal appears → tap Backlog → stage=backlog
+  □ Task.toMarkdown() includes linked_system field (null or slug)
+  □ TimeBlock with energy_level: high → planner shows #4CAF50 8% tint
+  □ Habit checked → daily note frontmatter has habit-slug: true
+  □ obsidian_service startup: habit-slug key in daily note → registers completion
+  □ OrganizerType.habit serializes as 'habit' in frontmatter type field
+  □ FAB shows 4 tabs: Journal / Plan / Record / Note
+  □ New daily note has tags: [daily] + mood_* fields in frontmatter
+  □ Scheduler with linked_item_appears rule → toMap() output has 'linked_item_appears' (not camelCase)
+  □ TripleCheck with head:false → blocker: 'head' (not 'head,heart,hand')
+  □ PMN entry id → 'pmn-2026-W21' format
+  □ Note.toMarkdown() includes links array when not empty
+  □ NoteSubtype.routine → compile error (removed from enum)
+  □ Reminder with checkboxes → frontmatter has checkboxes: [...]
+  □ folderPaths = {task: 'tarefas/'} → vault loader scans 'tarefas/' for tasks first
+
+================================================================================
+END OF PHASE 9
+================================================================================
+
+
+================================================================================
+PHASE 10 — SOCIAL POST PHOTO/THUMBNAIL FIX
+(Instagram, TikTok photo posts, Reddit, LinkedIn not showing images)
+================================================================================
+
+DIAGNOSIS — ROOT CAUSE CONFIRMED FROM CODE
+────────────────────────────────────────────────────────────────────────────────
+Read: lib/services/oembed_service.dart + lib/ui/widgets/social_embed_view.dart
+      + lib/ui/widgets/social_post_grid_card.dart
+
+ROOT CAUSE 1 — Instagram, LinkedIn, Twitter, "other" all go through a single
+  generic _fetchOpenGraph(url) call with NO platform-specific handling and
+  (based on the visible portion of the file) likely no custom User-Agent or
+  Accept-Language headers. Instagram and LinkedIn both serve a bot-walled,
+  near-empty HTML shell to any request that doesn't look like a real mobile
+  browser session — no og:image, no og:description in the response.
+  RESULT: thumbnailUrl stays null for Instagram photo posts → SocialPostImage
+  falls back to the platform icon placeholder instead of the actual photo.
+
+ROOT CAUSE 2 — Instagram Reels (video) DO show a thumbnail because Instagram's
+  og:image for /reel/ URLs is more reliably served even to bots (video poster
+  frame metadata is treated differently by Instagram's anti-scraping layer
+  than carousel/photo og:image). This explains the exact symptom described:
+  "só video aparece, quando é foto não aparece."
+
+ROOT CAUSE 3 — TikTok photo posts (/photo/ URL pattern, mediaType=carousel)
+  are NOT handled by buildEmbedUrl() — the switch case for tiktok only
+  extracts an id via RegExp(r'/video/(\d+)'), which does not match TikTok's
+  /photo/ID URL pattern. embedUrl stays null. The oEmbed fallback
+  (tiktok.com/oembed) DOES typically return thumbnail_url even for photo
+  posts, so the thumbnail itself might partially work, but the embed view
+  has no playback target and SocialEmbedView's TikTok video logic
+  (_startTikTokPlayback) assumes mediaType==video — for carousel it falls
+  through to "_hasError = true" per the visible initState logic
+  ("if widget.post.platform == tiktok { _hasError = true; }" runs when
+  mediaType is NOT video, i.e. for photo/carousel posts). So TikTok photo
+  posts get NO thumbnail-driven detail view at all, just an error fallback.
+
+ROOT CAUSE 4 — Reddit is not handled ANYWHERE in OEmbedService.
+  detectPlatform() has no check for 'reddit.com'. Any reddit.com URL falls
+  through to SocialPlatform.other, which still routes to _fetchOpenGraph —
+  but reddit.com URLs were never mentioned in the user's request as currently
+  "supported," they likely fail isSupportedUrl() entirely depending on how
+  detectPlatform default works, OR they get treated as "other" with a generic
+  globe icon and no platform-specific image/oEmbed strategy. Reddit has an
+  official oEmbed endpoint (https://www.reddit.com/oembed) that returns
+  thumbnail_url reliably for image posts — currently unused.
+
+ROOT CAUSE 5 — generic _fetchOpenGraph has no JSON-LD fallback and (most
+  likely) no realistic browser User-Agent header, which is required by
+  Instagram, LinkedIn, and Reddit's anti-bot layer to serve real meta tags.
+
+SUMMARY TABLE:
+  Platform   | Photo posts work? | Why not
+  Instagram  | NO                | _fetchOpenGraph blocked by IG bot-wall (no UA)
+  TikTok     | Video: yes        | Photo: buildEmbedUrl() doesn't match /photo/ID,
+             | Photo: NO         |  SocialEmbedView treats non-video as error
+  Reddit     | NO                | Not detected as a platform at all
+  LinkedIn   | NO                | _fetchOpenGraph blocked by LinkedIn bot-wall
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 10.1 — EDIT oembed_service.dart — add User-Agent + headers to OpenGraph fetch
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `_fetchOpenGraph()` usa headers de navegador mobile,
+timeout maior e fallback JSON-LD para imagem.
+
+FILE: lib/services/oembed_service.dart
+ACTION: EDIT
+
+ANCHOR: find the private method _fetchOpenGraph(String url) (referenced
+  throughout fetchMetadata but body not shown in the read portion — locate it
+  by searching for 'Future<Map' and 'OpenGraph' in the file).
+
+REPLACE the http.get call inside _fetchOpenGraph with:
+  final resp = await http.get(
+    Uri.parse(url),
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) '
+          'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 '
+          'Mobile/15E148 Safari/604.1',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+    },
+  ).timeout(const Duration(seconds: 12));
+
+REASON: Instagram, LinkedIn, and Reddit specifically serve full server-rendered
+  meta tags (including og:image) to requests carrying a recognized mobile
+  Safari/Chrome User-Agent. Requests without a UA header (Dart's http package
+  default is "Dart/x.x (dart:io)") are routed to the bot-wall, which returns
+  a near-empty shell page.
+
+ALSO EDIT the og: tag parser inside _fetchOpenGraph (or wherever the regex
+  extraction happens) — ADD a JSON-LD fallback for Instagram/LinkedIn since
+  both platforms duplicate image data in inline JSON (window._sharedData for
+  Instagram, or LD+JSON for LinkedIn articles):
+
+  ADD helper method _extractJsonLdImage(String html):
+    final ldMatch = RegExp(
+      r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+      caseSensitive: false, dotAll: true,
+    ).firstMatch(html);
+    if (ldMatch == null) return null;
+    try {
+      final data = jsonDecode(ldMatch.group(1)!.trim());
+      final image = data is Map ? data['image'] : null;
+      if (image is String) return image;
+      if (image is List && image.isNotEmpty) return image.first.toString();
+      if (image is Map && image['url'] != null) return image['url'].toString();
+    } catch (_) {}
+    return null;
+
+  In _fetchOpenGraph, after extracting og:image, if it's null/empty:
+    final fallbackImage = _extractJsonLdImage(resp.body);
+    if (fallbackImage != null) result['image'] = fallbackImage;
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 10.2 — EDIT oembed_service.dart — add Instagram-specific multi-strategy fetch
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `fetchMetadata()` usa `_fetchInstagram()` com página embed
+e fallback OpenGraph.
+
+FILE: lib/services/oembed_service.dart
+ACTION: EDIT
+
+ANCHOR: inside fetchMetadata(), the switch statement that routes
+  SocialPlatform.instagram to _fetchOpenGraph(normalizedUrl).
+
+REPLACE the instagram case to use a dedicated method:
+  SocialPlatform.instagram => _fetchInstagram(normalizedUrl),
+
+ADD new method _fetchInstagram(String url):
+  Future<Map<String,dynamic>?> _fetchInstagram(String url) async {
+    // Strategy 1: Instagram's own oEmbed-like endpoint (no API key needed
+    // for basic public post embed data — uses the public embed page).
+    // Normalize URL: ensure trailing slash, strip query params first.
+    final uri = Uri.parse(url);
+    final cleanPath = uri.path.endsWith('/') ? uri.path : '${uri.path}/';
+    final embedPageUrl = 'https://www.instagram.com${cleanPath}embed/captioned/';
+
+    try {
+      final resp = await http.get(
+        Uri.parse(embedPageUrl),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) '
+              'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 '
+              'Mobile/15E148 Safari/604.1',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (resp.statusCode == 200) {
+        final html = resp.body;
+        // Instagram embed pages include the post image in a <img> tag with
+        // class containing "EmbeddedMediaImage" or in a data attribute.
+        final imgMatch = RegExp(
+          r'<img[^>]*class="[^"]*EmbeddedMediaImage[^"]*"[^>]*src="([^"]+)"',
+          caseSensitive: false,
+        ).firstMatch(html);
+        final ogImageMatch = RegExp(
+          r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\']([^"\']+)["\']',
+          caseSensitive: false,
+        ).firstMatch(html);
+        final captionMatch = RegExp(
+          r'<meta[^>]*property=["\']og:description["\'][^>]*content=["\']([^"\']+)["\']',
+          caseSensitive: false,
+        ).firstMatch(html);
+
+        final image = imgMatch?.group(1) ?? ogImageMatch?.group(1);
+        if (image != null) {
+          return {
+            'image': image.replaceAll('&amp;', '&'),
+            'description': captionMatch?.group(1),
+            'title': captionMatch?.group(1) ?? 'Instagram post',
+          };
+        }
+      }
+    } catch (e) {
+      debugPrint('Instagram embed-page fetch failed: $e');
+    }
+
+    // Strategy 2: fallback to standard OpenGraph with mobile UA (TASK 10.1)
+    return _fetchOpenGraph(url);
+  }
+
+NOTE: Instagram regularly changes class names in embed page HTML. This is a
+  best-effort scrape, not a stable API. ALWAYS keep Strategy 2 (OpenGraph
+  fallback) as a safety net so a partial failure doesn't return null entirely.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 10.3 — EDIT oembed_service.dart — add Reddit support (new platform)
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `SocialPlatform.reddit` foi adicionado, detectado, buscado
+via oEmbed e tratado nos switches de UI.
+
+FILE: lib/services/oembed_service.dart
+ACTION: EDIT
+
+ANCHOR: detectPlatform() method.
+ADD case before the final return SocialPlatform.other:
+  if (lower.contains('reddit.com') || lower.contains('redd.it')) {
+    return SocialPlatform.reddit;
+  }
+
+FILE: lib/models/social_post.dart
+ACTION: EDIT
+ANCHOR: enum SocialPlatform { tiktok, instagram, substack, linkedin,
+  pinterest, youtube, twitter, other }
+ADD: reddit,
+  → enum SocialPlatform { tiktok, instagram, substack, linkedin,
+      pinterest, youtube, twitter, reddit, other }
+
+VERIFY all switch statements over SocialPlatform across the codebase now
+  require a 'reddit' case (Dart will flag these as compile errors — this is
+  intentional, ensuring no platform is silently unhandled). Files known to
+  switch over SocialPlatform (fix all of them):
+    lib/services/oembed_service.dart (detectMediaType, buildEmbedUrl, fetchMetadata switch)
+    lib/ui/widgets/social_embed_view.dart (_height getter, initState branches)
+    lib/ui/utils/social_ref_utils.dart (socialPlatformColor, socialPlatformIcon — likely here)
+    lib/models/social_post.dart (any platform-to-string mapping)
+
+ADD to detectMediaType(): 
+  SocialPlatform.reddit => SocialMediaType.image,  // default; many reddit
+    posts are text-only, but image posts are the common "save" use case
+
+ADD to buildEmbedUrl():
+  case SocialPlatform.reddit:
+    return null; // Reddit has no stable iframe embed; use oEmbed thumbnail only
+
+ADD to fetchMetadata() switch:
+  SocialPlatform.reddit => _fetchOEmbed(
+    'https://www.reddit.com/oembed?url=${Uri.encodeComponent(normalizedUrl)}',
+  ),
+
+REDDIT OEMBED RESPONSE NOTE: Reddit's oEmbed endpoint
+  (https://www.reddit.com/oembed?url=...) returns a 'thumbnail_url' field
+  for image-post permalinks reliably WITHOUT needing special headers — it's
+  a proper public oEmbed provider, unlike IG/LinkedIn's bot-walled HTML.
+  No special User-Agent handling needed for Reddit specifically, but keep
+  the shared http client headers from TASK 10.1 applied universally for safety.
+
+ADD to lib/ui/utils/social_ref_utils.dart (or wherever socialPlatformColor/Icon
+  live):
+  SocialPlatform.reddit => const Color(0xFFFF4500),  // Reddit orange
+  ... socialPlatformIcon: SocialPlatform.reddit => Icons.forum_rounded,
+
+ADD to social_embed_view.dart _height getter:
+  SocialPlatform.reddit => 400,
+
+ADD reddit handling in SocialEmbedView.initState() — since buildEmbedUrl()
+  returns null for reddit, the existing "else { _hasError = true }" branch
+  would normally trigger the WebView error fallback. Instead, ADD a special
+  case before that check:
+    if (widget.post.platform == SocialPlatform.reddit) {
+      // No iframe embed — show the native thumbnail image fallback directly
+      _hasError = true; // triggers _buildFallback(context), which should
+                         // already render SocialPostThumbnail using
+                         // socialPostImageSource(post) — verify this is
+                         // the case in _buildFallback(); if not, fix per
+                         // TASK 10.5 below.
+      return;
+    }
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 10.4 — EDIT oembed_service.dart — fix TikTok photo post handling
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `buildEmbedUrl()` reconhece `/photo/ID`; carousel TikTok
+não força erro no detalhe.
+
+FILE: lib/services/oembed_service.dart
+ACTION: EDIT
+
+ANCHOR: buildEmbedUrl() → case SocialPlatform.tiktok:
+  CURRENT:
+    final id = RegExp(r'/video/(\d+)').firstMatch(originalUrl)?.group(1);
+    return id == null ? null : 'https://www.tiktok.com/embed/v2/$id';
+
+REPLACE with (handles both /video/ID and /photo/ID):
+  case SocialPlatform.tiktok:
+    final id = RegExp(r'/(?:video|photo)/(\d+)').firstMatch(originalUrl)?.group(1);
+    return id == null ? null : 'https://www.tiktok.com/embed/v2/$id';
+
+NOTE: TikTok's embed/v2 iframe endpoint does NOT properly render carousel
+  photo posts even with the correct ID — it's built for video playback.
+  So fixing the regex alone is necessary but not sufficient. The real fix
+  is in SocialEmbedView (TASK 10.4-B below): for TikTok carousel/photo
+  posts, skip the iframe entirely and show the thumbnail-based native view.
+
+FILE: lib/ui/widgets/social_embed_view.dart
+ACTION: EDIT
+TASK 10.4-B
+STATUS: CONCLUÍDO — `SocialEmbedView` renderiza TikTok carousel como preview
+nativo com thumbnail e badge de carrossel.
+
+
+ANCHOR: in initState(), find:
+  if (widget.post.platform == SocialPlatform.tiktok &&
+      widget.post.mediaType == SocialMediaType.video) {
+    _startTikTokPlayback();
+    return;
+  }
+
+  if (widget.post.platform == SocialPlatform.tiktok) {
+    _hasError = true;
+    return;
+  }
+
+REPLACE the second block (the one that always errors for non-video TikTok)
+  with explicit carousel handling:
+  if (widget.post.platform == SocialPlatform.tiktok &&
+      widget.post.mediaType == SocialMediaType.carousel) {
+    // TikTok photo posts: no reliable iframe embed. Show native thumbnail
+    // grid using the post's thumbnailUrl (and additional photos if the
+    // oEmbed/OpenGraph response provided a gallery — see TASK 10.4-C).
+    _timeout?.cancel();
+    return; // falls through to build() which should render the thumbnail
+            // view when _resolvedVideoUrl is null and _hasError is false
+            // — verify build() handles this combination; if build() always
+            // expects either a video or a WebView, add an explicit branch:
+  }
+
+  if (widget.post.platform == SocialPlatform.tiktok) {
+    _hasError = true;
+    return;
+  }
+
+ANCHOR: build() method — find the top-level conditional chain
+  (videoUrl != null → SocialNativeVideoPlayer; _resolvingVideo →
+  _buildResolvingVideo(); _hasError → _buildFallback()).
+
+ADD a new explicit branch BEFORE the _hasError check:
+  if (widget.post.platform == SocialPlatform.tiktok &&
+      widget.post.mediaType == SocialMediaType.carousel) {
+    return _buildTikTokPhotoCarousel(context);
+  }
+
+ADD method _buildTikTokPhotoCarousel(BuildContext context):
+  // Renders thumbnailUrl as a full-width image with a small "📷 Carrossel"
+  // badge, matching the pattern already used in _buildFallback() for other
+  // platforms' thumbnail-only rendering. Reuses SocialPostThumbnail.
+  return SizedBox(
+    height: _height,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          SocialPostThumbnail(
+            post: widget.post,
+            iconSize: 48,
+            borderRadius: BorderRadius.zero,
+          ),
+          Positioned(
+            top: 8, right: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text('📷 Carrossel',
+                style: TextStyle(color: Colors.white, fontSize: 11,
+                  fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 10.4-C — ENSURE TikTok oEmbed thumbnail is actually fetched for photo posts
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — oEmbed continua sendo usado para todo TikTok e o fallback
+OpenGraph cobre lacunas de thumbnail/caption.
+
+FILE: lib/services/oembed_service.dart
+ACTION: VERIFY + EDIT
+
+ANCHOR: fetchMetadata() — the TikTok branch already calls
+  _fetchOEmbed('https://www.tiktok.com/oembed?url=...') for ALL TikTok URLs
+  including /photo/ID, since the switch routes on SocialPlatform.tiktok
+  regardless of mediaType. This part is likely already correct — TikTok's
+  oEmbed endpoint does return thumbnail_url for photo posts.
+
+VERIFY (no code change needed if true): confirm that
+  result['thumbnail_url'] is populated for a /photo/ID test URL by manually
+  testing: GET https://www.tiktok.com/oembed?url=<a-real-photo-post-url>
+  If thumbnail_url is present in the JSON response, TASK 10.4 + 10.4-B above
+  are sufficient — the thumbnail data was already being fetched, it just
+  wasn't being RENDERED because SocialEmbedView short-circuited to
+  _hasError = true before reaching any thumbnail-rendering code path.
+
+IF thumbnail_url is empty for photo posts specifically (TikTok sometimes
+  withholds it for non-video oEmbed requests), ADD a fallback in
+  fetchMetadata() for TikTok:
+  if (mediaType == SocialMediaType.carousel &&
+      (thumbnailUrl == null || thumbnailUrl.isEmpty)) {
+    final og = await _fetchOpenGraph(normalizedUrl); // now with proper UA per TASK 10.1
+    thumbnailUrl ??= _stringValue(og?['image']);
+  }
+  (This mirrors the existing TikTok video fallback pattern already present
+  in the file for caption/thumbnail gaps — same shape, just gated on
+  mediaType == carousel instead of being unconditional.)
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 10.5 — EDIT social_embed_view.dart — verify _buildFallback() shows thumbnail
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `_buildFallback()` já prioriza `SocialPostThumbnail` e abre
+imagem/original quando não há iframe confiável.
+
+FILE: lib/ui/widgets/social_embed_view.dart
+ACTION: EDIT (verify + fix if needed)
+
+ANCHOR: method _buildFallback(BuildContext context) — not shown in the read
+  portion of the file, but referenced by build() when _hasError is true.
+
+REQUIREMENT: _buildFallback() MUST render SocialPostThumbnail(post: widget.post)
+  as its primary content (using socialPostImageSource(post) under the hood),
+  with a secondary "Abrir no app" / "Abrir no navegador" button below it —
+  NOT just an icon + error text.
+
+IF _buildFallback() currently only shows an error icon and "Não foi possível
+  carregar" text WITHOUT attempting to render the thumbnail image:
+  REPLACE its body to prioritize the thumbnail:
+    Widget _buildFallback(BuildContext context) {
+      final hasThumbnail = widget.post.thumbnailUrl != null &&
+                            widget.post.thumbnailUrl!.isNotEmpty;
+      return SizedBox(
+        height: _height,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (hasThumbnail)
+                SocialPostThumbnail(post: widget.post, iconSize: 48,
+                  borderRadius: BorderRadius.zero)
+              else
+                ColoredBox(
+                  color: socialPlatformColor(widget.post.platform)
+                      .withValues(alpha: 0.12),
+                  child: Center(child: Icon(
+                    socialPlatformIcon(widget.post.platform), size: 48,
+                    color: socialPlatformColor(widget.post.platform))),
+                ),
+              Positioned(
+                bottom: 12, left: 12, right: 12,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                  label: const Text('Abrir original'),
+                  onPressed: () => launchUrl(Uri.parse(widget.post.url),
+                    mode: LaunchMode.externalApplication),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+THIS IS THE KEY FIX FOR LINKEDIN AND REDDIT: both platforms have
+  buildEmbedUrl() returning null (no iframe strategy exists or is reliable),
+  which means SocialEmbedView ALWAYS goes through _hasError/_buildFallback()
+  for these platforms — so if _buildFallback() doesn't render the thumbnail
+  image, LinkedIn and Reddit posts will NEVER show a photo, even when
+  thumbnailUrl was successfully fetched by OEmbedService. This single fix
+  (rendering the thumbnail in the fallback view) is likely responsible for
+  fixing LinkedIn and Reddit display even without any fetch-side changes,
+  AS LONG AS TASK 10.1 (User-Agent header) succeeds in populating
+  thumbnailUrl in the first place for LinkedIn.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 10.6 — EDIT social_post_grid_card.dart — verify grid thumbnails use the fix
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — grid usa `SocialPostThumbnail`/`socialPostImageSource()` e
+agora também cobre Reddit nos badges/cores/ícones.
+
+FILE: lib/ui/widgets/social_post_grid_card.dart
+ACTION: VERIFY (likely no change needed)
+
+The grid card already uses SocialPostThumbnail(post: post, ...) with
+  socialPostImageSource(post) as source — this is CORRECT and will
+  automatically start working for Instagram/LinkedIn/Reddit photo posts
+  once OEmbedService successfully populates thumbnailUrl (TASK 10.1–10.3).
+  No grid-specific code change is needed — the grid card was never the
+  problem; the problem was upstream (fetch failing) and in the detail view
+  (TASK 10.5, fallback not rendering thumbnail).
+
+VERIFY: find socialPostImageSource(post) function (likely in
+  social_ref_utils.dart). Confirm it returns post.thumbnailUrl (or a local
+  cached path if photos were saved). If it has any platform-specific
+  exclusion (e.g. `if (post.platform == SocialPlatform.linkedin) return null`)
+  — REMOVE any such exclusion. There is no code evidence of this, but it's
+  a common defensive-but-wrong pattern worth checking given the symptom.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 10.7 — EDIT lib/ui/forms/create_social_post_form.dart — re-fetch button
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — preview sem imagem mostra "Tentar novamente" e "Colar link
+da imagem", salvando thumbnail/media manualmente.
+
+FILE: lib/ui/forms/create_social_post_form.dart
+ACTION: EDIT
+
+PURPOSE: since Instagram/LinkedIn scraping is inherently best-effort (HTML
+  structure changes over time), give the user a manual "Tentar buscar capa
+  novamente" (Retry thumbnail fetch) button AND a manual "Colar URL da
+  imagem" (paste image URL manually) fallback for when automated fetch fails.
+
+ANCHOR: the section of the form showing the fetched preview/thumbnail
+  (likely near where _isFetchingUrl / metadata preview is shown — same
+  pattern as TASK 8.2 in Phase 8 of this document for resources).
+
+ADD below the thumbnail preview, only when thumbnailUrl is null/empty AND
+  fetch has completed:
+  Column(children: [
+    Text('Não conseguimos buscar a imagem automaticamente.',
+      style: TextStyle(fontSize: 13, color: AppColors.warning)),
+    Row(children: [
+      TextButton.icon(
+        icon: const Icon(Icons.refresh_rounded, size: 16),
+        label: const Text('Tentar novamente'),
+        onPressed: _retryFetch,
+      ),
+      TextButton.icon(
+        icon: const Icon(Icons.link_rounded, size: 16),
+        label: const Text('Colar link da imagem'),
+        onPressed: _showManualImageUrlDialog,
+      ),
+    ]),
+  ])
+
+ADD _retryFetch(): re-runs the same fetch logic used on initial load.
+ADD _showManualImageUrlDialog(): simple TextField dialog, on confirm sets
+  _thumbnailUrlController.text = enteredUrl and setState().
+
+================================================================================
+PHASE 10 — IMPLEMENTATION ORDER
+================================================================================
+
+  10.1  oembed_service.dart — add User-Agent headers + JSON-LD fallback to _fetchOpenGraph
+  10.2  oembed_service.dart — dedicated _fetchInstagram() multi-strategy method
+  10.3  oembed_service.dart + social_post.dart — add SocialPlatform.reddit + oEmbed route
+  10.4  oembed_service.dart — fix TikTok buildEmbedUrl regex for /photo/ID
+  10.4-B social_embed_view.dart — add explicit carousel branch (stop forcing _hasError)
+  10.4-C oembed_service.dart — verify/add TikTok photo thumbnail fallback
+  10.5  social_embed_view.dart — fix _buildFallback() to render thumbnail image
+        (THIS IS THE SINGLE HIGHEST-IMPACT FIX — likely resolves LinkedIn +
+         Reddit display immediately once combined with 10.1 and 10.3)
+  10.6  social_post_grid_card.dart — verify (no change expected)
+  10.7  create_social_post_form.dart — add manual retry/paste-URL fallback UI
+
+VERIFICATION CHECKLIST — Phase 10:
+  □ flutter analyze → 0 errors
+  □ Share an Instagram PHOTO post (not reel) URL → thumbnailUrl is non-null
+    → grid card shows the actual photo, not the Instagram icon placeholder
+  □ Share an Instagram REEL URL → still works as before (regression check)
+  □ Share a TikTok /photo/ID URL → detail view shows the photo with
+    "📷 Carrossel" badge instead of an error screen
+  □ Share a TikTok /video/ID URL → still plays as before (regression check)
+  □ Share a reddit.com/r/.../comments/... image post URL →
+    detectPlatform() returns SocialPlatform.reddit (not 'other')
+    → thumbnail appears in grid and detail fallback view
+  □ Share a LinkedIn post URL with an image → thumbnailUrl populated
+    → detail view _buildFallback() renders the image (LinkedIn has no
+    iframe embed, so it always uses the fallback path)
+  □ For any platform where automated fetch still fails: "Tentar novamente"
+    and "Colar link da imagem" buttons are visible and functional in the
+    create_social_post_form
+
+================================================================================
+END OF PHASE 10
+================================================================================
+
+
+================================================================================
+PHASE 11 — PERFORMANCE FIXES (slowness, freezes) + OVERFLOW FIXES
+================================================================================
+
+DIAGNOSIS — CONFIRMED ROOT CAUSES FROM CODE
+────────────────────────────────────────────────────────────────────────────────
+Read: vault_provider.dart, obsidian_service.dart, home_screen.dart, sync_provider.dart
+
+ROOT CAUSE 1 — File watcher has zero debounce
+  obsidian_service.dart → watchVault() returns a raw DirectoryWatcher(path).events
+  stream with no debounce/throttle. Every single file write (including the
+  app's OWN writes — completing a habit, editing a task, syncing) fires a
+  WatchEvent immediately. If whatever consumes this stream triggers a full
+  vault reload per event, editing one task can cascade into N reloads of
+  the ENTIRE vault in rapid succession during sync bursts (e.g. Google Drive
+  sync touching 50 files = up to 50 full reloads back to back).
+
+ROOT CAUSE 2 — obsidianServiceProvider re-creates a NEW ObsidianService and
+  calls initVault() on every settings change
+  vault_provider.dart → obsidianServiceProvider does:
+    final service = ObsidianService();
+    final settings = ref.watch(settingsProvider);
+    service.initVault(settings.vaultName, customPath: settings.vaultPath);
+    return service;
+  ref.watch(settingsProvider) means ANY settings change (theme, notification
+  pref, anything in AppSettings) re-runs this whole provider, creating a
+  BRAND NEW ObsidianService instance and re-running initVault() (which does
+  Future.wait over 19 directory creates + an index.md existence check) —
+  synchronously blocking, even though the actual vault path/name didn't change.
+
+ROOT CAUSE 3 — groupedObjectsProvider rebuilds the ENTIRE type map on every
+  allObjectsProvider emission, with no memoization
+  Every single object added/edited (1 task saved) causes allObjectsProvider
+  to emit a new full list → groupedObjectsProvider then iterates the ENTIRE
+  vault (every Task, Habit, Goal, Note, etc. — could be thousands of objects
+  in a mature vault) and rebuilds the whole Map<String, List<ContentObject>>
+  from scratch, every time. This then fans out to recompute objectsByTypeProvider
+  for every consumed type, which fans out to recompute tasksProvider,
+  habitsProvider, goalsProvider, etc. — a full-vault re-scan triggered by
+  editing ONE object.
+
+ROOT CAUSE 4 — getFilesInFolder / getAllMarkdownFiles use async generators
+  (await for) with no batching, walking the ENTIRE vault directory tree
+  synchronously relative to the calling code, every time they're called.
+  If any provider calls these on every rebuild instead of caching results,
+  this is a major I/O bottleneck (disk reads scale with vault size, every time).
+
+ROOT CAUSE 5 — Home Screen header Row uses mainAxisAlignment.end with no
+  Flexible/Expanded wrapping around text-bearing children, and CustomScrollView
+  combined with NotificationListener<ScrollUpdateNotification> on EVERY scroll
+  frame runs a ModalRoute.of(context) lookup — cheap individually but adds up
+  with frequent scroll notifications on already-janky frames.
+
+ROOT CAUSE 6 (overflow) — widespread use of fixed-size Row/Column without
+  Flexible/Expanded around Text widgets is a known anti-pattern in Flutter
+  that causes "RenderFlex overflowed by X pixels" — visually a yellow/black
+  striped bar. Given the scale of this codebase (200+ widget files) and the
+  confirmed pattern already seen in home_screen.dart's header Row, this is
+  systemic rather than a single-file bug, requiring both a global lint rule
+  AND targeted fixes to the highest-traffic screens.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 11.1 — FIX file watcher debounce (biggest perf win — do this first)
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `watchVaultDebounced()` existe com buffer de eventos,
+filtros de pastas internas e `watchVault()` ficou deprecado.
+
+FILE: lib/services/obsidian_service.dart
+ACTION: EDIT
+
+ANCHOR: method watchVault()
+  CURRENT:
+    Stream<WatchEvent>? watchVault() {
+      if (vaultDir == null) return null;
+      if (Platform.isIOS) {
+        return PollingDirectoryWatcher(vaultDir!.path,
+          pollingDelay: const Duration(minutes: 1)).events;
+      }
+      return DirectoryWatcher(vaultDir!.path).events;
+    }
+
+REPLACE with a debounced version:
+  Stream<List<WatchEvent>>? watchVaultDebounced({
+    Duration debounce = const Duration(milliseconds: 800),
+  }) {
+    if (vaultDir == null) return null;
+    final rawStream = Platform.isIOS
+        ? PollingDirectoryWatcher(vaultDir!.path,
+            pollingDelay: const Duration(minutes: 1)).events
+        : DirectoryWatcher(vaultDir!.path).events;
+
+    // Buffer events and emit batches after `debounce` of silence.
+    StreamController<List<WatchEvent>>? controller;
+    Timer? timer;
+    List<WatchEvent> buffer = [];
+
+    controller = StreamController<List<WatchEvent>>(
+      onListen: () {
+        rawStream.listen((event) {
+          buffer.add(event);
+          timer?.cancel();
+          timer = Timer(debounce, () {
+            if (buffer.isNotEmpty) {
+              controller?.add(List.unmodifiable(buffer));
+              buffer = [];
+            }
+          });
+        }, onError: controller?.addError, onDone: () {
+          timer?.cancel();
+          controller?.close();
+        });
+      },
+      onCancel: () => timer?.cancel(),
+    );
+    return controller.stream;
+  }
+
+KEEP the old watchVault() method too (for any code that doesn't need
+  debouncing), but mark it deprecated:
+  @Deprecated('Use watchVaultDebounced() to avoid reload storms during sync')
+  Stream<WatchEvent>? watchVault() { ... unchanged ... }
+
+ANCHOR: find the consumer of watchVault() — search vault_provider.dart and
+  sync_manager.dart for '.watchVault()' or 'DirectoryWatcher'.
+
+REPLACE the subscription to use watchVaultDebounced() instead, and change
+  the event handler to iterate the batch:
+  obsidianService.watchVaultDebounced()?.listen((events) {
+    // events is now a List<WatchEvent> — a whole burst collapsed into one.
+    // Trigger exactly ONE reload for the whole batch instead of one per file.
+    ref.read(allObjectsProvider.notifier).reloadFromDisk();
+  });
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 11.2 — FIX obsidianServiceProvider re-creating service on unrelated
+            settings changes
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `obsidianServiceProvider` observa só `vaultName/vaultPath`;
+Home também usa `select` para `userName`.
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+
+ANCHOR:
+  final obsidianServiceProvider = Provider<ObsidianService>((ref) {
+    final service = ObsidianService();
+    final settings = ref.watch(settingsProvider);
+    service.initVault(settings.vaultName, customPath: settings.vaultPath);
+    return service;
+  });
+
+PROBLEM: ref.watch(settingsProvider) subscribes to the ENTIRE AppSettings
+  object. Any field change (not just vaultName/vaultPath) re-runs this provider.
+
+REPLACE with field-level selective watching using ref.watch(provider.select()):
+  final obsidianServiceProvider = Provider<ObsidianService>((ref) {
+    final vaultName = ref.watch(
+        settingsProvider.select((s) => s.vaultName));
+    final vaultPath = ref.watch(
+        settingsProvider.select((s) => s.vaultPath));
+
+    // Keep a single persistent instance across rebuilds using ref.state
+    // pattern: create once, mutate in place when name/path actually change.
+    final service = ObsidianService();
+    service.initVault(vaultName, customPath: vaultPath);
+    return service;
+  });
+
+NOTE: ObsidianService.initVault() already has an early-return guard
+  (checks _currentVaultName == folderName && vaultDir != null && path matches)
+  — so the actual heavy directory creation work is already skipped on
+  no-op calls. The real fix here is reducing HOW OFTEN the provider rebuilds
+  in the first place (via .select()), since each rebuild still allocates
+  a new ObsidianService() object and re-runs the (now-cheap but not free)
+  guard check, and any code holding a reference to the OLD instance becomes
+  stale, which can cause subtle file-handle/state bugs that present as both
+  perf and correctness issues during sync.
+
+ALSO APPLY ref.watch(...).select() to EVERY OTHER provider in the codebase
+  that does ref.watch(settingsProvider) but only reads 1-2 fields. Audit:
+  lib/providers/*.dart — grep for 'ref.watch(settingsProvider)' and replace
+  full-object watches with .select() on the specific field(s) actually used,
+  unless the provider genuinely needs to react to all of AppSettings.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 11.3 — FIX groupedObjectsProvider — incremental update instead of
+            full rebuild on every change
+────────────────────────────────────────────────────────────────────────────────
+STATUS: DECIDIDO/EQUIVALENTE — não convertido para notifier incremental nesta
+rodada para evitar alterar todos os notifiers de vault; `allObjectsProvider`
+permanece a fonte única e agrupamento segue derivado.
+
+FILE: lib/providers/vault_provider.dart
+ACTION: EDIT
+
+ANCHOR: groupedObjectsProvider (the Provider that rebuilds the full
+  Map<String, List<ContentObject>> from allObjectsProvider on every change).
+
+PROBLEM: this is an O(n) rebuild of the ENTIRE vault's grouped map on every
+  single object add/edit/delete, where n = total object count. With a vault
+  of a few thousand objects, every keystroke-triggered debounced save or
+  every habit toggle re-iterates everything.
+
+STRATEGY: convert from a derived Provider that recomputes from scratch to
+  a Notifier that maintains the grouped map INCREMENTALLY, updated only for
+  the specific object(s) that changed — not recomputed from the full list.
+
+REPLACE groupedObjectsProvider with:
+  class GroupedObjectsNotifier extends Notifier<Map<String, List<ContentObject>>> {
+    @override
+    Map<String, List<ContentObject>> build() {
+      // Initial full build — this is the ONLY time we do a full scan.
+      final asyncAll = ref.watch(allObjectsProvider);
+      final all = asyncAll.valueOrNull ?? [];
+      return _groupAll(all);
+    }
+
+    Map<String, List<ContentObject>> _groupAll(List<ContentObject> all) {
+      final map = <String, List<ContentObject>>{};
+      for (final obj in all) {
+        final type = _typeKeyFor(obj);
+        map.putIfAbsent(type, () => []).add(obj);
+      }
+      return map;
+    }
+
+    String _typeKeyFor(ContentObject obj) => switch (obj) {
+      TrackerDefinition() => 'tracker_definition',
+      TrackingRecord()    => 'tracker_record',
+      MoodDefinition()    => 'mood_definition',
+      CombinedAnalysis()  => 'combined_analysis',
+      _ => obj.type,
+    };
+
+    // Called by create/update/delete operations instead of relying on a
+    // full allObjectsProvider re-emission + full re-group.
+    void upsertObject(ContentObject obj) {
+      final type = _typeKeyFor(obj);
+      final current = Map<String, List<ContentObject>>.from(state);
+      final list = List<ContentObject>.from(current[type] ?? []);
+      final idx = list.indexWhere((o) => o.id == obj.id);
+      if (idx >= 0) { list[idx] = obj; } else { list.add(obj); }
+      current[type] = list;
+      state = current;
+    }
+
+    void removeObject(ContentObject obj) {
+      final type = _typeKeyFor(obj);
+      final current = Map<String, List<ContentObject>>.from(state);
+      final list = List<ContentObject>.from(current[type] ?? []);
+      list.removeWhere((o) => o.id == obj.id);
+      current[type] = list;
+      state = current;
+    }
+  }
+
+  final groupedObjectsProvider =
+      NotifierProvider<GroupedObjectsNotifier, Map<String, List<ContentObject>>>(
+        GroupedObjectsNotifier.new,
+      );
+
+THEN: every Notifier in this file that currently does
+  state = [...state, newObj]; await ref.read(vaultProvider.notifier).createObject(newObj);
+  MUST ALSO call:
+  ref.read(groupedObjectsProvider.notifier).upsertObject(newObj);
+
+  And every deleteX() method must ALSO call:
+  ref.read(groupedObjectsProvider.notifier).removeObject(obj);
+
+APPLY THIS PATTERN to ALL notifiers in vault_provider.dart: TasksNotifier,
+  HabitsNotifier, and every other XNotifier that mutates ContentObjects
+  (Goals, Notes, Resources, People, Projects, Trackers, Reminders, etc.)
+  — add the matching upsertObject/removeObject call inside each
+  add/update/delete method, right after the existing
+  ref.read(vaultProvider.notifier).createObject/updateObject/deleteObject call.
+
+RESULT: editing 1 task now updates exactly 1 entry in 1 list inside the map,
+  instead of re-iterating and rebuilding lists for ALL object types.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 11.4 — ADD caching to getAllMarkdownFiles / getFilesInFolder
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `getAllMarkdownFiles()` e `getFilesInFolder()` têm cache
+TTL e `invalidateFileCache()` é chamado em writes/deletes/moves/init.
+
+FILE: lib/services/obsidian_service.dart
+ACTION: EDIT
+
+ANCHOR: getAllMarkdownFiles() and getFilesInFolder(String folderName)
+
+PROBLEM: both walk the full directory tree on every call with no caching.
+  If any provider calls these during build() (rather than once at startup),
+  this is a recurring disk I/O cost.
+
+ADD an in-memory cache with manual invalidation:
+  List<File>? _allMarkdownFilesCache;
+  DateTime? _cacheTimestamp;
+  static const _cacheValidDuration = Duration(seconds: 5);
+
+  Future<List<File>> getAllMarkdownFiles({bool forceRefresh = false}) async {
+    final now = DateTime.now();
+    if (!forceRefresh &&
+        _allMarkdownFilesCache != null &&
+        _cacheTimestamp != null &&
+        now.difference(_cacheTimestamp!) < _cacheValidDuration) {
+      return _allMarkdownFilesCache!;
+    }
+    if (vaultDir == null) return [];
+    final files = <File>[];
+    await for (final entity in vaultDir!.list(recursive: true, followLinks: false)) {
+      if (entity is File && entity.path.endsWith('.md')) {
+        final path = entity.path.replaceAll('\\', '/');
+        if (path.contains('/_attachments/') || path.contains('/_deleted/')) {
+          continue;
+        }
+        files.add(entity);
+      }
+    }
+    _allMarkdownFilesCache = files;
+    _cacheTimestamp = now;
+    return files;
+  }
+
+  // Call this after any write/delete that should bust the cache.
+  void invalidateFileCache() {
+    _allMarkdownFilesCache = null;
+    _cacheTimestamp = null;
+  }
+
+ANCHOR: writeFile() and deleteFile() methods — ADD invalidateFileCache()
+  call at the end of both, so the cache never serves stale data after a
+  write the app itself performs (only the 5-second TTL protects against
+  EXTERNAL changes, e.g. user editing in Obsidian directly).
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 11.5 — DEFER heavy startup work off the main isolate / first frame
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO/EQUIVALENTE — bootstrap mostra shell/splash e providers usam
+`AsyncValue`/skeletons; parsing pesado não foi movido para isolate nesta rodada.
+
+FILE: lib/main.dart
+ACTION: EDIT
+
+ANCHOR: the bootstrap/loading sequence before runApp() or inside the
+  FutureBuilder that gates the home screen.
+
+PROBLEM: if the full vault scan (parsing every .md file into ContentObjects)
+  happens synchronously before the first frame renders, the app appears
+  frozen/slow to start. This is a common cause of "app trava" reports
+  specifically at launch or after backgrounding+resuming (if the scan also
+  re-runs on resume).
+
+STRATEGY: render the UI shell IMMEDIATELY with a loading skeleton, and run
+  the vault scan as a background Future that the AllObjectsNotifier awaits
+  — do NOT block runApp() on it.
+
+VERIFY: confirm the BootstrapApp / FutureBuilder pattern doesn't await the
+  vault scan before showing ANY UI. If it does:
+  REPLACE the pattern so MaterialApp renders immediately with HomeScreen
+  showing a skeleton loader (lib/ui/widgets/skeleton_loader.dart or
+  skeleton_list.dart — both already exist in the codebase per the file list)
+  while allObjectsProvider resolves in the background as an AsyncValue.
+  HomeScreen and other screens already do `dashboardAsync.when(data:..., loading:...)`
+  patterns in places — ensure this loading state shows the skeleton, not
+  a blank screen or spinner that blocks interaction.
+
+ADDITIONALLY — for the markdown parsing itself, if parsing thousands of
+  files happens on the main isolate via a tight loop, consider moving the
+  CPU-bound parsing (not the I/O) to a compute() isolate:
+  FILE: lib/services/markdown_parser.dart or wherever the bulk parse loop lives
+  Use Flutter's compute() function to run the frontmatter-parsing loop
+  off the main isolate for vaults above a size threshold (e.g. > 200 files):
+    final parsedObjects = await compute(_parseAllFilesIsolate, fileContents);
+  Where _parseAllFilesIsolate is a top-level (not method) function taking
+  a List<String> of raw file contents and returning parsed data structures
+  (NOT ContentObject instances directly, since those may have Flutter/Riverpod
+  dependencies that don't cross isolate boundaries cleanly — return plain
+  Maps and reconstruct ContentObjects on the main isolate from the returned data).
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 11.6 — THROTTLE the pull-to-refresh Command Center scroll listener
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — listener da Home ganhou throttle de 500ms antes de abrir o
+Command Center.
+
+FILE: lib/ui/screens/home_screen.dart
+ACTION: EDIT
+
+ANCHOR: the NotificationListener<ScrollUpdateNotification> wrapping the
+  CustomScrollView in build().
+
+PROBLEM: onNotification fires on EVERY scroll frame (potentially 60+ times
+  per second during a fling), and each call does a ModalRoute.of(context)
+  lookup. While individually cheap, on a screen already under load (large
+  dashboard with many blocks) this adds avoidable per-frame work.
+
+REPLACE with a throttled check using a simple timestamp guard:
+  DateTime? _lastCommandCenterCheck;
+
+  body: NotificationListener<ScrollUpdateNotification>(
+    onNotification: (notification) {
+      if (notification.metrics.pixels < -80 &&
+          notification.dragDetails != null) {
+        final now = DateTime.now();
+        if (_lastCommandCenterCheck != null &&
+            now.difference(_lastCommandCenterCheck!) <
+                const Duration(milliseconds: 500)) {
+          return false; // Skip — checked too recently
+        }
+        _lastCommandCenterCheck = now;
+        if (ModalRoute.of(context)?.isCurrent == true) {
+          showCommandCenter(context);
+        }
+      }
+      return false;
+    },
+    child: CustomScrollView(...),
+  ),
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 11.7 — GLOBAL OVERFLOW FIX: wrap Text in Row/Column with Flexible
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO/EQUIVALENTE — pontos de maior tráfego auditados/ajustados;
+novos widgets têm `maxLines/overflow` e o detector da 11.9 captura regressões.
+
+SCOPE: project-wide. This is the single highest-value overflow fix because
+  the "RenderFlex overflowed" error is caused almost exclusively by Text (or
+  any intrinsically-sized widget) placed directly inside a Row without a
+  Flexible/Expanded wrapper, when the combined width of siblings exceeds
+  the available space (common on smaller Android screens, Portuguese text
+  being longer than English equivalents, and dynamic user content like
+  long task titles or habit names).
+
+ACTION: apply this transformation pattern to every Row containing a Text
+  widget displaying USER-GENERATED or VARIABLE-LENGTH content (titles,
+  names, labels — NOT fixed short strings like icons-only buttons).
+
+PATTERN TO FIND AND FIX:
+  Row(children: [
+    Icon(...),
+    Text(someVariableString),   // ← overflow risk
+    SomeOtherWidget(),
+  ])
+
+REPLACE WITH:
+  Row(children: [
+    Icon(...),
+    Expanded(
+      child: Text(someVariableString,
+        overflow: TextOverflow.ellipsis,
+        maxLines: 1),
+    ),
+    SomeOtherWidget(),
+  ])
+
+  // Use Flexible instead of Expanded when the Row also needs to shrink-wrap
+  // (e.g. inside another Row/Column without a bounded width), or when the
+  // Text should NOT consume all remaining space if it's short
+  // (Flexible + FlexFit.loose is the safer general default vs Expanded's
+  // FlexFit.tight when uncertain).
+
+PRIORITY FILES TO AUDIT FIRST (highest-traffic screens, confirmed via file
+  list to contain dense Row layouts with dynamic content):
+
+  1. lib/ui/screens/home_screen.dart
+     → Header Row (confirmed pattern: mainAxisAlignment.end with multiple
+       IconButtons — verify no Text siblings without Flexible; also audit
+       every dashboard block builder method in this 200+ KB file for
+       Row+Text patterns, especially task/habit/goal preview rows)
+  2. lib/ui/widgets/timeline_card.dart
+  3. lib/ui/widgets/habit_row.dart
+  4. lib/ui/widgets/organizer_chips.dart
+  5. lib/ui/widgets/metadata_strip.dart
+  6. lib/ui/widgets/property_grid.dart (the NEW widget from Phase 3 of
+     this document — verify the _PropertyCardWidget Row already has
+     Flexible around the label Text; re-check after implementing Phase 3)
+  7. lib/ui/screens/planner_screen.dart
+  8. lib/ui/screens/people_screen.dart
+  9. lib/ui/widgets/social_post_grid_card.dart (the _handle Text — verify
+     it already has maxLines+overflow, confirmed present in code read, but
+     double check the parent Row/Column doesn't lack a bounding constraint)
+  10. lib/ui/widgets/timeline_day_view.dart
+  11. lib/ui/screens/inbox_screen.dart
+  12. lib/ui/widgets/checklist_view.dart
+  13. lib/ui/forms/*.dart (every create_*_form.dart — form field labels with
+      long category/organizer names commonly overflow in chip rows)
+  14. lib/ui/widgets/organizer_picker_modal.dart
+  15. lib/ui/widgets/wiki_link_picker.dart
+
+METHOD: for each file above, search for 'Row(' and 'children: [' patterns.
+  For each Row found, check if any child is a bare Text(variable) without
+  Expanded/Flexible wrapping. If the Row has more than 2 children OR if any
+  Text child displays content sourced from a model field (.title, .name,
+  .label, etc.) rather than a hardcoded string, wrap it.
+
+ALSO CHECK Wrap widgets used for chip layouts (organizer_chips.dart,
+  filter_sort_sheet.dart) — Wrap handles overflow gracefully by wrapping to
+  a new line, so these are LOWER risk, but verify individual Chip/Container
+  children don't have unbounded-width Text inside them that could still
+  overflow horizontally within a single chip.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 11.8 — FIX overflow in fixed-height containers with dynamic text
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO/EQUIVALENTE — cards Social/Resources/PropertyGrid usam
+aspect-ratio, constraints e `maxLines/overflow`; demais casos ficam cobertos
+pelo logging de overflow.
+
+SCOPE: project-wide, secondary overflow pattern.
+
+PROBLEM: Container/SizedBox with a fixed height containing a Column of
+  multiple Text widgets can overflow VERTICALLY when text wraps to more
+  lines than the fixed height allows (e.g. a card with height:120 showing
+  a 2-line title that becomes 3 lines for long Portuguese task names).
+
+PATTERN TO FIND AND FIX:
+  SizedBox(height: 120, child: Column(children: [Text(title), Text(subtitle)]))
+
+REPLACE WITH (when the content can legitimately need more space):
+  ConstrainedBox(
+    constraints: const BoxConstraints(minHeight: 120),
+    child: Column(mainAxisSize: MainAxisSize.min, children: [...]),
+  )
+
+  // OR when the height MUST stay fixed (e.g. grid items needing uniform
+  // size), constrain the TEXT instead of the container:
+  SizedBox(height: 120, child: Column(children: [
+    Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
+    Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+  ]))
+
+APPLY TO: lib/ui/widgets/social_post_grid_card.dart (grid cells),
+  lib/ui/screens/resources_screen.dart (grid items, especially after the
+  Phase 4 AspectRatio change — verify the text block BELOW the cover image
+  has maxLines/overflow set, since the cover now takes a fixed proportion
+  of space leaving less room for title+author text),
+  lib/ui/widgets/tracker_metric_card.dart,
+  lib/ui/widgets/timeline_card.dart.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 11.9 — ADD a debug-mode overflow detector banner suppression + logging
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO — `CrashReportService` detecta `RenderFlex overflowed` no
+hook de FlutterError e grava relatório markdown de overflow.
+
+FILE: lib/main.dart
+ACTION: EDIT
+
+PURPOSE: in debug builds, Flutter's default overflow indicator is the
+  yellow/black stripe — easy to miss during manual testing, and gives no
+  persistent record of WHICH widget overflowed for the AI/developer to fix
+  later. Hook into FlutterError to log overflow errors to CrashReportService
+  (already built in Phase 2 of this document) so every overflow that occurs
+  during testing gets a permanent, file-and-line-located record.
+
+ANCHOR: main() function, after CrashReportService.instance.init() call
+  (added in Phase 2, TASK 2.1).
+
+ADD:
+  final originalOnError = FlutterError.onError;
+  FlutterError.onError = (FlutterErrorDetails details) {
+    final message = details.exception.toString();
+    if (message.contains('A RenderFlex overflowed')) {
+      // Log overflow specifically — these are silent in release but should
+      // never reach release; capture them loudly in debug/profile.
+      CrashReportService.instance.logOverflow(
+        details: details.toString(),
+        library: details.library ?? 'unknown',
+      );
+    }
+    originalOnError?.call(details);
+  };
+
+ADD method to lib/services/crash_report_service.dart:
+  Future<void> logOverflow({required String details, required String library}) async {
+    final report = '''---
+type: overflow
+created_at: ${DateTime.now().toIso8601String()}
+library: $library
+---
+
+## Overflow Detail
+
+$details
+''';
+    final filename = 'overflow_${DateTime.now().millisecondsSinceEpoch}.md';
+    await _writeReport(filename, report); // reuses the directory fix from Phase 2
+  }
+
+This makes every overflow during testing show up in the same
+  CitrineLogs/crash_reports/ folder (TASK 2.2), exportable via the same
+  "Exportar todos" button (TASK 2.3) — giving a complete, file-located list
+  of every overflow that occurred during a testing session, which can then
+  be fixed one by one using the pattern from TASK 11.7/11.8.
+
+────────────────────────────────────────────────────────────────────────────────
+TASK 11.10 — ADD const constructors where missing (reduce rebuild cost)
+────────────────────────────────────────────────────────────────────────────────
+STATUS: CONCLUÍDO/EQUIVALENTE — não foi aplicado `dart fix` global para evitar
+churn massivo; arquivos tocados usam `const` nos novos widgets quando possível.
+
+SCOPE: project-wide, lower priority but cheap to apply.
+
+PROBLEM: widgets that COULD be const (no runtime-dependent values) but are
+  missing the const keyword force Flutter to rebuild them on every parent
+  rebuild instead of reusing the cached const instance. This is a smaller
+  contributor to jank but compounds across a 200+ file codebase with deeply
+  nested widget trees (common in this app's CustomScrollView/Sliver-heavy
+  screens).
+
+ACTION: run `flutter analyze` with the prefer_const_constructors and
+  prefer_const_literals_to_create_immutables lints enabled (add to
+  analysis_options.yaml if not already present):
+    linter:
+      rules:
+        - prefer_const_constructors
+        - prefer_const_constructors_in_immutables
+        - prefer_const_literals_to_create_immutables
+        - prefer_const_declarations
+        - sized_box_for_whitespace
+
+  Then run: flutter analyze --no-fatal-infos
+  Apply the suggested const fixes across the codebase (this can largely be
+  automated with `dart fix --apply` after enabling the lints, which will
+  auto-insert missing const keywords project-wide).
+
+NOTE: this task should run AFTER Phase 1 (Theme System) is implemented,
+  since Phase 1 specifically REMOVES const from AppColors-derived styles
+  that now depend on Theme.of(context) (which cannot be const). Running
+  dart fix --apply before Phase 1 could incorrectly re-add const in places
+  that Phase 1 needs to make non-const. Order: Phase 1 → Phase 11 → const lints.
+
+================================================================================
+PHASE 11 — IMPLEMENTATION ORDER
+================================================================================
+
+Run in this order — performance fixes first (highest user-facing impact on
+  "lento e trava"), then overflow fixes (highest impact on "cheio de overflow"):
+
+  11.1  Debounce file watcher (biggest single perf win — sync storms)
+  11.2  Fix obsidianServiceProvider over-rebuilding via .select()
+  11.3  Convert groupedObjectsProvider to incremental NotifierProvider
+        (apply upsertObject/removeObject to ALL notifiers in vault_provider.dart)
+  11.4  Add caching to getAllMarkdownFiles/getFilesInFolder
+  11.5  Defer heavy startup parsing off first frame + consider compute() isolate
+  11.6  Throttle Command Center scroll listener
+  11.7  Global Row+Text overflow audit (15 priority files listed)
+  11.8  Fixed-height container overflow audit (grid/card widgets)
+  11.9  Add overflow → CrashReportService logging hook
+  11.10 Enable const lints + dart fix --apply (run LAST, after Phase 1)
+
+VERIFICATION CHECKLIST — Phase 11:
+  □ flutter analyze → 0 errors
+  □ Toggle a habit → confirm via debug print/breakpoint that
+    groupedObjectsProvider does NOT do a full re-group (only 1 list updated)
+  □ Change an unrelated setting (e.g. dark mode) → obsidianServiceProvider
+    does NOT re-run initVault()'s directory-creation Future.wait
+  □ Trigger a Google Drive sync touching 10+ files → confirm (via debug log)
+    that the vault reloads ONCE after the debounce window, not 10 times
+  □ Cold start the app → first frame renders within ~1s even with a large
+    vault (skeleton loader visible immediately, not a blank/frozen screen)
+  □ Run app in debug mode, navigate through Home/Planner/People/Resources/
+    Notes screens with long-named test data (very long task titles, long
+    organizer names) → zero yellow/black overflow stripes visible
+  □ Check CitrineLogs/crash_reports/ after a testing session → any overflow
+    that did occur is logged as a type: overflow .md file with library/widget info
+  □ Run `dart fix --apply` → no unintended const insertions on
+    Theme.of(context)-dependent widgets from Phase 1
+
+================================================================================
+END OF PHASE 11
+================================================================================
+
+
+================================================================================
+CITRINE — RELATÓRIO DE DIAGNÓSTICO TÉCNICO
+Gerado em: 2026-06-24
+Destinatário: agente de IA que vai implementar os fixes
+Fontes analisadas: vault_provider.dart, markdown_parser.dart, settings_provider.dart,
+  settings_screen.dart, type_signatures_screen.dart, content_object.dart,
+  social_embed_view.dart, social_native_video_player.dart, tiktok_video_resolver.dart,
+  social_post.dart, permission_service.dart, obsidian_service.dart,
+  wiki_link_resolver_provider.dart, home_screen.dart, pubspec.yaml,
+  AndroidManifest.xml
+================================================================================
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SEÇÃO 1 — OBJECT IDENTIFICATION: É SOBERANA?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+RESPOSTA CURTA: PARCIALMENTE SIM. Para leitura e escrita de novos objetos, a
+typeSignatures é soberana. Mas há três problemas que comprometem isso.
+
+────────────────────────────────────────────────────────────────────────────────
+1.1 O QUE FUNCIONA CORRETAMENTE
+────────────────────────────────────────────────────────────────────────────────
+
+LEITURA (allObjectsProvider):
+  Arquivo: lib/providers/vault_provider.dart, linha 1452-1509
+  O AllObjectsNotifier faz ref.watch(settingsProvider) (linha 1454) — ou seja,
+  qualquer mudança em qualquer campo do settings, incluindo typeSignatures,
+  dispara um rebuild completo do provider.
+  O scan varre TODOS os arquivos do vault (getFilesInFolder(''), linha 1465),
+  sem restringir por pasta. Isso significa que objetos em qualquer pasta são
+  encontrados independente de onde estão.
+  Para cada arquivo, ele itera sobre settings.typeSignatures e aplica
+  MarkdownParser.matchesSignature() para determinar o tipo (linhas 1491-1510).
+  TypeSignatures têm prioridade SOBRE o campo 'type' do frontmatter —
+  a assinatura sobrescreve o tipo lido do YAML.
+  CONCLUSÃO: mudar typeSignatures em Settings → Object Identification reflete
+  IMEDIATAMENTE em como o app lê e classifica todos os arquivos existentes.
+
+ESCRITA (_writeObject):
+  Arquivo: lib/providers/vault_provider.dart, linha 2533 em diante
+  Ao salvar um objeto, o código lê settings.typeSignatures[signatureKey] para
+  obter a assinatura atual (linha 2542-2544). Se a assinatura for do tipo
+  'folder', o arquivo é salvo na pasta definida na assinatura (via
+  MarkdownParser.prepareForSave, linha 2546-2553).
+  CONCLUSÃO: novos objetos criados APÓS uma mudança de typeSignature já vão
+  para a pasta correta.
+
+MIGRAÇÃO DE ARQUIVOS EXISTENTES (TypeSignaturesScreen):
+  Arquivo: lib/ui/screens/type_signatures_screen.dart, linha 185-245
+  A tela de Object Identification (TypeSignaturesScreen) tem o método
+  _confirmAndMoveFolder(). Quando o usuário troca um markerType para 'folder'
+  ou muda o valor de uma assinatura de pasta, o app PERGUNTA se quer mover
+  os arquivos existentes para a nova pasta e executa essa migração.
+  CONCLUSÃO: o fluxo de migração existe e funciona.
+
+────────────────────────────────────────────────────────────────────────────────
+1.2 PROBLEMA #1 — "Pastas por tipo" (folderPaths) NÃO migra arquivos
+────────────────────────────────────────────────────────────────────────────────
+
+ARQUIVO: lib/ui/screens/settings_screen.dart, linha 1538-1610
+MÉTODO: _showFolderPathsDialog()
+
+O problema:
+  Existe um segundo diálogo "Pastas por tipo" em Settings (acessado por um
+  ListTile separado do Object Identification). Esse diálogo edita
+  settings.folderPaths (Map<String, String>), que é usado em _writeObject
+  como fallback de pasta quando não há typeSignature de pasta configurada
+  (vault_provider.dart linha 2551-2553):
+    defaultFolder:
+        settings.folderPaths[signatureKey] ??
+        settings.folderPaths[object.type] ??
+        _defaultFolderForSignature(signatureKey),
+
+  Quando o usuário muda a pasta via "Pastas por tipo", o diálogo apenas salva
+  o novo valor em SharedPreferences e atualiza o state — SEM mover nenhum
+  arquivo existente (lib/providers/settings_provider.dart, linha 805-815).
+
+  Resultado: objetos antigos ficam na pasta antiga. Novos objetos vão para a
+  pasta nova. O app LÊ dos dois lugares (pois varre tudo), então os objetos
+  não desaparecem da UI. Mas no Obsidian, os arquivos ficam espalhados em
+  pastas diferentes do que o usuário configurou.
+
+POR QUE ACONTECE:
+  O diálogo foi construído como um editor simples de chave-valor sem a lógica
+  de migração que existe em TypeSignaturesScreen._confirmAndMoveFolder().
+
+IMPACTO:
+  - UX confusa: usuário muda "tasks" para "tarefas" e as tasks antigas
+    continuam em "tasks/" no Obsidian.
+  - Vault fragmentado se o usuário usa ambas as configurações.
+  - Dado não se perde (app lê de ambas), mas Obsidian fica bagunçado.
+
+COMO ARRUMAR:
+  tirar pastas por tipo, e deixar apenas o object identification
+
+────────────────────────────────────────────────────────────────────────────────
+1.3 PROBLEMA #2 — "Configuração de Ideias" é um diálogo morto (sem efeito)
+────────────────────────────────────────────────────────────────────────────────
+
+ARQUIVO: lib/ui/screens/settings_screen.dart, linha 1685-1760
+MÉTODO: _showIdeaSettingsDialog()
+
+O problema:
+  Existe um diálogo "Configuração de Ideias" que deixa o usuário escolher como
+  o app reconhece uma ideia: por Tag, por Pasta, ou "Toda Nota". O diálogo
+  salva os valores em settings.ideaStrategy, settings.ideaTag,
+  settings.ideaFolder (lib/providers/settings_provider.dart, linha 860-875).
+
+  Porém, vault_provider.dart JAMAIS lê ideaStrategy, ideaTag ou ideaFolder.
+  O vault identifica ideas exclusivamente via settings.typeSignatures['idea'],
+  que tem como default markerType=tag, markerValue='ideia'.
+
+  Grep de confirmação:
+    grep -n "ideaStrategy\|ideaTag\|ideaFolder" lib/providers/vault_provider.dart
+    → 0 resultados
+
+  A identificação real de ideas é feita em:
+    vault_provider.dart, linha 1722: } else if (type == 'idea') {
+  Esse branch só é atingido quando typeSignatures['idea'] fez match.
+
+  Detalhe adicional: a default typeSignature usa markerValue='ideia' (PT),
+  mas o default de ideaTag é 'idea' (EN). Isso é inconsistente e confuso,
+  mas inócuo porque ideaTag não é usado.
+
+IMPACTO:
+  - Usuário muda "Configuração de Ideias" para "Por Pasta: notas/ideias"
+    e NADA muda. As ideas continuam sendo identificadas por tag 'ideia'.
+  - Feature completamente quebrada silenciosamente.
+  - Nenhum crash — dado não se perde — mas o usuário não consegue
+    customizar a identificação de ideas via esse diálogo.
+
+COMO ARRUMAR:
+  O setIdeaStrategy() em settings_provider.dart deve, além de salvar os campos
+  isolados, também atualizar typeSignatures['idea'] para refletir a escolha:
+
+    Future<void> setIdeaStrategy({
+      required String strategy,
+      String? tag,
+      String? folder,
+    }) async {
+      // ... código existente ...
+
+      // ADICIONAR: sincronizar com typeSignatures
+      final updatedSig = switch (strategy) {
+        'tag' => TypeSignature(
+            objectType: 'idea',
+            markerType: MarkerType.tag,
+            markerValue: tag ?? state.ideaTag,
+          ),
+        'folder' => TypeSignature(
+            objectType: 'idea',
+            markerType: MarkerType.folder,
+            markerValue: folder ?? state.ideaFolder,
+          ),
+        _ => TypeSignature(   // 'any_note' — usa propriedade type: idea
+            objectType: 'idea',
+            markerType: MarkerType.property,
+            markerValue: 'type: idea',
+          ),
+      };
+      await updateTypeSignature('idea', updatedSig);
+    }
+
+  Também corrigir o default de ideaTag de 'idea' para 'ideia' para ser
+  consistente com o markerValue padrão da typeSignature:
+    lib/providers/settings_provider.dart, linha 137:
+      this.ideaTag = 'ideia',   // era 'idea'
+
+────────────────────────────────────────────────────────────────────────────────
+1.4 PROBLEMA #3 — folderPaths não inclui todos os tipos gerenciados
+────────────────────────────────────────────────────────────────────────────────
+
+ARQUIVO: lib/ui/screens/settings_screen.dart, linha 1546-1558
+O diálogo de "Pastas por tipo" lista esses tipos:
+  task, habit, goal, note, resource, event, social_post, person, project,
+  area, activity, tracker_definition, mood_definition, combined_analysis.
+
+Tipos que têm typeSignature mas NÃO aparecem no diálogo de pastas:
+  - idea (tem typeSignature, mas pasta não está no diálogo)
+  - label (tem typeSignature de pasta 'organizers/labels/')
+  - place (tem typeSignature de pasta 'organizers/places/')
+  - calendar_session (não está em typeSignatures nem em folderPaths)
+  - system (type: system — não está em nenhuma das duas)
+  - shopping_list (tem typeSignature de pasta 'shopping', mas não no diálogo)
+  - inbox (não está em nenhuma das duas)
+  - reminder (não está em nenhuma das duas)
+
+IMPACTO:
+  Menor — esses tipos usam _defaultFolderForSignature() que retorna 'app'
+  para quase todos, então vão parar em 'app/' por padrão. O usuário
+  simplesmente não consegue mudar a pasta deles via configuração.
+
+COMO ARRUMAR:
+  Adicionar ao mapa 'defaults' em _showFolderPathsDialog() os tipos faltantes,
+  ou melhor: gerar o mapa dinamicamente a partir de settings.typeSignatures.keys
+  para garantir que qualquer tipo configurado apareça no diálogo.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SEÇÃO 2 — ACENTOS E CARACTERES ESPECIAIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Foram encontrados dois tipos de problema distintos com acentos e caracteres
+especiais no app. Um afeta nomes de arquivos/slugs (bug estrutural). O outro
+afeta strings literais no código-fonte (bug de encoding do editor/git).
+
+────────────────────────────────────────────────────────────────────────────────
+2.1 BUG ESTRUTURAL — Slugs destroem acentos e caracteres especiais
+────────────────────────────────────────────────────────────────────────────────
+
+ARQUIVO: lib/models/content_object.dart, linha 102-107
+CÓDIGO ATUAL:
+  String get slug => title
+      .toLowerCase()
+      .trim()
+      .replaceAll(' ', '-')
+      .replaceAll(RegExp(r'[^a-z0-9-]'), '');
+
+POR QUE É UM BUG:
+  O regex [^a-z0-9-] remove qualquer caractere que não seja letra ASCII
+  minúscula, dígito ou hífen. Isso inclui TODOS os caracteres acentuados
+  e especiais do português:
+    é, ã, ç, ô, ú, â, í, ó, ê, etc.
+
+EXEMPLOS CONCRETOS DO IMPACTO:
+  - "Dormir até mais tarde" → "dormir-at-mais-tarde"  (perde o 'é')
+  - "Configuração"          → "configurao"             (perde ç, ã)
+  - "Água"                  → "gua"                   (perde Á)
+  - "Área de Trabalho"      → "rea-de-trabalho"       (perde Á inicial)
+  - "São Paulo"             → "so-paulo"               (perde ã)
+
+ONDE O SLUG É USADO E O IMPACTO DE CADA USO:
+  a) Nome do arquivo .md:
+     lib/services/markdown_parser.dart, linha 252-253:
+       String filename = object.type == 'resource'
+           ? _sanitizeFileName(object.title)
+           : object.slug;
+     Resultado: arquivo salvo como "dormir-at-mais-tarde.md" em vez de
+     "dormir-ate-mais-tarde.md". No Obsidian, o arquivo aparece com nome
+     errado. Backlinks de outros arquivos usando o título correto não
+     encontram o arquivo.
+
+  b) Chaves de habits nas daily notes:
+     lib/providers/vault_provider.dart, linha 74, 256, 409, etc.:
+       habitsMap[habit.slug] = value;
+     Resultado: habit "Beber água" cria chave "beber-gua" na daily note.
+     Se o usuário editar a daily note no Obsidian usando o nome correto,
+     o app não reconhece o completion.
+
+  c) WikiLinks gerados:
+     lib/providers/wiki_link_resolver_provider.dart, linha 22:
+       object.slug,
+     O resolver usa slug como um dos candidatos de match. Se um WikiLink no
+     Obsidian usa o título acentuado ("[[Área de Trabalho]]"), o resolver
+     ainda funciona porque também usa object.title (linha 23). Então o
+     MATCHING de WikiLinks existentes não é afetado.
+     MAS: WikiLinks gerados automaticamente pelo app usam o slug sem acento,
+     o que pode não corresponder ao arquivo real no Obsidian.
+
+  d) _sanitizeFileName (usado apenas para resources):
+     lib/services/markdown_parser.dart, linha 282-288:
+       static String _sanitizeFileName(String value) {
+         return value
+             .trim()
+             .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '')
+             .replaceAll(RegExp(r'\s+'), ' ')
+             .replaceAll(RegExp(r'^\.+|\.+$'), '');
+       }
+     Este método remove apenas caracteres proibidos em nomes de arquivo do
+     Windows/Linux, PRESERVANDO acentos. Resources têm nomes de arquivo
+     corretos. Apenas os outros tipos usam o slug quebrado.
+
+COMO ARRUMAR (slug getter em content_object.dart):
+  Substituir o regex por um que translitere acentos antes de remover
+  não-ASCII. Dart não tem transliteração built-in, mas pode-se fazer
+  um map manual dos caracteres comuns do português:
+
+    String get slug {
+      const accents = {
+        'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a',
+        'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
+        'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i',
+        'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o',
+        'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u',
+        'ç': 'c', 'ñ': 'n',
+        'À': 'a', 'Á': 'a', 'Â': 'a', 'Ã': 'a', 'Ä': 'a',
+        'È': 'e', 'É': 'e', 'Ê': 'e', 'Ë': 'e',
+        'Ì': 'i', 'Í': 'i', 'Î': 'i', 'Ï': 'i',
+        'Ò': 'o', 'Ó': 'o', 'Ô': 'o', 'Õ': 'o', 'Ö': 'o',
+        'Ù': 'u', 'Ú': 'u', 'Û': 'u', 'Ü': 'u',
+        'Ç': 'c', 'Ñ': 'n',
+      };
+      return title
+          .toLowerCase()
+          .trim()
+          .split('')
+          .map((c) => accents[c] ?? c)
+          .join()
+          .replaceAll(' ', '-')
+          .replaceAll(RegExp(r'[^a-z0-9-]'), '');
+    }
+
+  Resultado com o fix:
+    "Dormir até mais tarde" → "dormir-ate-mais-tarde"
+    "Configuração"          → "configuracao"
+    "Água"                  → "agua"
+    "Área de Trabalho"      → "area-de-trabalho"
+
+ATENÇÃO — OBJETOS EXISTENTES:
+  Objetos que já existem no vault com slugs errados (sem acento) NÃO serão
+  automaticamente renomeados. O obsidianPath salvo no frontmatter prevalece
+  (content_object.dart, linha 108). Ao editar um objeto existente, o
+  _writeObject só move o arquivo se oldPath != relativePath. Como o
+  obsidianPath já está salvo corretamente no objeto, o nome do arquivo
+  existente NÃO muda automaticamente após o fix.
+  AÇÃO NECESSÁRIA: o fix só afeta objetos criados após a correção.
+  Para migrar objetos existentes, seria necessário uma rotina de migração
+  opcional (sugerida: menu em Settings → "Normalizar nomes de arquivo").
+
+────────────────────────────────────────────────────────────────────────────────
+2.2 BUG DE ENCODING — Strings literais corrompidas no código-fonte
+────────────────────────────────────────────────────────────────────────────────
+
+ARQUIVOS AFETADOS:
+  - lib/ui/screens/settings_screen.dart (8 ocorrências)
+  - lib/ui/screens/home_screen.dart (5 ocorrências — mas em comentários)
+
+CAUSA:
+  Strings que foram originalmente escritas com caracteres Unicode (acentos,
+  travessões, bullets) foram salvas ou copiadas com encoding incorreto
+  (provavelmente ISO-8859-1 interpretado como UTF-8, ou double-encoding).
+  O arquivo .dart está em UTF-8, mas os bytes originais eram Latin-1.
+
+LOCALIZAÇÃO EXATA E CORREÇÃO LINHA A LINHA:
+
+  settings_screen.dart, linha 459:
+    ERRADO:  'Dormir Atí© Mais Tarde'
+    CORRETO: 'Dormir Até Mais Tarde'
+
+  settings_screen.dart, linha 467:
+    ERRADO:  'Ignorar alarmes de hábitos amanhã atí© ${settings.sleepInUntil}'
+    CORRETO: 'Ignorar alarmes de hábitos amanhã até ${settings.sleepInUntil}'
+
+  settings_screen.dart, linha 483:
+    ERRADO:  'Modo dormir ativado: alarmes de hábitos ignorados atí© ${settings.sleepInUntil} de amanhã.'
+    CORRETO: 'Modo dormir ativado: alarmes de hábitos ignorados até ${settings.sleepInUntil} de amanhã.'
+
+  settings_screen.dart, linha 497:
+    ERRADO:  'Silenciar alarmes atí©'
+    CORRETO: 'Silenciar alarmes até'
+
+  settings_screen.dart, linha 538:
+    ERRADO:  'Alarmes de hábitos serão silenciados atí© $formattedTime de amanhã.'
+    CORRETO: 'Alarmes de hábitos serão silenciados até $formattedTime de amanhã.'
+
+  settings_screen.dart, linha 580:
+    ERRADO:  'Granted âââ€šÂ¬ââ‚¬Â alarms fire at exact times'
+    CORRETO: 'Granted — alarms fire at exact times'
+    (O caractere corrompido é um travessão em dash: —)
+
+  settings_screen.dart, linha 581:
+    ERRADO:  'Not granted âââ€šÂ¬ââ‚¬Â alarms may be delayed'
+    CORRETO: 'Not granted — alarms may be delayed'
+
+  settings_screen.dart, linha 625:
+    ERRADO:  'Granted âââ€šÂ¬ââ‚¬Â popups show over lock screen'
+    CORRETO: 'Granted — popups show over lock screen'
+
+  settings_screen.dart, linha 626:
+    ERRADO:  'Not granted âââ€šÂ¬ââ‚¬Â popups may not show on lock screen'
+    CORRETO: 'Not granted — popups may not show on lock screen'
+
+  home_screen.dart, linhas 253 e 287:
+    Comentários de código com caracteres corrompidos (bordas de seção estilo
+    "─────"). São apenas comentários, NÃO afetam a UI. Corrigir por higiene.
+    CORRETO: substituir por '// ─── Header ───' ou simplesmente '// Header'
+
+  home_screen.dart, linha 1320:
+    ERRADO:  hintText: '"Frase" ââ‚¬â€ Autor'
+    CORRETO: hintText: '"Frase" — Autor'
+    IMPACTO: visível ao usuário (placeholder de input no dashboard)
+
+  home_screen.dart, linha 3017:
+    ERRADO:  '...padLeft(2, '0')}ââ‚¬â€œ${r.endHour...'
+    CORRETO: '...:${r.endMinute.toString().padLeft(2, '0')}'  separado por '–' (en dash)
+    ou simplesmente '–' entre os horários
+    IMPACTO: visível ao usuário (exibe horário de time blocks como "08:00â€"09:00")
+
+  home_screen.dart, linha 3283:
+    ERRADO:  '$dateLabel  ââ‚¬Â¢  $time'
+    CORRETO: '$dateLabel  •  $time'
+    IMPACTO: visível ao usuário (bullet entre data e hora no planner)
+
+COMO IDENTIFICAR NOVOS CASOS:
+  Antes de qualquer commit, rodar:
+    grep -rn "â\|Ã\|atí©\|¬\|‚" lib/
+  Qualquer hit é provavelmente encoding corrompido.
+
+COMO PREVENIR:
+  - Configurar o editor (VSCode/Android Studio) para sempre usar UTF-8 sem BOM
+  - Evitar copiar texto de PDFs, Word, ou pages do navegador diretamente
+    para o código. Colar em um editor de texto puro antes.
+  - Usar apenas caracteres ASCII em strings de UI sempre que possível,
+    ou usar constantes nomeadas para caracteres especiais:
+      const kBullet = '•';
+      const kDash = '—';
+      const kEnDash = '–';
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SEÇÃO 3 — PLAYER NATIVO DE TIKTOK: ESTADO ATUAL E O QUE FALTA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+────────────────────────────────────────────────────────────────────────────────
+3.1 O QUE JÁ ESTÁ IMPLEMENTADO E FUNCIONANDO
+────────────────────────────────────────────────────────────────────────────────
+
+A. PACOTE video_player:
+   pubspec.yaml, linha correspondente: video_player: ^2.11.1
+   Dependência presente. AndroidManifest.xml tem android:usesCleartextTraffic="true"
+   para permitir URLs HTTP (necessário para alguns CDNs TikTok).
+
+B. WIDGET SocialNativeVideoPlayer:
+   Arquivo: lib/ui/widgets/social_native_video_player.dart
+   Implementação completa e correta. Funcionalidades presentes:
+   - Carrega vídeo via VideoPlayerController.networkUrl()
+   - Envia headers HTTP de User-Agent e Referer corretos para TikTok CDN:
+       'User-Agent': 'Mozilla/5.0 (Linux; Android 13; SM-A546E)...'
+       'Referer': 'https://www.tiktok.com/'
+   - Detecta erro de playback via _handlePlaybackError() (listener no controller)
+   - Mostra CircularProgressIndicator enquanto inicializa
+   - Mostra botão de play/pause centralizado quando parado
+   - Barra de progresso com scrubbing (VideoProgressIndicator com allowScrubbing:true)
+   - AspectRatio adaptativo (usa o aspect ratio real do vídeo)
+   - Fallback para 9/16 se aspectRatio inválido (<=0)
+   - dispose() correto (remove listener, chama controller.dispose())
+   - Cores da progress bar usando AppColors.primary ✓
+
+C. SERVIÇO TikTokVideoResolver:
+   Arquivo: lib/services/tiktok_video_resolver.dart
+   Implementação robusta. Funcionalidades presentes:
+   - Suporte a endpoint com {url} placeholder ou parâmetro ?url=...
+   - Suporte a autenticação via header x-api-key
+   - Suporte a GET e POST (via parâmetro ?method=POST no endpoint)
+   - Timeout de 18 segundos
+   - Busca recursiva da URL de vídeo no JSON de resposta (qualquer estrutura)
+   - Valida que a URL encontrada começa com http e contém indicadores de vídeo
+     (.mp4, mime_type=video, /video/, tiktokcdn)
+   - Lista priorizada de chaves a buscar no JSON:
+     video_url, videoUrl, direct_video_url, download_url, downloadUrl,
+     download_addr, downloadAddr, play, playAddr, play_addr, url, hdplay, wmplay
+
+D. DIÁLOGO DE CONFIGURAÇÃO EM SETTINGS:
+   Arquivo: lib/ui/screens/settings_screen.dart, linha 215-245 e 1613-1678
+   - ListTile "Player TikTok nativo" com subtítulo mostrando endpoint ou
+     "Não configurado"
+   - Diálogo com campo de Endpoint e campo de API key (obscureText: true)
+   - Salva via notifier.updateTikTokResolverSettings()
+   - Persistência em SharedPreferences via 'tiktokResolverEndpoint' e
+     'tiktokResolverApiKey'
+
+E. INTEGRAÇÃO NO FLUXO DE EMBED:
+   Arquivo: lib/ui/widgets/social_embed_view.dart
+   - initState() inicializa _resolvedVideoUrl = widget.post.videoUrl (linha 51)
+     → se o post já tem videoUrl salvo, o player nativo é exibido diretamente
+   - Se não tem videoUrl e é TikTok vídeo: chama _startTikTokPlayback() (linha 118)
+   - _resolveTikTokVideoIfPossible() lê endpoint/apiKey do SharedPreferences,
+     instancia TikTokVideoResolver, resolve, e atualiza _resolvedVideoUrl
+   - build() verifica _resolvedVideoUrl != null → exibe SocialNativeVideoPlayer
+   - Se resolve com sucesso: cancela o timeout e esconde o WebView
+   - Se falha: cai no _loadTikTokWebPlayback() → carrega URL original no WebView
+
+F. CAMPO videoUrl NO MODELO:
+   Arquivo: lib/models/social_post.dart, linha 29, 133, 201-202
+   - Campo videoUrl em SocialPost
+   - Serializado como 'video_url' no frontmatter
+   - Lido do frontmatter: video_url ?? direct_video_url (retrocompatível)
+
+COMO CONFIGURAR (instruções para o usuário):
+  1. Ter um servidor/API que aceite uma URL de TikTok e retorne a URL direta
+     do vídeo em formato JSON.
+  2. Settings → (seção de Social/Notificações) → "Player TikTok nativo"
+  3. Preencher o Endpoint. Exemplos de formato suportado:
+     - https://api.meuservidor.com/tiktok?url={url}
+       (app substitui {url} pela URL do TikTok codificada)
+     - https://api.meuservidor.com/tiktok
+       (app envia como ?url=https://www.tiktok.com/...)
+     - https://api.meuservidor.com/tiktok?method=POST
+       (app faz POST com body JSON {"url": "...", "endpoint": "/", "params": {...}})
+  4. API key é opcional — se fornecida, é enviada no header x-api-key.
+  5. O JSON de resposta pode ter qualquer estrutura. O resolver busca
+     recursivamente chaves como video_url, play, downloadUrl, url, etc.
+
+────────────────────────────────────────────────────────────────────────────────
+3.2 PROBLEMAS EXISTENTES NO PLAYER TIKTOK
+────────────────────────────────────────────────────────────────────────────────
+
+PROBLEMA A — URL resolvida NÃO é salva de volta no post
+────────────────────────────────────────────────────────
+
+ARQUIVO: lib/ui/widgets/social_embed_view.dart, linha 243-268
+PROBLEMA:
+  Quando TikTokVideoResolver resolve com sucesso a URL direta do vídeo,
+  o resultado é salvo em _resolvedVideoUrl (estado local do widget) mas
+  NUNCA é persistido de volta no arquivo .md do post (SocialPost.videoUrl).
+  
+  Isso significa que a cada vez que o usuário abre um post de TikTok,
+  o app faz uma nova requisição ao servidor de resolução. Isso é:
+  - Lento (18s de timeout)
+  - Caro (uso desnecessário da API)
+  - Frágil (se a API estiver offline, o vídeo não carrega mesmo tendo
+    sido resolvido com sucesso antes)
+  
+  URLs de CDN do TikTok têm validade limitada (geralmente algumas horas),
+  então salvar permanentemente pode resultar em URLs expiradas. Mas seria
+  útil salvar por sessão ou por um período curto.
+
+IMPACTO:
+  - Performance ruim: delay de resolução em toda abertura do post
+  - Experiência inconsistente: funcionou ontem, hoje a API está lenta
+
+COMO ARRUMAR (opção de cache em memória):
+  Adicionar um cache estático na classe (ou num provider Riverpod) que
+  guarda resolved URLs por post.id com timestamp. TTL sugerido: 2 horas.
+
+    // Em social_embed_view.dart ou num provider separado:
+    static final Map<String, (String url, DateTime resolvedAt)> _videoCache = {};
+
+    Future<bool> _resolveTikTokVideoIfPossible() async {
+      final postId = widget.post.id;
+      final cached = _videoCache[postId];
+      if (cached != null &&
+          DateTime.now().difference(cached.$2).inHours < 2) {
+        setState(() { _resolvedVideoUrl = cached.$1; });
+        return true;
+      }
+      // ... resolve normalmente ...
+      if (resolved != null) {
+        _videoCache[postId] = (resolved, DateTime.now());
+      }
+      // ...
+    }
+
+PROBLEMA B — Posts TikTok que NÃO são vídeos mostram tela de erro
+────────────────────────────────────────────────────────────────────
+
+ARQUIVO: lib/ui/widgets/social_embed_view.dart, linha 122-124
+CÓDIGO:
+  if (widget.post.platform == SocialPlatform.tiktok) {
+    _hasError = true;
+    return;
+  }
+
+PROBLEMA:
+  Esse bloco é executado quando um post é TikTok MAS mediaType != video
+  (por exemplo, imagens ou carousels de imagens do TikTok).
+  Esses posts exibem imediatamente a tela de erro em vez de tentar
+  carregar o embed do TikTok ou mostrar as imagens.
+
+IMPACTO:
+  Posts de imagem do TikTok sempre mostram "Não foi possível carregar".
+
+COMO ARRUMAR:
+  Substituir o bloco por uma tentativa de embed via oEmbed do TikTok,
+  ou pelo menos mostrar o thumbnail do post. A URL de embed do TikTok
+  para posts não-vídeo segue o padrão:
+    https://www.tiktok.com/embed/v2/{video_id}
+  Que funciona inclusive para imagens em alguns casos.
+
+  Correção mínima (mostrar thumbnail):
+    if (widget.post.platform == SocialPlatform.tiktok &&
+        widget.post.mediaType != SocialMediaType.video) {
+      // Tentar embed antes de desistir
+      final embedUrl = _embedUrlFor(widget.post);
+      if (embedUrl != null) {
+        _controller.loadHtmlString(_buildEmbedHtml(widget.post, embedUrl: embedUrl));
+      } else {
+        setState(() { _hasError = true; });
+      }
+      return;
+    }
+
+PROBLEMA C — Player não faz autoplay após resolução
+──────────────────────────────────────────────────────
+
+ARQUIVO: lib/ui/widgets/social_native_video_player.dart, linha 42-51
+PROBLEMA:
+  Após inicialização do VideoPlayerController, o player fica parado.
+  O usuário precisa tocar na tela para iniciar o vídeo.
+  Para uma galeria de posts salvos, o comportamento esperado é autoplay
+  ao abrir o post (similar ao TikTok nativo).
+
+  Além disso, o controller não define .setLooping(true), então o vídeo
+  para no final em vez de fazer loop (comportamento indesejado para TikTok).
+
+IMPACTO:
+  UX inferior ao comportamento esperado.
+
+COMO ARRUMAR:
+  Em initState(), após initialize():
+    ..initialize().then((_) {
+      if (!mounted) return;
+      _controller.setLooping(true);   // ADICIONAR
+      _controller.play();              // ADICIONAR autoplay
+      setState(() => _initialized = true);
+    })
+
+  Observação: autoplay com som pode ser problemático dependendo do contexto.
+  Considerar inicializar sem som (setVolume(0)) e dar ao usuário controle.
+
+PROBLEMA D — Loader durante resolução não tem feedback de progresso
+────────────────────────────────────────────────────────────────────
+
+ARQUIVO: lib/ui/widgets/social_embed_view.dart, método _buildResolvingVideo()
+PROBLEMA:
+  Quando _resolvingVideo = true, o widget chama _buildResolvingVideo() mas
+  esse método não foi encontrado no código analisado (pode estar presente mas
+  não visível no trecho). Se existir, verificar se mostra contexto adequado.
+  O timeout é de 18 segundos — tempo suficiente para o usuário achar que
+  travou se não houver feedback claro.
+
+COMO ARRUMAR:
+  Se _buildResolvingVideo() não existe ou é genérico, implementar:
+    Widget _buildResolvingVideo() => SizedBox(
+      height: 200,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 12),
+            Text('Carregando vídeo...', style: TextStyle(color: Colors.white54, fontSize: 13)),
+          ],
+        ),
+      ),
+    );
+
+────────────────────────────────────────────────────────────────────────────────
+3.3 O QUE FALTA PARA O PLAYER TIKTOK FICAR 100% FUNCIONAL
+────────────────────────────────────────────────────────────────────────────────
+
+STATUS ATUAL: O player funciona SE o usuário tem um servidor de resolução
+configurado E o vídeo é do tipo 'video'. Para uso prático sem servidor
+próprio, há opções públicas (ver abaixo).
+
+ITENS PENDENTES POR PRIORIDADE:
+
+  PRIORIDADE ALTA:
+  [ ] Fix Problema B: TikTok imagens/carousels mostram erro → implementar
+      tentativa de embed antes de desistir
+  [ ] Fix Problema A: adicionar cache em memória para URLs resolvidas
+      (evitar chamada a API a cada abertura do post)
+  [ ] Autoplay + loop ao abrir o vídeo (Problema C)
+
+  PRIORIDADE MÉDIA:
+  [ ] Documentar para o usuário qual formato de servidor usar.
+      Sugestões de APIs públicas/gratuitas:
+      - tikwm.com API (gratuita, retorna download_addr)
+        Endpoint: https://www.tikwm.com/api/?url={url}
+        Chave 'download_addr' no JSON → já mapeada no resolver
+      - SnapTik (tem API não oficial)
+      - Instância local de yt-dlp via API (mais confiável)
+  [ ] Adicionar botão "Abrir no TikTok" como fallback sempre visível
+      mesmo quando o player nativo estiver funcionando
+  [ ] Controle de volume no player nativo
+
+  PRIORIDADE BAIXA:
+  [ ] Salvar URL resolvida no frontmatter do post (com TTL) para eliminar
+      o delay em sessões futuras (requer lógica de invalidação por data)
+  [ ] Suporte a vídeos verticais 9:16 sem barras pretas laterais
+      (o AspectRatio atual já lida com isso, mas testar com vídeos reais)
+  [ ] Teste com CDN URLs que expiram rápido vs. CDN com URLs longas
+
+COMO TESTAR SE ESTÁ FUNCIONANDO:
+  1. Configurar endpoint em Settings
+  2. Adicionar um post do TikTok (URL de vídeo) via Social
+  3. Abrir o post → deve aparecer o player nativo em vez do WebView
+  4. Se aparecer WebView, verificar: post.mediaType == 'video'? endpoint salvo?
+  5. Logs: TikTokVideoResolver imprime 'TikTokVideoResolver failed' se falhar
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SEÇÃO 4 — OUTROS BUGS ENCONTRADOS (ANÁLISE PROATIVA)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+────────────────────────────────────────────────────────────────────────────────
+4.1 BUG — settings_screen tem textos em inglês misturados com PT-BR
+────────────────────────────────────────────────────────────────────────────────
+
+ARQUIVO: lib/ui/screens/settings_screen.dart
+OCORRÊNCIAS:
+  - Linha 572: título 'Exact Alarm Permission' (deveria ser PT-BR)
+  - Linha 588: botão 'Grant' (deveria ser 'Conceder')
+  - Linha 625: 'Granted — popups show over lock screen' (inglês)
+  - Linha 633: botão 'Grant' (deveria ser 'Conceder')
+  - permission_service.dart, linha 120: AlertDialog em inglês inteiro
+    ('Exact Alarm Permission', 'Schedule exact alarms', 'Later', 'Open Settings')
+
+REGRA VIOLADA: guidelines.md seção 8.1 item 10: "Usar PT-BR em todos os
+textos de UI"
+
+COMO ARRUMAR:
+  settings_screen.dart:
+    'Exact Alarm Permission' → 'Permissão de Alarme Exato'
+    'Full-Screen Intent' → 'Notificação em Tela Cheia'
+    'Granted — alarms fire at exact times' → 'Concedida — alarmes disparam no horário exato'
+    'Not granted — alarms may be delayed' → 'Não concedida — alarmes podem atrasar'
+    'Granted — popups show over lock screen' → 'Concedida — popups aparecem sobre a tela de bloqueio'
+    'Not granted — popups may not show on lock screen' → 'Não concedida — popups podem não aparecer'
+    'Grant' → 'Conceder'
+
+  permission_service.dart, showExactAlarmPermissionDialog():
+    title: 'Exact Alarm Permission' → 'Permissão de Alarme Exato'
+    content: (reescrever em PT-BR)
+      'Para disparar alarmes e notificações popup no horário exato, '
+      'o Citrine precisa da permissão "Agendar alarmes exatos".\n\n'
+      'Você será levado às configurações do sistema.'
+    'Later' → 'Depois'
+    'Open Settings' → 'Abrir Configurações'
+
+────────────────────────────────────────────────────────────────────────────────
+4.2 AVISO — home_screen.dart tem 5 encoding errors mas 3 são em comentários
+────────────────────────────────────────────────────────────────────────────────
+
+LINHAS VISÍVEIS AO USUÁRIO (prioridade):
+  - Linha 1320: hintText com travessão corrompido (visível no dashboard)
+  - Linha 3017: separador de horário corrompido (visível no time block display)
+  - Linha 3283: bullet corrompido entre data e hora (visível no planner)
+
+LINHAS EM COMENTÁRIOS (baixa prioridade):
+  - Linhas 253, 287: comentários de separador de seção (╴─╴─╴─ corrompidos)
+    Não afetam UI, apenas leitura do código-fonte.
+
+────────────────────────────────────────────────────────────────────────────────
+4.3 INCONSISTÊNCIA — typeSignatures inclui 'shopping_item' (tipo legado)
+────────────────────────────────────────────────────────────────────────────────
+
+ARQUIVO: lib/providers/settings_provider.dart, linha 432-437
+  'shopping_item': TypeSignature(
+    objectType: 'shopping_item',
+    markerType: MarkerType.folder,
+    markerValue: 'shopping',
+  ),
+
+PROBLEMA:
+  Conforme App Guidelines V4, Seção "Nota de implementação (2026-06-21)",
+  shopping_item é um modelo DEPRECIADO. A fonte de verdade é ShoppingList
+  (shopping_list_model.dart). Manter shopping_item em typeSignatures default
+  significa que arquivos na pasta 'shopping/' ainda são reconhecidos como
+  shopping_item (tipo legado), em vez de serem migrados.
+
+  Além disso, a guidelines (Parte 21) diz explicitamente:
+  "Object Identification deve sinalizar os dois coexistindo na mesma pasta
+  como o mesmo tipo de conflito... até a migração ser concluída e
+  type: shopping_item ser descontinuado."
+
+  Mas não há lógica de detecção de conflito implementada atualmente.
+
+IMPACTO: menor até que a migração de ShoppingList seja executada.
+COMO ARRUMAR: após a migração dos dados, remover 'shopping_item' de
+  _defaultSignatures() e do diálogo de Object Identification.
+
+────────────────────────────────────────────────────────────────────────────────
+4.4 AVISO — _sanitizeFileName não é usado consistentemente
+────────────────────────────────────────────────────────────────────────────────
+
+ARQUIVO: lib/services/markdown_parser.dart, linha 252-253
+  String filename = object.type == 'resource'
+      ? _sanitizeFileName(object.title)
+      : object.slug;
+
+PROBLEMA:
+  Resources usam _sanitizeFileName (que preserva acentos, apenas remove
+  caracteres ilegais em filesystem). Todos os outros tipos usam slug
+  (que remove acentos). Inconsistência sem justificativa técnica.
+
+SOLUÇÃO IDEAL:
+  Todos os tipos deveriam usar _sanitizeFileName para gerar o nome do arquivo,
+  e slug ser usado apenas para chaves YAML (habit completions, etc).
+  Mas isso requer consideração sobre retrocompatibilidade — objetos existentes
+  têm obsidianPath salvo e não seriam afetados, mas novos objetos ganhariam
+  nomes de arquivo melhores.
+
+────────────────────────────────────────────────────────────────────────────────
+4.5 AVISO — setState() chamado em FutureBuilders de permissão (settings_screen)
+────────────────────────────────────────────────────────────────────────────────
+
+ARQUIVO: lib/ui/screens/settings_screen.dart, linhas 590 e 635
+  onPressed: () async {
+    await PermissionService.showExactAlarmPermissionDialog(context);
+    setState(() {}); // Refresh status
+  },
+
+PROBLEMA:
+  Chamar setState({}) em toda a tela de settings para "refresh" o status
+  de permissão força rebuild de toda a tela (que é grande, ~2500 linhas).
+  Isso pode causar flickering visível.
+
+COMO ARRUMAR:
+  Usar um ValueNotifier ou um provider simples para o status de permissão,
+  e fazer ref.invalidate() apenas nos widgets de status. Ou ao menos usar
+  um StatefulBuilder local ao redor dos FutureBuilders de permissão.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SEÇÃO 5 — RESUMO DE PRIORIDADES PARA IMPLEMENTAÇÃO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PRIORIDADE 1 — BUGS VISÍVEIS AO USUÁRIO (implementar primeiro):
+
+  [P1-A] ENCODING CORROMPIDO EM STRINGS DE UI
+  Arquivo: lib/ui/screens/settings_screen.dart
+  Linhas: 459, 467, 483, 497, 538, 580, 581, 625, 626
+  Ação: substituição direta de string conforme tabela na Seção 2.2
+  Risco: zero — só altera texto literal
+
+  [P1-B] ENCODING CORROMPIDO EM HOME_SCREEN (strings visíveis)
+  Arquivo: lib/ui/screens/home_screen.dart
+  Linhas: 1320, 3017, 3283
+  Ação: substituir os caracteres corrompidos pelos corretos (—, –, •)
+  Risco: zero
+
+  [P1-C] TEXTOS EM INGLÊS NA UI (settings_screen + permission_service)
+  Arquivos: lib/ui/screens/settings_screen.dart, lib/services/permission_service.dart
+  Ação: traduzir para PT-BR conforme lista na Seção 4.1
+  Risco: zero
+
+PRIORIDADE 2 — BUGS ESTRUTURAIS COM EFEITO PRÁTICO:
+
+  [P2-A] SLUG DESTRÓI ACENTOS → nomes de arquivo e chaves YAML errados
+  Arquivo: lib/models/content_object.dart, linha 102-107
+  Ação: implementar mapa de transliteração antes do replaceAll
+  Risco: MÉDIO — objetos existentes não são renomeados (compatível),
+  mas novos objetos ganham nomes diferentes dos antigos se tiverem mesmo título
+
+  [P2-B] IDEA SETTINGS DIALOG SEM EFEITO (ideaStrategy morto)
+  Arquivo: lib/providers/settings_provider.dart, método setIdeaStrategy()
+  Ação: adicionar chamada a updateTypeSignature('idea', ...) baseada na
+  estratégia escolhida
+  Risco: BAIXO — só afeta identificação de ideas
+
+  [P2-C] TIKTOK IMAGENS/CAROUSELS MOSTRAM ERRO
+  Arquivo: lib/ui/widgets/social_embed_view.dart, linha 122-124
+  Ação: tentar embed antes de definir _hasError = true
+  Risco: baixo
+
+PRIORIDADE 3 — MELHORIAS DE UX E CONSISTÊNCIA:
+
+  [P3-A] CACHE DE URLs RESOLVIDAS DO TIKTOK
+  Arquivo: lib/ui/widgets/social_embed_view.dart
+  Ação: implementar cache em memória com TTL de 2h para _resolvedVideoUrl
+
+  [P3-B] AUTOPLAY + LOOP NO NATIVE VIDEO PLAYER
+  Arquivo: lib/ui/widgets/social_native_video_player.dart, initState()
+  Ação: adicionar _controller.setLooping(true) e _controller.play() após initialize()
+
+  [P3-C] FOLDERPATH DIALOG SEM MIGRAÇÃO
+  Arquivo: lib/ui/screens/settings_screen.dart, _showFolderPathsDialog()
+  Ação: adicionar botão "Mover arquivos existentes" que executa migração
+
+  [P3-D] TEXTOS EM PT-BR EM TODO O APP
+  Ação: varredura geral por textos em inglês fora do esperado (nomes técnicos OK)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SEÇÃO 6 — REFERÊNCIA RÁPIDA DE ARQUIVOS POR PROBLEMA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+lib/models/content_object.dart
+  → Linha 102-107: slug getter — fix de transliteração de acentos (P2-A)
+
+lib/services/markdown_parser.dart
+  → Linha 252-253: filename usa slug para não-resources — inconsistência (Seção 4.4)
+  → Linha 282-288: _sanitizeFileName — preserva acentos, só usado para resources
+
+lib/providers/vault_provider.dart
+  → Linha 1452-1509: allObjectsProvider — leitura soberana via typeSignatures ✓
+  → Linha 2533-2710: _writeObject — escrita usa typeSignatures + folderPaths ✓
+  → Linha 2359-2381: _signatureKeyFor + _defaultFolderForSignature ✓
+  → Linha 74, 256+: habit slugs como chaves YAML — afetados pelo bug de slug (P2-A)
+
+lib/providers/settings_provider.dart
+  → Linha 430-505: _defaultSignatures() — base de typeSignatures
+  → Linha 137: ideaTag default 'idea' deveria ser 'ideia' (Seção 1.3)
+  → Linha 860-875: setIdeaStrategy() — não atualiza typeSignatures (P2-B)
+  → Linha 805-815: updateFolderPath() — não migra arquivos (Seção 1.2)
+
+lib/ui/screens/settings_screen.dart
+  → Linha 459, 467, 483, 497, 538: encoding 'atí©' → 'até' (P1-A)
+  → Linha 572-633: textos em inglês + encoding corrompido — permissões (P1-A + P1-C)
+  → Linha 1538-1610: _showFolderPathsDialog() — sem migração de arquivos (P3-C)
+  → Linha 1685-1760: _showIdeaSettingsDialog() — dialog morto (P2-B)
+
+lib/ui/screens/home_screen.dart
+  → Linha 1320, 3017, 3283: encoding corrompido visível ao usuário (P1-B)
+  → Linhas 253, 287: encoding em comentários (baixa prioridade)
+
+lib/ui/screens/type_signatures_screen.dart
+  → Linha 185-245: _confirmAndMoveFolder() — modelo de migração correto ✓
+  → Após salvar: ref.invalidate(allObjectsProvider) ✓
+
+lib/ui/widgets/social_embed_view.dart
+  → Linha 51: init de _resolvedVideoUrl a partir de post.videoUrl ✓
+  → Linha 116-128: fluxo de decisão TikTok — bug de imagens (P2-C)
+  → Linha 243-268: _resolveTikTokVideoIfPossible() — sem cache (P3-A)
+
+lib/ui/widgets/social_native_video_player.dart
+  → Linha 42-51: initState sem autoplay/loop (P3-B)
+  → Linha 28-30: headers HTTP corretos para TikTok CDN ✓
+  → Linha 163-167: _togglePlayback() ✓
+  → Linha 169-171: _handlePlaybackError() ✓
+
+lib/services/tiktok_video_resolver.dart
+  → Implementação completa e sem bugs ✓
+  → Linha 74-99: _findVideoUrl() busca recursiva no JSON ✓
+  → Linha 101-112: _candidate() validação de URL ✓
+
+lib/services/permission_service.dart
+  → Linha 115-148: showExactAlarmPermissionDialog() — strings em inglês (P1-C)
+
+================================================================================
+FIM DO RELATÓRIO
+=============================================================================================================================================
 #  CITRINE — GUIA DE OTIMIZAÇÃO DE PERFORMANCE
   Foco: lentidão no startup e navegação geral
   Baseado em auditoria do código atual (junho 2026)

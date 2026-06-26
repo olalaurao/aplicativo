@@ -38,12 +38,11 @@ import '../services/sync_queue_service.dart';
 import '../services/backup_service.dart';
 import '../services/notification_service.dart';
 import '../models/reminder_model.dart';
+import '../providers/settings_provider.dart';
 import '../models/reminder_config.dart';
 import '../services/automation_service.dart';
-import '../models/shared_types.dart' as shared_types;
 import '../services/widget_service.dart';
 import '../services/dataview_generator.dart';
-import 'settings_provider.dart';
 import 'pomodoro_provider.dart';
 import '../services/google_drive_sync_service.dart';
 
@@ -91,6 +90,21 @@ String getDailyNoteTemplate(
   buf.write('## Tasks\n\n');
   buf.write('## Pomodoros\n');
   return buf.toString();
+}
+
+Map<String, String> _habitLabelsFromRef(Ref ref) {
+  return {
+    for (final habit in ref.read(habitsProvider))
+      habit.slug: habit.displayTitle,
+  };
+}
+
+Set<String> _pactHabitSlugsFromRef(Ref ref) {
+  return ref
+      .read(habitsProvider)
+      .where((habit) => habit.habitMode == HabitMode.pact)
+      .map((habit) => habit.slug)
+      .toSet();
 }
 
 class _ParsedQuickTask {
@@ -188,7 +202,6 @@ final typeConflictedObjectsProvider = Provider<List<ContentObject>>((ref) {
   final all = ref.watch(allObjectsProvider).valueOrNull ?? [];
   return all.where((obj) => obj.hasTypeConflict).toList();
 });
-
 
 Future<void> _cancelHabitSlotReminderNotification(
   Habit habit,
@@ -377,7 +390,9 @@ class HabitsNotifier extends Notifier<List<Habit>> {
   List<Habit> build() {
     final habits = ref.watch(objectsByTypeProvider('habit')).cast<Habit>();
     if (habits.isNotEmpty) {
-      Future.microtask(() => AutomationService.checkPactExpirations(ref, habits));
+      Future.microtask(
+        () => AutomationService.checkPactExpirations(ref, habits),
+      );
     }
     return habits;
   }
@@ -395,11 +410,14 @@ class HabitsNotifier extends Notifier<List<Habit>> {
     try {
       final path = 'daily/$dateStr.md';
       final dayThemes = ref.read(dayThemesProvider);
-      final content = await obsidianService.readFile(path) ??
+      final content =
+          await obsidianService.readFile(path) ??
           getDailyNoteTemplate(
             dateStr,
             dayThemes,
-            activeHabits: state.where((h) => h.status == HabitStatus.active).toList(),
+            activeHabits: state
+                .where((h) => h.status == HabitStatus.active)
+                .toList(),
           );
 
       final frontmatter = MarkdownParser.parseFrontmatter(content);
@@ -468,6 +486,8 @@ class HabitsNotifier extends Notifier<List<Habit>> {
         entries: entries,
         tasks: tasks,
         habits: habitsMap,
+        habitLabels: _habitLabelsFromRef(ref),
+        pactHabitSlugs: _pactHabitSlugsFromRef(ref),
         trackers: trackers,
         pomodoros: pomodoros,
       );
@@ -617,7 +637,9 @@ class HabitsNotifier extends Notifier<List<Habit>> {
         getDailyNoteTemplate(
           dateStr,
           dayThemes,
-          activeHabits: state.where((h) => h.status == HabitStatus.active).toList(),
+          activeHabits: state
+              .where((h) => h.status == HabitStatus.active)
+              .toList(),
         );
 
     final frontmatter = MarkdownParser.parseFrontmatter(content);
@@ -657,6 +679,8 @@ class HabitsNotifier extends Notifier<List<Habit>> {
       entries: entries,
       tasks: tasks,
       habits: habitsMap,
+      habitLabels: _habitLabelsFromRef(ref),
+      pactHabitSlugs: _pactHabitSlugsFromRef(ref),
       trackers: trackers,
       pomodoros: pomodoros,
     );
@@ -694,12 +718,24 @@ final habitsProvider = NotifierProvider<HabitsNotifier, List<Habit>>(() {
 class OrganizersNotifier extends Notifier<List<organizer_model.Organizer>> {
   @override
   List<organizer_model.Organizer> build() {
-    final areas = ref.watch(objectsByTypeProvider('area')).cast<organizer_model.Organizer>();
-    final projects = ref.watch(objectsByTypeProvider('project')).cast<organizer_model.Organizer>();
-    final activities = ref.watch(objectsByTypeProvider('activity')).cast<organizer_model.Organizer>();
-    final people = ref.watch(objectsByTypeProvider('person')).cast<organizer_model.Organizer>();
-    final places = ref.watch(objectsByTypeProvider('place')).cast<organizer_model.Organizer>();
-    final labels = ref.watch(objectsByTypeProvider('label')).cast<organizer_model.Organizer>();
+    final areas = ref
+        .watch(objectsByTypeProvider('area'))
+        .cast<organizer_model.Organizer>();
+    final projects = ref
+        .watch(objectsByTypeProvider('project'))
+        .cast<organizer_model.Organizer>();
+    final activities = ref
+        .watch(objectsByTypeProvider('activity'))
+        .cast<organizer_model.Organizer>();
+    final people = ref
+        .watch(objectsByTypeProvider('person'))
+        .cast<organizer_model.Organizer>();
+    final places = ref
+        .watch(objectsByTypeProvider('place'))
+        .cast<organizer_model.Organizer>();
+    final labels = ref
+        .watch(objectsByTypeProvider('label'))
+        .cast<organizer_model.Organizer>();
 
     return [
       ...areas,
@@ -789,6 +825,7 @@ Future<void> saveTrackerRecord(
     categories: const ['[[tracker_records]]'],
   );
   await ref.read(trackingRecordsProvider.notifier).addRecord(record);
+  await AutomationService.executeTrackerActions(ref, tracker, record);
 }
 
 class ProjectsNotifier extends Notifier<List<Project>> {
@@ -1402,7 +1439,9 @@ final allEntriesProvider = Provider<List<JournalEntry>>((ref) {
   return [];
 });
 
-final pmnByReferencedDateProvider = Provider<Map<String, List<JournalEntry>>>((ref) {
+final pmnByReferencedDateProvider = Provider<Map<String, List<JournalEntry>>>((
+  ref,
+) {
   final all = ref.watch(allObjectsProvider).valueOrNull ?? [];
   final map = <String, List<JournalEntry>>{};
   for (final entry in all.whereType<JournalEntry>()) {
@@ -1472,11 +1511,27 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
 
     // Run journal entry migration
     await service.fixEntryTypeMigration();
+    await service.migrateDailyHabitCompletions(
+      ref.read(sharedPreferencesProvider),
+    );
 
-    // 1. Fetch all markdown files (single call)
-    final mdFiles = (await service.getFilesInFolder(
-      '',
-    )).where((f) => f.path.endsWith('.md')).toList();
+    // 1. Fetch markdown files, prioritizing user-configured object folders.
+    final scannedPaths = <String>{};
+    final mdFiles = <File>[];
+    for (final folder in settings.folderPaths.values) {
+      final files = await service.getFilesInFolder(folder);
+      for (final file in files) {
+        final normalized = file.path.replaceAll('\\', '/');
+        if (scannedPaths.add(normalized)) mdFiles.add(file);
+      }
+    }
+    final defaultFiles = await service.getFilesInFolder('');
+    for (final file in defaultFiles) {
+      final normalized = file.path.replaceAll('\\', '/');
+      if (scannedPaths.add(normalized) && file.path.endsWith('.md')) {
+        mdFiles.add(file);
+      }
+    }
 
     // 2. Read and parse files in parallel batches (max 50 concurrent I/O ops)
     const batchSize = 50;
@@ -1521,8 +1576,11 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
               }
             }
 
-            final pmnMatch = RegExp(r'(\d{4})-(\d{2})-W(\d{2})').firstMatch(relativePath);
-            final isPmnFile = pmnMatch != null && relativePath.split('/').contains('daily');
+            final pmnMatch = RegExp(
+              r'(\d{4})-(\d{2})-W(\d{2})',
+            ).firstMatch(relativePath);
+            final isPmnFile =
+                pmnMatch != null && relativePath.split('/').contains('daily');
 
             if (isPmnFile) {
               final yearStr = pmnMatch.group(1)!;
@@ -1531,20 +1589,30 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
               final entry = JournalEntry(
                 id: frontmatter['id']?.toString() ?? canonicalId,
                 body: '',
-                date: DateTime.tryParse(frontmatter['date_range_start']?.toString() ?? '') ?? DateTime.now(),
+                date:
+                    DateTime.tryParse(
+                      frontmatter['date_range_start']?.toString() ?? '',
+                    ) ??
+                    DateTime.now(),
                 title: 'PMN ${frontmatter['week'] ?? weekStr}',
                 entryType: JournalEntryType.pmn,
                 obsidianPath: relativePath,
               );
               entry.week = frontmatter['week']?.toString();
-              entry.dateRangeStart = DateTime.tryParse(frontmatter['date_range_start']?.toString() ?? '');
-              entry.dateRangeEnd = DateTime.tryParse(frontmatter['date_range_end']?.toString() ?? '');
-              entry.referencedDates = (frontmatter['referenced_dates'] as List? ?? [])
-                  .map((d) => DateTime.tryParse(d.toString()))
-                  .whereType<DateTime>()
-                  .toList();
+              entry.dateRangeStart = DateTime.tryParse(
+                frontmatter['date_range_start']?.toString() ?? '',
+              );
+              entry.dateRangeEnd = DateTime.tryParse(
+                frontmatter['date_range_end']?.toString() ?? '',
+              );
+              entry.referencedDates =
+                  (frontmatter['referenced_dates'] as List? ?? [])
+                      .map((d) => DateTime.tryParse(d.toString()))
+                      .whereType<DateTime>()
+                      .toList();
               entry.pactRefs = (frontmatter['pact_refs'] as List? ?? [])
-                  .map((p) => p.toString()).toList();
+                  .map((p) => p.toString())
+                  .toList();
               final pmnSections = MarkdownParser.parsePmnSections(body);
               entry.plus = pmnSections['plus'] ?? [];
               entry.minus = pmnSections['minus'] ?? [];
@@ -1564,10 +1632,18 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
 
                 for (final data in entriesData) {
                   // Resolve entry_type from inline Dataview field
-                  JournalEntryType resolvedEntryType = JournalEntryType.standard;
-                  final rawEntryType = data['entry_type']?.toString().replaceAll('_', '').toLowerCase();
-                  if (rawEntryType == 'fieldnote') resolvedEntryType = JournalEntryType.fieldNote;
-                  if (rawEntryType == 'pmn') resolvedEntryType = JournalEntryType.pmn;
+                  JournalEntryType resolvedEntryType =
+                      JournalEntryType.standard;
+                  final rawEntryType = data['entry_type']
+                      ?.toString()
+                      .replaceAll('_', '')
+                      .toLowerCase();
+                  if (rawEntryType == 'fieldnote') {
+                    resolvedEntryType = JournalEntryType.fieldNote;
+                  }
+                  if (rawEntryType == 'pmn') {
+                    resolvedEntryType = JournalEntryType.pmn;
+                  }
 
                   final entry = JournalEntry(
                     id: data['id'],
@@ -1590,12 +1666,10 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                   );
                   if (data['organizers'] != null) {
                     entry.organizers = (data['organizers'] as List)
-                        .map<shared_types.OrganizerReference>(
-                          (o) => o is shared_types.OrganizerReference
+                        .map<OrganizerReference>(
+                          (o) => o is OrganizerReference
                               ? o
-                              : shared_types.OrganizerReference.fromWikiLink(
-                                  o.toString(),
-                                ),
+                              : OrganizerReference.fromWikiLink(o.toString()),
                         )
                         .toList();
                   }
@@ -1635,10 +1709,13 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                     hours,
                     minutes,
                   );
-                  
-                  final blocks = int.tryParse(pom['blocks']?.toString() ?? '') ?? 0;
-                  final worked = int.tryParse(pom['worked']?.toString() ?? '') ?? 0;
-                  final breakTime = int.tryParse(pom['break']?.toString() ?? '') ?? 0;
+
+                  final blocks =
+                      int.tryParse(pom['blocks']?.toString() ?? '') ?? 0;
+                  final worked =
+                      int.tryParse(pom['worked']?.toString() ?? '') ?? 0;
+                  final breakTime =
+                      int.tryParse(pom['break']?.toString() ?? '') ?? 0;
                   final linkedItem = pom['linked_item'] as String?;
 
                   final session = PomodoroSession(
@@ -1685,7 +1762,8 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                   frontmatter,
                   body,
                 )..obsidianPath = relativePath;
-              } else if (type == 'habit' && !relativePath.startsWith('organizers/')) {
+              } else if (type == 'habit' &&
+                  !relativePath.startsWith('organizers/')) {
                 obj = Habit.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
               } else if (type == 'project' ||
@@ -1706,7 +1784,8 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
                   (type == 'task' && relativePath.startsWith('organizers/')) ||
                   (type == 'goal' && relativePath.startsWith('organizers/')) ||
                   (type == 'habit' && relativePath.startsWith('organizers/')) ||
-                  (type == 'tracker' && relativePath.startsWith('organizers/'))) {
+                  (type == 'tracker' &&
+                      relativePath.startsWith('organizers/'))) {
                 if (frontmatter['organizer_type'] == null &&
                     type != 'organizer') {
                   frontmatter['organizer_type'] = type;
@@ -1722,7 +1801,8 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
               } else if (type == 'social_post') {
                 obj = SocialPost.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
-              } else if (type == 'goal' && !relativePath.startsWith('organizers/')) {
+              } else if (type == 'goal' &&
+                  !relativePath.startsWith('organizers/')) {
                 obj = Goal.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
               } else if (type == 'entry') {
@@ -1790,7 +1870,8 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
               obj.literalType = literalType;
               if (literalType != null && literalType != type) {
                 obj.hasTypeConflict = true;
-                obj.conflictReason = 'Tipo no frontmatter ("$literalType") diverge do tipo detectado pela assinatura ("$type").';
+                obj.conflictReason =
+                    'Tipo no frontmatter ("$literalType") diverge do tipo detectado pela assinatura ("$type").';
               }
               if (obj.title == 'Untitled' ||
                   obj.title.toLowerCase() == 'untitled' ||
@@ -2034,7 +2115,7 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
         minute,
       ).toIso8601String(),
       if (entry.entryType != JournalEntryType.standard)
-        'entry_type': entry.entryType.name.replaceAll(RegExp(r'([A-Z])'), r'_\1').toLowerCase(),
+        'entry_type': JournalEntry.entryTypeToString(entry.entryType),
       if (entry.category != null) 'category': entry.category,
       if (entry.energyValue != null) 'energy_value': entry.energyValue,
     };
@@ -2079,12 +2160,10 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
       final organizers = data['organizers'];
       if (organizers is List) {
         entry.organizers = organizers
-            .map<shared_types.OrganizerReference>(
-              (organizer) => organizer is shared_types.OrganizerReference
+            .map<OrganizerReference>(
+              (organizer) => organizer is OrganizerReference
                   ? organizer
-                  : shared_types.OrganizerReference.fromWikiLink(
-                      organizer.toString(),
-                    ),
+                  : OrganizerReference.fromWikiLink(organizer.toString()),
             )
             .toList();
       }
@@ -2136,7 +2215,10 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
         getDailyNoteTemplate(
           dateStr,
           dayThemes,
-          activeHabits: ref.read(habitsProvider).where((h) => h.status == HabitStatus.active).toList(),
+          activeHabits: ref
+              .read(habitsProvider)
+              .where((h) => h.status == HabitStatus.active)
+              .toList(),
         );
 
     final frontmatter = MarkdownParser.parseFrontmatter(content);
@@ -2151,6 +2233,7 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
 
     // Add new entry
     entries.add(_dailyMapForEntry(entry, dateStr));
+    await _applyMoodToDailyFrontmatter(frontmatter, entry);
 
     // Sort by time
     entries.sort((a, b) => a['time'].compareTo(b['time']));
@@ -2159,6 +2242,8 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
       entries: entries,
       tasks: tasks,
       habits: habits,
+      habitLabels: _habitLabelsFromRef(ref),
+      pactHabitSlugs: _pactHabitSlugsFromRef(ref),
       trackers: trackers,
       pomodoros: pomodoros,
     );
@@ -2188,6 +2273,41 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
 
     ref.invalidate(dailyNoteDataProvider(dateStr));
     ref.invalidate(allObjectsProvider);
+  }
+
+  Future<void> _applyMoodToDailyFrontmatter(
+    Map<String, dynamic> frontmatter,
+    JournalEntry entry,
+  ) async {
+    final moodId = entry.moodSlug?.trim();
+    if (moodId == null || moodId.isEmpty) return;
+    final cleanMoodId = moodId
+        .replaceAll('[[', '')
+        .replaceAll(']]', '')
+        .split(',')
+        .first
+        .trim();
+    if (cleanMoodId.isEmpty) return;
+
+    await ref.read(moodsProvider.notifier).ensureMoodFileExists(cleanMoodId);
+    final availableMoods = [
+      ...ref.read(moodsProvider),
+      ...MoodDefinition.systemMoods,
+    ];
+    final mood = availableMoods.firstWhere(
+      (mood) => mood.id == cleanMoodId || mood.slug == cleanMoodId,
+      orElse: () => MoodDefinition(
+        id: cleanMoodId,
+        label: cleanMoodId,
+        emoji: '😐',
+        color: '#9E9E9E',
+      ),
+    );
+
+    frontmatter['mood_pleasantness'] = mood.pleasantness;
+    frontmatter['mood_energy'] = mood.energy;
+    frontmatter['mood_label'] = mood.label;
+    frontmatter['mood_emoji'] = mood.emoji;
   }
 
   Future<void> updateEntry(
@@ -2231,7 +2351,10 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
         getDailyNoteTemplate(
           dateStr,
           dayThemes,
-          activeHabits: ref.read(habitsProvider).where((h) => h.status == HabitStatus.active).toList(),
+          activeHabits: ref
+              .read(habitsProvider)
+              .where((h) => h.status == HabitStatus.active)
+              .toList(),
         );
 
     final frontmatter = MarkdownParser.parseFrontmatter(content);
@@ -2244,6 +2367,7 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
 
     entry.obsidianPath = relativePath;
     final replacement = _dailyMapForEntry(entry, dateStr);
+    await _applyMoodToDailyFrontmatter(frontmatter, entry);
 
     final index = _findEntryIndex(entries, sourceEntry);
     if (index >= 0) {
@@ -2261,6 +2385,8 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
       entries: entries,
       tasks: tasks,
       habits: habits,
+      habitLabels: _habitLabelsFromRef(ref),
+      pactHabitSlugs: _pactHabitSlugsFromRef(ref),
       trackers: trackers,
       pomodoros: pomodoros,
     );
@@ -2326,6 +2452,8 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
       entries: entries,
       tasks: tasks,
       habits: habits,
+      habitLabels: _habitLabelsFromRef(ref),
+      pactHabitSlugs: _pactHabitSlugsFromRef(ref),
       trackers: trackers,
       pomodoros: pomodoros,
     );
@@ -2384,7 +2512,7 @@ class VaultNotifier extends Notifier<void> {
 
   String _defaultFolderForSignature(String type) {
     return switch (type) {
-      'mood_definition'   => 'moods',
+      'mood_definition' => 'moods',
       'combined_analysis' => 'analyses',
       _ => 'app',
     };
@@ -2581,7 +2709,9 @@ class VaultNotifier extends Notifier<void> {
 
     if (oldPath != pathToCheck) {
       while (true) {
-        final collision = allObjects.any((o) => o.id != object.id && o.obsidianPath == pathToCheck);
+        final collision = allObjects.any(
+          (o) => o.id != object.id && o.obsidianPath == pathToCheck,
+        );
         if (!collision) {
           if (await obsidianService.fileExists(pathToCheck)) {
             try {
@@ -2594,13 +2724,17 @@ class VaultNotifier extends Notifier<void> {
               }
             } catch (_) {}
             suffixCounter++;
-            pathToCheck = folder.isNotEmpty ? '$folder/$filename-$suffixCounter.md' : '$filename-$suffixCounter.md';
+            pathToCheck = folder.isNotEmpty
+                ? '$folder/$filename-$suffixCounter.md'
+                : '$filename-$suffixCounter.md';
             continue;
           }
           break;
         }
         suffixCounter++;
-        pathToCheck = folder.isNotEmpty ? '$folder/$filename-$suffixCounter.md' : '$filename-$suffixCounter.md';
+        pathToCheck = folder.isNotEmpty
+            ? '$folder/$filename-$suffixCounter.md'
+            : '$filename-$suffixCounter.md';
       }
     }
     relativePath = pathToCheck;
@@ -2633,7 +2767,7 @@ class VaultNotifier extends Notifier<void> {
       ].join('\n\n');
     } else if (object is CombinedAnalysis) {
       final trackerBlock = DataviewGenerator.generateTrackerPluginBlock(object);
-      
+
       final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
       final entries = ref.read(allEntriesProvider);
       final pomodoros = ref.read(pomodoroProvider).history;
@@ -2642,19 +2776,38 @@ class VaultNotifier extends Notifier<void> {
       final today = DateTime.now();
       final dateRange = object.defaultDateRange;
       if (dateRange != null) {
-        var current = DateTime(dateRange.start.year, dateRange.start.month, dateRange.start.day);
-        final end = DateTime(dateRange.end.year, dateRange.end.month, dateRange.end.day);
+        var current = DateTime(
+          dateRange.start.year,
+          dateRange.start.month,
+          dateRange.start.day,
+        );
+        final end = DateTime(
+          dateRange.end.year,
+          dateRange.end.month,
+          dateRange.end.day,
+        );
         while (!current.isAfter(end)) {
           dates.add(current);
           current = current.add(const Duration(days: 1));
         }
       } else {
         for (int i = 0; i < 14; i++) {
-          dates.add(DateTime(today.year, today.month, today.day).subtract(Duration(days: 13 - i)));
+          dates.add(
+            DateTime(
+              today.year,
+              today.month,
+              today.day,
+            ).subtract(Duration(days: 13 - i)),
+          );
         }
       }
 
-      final List<String> labels = dates.map((d) => '${d.day.toString().padLeft(2, "0")}/${d.month.toString().padLeft(2, "0")}').toList();
+      final List<String> labels = dates
+          .map(
+            (d) =>
+                '${d.day.toString().padLeft(2, "0")}/${d.month.toString().padLeft(2, "0")}',
+          )
+          .toList();
 
       final List<List<num>> seriesData = [];
       for (final source in object.dataSources) {
@@ -2742,7 +2895,13 @@ class VaultNotifier extends Notifier<void> {
         if (dayEntries.isNotEmpty) {
           final moods = allObjects.whereType<MoodDefinition>().toList();
           final values = dayEntries
-              .map((entry) => moods.where((m) => m.id == entry.moodSlug || m.slug == entry.moodSlug).firstOrNull)
+              .map(
+                (entry) => moods
+                    .where(
+                      (m) => m.id == entry.moodSlug || m.slug == entry.moodSlug,
+                    )
+                    .firstOrNull,
+              )
               .whereType<MoodDefinition>()
               .map((mood) {
                 if (source.dimension == 'energy') {
@@ -2760,7 +2919,10 @@ class VaultNotifier extends Notifier<void> {
         return null;
 
       case MetricType.habit:
-        final habit = allObjects.whereType<Habit>().where((h) => h.id == source.id).firstOrNull;
+        final habit = allObjects
+            .whereType<Habit>()
+            .where((h) => h.id == source.id)
+            .firstOrNull;
         if (habit == null) return null;
         final record = habit.completionHistory
             .where(
@@ -2840,7 +3002,11 @@ class VaultNotifier extends Notifier<void> {
     }
   }
 
-  bool _recordBelongsToTracker(TrackingRecord record, String trackerId, List<ContentObject> allObjects) {
+  bool _recordBelongsToTracker(
+    TrackingRecord record,
+    String trackerId,
+    List<ContentObject> allObjects,
+  ) {
     if (record.trackerId == trackerId) return true;
     final tracker = allObjects
         .whereType<TrackerDefinition>()

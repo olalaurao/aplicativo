@@ -20,6 +20,9 @@ abstract class ContentObject {
   List<ReminderConfig> reminders;
   int? order;
   String? snippet;
+  /// WikiLinks externos referenciados por este objeto (PARTE 16 + 20).
+  /// Gravados como lista de strings `[[slug]]` no frontmatter `links:`.
+  List<String> links;
 
   // Conflict fields
   bool hasTypeConflict = false;
@@ -40,12 +43,14 @@ abstract class ContentObject {
     this.pinned = false,
     this.order,
     List<ReminderConfig>? reminders,
+    List<String>? links,
   }) : id = id ?? const Uuid().v4(),
        organizers = organizers ?? [],
        categories = categories ?? [],
        tags = tags ?? [],
        aliases = aliases ?? [],
        reminders = reminders ?? [],
+       links = links ?? [],
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
 
@@ -67,6 +72,7 @@ abstract class ContentObject {
       'order': order,
       'organizers': organizers.map((o) => o.toWikiLink()).toList(),
       'reminders': reminders.map((r) => r.toMap()).toList(),
+      if (links.isNotEmpty) 'links': links,
     };
   }
 
@@ -96,6 +102,9 @@ abstract class ContentObject {
             (r) => ReminderConfig.fromMap(Map<String, dynamic>.from(r as Map)),
           )
           .toList();
+    }
+    if (map['links'] != null && map['links'] is List) {
+      links = List<String>.from(map['links'] as List);
     }
   }
 

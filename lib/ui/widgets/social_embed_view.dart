@@ -14,10 +14,7 @@ import 'social_native_video_player.dart';
 import 'social_post_grid_card.dart';
 
 class SocialEmbedView extends StatefulWidget {
-  const SocialEmbedView({
-    super.key,
-    required this.post,
-  });
+  const SocialEmbedView({super.key, required this.post});
 
   final SocialPost post;
 
@@ -46,6 +43,7 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
       SocialPlatform.pinterest => 400,
       SocialPlatform.twitter => 280,
       SocialPlatform.linkedin => 260,
+      SocialPlatform.reddit => 400,
       SocialPlatform.substack => MediaQuery.of(context).size.height * 0.7,
       SocialPlatform.other => 400,
     };
@@ -125,6 +123,12 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
       return;
     }
 
+    if (widget.post.platform == SocialPlatform.tiktok &&
+        widget.post.mediaType == SocialMediaType.carousel) {
+      _timeout?.cancel();
+      return;
+    }
+
     if (widget.post.platform == SocialPlatform.tiktok) {
       // Tentar embed antes de mostrar erro (imagens, carousels, etc.)
       final embedUrl = _embedUrlFor(widget.post);
@@ -141,6 +145,9 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
     final embedUrl = _embedUrlFor(widget.post);
     if (widget.post.platform == SocialPlatform.substack) {
       _controller.loadRequest(Uri.parse(widget.post.url));
+    } else if (widget.post.platform == SocialPlatform.reddit) {
+      _timeout?.cancel();
+      _hasError = true;
     } else if (embedUrl != null && embedUrl.isNotEmpty) {
       _controller.loadHtmlString(
         _buildEmbedHtml(widget.post, embedUrl: embedUrl),
@@ -169,6 +176,10 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
     }
 
     if (_resolvingVideo) return _buildResolvingVideo();
+    if (widget.post.platform == SocialPlatform.tiktok &&
+        widget.post.mediaType == SocialMediaType.carousel) {
+      return _buildTikTokPhotoCarousel(context);
+    }
     if (_hasError) return _buildFallback(context);
 
     return SizedBox(
@@ -238,6 +249,60 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
     );
   }
 
+  Widget _buildTikTokPhotoCarousel(BuildContext context) {
+    return SizedBox(
+      height: _height,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            GestureDetector(
+              onTap: _openImagePreview,
+              child: SocialPostThumbnail(
+                post: widget.post,
+                iconSize: 48,
+                borderRadius: BorderRadius.zero,
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.photo_library_rounded,
+                      color: Colors.white,
+                      size: 13,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      'Carrossel',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _openOriginal() async {
     final uri = Uri.tryParse(widget.post.url);
     if (uri != null) {
@@ -263,8 +328,7 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
     // Verificar cache em memória (TTL: 2h)
     final postId = widget.post.id;
     final cached = SocialEmbedView._videoCache[postId];
-    if (cached != null &&
-        DateTime.now().difference(cached.$2).inHours < 2) {
+    if (cached != null && DateTime.now().difference(cached.$2).inHours < 2) {
       if (mounted) setState(() => _resolvedVideoUrl = cached.$1);
       return true;
     }

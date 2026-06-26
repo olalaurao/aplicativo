@@ -203,7 +203,6 @@ class NotificationService with WidgetsBindingObserver {
     _checkPendingPayloadFromNative();
   }
 
-
   /// Handle a notification that launched the app via fullScreenIntent.
   void _handleFullScreenLaunch(NotificationResponse response) {
     if (_navigatorKey?.currentState == null) {
@@ -494,6 +493,10 @@ class NotificationService with WidgetsBindingObserver {
     DateTime? triggerTime,
     String? payload,
   }) async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      debugPrint('NotificationService: skipping schedule on desktop platform');
+      return;
+    }
     final time = triggerTime ?? config.triggerTime;
     if (time == null || time.isBefore(DateTime.now())) return;
 
@@ -727,6 +730,12 @@ class NotificationService with WidgetsBindingObserver {
     required String body,
     String? payload,
   }) async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      debugPrint(
+        'NotificationService: skipping immediate notification on desktop platform',
+      );
+      return;
+    }
     const androidDetails = AndroidNotificationDetails(
       'immediate_channel_v2',
       'Immediate Notifications',
@@ -759,6 +768,12 @@ class NotificationService with WidgetsBindingObserver {
   }
 
   Future<void> showQuickCaptureNotification() async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      debugPrint(
+        'NotificationService: skipping quick capture notification on desktop platform',
+      );
+      return;
+    }
     const androidDetails = AndroidNotificationDetails(
       'quick_capture_channel_v2',
       'Quick Capture',
@@ -803,6 +818,12 @@ class NotificationService with WidgetsBindingObserver {
   }
 
   Future<void> scheduleWeeklyReviewNotifications() async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      debugPrint(
+        'NotificationService: skipping weekly review notifications on desktop platform',
+      );
+      return;
+    }
     await _scheduleWeeklyReviewNotification(
       id: 999991,
       weekday: DateTime.friday,
@@ -877,6 +898,7 @@ class NotificationService with WidgetsBindingObserver {
 
   Future<void> cancelNotification(int id) async {
     _cancelForegroundTimer(id);
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return;
     await _notifications.cancel(id);
   }
 
@@ -887,7 +909,9 @@ class NotificationService with WidgetsBindingObserver {
     _foregroundTimers.clear();
     _foregroundEntries.clear();
 
-    await _notifications.cancelAll();
+    if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
+      await _notifications.cancelAll();
+    }
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('notification_actions');
@@ -899,6 +923,7 @@ class NotificationService with WidgetsBindingObserver {
     }
     _foregroundTimers.clear();
     _foregroundEntries.clear();
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return;
     await _notifications.cancelAll();
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/vault_provider.dart';
@@ -6,6 +7,7 @@ import '../../providers/settings_provider.dart';
 import '../../models/resource_model.dart';
 import '../../models/saved_filter.dart';
 import '../../services/markdown_parser.dart';
+import '../../services/resource_metadata_service.dart';
 import '../theme.dart';
 import '../forms/create_resource_form.dart';
 import '../widgets/empty_state.dart';
@@ -25,7 +27,8 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   ResourceViewMode _resourceViewMode = ResourceViewMode.shelfHighlights;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  
+  bool _clipboardBannerShown = false;
+
   SavedFilter? _activeFilter;
   List<SavedFilter> _savedFilters = [];
 
@@ -33,7 +36,10 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() => _savedFilters = ref.read(settingsProvider).filtersFor('resource'));
+      setState(
+        () => _savedFilters = ref.read(settingsProvider).filtersFor('resource'),
+      );
+      _checkClipboardUrl();
     });
   }
 
@@ -48,25 +54,42 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
       if (_searchQuery.isEmpty) return true;
       final res = item as Resource;
       final haystack = [
-        res.title, res.author, res.category, res.resourceType,
-        res.synopsis, ...res.tags, ...res.aliases,
+        res.title,
+        res.author,
+        res.category,
+        res.resourceType,
+        res.synopsis,
+        ...res.tags,
+        ...res.aliases,
       ].whereType<String>().join(' ').toLowerCase();
       return haystack.contains(_searchQuery.toLowerCase());
     }).toList();
 
     final sort = _activeFilter?.sortBy ?? SortField.modified;
-    final asc  = _activeFilter?.sortAscending ?? false;
+    final asc = _activeFilter?.sortAscending ?? false;
     result.sort((a, b) {
       final cmp = switch (sort) {
-        SortField.title    => (a as dynamic).title.compareTo((b as dynamic).title),
-        SortField.created  => ((a as dynamic).createdAt ?? DateTime(0))
-                                .compareTo((b as dynamic).createdAt ?? DateTime(0)),
-        SortField.modified => ((a as dynamic).updatedAt ?? DateTime(0))
-                                .compareTo((b as dynamic).updatedAt ?? DateTime(0)),
-        SortField.manual   => ((a as dynamic).order ?? 0).compareTo((b as dynamic).order ?? 0),
-        SortField.rating   => ((a as dynamic).rating ?? 0).compareTo((b as dynamic).rating ?? 0),
-        SortField.status   => ((a as dynamic).status?.name ?? '').compareTo((b as dynamic).status?.name ?? ''),
-        SortField.type     => ((a as dynamic).resourceType ?? '').compareTo((b as dynamic).resourceType ?? ''),
+        SortField.title => (a as dynamic).title.compareTo((b as dynamic).title),
+        SortField.created =>
+          ((a as dynamic).createdAt ?? DateTime(0)).compareTo(
+            (b as dynamic).createdAt ?? DateTime(0),
+          ),
+        SortField.modified =>
+          ((a as dynamic).updatedAt ?? DateTime(0)).compareTo(
+            (b as dynamic).updatedAt ?? DateTime(0),
+          ),
+        SortField.manual => ((a as dynamic).order ?? 0).compareTo(
+          (b as dynamic).order ?? 0,
+        ),
+        SortField.rating => ((a as dynamic).rating ?? 0).compareTo(
+          (b as dynamic).rating ?? 0,
+        ),
+        SortField.status => ((a as dynamic).status?.name ?? '').compareTo(
+          (b as dynamic).status?.name ?? '',
+        ),
+        SortField.type => ((a as dynamic).resourceType ?? '').compareTo(
+          (b as dynamic).resourceType ?? '',
+        ),
         _ => 0,
       };
       return asc ? cmp : -cmp;
@@ -75,7 +98,8 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   }
 
   void _openFilterSheet() => FilterSortSheet.show(
-    context: context, ref: ref,
+    context: context,
+    ref: ref,
     targetType: 'resource',
     currentFilter: _activeFilter,
     availableProperties: ResourceFilterProperties.all,
@@ -89,7 +113,8 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
           _resourceViewMode = ResourceViewMode.listHighlights;
         }
       }
-    }));
+    }),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -117,10 +142,16 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                       : Icons.grid_view_rounded,
                 ),
                 onPressed: () => setState(() {
-                  _resourceViewMode = _resourceViewMode == ResourceViewMode.shelfHighlights
+                  _resourceViewMode =
+                      _resourceViewMode == ResourceViewMode.shelfHighlights
                       ? ResourceViewMode.listHighlights
                       : ResourceViewMode.shelfHighlights;
                 }),
+              ),
+              IconButton(
+                icon: const Icon(Icons.content_paste_search_rounded),
+                tooltip: 'Importar link',
+                onPressed: _importFromClipboardOrPrompt,
               ),
               IconButton(
                 icon: const Icon(Icons.add_link_rounded),
@@ -135,9 +166,18 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Row(
                 children: [
-                  _chip('Todos', _activeFilter == null, () => setState(() => _activeFilter = null)),
-                  ..._savedFilters.map((f) => _chip(f.name, _activeFilter?.id == f.id,
-                    () => setState(() => _activeFilter = f))),
+                  _chip(
+                    'Todos',
+                    _activeFilter == null,
+                    () => setState(() => _activeFilter = null),
+                  ),
+                  ..._savedFilters.map(
+                    (f) => _chip(
+                      f.name,
+                      _activeFilter?.id == f.id,
+                      () => setState(() => _activeFilter = f),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -176,17 +216,31 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     );
   }
 
-  Widget _chip(String label, bool selected, VoidCallback onTap) => GestureDetector(
-    onTap: onTap,
-    child: AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      margin: const EdgeInsets.only(right: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-      decoration: BoxDecoration(
-        color: selected ? AppColors.primary : AppTheme.surfaceVariantColor(context),
-        borderRadius: BorderRadius.circular(20)),
-      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-        color: selected ? Colors.black : AppTheme.textSecondaryColor(context)))));
+  Widget _chip(String label, bool selected, VoidCallback onTap) =>
+      GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.only(right: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.primary
+                : AppTheme.surfaceVariantColor(context),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: selected
+                  ? Colors.black
+                  : AppTheme.textSecondaryColor(context),
+            ),
+          ),
+        ),
+      );
 
   Widget _buildSearchField() {
     return Padding(
@@ -214,45 +268,96 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   }
 
   Widget _buildShelf(List<Resource> resources) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(padding: const EdgeInsets.fromLTRB(16,12,16,6),
-        child: Text('RECENTES', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
-          letterSpacing: 0.10, color: AppTheme.textMutedColor(context)))),
-      SizedBox(height: 108, child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: resources.take(8).length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
-        itemBuilder: (ctx, i) => _buildShelfItem(ctx, resources.take(8).toList()[i]))),
-    ]);
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+        child: Text(
+          'RECENTES',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.10,
+            color: AppTheme.textMutedColor(context),
+          ),
+        ),
+      ),
+      SizedBox(
+        height: 108,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: resources.take(8).length,
+          separatorBuilder: (context, index) => const SizedBox(width: 8),
+          itemBuilder: (ctx, i) =>
+              _buildShelfItem(ctx, resources.take(8).toList()[i]),
+        ),
+      ),
+    ],
+  );
 
-  Widget _buildShelfItem(BuildContext context, Resource resource) =>
-    GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(
-        builder: (_) => UniversalDetailView(object: resource))),
-      child: SizedBox(width: 72, child: Column(children: [
-        Container(
-          width: 72, height: 72, clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(10),
-            color: AppColors.surfaceVariant),
-          child: resource.coverImage?.isNotEmpty == true
-            ? Image.network(resource.coverImage!, fit: BoxFit.cover,
-                errorBuilder: (ctx, err, stack) => _fallbackIcon(resource))
-            : _fallbackIcon(resource)),
-        const SizedBox(height: 4),
-        Text(resource.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700)),
-        Text(resource.author ?? '', maxLines: 1, overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 8, color: AppTheme.textMutedColor(context))),
-      ])));
+  Widget _buildShelfItem(
+    BuildContext context,
+    Resource resource,
+  ) => GestureDetector(
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => UniversalDetailView(object: resource)),
+    ),
+    child: SizedBox(
+      width: 72,
+      child: Column(
+        children: [
+          SizedBox(
+            width: 64,
+            child: AspectRatio(
+              aspectRatio: 1 / 1.414,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: resource.coverImage?.isNotEmpty == true
+                    ? Image.network(
+                        resource.coverImage!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, err, stack) =>
+                            _fallbackIcon(resource),
+                      )
+                    : _fallbackIcon(resource),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            resource.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700),
+          ),
+          Text(
+            resource.author ?? '',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 8,
+              color: AppTheme.textMutedColor(context),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 
   Widget _fallbackIcon(Resource r) {
     final emoji = switch (r.resourceType.toLowerCase()) {
-      'book' || 'livro' => '📗', 'podcast' => '🎙️',
-      'movie' || 'filme' => '🎬', 'article' => '📄', _ => '📚',
+      'book' || 'livro' => '📗',
+      'podcast' => '🎙️',
+      'movie' || 'filme' => '🎬',
+      'article' => '📄',
+      _ => '📚',
     };
-    return Container(color: AppColors.surfaceVariant,
-      child: Center(child: Text(emoji, style: const TextStyle(fontSize: 28))));
+    return Container(
+      color: AppColors.surfaceVariant,
+      child: Center(child: Text(emoji, style: const TextStyle(fontSize: 28))),
+    );
   }
 
   Widget _buildHighlightsFeed(List<Resource> resources) {
@@ -260,46 +365,95 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     for (final r in resources) {
       if (r.synopsis == null || r.synopsis!.isEmpty) continue;
       final hls = MarkdownParser.extractHighlights(r.synopsis!);
-      highlights.addAll(hls.take(2).map((h) => (r: r, text: h.text, tag: h.tag)));
+      highlights.addAll(
+        hls.take(2).map((h) => (r: r, text: h.text, tag: h.tag)),
+      );
     }
     if (highlights.isEmpty) return const SizedBox.shrink();
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(padding: const EdgeInsets.fromLTRB(16,16,16,8),
-        child: Text('✨ HIGHLIGHTS RECENTES', style: TextStyle(fontSize: 10,
-          fontWeight: FontWeight.w700, letterSpacing: 0.10,
-          color: AppTheme.textMutedColor(context)))),
-      ...highlights.map((hl) => Padding(
-        padding: const EdgeInsets.fromLTRB(16,0,16,8),
-        child: GestureDetector(
-          onTap: () => Navigator.push(context, MaterialPageRoute(
-            builder: (_) => UniversalDetailView(object: hl.r))),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: _resourceColor(hl.r).withValues(alpha: 0.08),
-              border: Border(left: BorderSide(color: _resourceColor(hl.r), width: 2)),
-              borderRadius: const BorderRadius.only(
-                topRight: Radius.circular(8), bottomRight: Radius.circular(8))),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${_resourceEmoji(hl.r)} ${hl.r.title}${hl.tag != null ? " · #${hl.tag}" : ""}',
-                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700,
-                  color: _resourceColor(hl.r))),
-              const SizedBox(height: 3),
-              Text('"${hl.text}"', style: TextStyle(fontSize: 10,
-                color: AppTheme.textSecondaryColor(context),
-                height: 1.55, fontStyle: FontStyle.italic)),
-            ]))))),
-    ]);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Text(
+            '✨ HIGHLIGHTS RECENTES',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.10,
+              color: AppTheme.textMutedColor(context),
+            ),
+          ),
+        ),
+        ...highlights.map(
+          (hl) => Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => UniversalDetailView(object: hl.r),
+                ),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: _resourceColor(hl.r).withValues(alpha: 0.08),
+                  border: Border(
+                    left: BorderSide(color: _resourceColor(hl.r), width: 2),
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topRight: Radius.circular(8),
+                    bottomRight: Radius.circular(8),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${_resourceEmoji(hl.r)} ${hl.r.title}${hl.tag != null ? " · #${hl.tag}" : ""}',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: _resourceColor(hl.r),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '"${hl.text}"',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppTheme.textSecondaryColor(context),
+                        height: 1.55,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Color _resourceColor(Resource r) => switch (r.resourceType.toLowerCase()) {
-    'podcast' => AppColors.info, 'book' || 'livro' => AppColors.primary,
-    _ => AppColors.habitPurple };
+    'podcast' => AppColors.info,
+    'book' || 'livro' => AppColors.primary,
+    _ => AppColors.habitPurple,
+  };
 
   String _resourceEmoji(Resource r) => switch (r.resourceType.toLowerCase()) {
-    'book' || 'livro' => '📗', 'podcast' => '🎙️',
-    'movie' || 'filme' => '🎬', 'article' => '📄', _ => '📚',
+    'book' || 'livro' => '📗',
+    'podcast' => '🎙️',
+    'movie' || 'filme' => '🎬',
+    'article' => '📄',
+    _ => '📚',
   };
 
   Widget _buildResourceListTile(BuildContext context, Resource resource) {
@@ -311,26 +465,22 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
         margin: const EdgeInsets.only(bottom: 12),
         decoration: AppTheme.cardDecoration(context),
         child: ListTile(
-          leading: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(8),
-              image:
-                  resource.coverImage != null &&
-                      resource.coverImage!.isNotEmpty
-                  ? DecorationImage(
-                      image: NetworkImage(resource.coverImage!),
-                      fit: BoxFit.cover,
-                      onError: (_, _) {},
-                    )
-                  : null,
+          leading: SizedBox(
+            width: 40,
+            child: AspectRatio(
+              aspectRatio: 1 / 1.414,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: resource.coverImage?.isNotEmpty == true
+                    ? Image.network(
+                        resource.coverImage!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            _fallbackIcon(resource),
+                      )
+                    : _fallbackIcon(resource),
+              ),
             ),
-            child:
-                resource.coverImage == null || resource.coverImage!.isEmpty
-                ? _fallbackIcon(resource)
-                : null,
           ),
           title: Text(
             resource.title,
@@ -379,6 +529,111 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const CreateResourceForm()),
+    );
+  }
+
+  Future<void> _checkClipboardUrl() async {
+    if (_clipboardBannerShown || !mounted) return;
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text?.trim() ?? '';
+    final uri = Uri.tryParse(text);
+    if (text.isEmpty || uri == null || !uri.hasScheme) return;
+    if (!ResourceMetadataService.isResourceUrl(text)) return;
+
+    final source = ResourceMetadataService.detectSource(text);
+    _clipboardBannerShown = true;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showMaterialBanner(
+      MaterialBanner(
+        leading: const Icon(Icons.link_rounded),
+        content: Text(
+          'Link de ${_sourceLabel(source)} detectado. Importar como recurso?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+            child: const Text('Ignorar'),
+          ),
+          TextButton(
+            onPressed: () {
+              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CreateResourceForm(initialUrl: text),
+                ),
+              );
+            },
+            child: const Text('Importar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _sourceLabel(ResourceSource source) {
+    return switch (source) {
+      ResourceSource.openLibrary => 'OpenLibrary',
+      ResourceSource.googleBooks => 'Google Books',
+      ResourceSource.imdb => 'IMDB',
+      ResourceSource.amazon => 'Amazon',
+      ResourceSource.goodreads => 'Goodreads',
+      ResourceSource.unknown => 'web',
+    };
+  }
+
+  Future<void> _importFromClipboardOrPrompt() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final url = data?.text?.trim() ?? '';
+    if (url.isNotEmpty && ResourceMetadataService.isResourceUrl(url)) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => CreateResourceForm(initialUrl: url)),
+      );
+      return;
+    }
+    if (!mounted) return;
+    await _showUrlInputDialog(context);
+  }
+
+  Future<void> _showUrlInputDialog(BuildContext context) async {
+    final controller = TextEditingController();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Importar link'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Cole um link de livro, filme ou série',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                final url = controller.text.trim();
+                if (!ResourceMetadataService.isResourceUrl(url)) return;
+                Navigator.pop(dialogContext);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CreateResourceForm(initialUrl: url),
+                  ),
+                );
+              },
+              child: const Text('Buscar'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

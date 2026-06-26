@@ -8,6 +8,15 @@ import '../models/social_post.dart';
 import 'tiktok_video_resolver.dart';
 
 class OEmbedService {
+  static const Map<String, String> _browserHeaders = {
+    'User-Agent':
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) '
+        'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 '
+        'Mobile/15E148 Safari/604.1',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+  };
+
   static SocialPlatform detectPlatform(String url) {
     final lower = url.toLowerCase();
     if (lower.contains('tiktok.com')) return SocialPlatform.tiktok;
@@ -22,6 +31,9 @@ class OEmbedService {
     }
     if (lower.contains('twitter.com') || lower.contains('x.com')) {
       return SocialPlatform.twitter;
+    }
+    if (lower.contains('reddit.com') || lower.contains('redd.it')) {
+      return SocialPlatform.reddit;
     }
     return SocialPlatform.other;
   }
@@ -47,6 +59,7 @@ class OEmbedService {
       SocialPlatform.substack => SocialMediaType.article,
       SocialPlatform.linkedin => SocialMediaType.other,
       SocialPlatform.pinterest => SocialMediaType.image,
+      SocialPlatform.reddit => SocialMediaType.image,
       SocialPlatform.twitter || SocialPlatform.other => SocialMediaType.other,
     };
   }
@@ -54,7 +67,9 @@ class OEmbedService {
   static String? buildEmbedUrl(SocialPlatform platform, String originalUrl) {
     switch (platform) {
       case SocialPlatform.tiktok:
-        final id = RegExp(r'/video/(\d+)').firstMatch(originalUrl)?.group(1);
+        final id = RegExp(
+          r'/(?:video|photo)/(\d+)',
+        ).firstMatch(originalUrl)?.group(1);
         return id == null ? null : 'https://www.tiktok.com/embed/v2/$id';
       case SocialPlatform.instagram:
         final shortcode = RegExp(
@@ -82,6 +97,8 @@ class OEmbedService {
         return id == null
             ? null
             : 'https://platform.twitter.com/embed/Tweet.html?id=$id';
+      case SocialPlatform.reddit:
+        return null;
       case SocialPlatform.other:
         return null;
     }
@@ -115,7 +132,10 @@ class OEmbedService {
         SocialPlatform.youtube => _fetchOEmbed(
           'https://www.youtube.com/oembed?url=${Uri.encodeComponent(normalizedUrl)}&format=json',
         ),
-        SocialPlatform.instagram ||
+        SocialPlatform.instagram => _fetchInstagram(normalizedUrl),
+        SocialPlatform.reddit => _fetchOEmbed(
+          'https://www.reddit.com/oembed?url=${Uri.encodeComponent(normalizedUrl)}',
+        ),
         SocialPlatform.substack ||
         SocialPlatform.linkedin ||
         SocialPlatform.twitter ||
@@ -195,7 +215,7 @@ class OEmbedService {
   Future<Map<String, dynamic>?> _fetchOEmbed(String oembedUrl) async {
     try {
       final response = await http
-          .get(Uri.parse(oembedUrl))
+          .get(Uri.parse(oembedUrl), headers: _browserHeaders)
           .timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
@@ -210,19 +230,8 @@ class OEmbedService {
   Future<Map<String, dynamic>?> _fetchOpenGraph(String url) async {
     try {
       final response = await http
-          .get(
-            Uri.parse(url),
-            headers: const {
-              'User-Agent':
-                  'Mozilla/5.0 (Linux; Android 13; SM-A546E) '
-                  'AppleWebKit/537.36 (KHTML, like Gecko) '
-                  'Chrome/124.0.0.0 Mobile Safari/537.36',
-              'Accept':
-                  'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-              'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-            },
-          )
-          .timeout(const Duration(seconds: 10));
+          .get(Uri.parse(url), headers: _browserHeaders)
+          .timeout(const Duration(seconds: 12));
       if (response.statusCode != 200) {
         debugPrint('OpenGraph failed ${response.statusCode}: $url');
         return null;
@@ -234,12 +243,79 @@ class OEmbedService {
         final value = _metaContent(html, 'og:$key');
         if (value != null) result[key] = value;
       }
+      result['image'] ??= _extractJsonLdImage(html);
       result['title'] ??= _titleTag(html);
       return result.isEmpty ? null : result;
     } catch (error) {
       debugPrint('OpenGraph request failed: $error');
       return null;
     }
+  }
+
+  Future<Map<String, dynamic>?> _fetchInstagram(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.path.isEmpty) return _fetchOpenGraph(url);
+    final cleanPath = uri.path.endsWith('/') ? uri.path : '${uri.path}/';
+    final embedPageUrl =
+        'https://www.instagram.com${cleanPath}embed/captioned/';
+
+    try {
+      final response = await http
+          .get(Uri.parse(embedPageUrl), headers: _browserHeaders)
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final html = response.body;
+        final image =
+            RegExp(
+              r'''<img[^>]*class=["'][^"']*EmbeddedMediaImage[^"']*["'][^>]*src=["']([^"']+)["']''',
+              caseSensitive: false,
+            ).firstMatch(html)?.group(1) ??
+            _metaContent(html, 'og:image') ??
+            _extractJsonLdImage(html);
+        final caption = _metaContent(html, 'og:description');
+        if (image != null && image.trim().isNotEmpty) {
+          final result = {
+            'image': _decodeHtml(image),
+            'title': caption ?? 'Instagram post',
+            'site_name': 'Instagram',
+          };
+          if (caption != null) result['description'] = caption;
+          return result;
+        }
+      } else {
+        debugPrint('Instagram embed failed ${response.statusCode}: $url');
+      }
+    } catch (error) {
+      debugPrint('Instagram embed-page fetch failed: $error');
+    }
+
+    return _fetchOpenGraph(url);
+  }
+
+  static String? _extractJsonLdImage(String html) {
+    final matches = RegExp(
+      r'''<script[^>]*type=["']application/ld\+json["'][^>]*>(.*?)</script>''',
+      caseSensitive: false,
+      dotAll: true,
+    ).allMatches(html);
+    for (final match in matches) {
+      try {
+        final data = jsonDecode(match.group(1)!.trim());
+        final image = data is Map ? data['image'] : null;
+        if (image is String && image.trim().isNotEmpty) {
+          return _decodeHtml(image);
+        }
+        if (image is List && image.isNotEmpty) {
+          return _decodeHtml(image.first.toString());
+        }
+        if (image is Map && image['url'] != null) {
+          return _decodeHtml(image['url'].toString());
+        }
+      } catch (error) {
+        debugPrint('JSON-LD image parse failed: $error');
+      }
+    }
+    return null;
   }
 
   static String? _metaContent(String html, String property) {

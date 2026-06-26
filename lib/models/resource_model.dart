@@ -6,6 +6,7 @@ enum ResourceStatus { toConsume, inProgress, completed, dropped }
 
 class Resource extends ContentObject {
   String? coverImage;
+  String? sourceUrl;
   String resourceType; // Book, Movie, etc.
   ResourceStatus status;
   int rating; // 1-5 or 1-10
@@ -22,6 +23,7 @@ class Resource extends ContentObject {
     required super.title,
     required this.resourceType,
     this.coverImage,
+    this.sourceUrl,
     this.status = ResourceStatus.toConsume,
     this.rating = 0,
     this.synopsis,
@@ -47,6 +49,7 @@ class Resource extends ContentObject {
     final frontmatter = toBaseMap();
     frontmatter['resource_type'] = resourceType;
     if (coverImage != null) frontmatter['cover'] = coverImage;
+    if (sourceUrl != null) frontmatter['source_url'] = sourceUrl;
     frontmatter['status'] = status.name;
     frontmatter['rating'] = rating;
     if (author != null) frontmatter['author'] = author;
@@ -73,6 +76,7 @@ class Resource extends ContentObject {
     resource.coverImage = _stringValue(
       frontmatter['cover'] ?? frontmatter['cover_image'],
     );
+    resource.sourceUrl = _stringValue(frontmatter['source_url']);
     final rawStatus = _stringValue(frontmatter['status'])?.toLowerCase();
     if (rawStatus != null) {
       resource.status = ResourceStatus.values.firstWhere(
@@ -102,6 +106,7 @@ class Resource extends ContentObject {
     String? title,
     String? resourceType,
     String? coverImage,
+    String? sourceUrl,
     ResourceStatus? status,
     int? rating,
     String? synopsis,
@@ -123,6 +128,7 @@ class Resource extends ContentObject {
       title: title ?? this.title,
       resourceType: resourceType ?? this.resourceType,
       coverImage: coverImage ?? this.coverImage,
+      sourceUrl: sourceUrl ?? this.sourceUrl,
       status: status ?? this.status,
       rating: rating ?? this.rating,
       synopsis: synopsis ?? this.synopsis,

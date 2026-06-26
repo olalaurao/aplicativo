@@ -293,6 +293,32 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
               border: InputBorder.none,
             ),
           ),
+          if (!_isFetching && !_hasThumbnail(draft)) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'Não conseguimos buscar a imagem automaticamente.',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: AppColors.warning, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                TextButton.icon(
+                  onPressed: _retryFetch,
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Tentar novamente'),
+                ),
+                TextButton.icon(
+                  onPressed: _showManualImageUrlDialog,
+                  icon: const Icon(Icons.link_rounded, size: 16),
+                  label: const Text('Colar link da imagem'),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -515,6 +541,46 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
     }
   }
 
+  Future<void> _retryFetch() => _fetchMetadata();
+
+  Future<void> _showManualImageUrlDialog() async {
+    final controller = TextEditingController();
+    final imageUrl = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Colar link da imagem'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.url,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'https://...'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Usar imagem'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (imageUrl == null || imageUrl.trim().isEmpty || !mounted) return;
+    final base = _draft ?? _fallbackDraft();
+    final currentMedia = base.mediaUrls
+        .where((url) => url.trim().isNotEmpty && url.trim() != imageUrl)
+        .toList();
+    setState(() {
+      _draft = base.copyWith(
+        thumbnailUrl: imageUrl,
+        mediaUrls: [imageUrl, ...currentMedia],
+      );
+    });
+  }
+
   void _unlockUrl() {
     setState(() {
       _urlLocked = false;
@@ -648,6 +714,10 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
       mediaType: OEmbedService.detectMediaType(platform, url),
       embedUrl: OEmbedService.buildEmbedUrl(platform, url),
     );
+  }
+
+  bool _hasThumbnail(SocialPost post) {
+    return socialPostImageSource(post)?.trim().isNotEmpty == true;
   }
 
   Future<void> _pickLinkedObject() async {
@@ -869,7 +939,10 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
     final target = object.obsidianFileName.trim().isNotEmpty
         ? object.obsidianFileName
         : object.slug;
-    return '[[${target.isEmpty ? object.id : target}]]';
+    if (target.isNotEmpty) {
+      return '[[$target]]';
+    }
+    return '[[${object.slug}]]';
   }
 }
 
@@ -940,6 +1013,7 @@ Color _platformColor(SocialPlatform platform) {
     SocialPlatform.pinterest => AppColors.error,
     SocialPlatform.youtube => AppColors.error,
     SocialPlatform.twitter => AppColors.info,
+    SocialPlatform.reddit => AppColors.warning,
     SocialPlatform.other => AppColors.primary,
   };
 }
@@ -953,6 +1027,7 @@ IconData _platformIcon(SocialPlatform platform) {
     SocialPlatform.instagram => Icons.camera_alt_outlined,
     SocialPlatform.tiktok => Icons.music_note_rounded,
     SocialPlatform.twitter => Icons.alternate_email_rounded,
+    SocialPlatform.reddit => Icons.forum_rounded,
     SocialPlatform.other => Icons.link_rounded,
   };
 }

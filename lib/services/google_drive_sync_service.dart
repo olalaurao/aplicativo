@@ -208,7 +208,11 @@ class GoogleDriveSyncService {
 
     // For body, if it's a daily note, we can try to merge sections
     String mergedBody = localBody;
-    if (localFM['type'] == 'daily_note' || relativePath.contains('/daily/')) {
+    final isDailyPath =
+        relativePath == 'daily' ||
+        relativePath.startsWith('daily/') ||
+        relativePath.contains('/daily/');
+    if (localFM['type'] == 'daily_note' || isDailyPath) {
       // Very naive body merge: if remote has things local doesn't, append them?
       // Better: just keep both in different files if body differs significantly.
       if (localBody != remoteBody) {

@@ -8,6 +8,7 @@ class Person extends Organizer {
   String? photo;
   String? phone;
   String? email;
+  String? notes;
   DateTime? lastContactDate;
   Duration? contactFrequency;
   TaskPriority contactPriority;
@@ -18,6 +19,7 @@ class Person extends Organizer {
     this.photo,
     this.phone,
     this.email,
+    this.notes,
     this.lastContactDate,
     this.contactFrequency,
     this.contactPriority = TaskPriority.none,
@@ -57,7 +59,7 @@ class Person extends Organizer {
     }
     frontmatter['contact_priority'] = contactPriority.name;
 
-    return generateMarkdown(frontmatter, '');
+    return generateMarkdown(frontmatter, notes ?? '');
   }
 
   factory Person.fromMarkdown(Map<String, dynamic> frontmatter, String body) {
@@ -67,6 +69,7 @@ class Person extends Organizer {
     person.photo = frontmatter['photo'] as String?;
     person.phone = frontmatter['phone'] as String?;
     person.email = frontmatter['email'] as String?;
+    person.notes = body.trim().isEmpty ? null : body.trim();
     if (frontmatter['last_contact_date'] != null) {
       person.lastContactDate = DateTime.tryParse(
         frontmatter['last_contact_date'],
@@ -106,6 +109,7 @@ class Person extends Organizer {
     String? photo,
     String? phone,
     String? email,
+    String? notes,
     DateTime? lastContactDate,
     Duration? contactFrequency,
     TaskPriority? contactPriority,
@@ -116,6 +120,7 @@ class Person extends Organizer {
       photo: photo ?? this.photo,
       phone: phone ?? this.phone,
       email: email ?? this.email,
+      notes: notes ?? this.notes,
       lastContactDate: lastContactDate ?? this.lastContactDate,
       contactFrequency: contactFrequency ?? this.contactFrequency,
       contactPriority: contactPriority ?? this.contactPriority,

@@ -27,13 +27,35 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
 
   // Step 3 values
   final _learningController = TextEditingController();
+  late final TextEditingController _persistDaysController;
   int _persistDays = 30;
+
+  @override
+  void initState() {
+    super.initState();
+    final startedAt = widget.habit.startedAt;
+    final endsAt = widget.habit.endsAt;
+    if (startedAt != null && endsAt != null) {
+      final days = endsAt.difference(startedAt).inDays;
+      if (days > 0) _persistDays = days;
+    }
+    _persistDaysController = TextEditingController(text: '$_persistDays');
+  }
 
   @override
   void dispose() {
     _reflectionController.dispose();
     _learningController.dispose();
+    _persistDaysController.dispose();
     super.dispose();
+  }
+
+  bool get _canAdvance {
+    if (_currentStep == 1) return _reflectionController.text.trim().isNotEmpty;
+    if (_currentStep == 2) {
+      return _hypothesisEvaluation != null && _endedReason != null;
+    }
+    return true;
   }
 
   Color _parseColor(String hex) {
@@ -62,12 +84,36 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
     }
   }
 
+  Future<void> _confirmClose() async {
+    final shouldClose = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sair da revisão?'),
+        content: const Text('Você pode revisar esse pacto depois.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Continuar revisão'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sair'),
+          ),
+        ],
+      ),
+    );
+    if (shouldClose == true && mounted) {
+      Navigator.pop(context);
+    }
+  }
+
   Future<void> _handleDecision(PactOutcome outcome) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
     final finishedCycle = PactCycle(
-      startedAt: widget.habit.startedAt ?? today.subtract(const Duration(days: 30)),
+      startedAt:
+          widget.habit.startedAt ?? today.subtract(const Duration(days: 30)),
       endsAt: widget.habit.endsAt ?? today,
       outcome: outcome,
       reflection: _reflectionController.text.trim(),
@@ -210,9 +256,17 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
                         ],
                       ),
                     ),
+                    IconButton(
+                      onPressed: _confirmClose,
+                      icon: const Icon(Icons.close_rounded),
+                      tooltip: 'Fechar',
+                    ),
                     // Steps progress indicator
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
@@ -234,7 +288,10 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
 
               // Step content
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 250),
                   child: _buildStepContent(context, color),
@@ -253,16 +310,14 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
                         onPressed: _previousStep,
                         icon: const Icon(Icons.arrow_back_rounded),
                         label: const Text('Voltar'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: color,
-                        ),
+                        style: TextButton.styleFrom(foregroundColor: color),
                       )
                     else
                       const SizedBox.shrink(),
                     const Spacer(),
                     if (_currentStep < 3)
                       FilledButton.icon(
-                        onPressed: _nextStep,
+                        onPressed: _canAdvance ? _nextStep : null,
                         icon: const Icon(Icons.arrow_forward_rounded),
                         label: const Text('Avançar'),
                         style: FilledButton.styleFrom(
@@ -349,12 +404,11 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
         const SizedBox(height: 8),
         TextField(
           controller: _reflectionController,
+          onChanged: (_) => setState(() {}),
           maxLines: 4,
           decoration: InputDecoration(
             hintText: 'Escreva livremente sobre como foi esse ciclo...',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: color, width: 2),
@@ -452,9 +506,7 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
           maxLines: 2,
           decoration: InputDecoration(
             hintText: 'Inscreva o aprendizado chave (opcional)...',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
         const SizedBox(height: 16),
@@ -472,23 +524,25 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
                   children: [
                     const Text('Dias: '),
                     SizedBox(
-                      width: 30,
-                      child: DropdownButton<int>(
-                        value: _persistDays,
-                        items: [7, 14, 21, 30, 60, 90].map((d) {
-                          return DropdownMenuItem<int>(
-                            value: d,
-                            child: Text('$d', style: const TextStyle(fontSize: 12)),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() {
-                              _persistDays = val;
-                            });
+                      width: 54,
+                      child: TextField(
+                        controller: _persistDaysController,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 12),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 4,
+                          ),
+                        ),
+                        onChanged: (value) {
+                          final parsed = int.tryParse(value);
+                          if (parsed != null && parsed > 0) {
+                            _persistDays = parsed;
                           }
                         },
-                        underline: const SizedBox.shrink(),
                       ),
                     ),
                   ],

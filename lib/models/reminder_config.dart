@@ -26,7 +26,7 @@ class ReminderConfig {
     this.type = NotificationType.push,
     this.notificationBody,
     this.sound,
-    this.ringOnSilent = false,
+    this.ringOnSilent = true,
     this.snoozeMinutes = 10,
     this.popupColor,
     this.playSound = true,
@@ -78,8 +78,8 @@ class ReminderConfig {
       final normalized = raw.startsWith('#')
           ? 'ff${raw.substring(1)}'
           : (raw.startsWith('0x') || raw.startsWith('0X'))
-              ? raw.substring(2)
-              : raw;
+          ? raw.substring(2)
+          : raw;
       final parsed = int.tryParse(normalized, radix: 16);
       return parsed == null ? null : Color(parsed);
     }
@@ -91,7 +91,9 @@ class ReminderConfig {
     }
 
     return ReminderConfig(
-      id: map['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      id:
+          map['id']?.toString() ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
       triggerTime: map['trigger_time'] != null
           ? DateTime.tryParse(map['trigger_time'] as String)
           : null,
@@ -104,7 +106,7 @@ class ReminderConfig {
       ),
       notificationBody: map['notification_body']?.toString(),
       sound: map['sound']?.toString(),
-      ringOnSilent: map['ring_on_silent'] ?? false,
+      ringOnSilent: map['ring_on_silent'] ?? true,
       snoozeMinutes: parseInt(map['snooze_minutes']) ?? 10,
       popupColor: parsePopupColor(map['popup_color']),
       playSound: map['play_sound'] as bool? ?? true,

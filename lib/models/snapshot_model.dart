@@ -6,6 +6,7 @@ class Snapshot extends ContentObject {
   final Map<String, double> kpiValues;
   final String reflection;
   final DateTime date;
+  final List<String> photos;
 
   Snapshot({
     super.id,
@@ -14,6 +15,7 @@ class Snapshot extends ContentObject {
     required this.kpiValues,
     required this.reflection,
     required this.date,
+    this.photos = const [],
     super.createdAt,
     super.updatedAt,
   }) : super();
@@ -24,20 +26,41 @@ class Snapshot extends ContentObject {
   @override
   String toMarkdown() {
     final frontmatter = toBaseMap();
-    frontmatter['parent_id'] = parentId;
+    frontmatter['subject'] = parentId.startsWith('[[')
+        ? parentId
+        : '[[$parentId]]';
     frontmatter['kpi_values'] = kpiValues;
     frontmatter['date'] = date.toIso8601String();
+    if (photos.isNotEmpty) frontmatter['photos'] = photos;
 
     return generateMarkdown(frontmatter, reflection);
   }
 
   factory Snapshot.fromMarkdown(Map<String, dynamic> frontmatter, String body) {
+    final subject = frontmatter['subject']?.toString();
+    final parent =
+        subject != null && subject.startsWith('[[') && subject.endsWith(']]')
+        ? subject.substring(2, subject.length - 2)
+        : subject ?? frontmatter['parent_id']?.toString() ?? '';
+    final rawKpis = Map<String, dynamic>.from(
+      frontmatter['kpi_values'] as Map? ?? {},
+    );
     final snapshot = Snapshot(
       title: frontmatter['title'] as String? ?? 'Snapshot',
-      parentId: frontmatter['parent_id'] as String,
-      kpiValues: Map<String, double>.from(frontmatter['kpi_values'] ?? {}),
+      parentId: parent,
+      kpiValues: rawKpis.map(
+        (key, value) => MapEntry(
+          key,
+          value is num
+              ? value.toDouble()
+              : double.tryParse(value.toString()) ?? 0,
+        ),
+      ),
       reflection: body,
-      date: DateTime.parse(frontmatter['date']),
+      date:
+          DateTime.tryParse(frontmatter['date']?.toString() ?? '') ??
+          DateTime.now(),
+      photos: List<String>.from(frontmatter['photos'] as List? ?? []),
     );
     snapshot.loadBaseMap(frontmatter);
     return snapshot;

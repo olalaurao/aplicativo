@@ -5,15 +5,14 @@ import 'package:flutter/foundation.dart';
 import '../models/shared_types.dart';
 import '../models/content_object.dart';
 
-
 // ---------------------------------------------------------------------------
 // A3 — HighlightItem: represents a single blockquote/highlight extracted
 //       from a Resource synopsis or Note body.
 // ---------------------------------------------------------------------------
 class HighlightItem {
   final String text;
-  final String? tag;   // extracted from '#word' at end of line
-  final String? date;  // extracted from 'YYYY-MM-DD' if present
+  final String? tag; // extracted from '#word' at end of line
+  final String? date; // extracted from 'YYYY-MM-DD' if present
 
   const HighlightItem({required this.text, this.tag, this.date});
 }
@@ -141,8 +140,6 @@ class MarkdownParser {
 
     return result;
   }
-
-
 
   static Map<String, dynamic> parseFrontmatter(String content) {
     if (!content.startsWith('---')) return {};
@@ -336,7 +333,7 @@ class MarkdownParser {
     if (ops != null) {
       for (final op in ops) {
         final insert = op['insert'];
-        final attrs  = op['attributes'];
+        final attrs = op['attributes'];
         if (insert is String &&
             attrs is Map &&
             (attrs['blockquote'] == true || attrs['quote'] == true)) {
@@ -360,7 +357,7 @@ class MarkdownParser {
       String? tag;
       final tagMatch = RegExp(r'#(\w+)\s*$').firstMatch(text);
       if (tagMatch != null) {
-        tag  = tagMatch.group(1);
+        tag = tagMatch.group(1);
         text = text.substring(0, tagMatch.start).trim();
       }
 
@@ -591,7 +588,7 @@ class MarkdownParser {
                 int.tryParse(time.split(':').last) ?? 0,
               ).toIso8601String();
 
-        entries.add({
+        final entryData = <String, dynamic>{
           'time': time,
           'title': title,
           'body': entryBody,
@@ -599,15 +596,15 @@ class MarkdownParser {
           'organizers': orgsList,
           'hashtags': hashtags,
           'date': entryDate,
-          if (entryTypeStr != null) 'entry_type': entryTypeStr,
-          if (categoryStr != null) 'category': categoryStr,
-          if (energyValue != null) 'energy_value': energyValue,
-        });
+        };
+        if (entryTypeStr != null) entryData['entry_type'] = entryTypeStr;
+        if (categoryStr != null) entryData['category'] = categoryStr;
+        if (energyValue != null) entryData['energy_value'] = energyValue;
+        entries.add(entryData);
       }
     }
     return entries;
   }
-
 
   static Map<String, dynamic> parseHabitCompletions(
     Map<String, dynamic> frontmatter,
@@ -679,8 +676,16 @@ class MarkdownParser {
   }
 
   static Map<String, List<String>> parsePmnSections(String body) {
-    final result = {'plus': <String>[], 'minus': <String>[], 'next': <String>[]};
-    final sectionRegex = RegExp(r'^##\s*(Plus|Minus|Next)\s*$', multiLine: true, caseSensitive: false);
+    final result = {
+      'plus': <String>[],
+      'minus': <String>[],
+      'next': <String>[],
+    };
+    final sectionRegex = RegExp(
+      r'^##\s*(Plus|Minus|Next)\s*$',
+      multiLine: true,
+      caseSensitive: false,
+    );
     final matches = sectionRegex.allMatches(body).toList();
     for (var i = 0; i < matches.length; i++) {
       final key = matches[i].group(1)!.toLowerCase();
@@ -719,20 +724,34 @@ class MarkdownParser {
         for (final line in lines.sublist(1)) {
           final trimmed = line.trim();
           if (trimmed.contains('Duration:')) {
-            pom['worked'] = RegExp(r'Duration:\s*(\d+)').firstMatch(trimmed)?.group(1) ?? '';
+            pom['worked'] =
+                RegExp(r'Duration:\s*(\d+)').firstMatch(trimmed)?.group(1) ??
+                '';
           } else if (trimmed.contains('Blocks:')) {
-            pom['blocks'] = RegExp(r'Blocks:\s*(\d+)').firstMatch(trimmed)?.group(1) ?? '';
+            pom['blocks'] =
+                RegExp(r'Blocks:\s*(\d+)').firstMatch(trimmed)?.group(1) ?? '';
           } else if (trimmed.contains('- Linked:')) {
             final linkMatch = RegExp(r'\[\[(.*?)\]\]').firstMatch(trimmed);
             if (linkMatch != null) {
               pom['linked_item'] = linkMatch.group(1);
             }
           } else if (trimmed.contains('- Blocos:')) {
-            pom['blocks'] = RegExp(r'Blocos:\s*(\d+)').firstMatch(trimmed)?.group(1) ?? '';
-          } else if (trimmed.contains('- Tempo trabalhado:') || trimmed.contains('- Tempo:')) {
-            pom['worked'] = RegExp(r'(?:trabalhado|Tempo):\s*(\d+)').firstMatch(trimmed)?.group(1) ?? '';
-          } else if (trimmed.contains('- Tempo de pausa:') || trimmed.contains('- Pausas:')) {
-            pom['break'] = RegExp(r'(?:pausa|Pausas):\s*(\d+)').firstMatch(trimmed)?.group(1) ?? '';
+            pom['blocks'] =
+                RegExp(r'Blocos:\s*(\d+)').firstMatch(trimmed)?.group(1) ?? '';
+          } else if (trimmed.contains('- Tempo trabalhado:') ||
+              trimmed.contains('- Tempo:')) {
+            pom['worked'] =
+                RegExp(
+                  r'(?:trabalhado|Tempo):\s*(\d+)',
+                ).firstMatch(trimmed)?.group(1) ??
+                '';
+          } else if (trimmed.contains('- Tempo de pausa:') ||
+              trimmed.contains('- Pausas:')) {
+            pom['break'] =
+                RegExp(
+                  r'(?:pausa|Pausas):\s*(\d+)',
+                ).firstMatch(trimmed)?.group(1) ??
+                '';
           }
         }
         pomodoros.add(pom);
@@ -765,6 +784,8 @@ class MarkdownParser {
     required List<Map<String, dynamic>> entries,
     List<Map<String, dynamic>> tasks = const [],
     Map<String, dynamic> habits = const {},
+    Map<String, String> habitLabels = const {},
+    Set<String> pactHabitSlugs = const {},
     Map<String, dynamic> trackers = const {},
     List<Map<String, dynamic>> pomodoros = const [],
   }) {
@@ -834,7 +855,11 @@ class MarkdownParser {
           final count = val.where((v) => v == true).length;
           details = ' ($count/${val.length})';
         }
-        buffer.writeln('- $status [[$slug]]$details');
+        final title = habitLabels[slug] ?? slug.toString();
+        final pactSuffix = pactHabitSlugs.contains(slug.toString())
+            ? ' ← pact'
+            : '';
+        buffer.writeln('- $status $title$details$pactSuffix');
       });
       buffer.writeln();
     }
@@ -886,5 +911,4 @@ class MarkdownParser {
 
     return buffer.toString().trim();
   }
-
 }

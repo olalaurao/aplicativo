@@ -1,5 +1,7 @@
 import 'content_object.dart';
 import 'organizer_model.dart';
+import 'scheduler.dart';
+import 'shared_types.dart';
 import 'task_model.dart';
 
 enum ProjectState { active, paused, completed, archived }
@@ -15,17 +17,18 @@ class Project extends Organizer {
   String? linkedGoogleEventTitle;
   String? linkedGoogleEventDate;
   String? linkedGoogleEventUrl;
+  Scheduler? scheduler;
 
   ProjectState get projectState => ProjectState.values.firstWhere(
-        (e) => e.name == super.state,
-        orElse: () => ProjectState.active,
-      );
+    (e) => e.name == super.state,
+    orElse: () => ProjectState.active,
+  );
   set projectState(ProjectState value) => super.state = value.name;
 
   TaskPriority get projectPriority => TaskPriority.values.firstWhere(
-        (e) => e.name == super.priority,
-        orElse: () => TaskPriority.none,
-      );
+    (e) => e.name == super.priority,
+    orElse: () => TaskPriority.none,
+  );
   set projectPriority(TaskPriority value) => super.priority = value.name;
 
   Project({
@@ -43,6 +46,7 @@ class Project extends Organizer {
     this.linkedGoogleEventTitle,
     this.linkedGoogleEventDate,
     this.linkedGoogleEventUrl,
+    this.scheduler,
     super.parentId,
     super.startDate,
     super.endDate,
@@ -89,6 +93,9 @@ class Project extends Organizer {
     if (linkedGoogleEventUrl != null) {
       frontmatter['linked_google_event_url'] = linkedGoogleEventUrl;
     }
+    if (scheduler != null) {
+      frontmatter['scheduler'] = scheduler!.toMap();
+    }
 
     // Add organizer-specific fields
     if (startDate != null) {
@@ -102,9 +109,7 @@ class Project extends Organizer {
   }
 
   factory Project.fromMarkdown(Map<String, dynamic> frontmatter, String body) {
-    final project = Project(
-      title: frontmatter['title'] as String? ?? '',
-    );
+    final project = Project(title: frontmatter['title'] as String? ?? '');
     project.loadBaseMap(frontmatter);
 
     if (frontmatter['state'] != null) {
@@ -119,8 +124,12 @@ class Project extends Organizer {
         orElse: () => TaskPriority.none,
       );
     }
-    project.description = frontmatter['description'] is List ? (frontmatter['description'] as List).join(', ') : frontmatter['description']?.toString() ?? body;
-    project.primaryKpiId = frontmatter['primary_kpi'] is List ? (frontmatter['primary_kpi'] as List).join(', ') : frontmatter['primary_kpi']?.toString();
+    project.description = frontmatter['description'] is List
+        ? (frontmatter['description'] as List).join(', ')
+        : frontmatter['description']?.toString() ?? body;
+    project.primaryKpiId = frontmatter['primary_kpi'] is List
+        ? (frontmatter['primary_kpi'] as List).join(', ')
+        : frontmatter['primary_kpi']?.toString();
     project.secondaryKpiIds = List<String>.from(
       frontmatter['secondary_kpis'] as List? ?? [],
     );
@@ -129,7 +138,12 @@ class Project extends Organizer {
       frontmatter['quick_access'] as List? ?? [],
     );
     final tpt = frontmatter['total_pomodoro_time'];
-    project.totalPomodoroTime = tpt is int ? tpt : int.tryParse(tpt?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '') ?? 0;
+    project.totalPomodoroTime = tpt is int
+        ? tpt
+        : int.tryParse(
+                tpt?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '',
+              ) ??
+              0;
 
     if (frontmatter['start_date'] != null) {
       project.startDate = DateTime.tryParse(frontmatter['start_date']);
@@ -137,17 +151,135 @@ class Project extends Organizer {
     if (frontmatter['end_date'] != null) {
       project.endDate = DateTime.tryParse(frontmatter['end_date']);
     }
-    project.color = frontmatter['color'] is List ? (frontmatter['color'] as List).join(', ') : frontmatter['color']?.toString();
-    project.icon = frontmatter['icon'] is List ? (frontmatter['icon'] as List).join(', ') : frontmatter['icon']?.toString();
-    project.linkedGoogleEventId =
-        frontmatter['linked_google_event_id']?.toString();
-    project.linkedGoogleEventTitle =
-        frontmatter['linked_google_event_title']?.toString();
-    project.linkedGoogleEventDate =
-        frontmatter['linked_google_event_date']?.toString();
-    project.linkedGoogleEventUrl =
-        frontmatter['linked_google_event_url']?.toString();
+    project.color = frontmatter['color'] is List
+        ? (frontmatter['color'] as List).join(', ')
+        : frontmatter['color']?.toString();
+    project.icon = frontmatter['icon'] is List
+        ? (frontmatter['icon'] as List).join(', ')
+        : frontmatter['icon']?.toString();
+    project.linkedGoogleEventId = frontmatter['linked_google_event_id']
+        ?.toString();
+    project.linkedGoogleEventTitle = frontmatter['linked_google_event_title']
+        ?.toString();
+    project.linkedGoogleEventDate = frontmatter['linked_google_event_date']
+        ?.toString();
+    project.linkedGoogleEventUrl = frontmatter['linked_google_event_url']
+        ?.toString();
+    if (frontmatter['scheduler'] is Map) {
+      project.scheduler = Scheduler.fromMap(
+        Map<String, dynamic>.from(frontmatter['scheduler'] as Map),
+      );
+    }
 
     return project;
+  }
+
+  @override
+  Project copyWith({
+    String? title,
+    OrganizerType? organizerType,
+    String? parentId,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? color,
+    String? icon,
+    String? state,
+    String? priority,
+    List<OrganizerReference>? organizers,
+    List<String>? categories,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? obsidianPath,
+  }) {
+    return Project(
+      id: id,
+      title: title ?? this.title,
+      state: ProjectState.values.firstWhere(
+        (e) => e.name == (state ?? this.state),
+        orElse: () => projectState,
+      ),
+      priority: TaskPriority.values.firstWhere(
+        (e) => e.name == (priority ?? this.priority),
+        orElse: () => projectPriority,
+      ),
+      description: description,
+      primaryKpiId: primaryKpiId,
+      secondaryKpiIds: secondaryKpiIds,
+      taskLinks: taskLinks,
+      quickAccessLinks: quickAccessLinks,
+      totalPomodoroTime: totalPomodoroTime,
+      linkedGoogleEventId: linkedGoogleEventId,
+      linkedGoogleEventTitle: linkedGoogleEventTitle,
+      linkedGoogleEventDate: linkedGoogleEventDate,
+      linkedGoogleEventUrl: linkedGoogleEventUrl,
+      scheduler: scheduler,
+      parentId: parentId ?? this.parentId,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      color: color ?? this.color,
+      icon: icon ?? this.icon,
+      organizers: organizers ?? this.organizers,
+      categories: categories ?? this.categories,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      obsidianPath: obsidianPath ?? this.obsidianPath,
+    );
+  }
+
+  Project copyProjectWith({
+    String? title,
+    ProjectState? state,
+    TaskPriority? priority,
+    String? description,
+    String? primaryKpiId,
+    List<String>? secondaryKpiIds,
+    List<String>? taskLinks,
+    List<String>? quickAccessLinks,
+    int? totalPomodoroTime,
+    String? linkedGoogleEventId,
+    String? linkedGoogleEventTitle,
+    String? linkedGoogleEventDate,
+    String? linkedGoogleEventUrl,
+    Scheduler? scheduler,
+    String? parentId,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? color,
+    String? icon,
+    List<OrganizerReference>? organizers,
+    List<String>? categories,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? obsidianPath,
+  }) {
+    return Project(
+      id: id,
+      title: title ?? this.title,
+      state: state ?? projectState,
+      priority: priority ?? projectPriority,
+      description: description ?? this.description,
+      primaryKpiId: primaryKpiId ?? this.primaryKpiId,
+      secondaryKpiIds: secondaryKpiIds ?? this.secondaryKpiIds,
+      taskLinks: taskLinks ?? this.taskLinks,
+      quickAccessLinks: quickAccessLinks ?? this.quickAccessLinks,
+      totalPomodoroTime: totalPomodoroTime ?? this.totalPomodoroTime,
+      linkedGoogleEventId: linkedGoogleEventId ?? this.linkedGoogleEventId,
+      linkedGoogleEventTitle:
+          linkedGoogleEventTitle ?? this.linkedGoogleEventTitle,
+      linkedGoogleEventDate:
+          linkedGoogleEventDate ?? this.linkedGoogleEventDate,
+      linkedGoogleEventUrl: linkedGoogleEventUrl ?? this.linkedGoogleEventUrl,
+      scheduler: scheduler ?? this.scheduler,
+      parentId: parentId ?? this.parentId,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      color: color ?? this.color,
+      icon: icon ?? this.icon,
+      organizers: organizers ?? this.organizers,
+      categories: categories ?? this.categories,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      obsidianPath: obsidianPath ?? this.obsidianPath,
+    );
   }
 }

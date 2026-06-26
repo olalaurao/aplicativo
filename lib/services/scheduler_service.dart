@@ -2,6 +2,18 @@
 import '../models/scheduler.dart';
 
 class SchedulerService {
+  /// Returns true when a scheduled organizer/project should be considered
+  /// active again for [date]. Callers own the actual state mutation so the
+  /// app does not silently rewrite vault objects during read-only views.
+  static bool shouldRestartScheduledProject(
+    Scheduler? scheduler,
+    DateTime date, {
+    DateTime? lastCompletionDate,
+  }) {
+    if (scheduler == null) return false;
+    return shouldFire(scheduler, date, lastCompletionDate: lastCompletionDate);
+  }
+
   static bool shouldFire(
     Scheduler scheduler,
     DateTime date, {
