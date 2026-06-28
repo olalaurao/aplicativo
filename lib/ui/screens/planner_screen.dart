@@ -237,6 +237,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         controller: _scrollController,
         slivers: [
           SliverAppBar(
+            toolbarHeight: activeTheme != null ? 56.0 : 44.0,
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -247,6 +248,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 if (activeTheme != null)
                   Text(
                     activeTheme.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -257,7 +260,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                   ),
               ],
             ),
-            floating: true,
             pinned: true,
             actions: [
               IconButton(
@@ -1079,10 +1081,17 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         .join(', ');
     final items = <ContentObject>[...tasks, ...habits]
       ..sort((a, b) => (a.order ?? 999).compareTo(b.order ?? 999));
+    final energyLevel = block.energyLevel;
+    final energyColor = energyLevel == null
+        ? null
+        : _energyTintColor(energyLevel);
+    final isHighEnergyBlock = energyLevel == EnergyLevel.high;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: AppTheme.cardDecorationFlat(context),
+      decoration: AppTheme.cardDecorationFlat(
+        context,
+      ).copyWith(color: energyColor?.withValues(alpha: 0.08)),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
@@ -1099,12 +1108,37 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
               Expanded(
                 child: Text(
                   block.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
+              if (isHighEnergyBlock) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    '⚡ High energy',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
               if (ranges.isNotEmpty) ...[
                 Text(
                   ranges,
@@ -1161,7 +1195,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                     final item = items[index];
                     Widget child;
                     if (item is Task) {
-                      child = _buildTaskItem(item);
+                      child = _buildTaskItem(
+                        item,
+                        isHighEnergyBlock: isHighEnergyBlock,
+                      );
                     } else {
                       child = _buildHabitItem(item as Habit);
                     }
@@ -1249,7 +1286,15 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     );
   }
 
-  Widget _buildTaskItem(Task task) {
+  Color _energyTintColor(EnergyLevel level) {
+    return switch (level) {
+      EnergyLevel.high => AppColors.success,
+      EnergyLevel.medium => AppColors.warning,
+      EnergyLevel.low => AppColors.habitOrange,
+    };
+  }
+
+  Widget _buildTaskItem(Task task, {bool isHighEnergyBlock = false}) {
     return LongPressDraggable<Task>(
       data: task,
       feedback: Material(
@@ -1269,14 +1314,20 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
           ),
         ),
       ),
-      childWhenDragging: Opacity(opacity: 0.3, child: _buildTaskCard(task)),
-      child: _buildTaskCard(task),
+      childWhenDragging: Opacity(
+        opacity: 0.3,
+        child: _buildTaskCard(task, isHighEnergyBlock: isHighEnergyBlock),
+      ),
+      child: _buildTaskCard(task, isHighEnergyBlock: isHighEnergyBlock),
     );
   }
 
-  Widget _buildTaskCard(Task task) {
+  Widget _buildTaskCard(Task task, {bool isHighEnergyBlock = false}) {
     final allObjects = ref.watch(allObjectsProvider).value ?? [];
     final isBlocked = task.isBlocked(allObjects);
+    final isBestTime =
+        isHighEnergyBlock &&
+        (task.priority == TaskPriority.high || task.duration >= 60);
 
     return ObjectActionWrapper(
       object: task,
@@ -1345,17 +1396,49 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          task.title,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            decoration: task.stage == TaskStage.finalized
-                                ? TextDecoration.lineThrough
-                                : null,
-                            color: task.stage == TaskStage.finalized
-                                ? AppColors.textMuted
-                                : AppColors.textPrimary,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              task.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                decoration: task.stage == TaskStage.finalized
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                color: task.stage == TaskStage.finalized
+                                    ? AppColors.textMuted
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
+                            if (task.tripleCheck != null) ...[
+                              const SizedBox(height: 4),
+                              TripleCheckIconRow(
+                                tripleCheck: task.tripleCheck!,
+                                onTap: () => showTripleCheckSheet(
+                                  context,
+                                  ref,
+                                  task,
+                                  readOnly: true,
+                                ),
+                              ),
+                            ],
+                            if (isBestTime) ...[
+                              const SizedBox(height: 4),
+                              const Text(
+                                '↑ Best time',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.success,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                       if (task.needsTripleCheckBadge) ...[

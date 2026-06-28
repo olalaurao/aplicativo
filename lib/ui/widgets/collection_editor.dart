@@ -81,10 +81,22 @@ class _CollectionEditorState extends State<CollectionEditor> {
     if (widget.initialContent.isEmpty) return;
     try {
       final data = jsonDecode(widget.initialContent);
-      _schema = (data['schema'] as List)
-          .map((e) => PropertyDefinition.fromMap(e))
-          .toList();
-      _items = List<Map<String, dynamic>>.from(data['items']);
+      final schemaData = data is Map ? data['schema'] : null;
+      final itemData = data is Map ? data['items'] : null;
+      if (schemaData is List) {
+        _schema = schemaData
+            .whereType<Map>()
+            .map(
+              (e) => PropertyDefinition.fromMap(Map<String, dynamic>.from(e)),
+            )
+            .toList();
+      }
+      if (itemData is List) {
+        _items = itemData
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
       if (_schema.isNotEmpty) _isConfiguringSchema = false;
     } catch (e) {
       // Not JSON or invalid
@@ -103,71 +115,52 @@ class _CollectionEditorState extends State<CollectionEditor> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _buildViewToggle(),
+        _buildCollectionToolbar(),
         const SizedBox(height: 16),
         _isConfiguringSchema ? _buildSchemaEditor() : _buildDataView(),
       ],
     );
   }
 
-  Widget _buildViewToggle() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(12),
-      ),
+  Widget _buildCollectionToolbar() {
+    final canShowItems = _schema.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          _toggleButton(true, 'Schema', Icons.settings_outlined),
-          _toggleButton(false, 'Items', Icons.table_chart_outlined),
+          Expanded(
+            child: Text(
+              _isConfiguringSchema ? 'Properties' : 'Items',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (_isConfiguringSchema && canShowItems)
+            TextButton.icon(
+              onPressed: () => setState(() => _isConfiguringSchema = false),
+              icon: const Icon(Icons.table_chart_outlined),
+              label: const Text('Items'),
+              style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            ),
+          if (!_isConfiguringSchema) ...[
+            IconButton(
+              tooltip: 'Configure properties',
+              icon: const Icon(Icons.settings_outlined),
+              color: AppColors.textSecondary,
+              onPressed: () => setState(() => _isConfiguringSchema = true),
+            ),
+            FilledButton.icon(
+              onPressed: _addItem,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('New row'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.textOnPrimary,
+              ),
+            ),
+          ],
         ],
-      ),
-    );
-  }
-
-  Widget _toggleButton(bool isSchema, String label, IconData icon) {
-    final selected = _isConfiguringSchema == isSchema;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _isConfiguringSchema = isSchema),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.surface : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                    ),
-                  ]
-                : [],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: selected ? AppColors.primary : AppColors.textSecondary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected
-                      ? AppColors.textPrimary
-                      : AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -178,11 +171,6 @@ class _CollectionEditorState extends State<CollectionEditor> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Define Properties',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
           ..._schema.asMap().entries.map(
             (entry) => _buildPropertyRow(entry.key, entry.value),
           ),
@@ -246,7 +234,10 @@ class _CollectionEditorState extends State<CollectionEditor> {
               size: 20,
               color: AppColors.priorityHigh,
             ),
-            onPressed: () => setState(() => _schema.removeAt(index)),
+            onPressed: () {
+              setState(() => _schema.removeAt(index));
+              _save();
+            },
           ),
         ],
       ),
@@ -255,7 +246,7 @@ class _CollectionEditorState extends State<CollectionEditor> {
 
   Widget _buildDataView() {
     if (_schema.isEmpty) {
-      return const Center(child: Text('Add properties first in Schema tab'));
+      return const Center(child: Text('Add properties first.'));
     }
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -270,34 +261,19 @@ class _CollectionEditorState extends State<CollectionEditor> {
             final item = entry.value;
             return DataRow(
               cells: [
-                ..._schema.map(
-                  (p) => DataCell(
-                    _buildCellEditor(p, item),
-                  ),
-                ),
+                ..._schema.map((p) => DataCell(_buildCellEditor(p, item))),
                 DataCell(
                   IconButton(
                     icon: const Icon(Icons.remove_circle_outline, size: 18),
-                    onPressed: () => setState(() => _items.removeAt(idx)),
+                    onPressed: () {
+                      setState(() => _items.removeAt(idx));
+                      _save();
+                    },
                   ),
                 ),
               ],
             );
           }),
-          DataRow(
-            cells: [
-              ..._schema.map((p) => const DataCell(SizedBox())),
-              DataCell(
-                IconButton(
-                  icon: const Icon(
-                    Icons.add_circle_outline,
-                    color: AppColors.primary,
-                  ),
-                  onPressed: _addItem,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -318,7 +294,9 @@ class _CollectionEditorState extends State<CollectionEditor> {
 
   void _addItem() {
     setState(() {
-      final newItem = <String, dynamic>{};
+      final newItem = <String, dynamic>{
+        'id': 'item_${DateTime.now().microsecondsSinceEpoch}',
+      };
       for (var p in _schema) {
         newItem[p.id] = '';
       }
@@ -362,16 +340,15 @@ class _CollectionEditorState extends State<CollectionEditor> {
       );
     } else {
       return TextField(
-        decoration: const InputDecoration(
-          border: InputBorder.none,
-        ),
+        decoration: const InputDecoration(border: InputBorder.none),
         onChanged: (v) {
           item[p.id] = v;
           _save();
         },
-        controller: TextEditingController(
-          text: item[p.id]?.toString() ?? '',
-        )..selection = TextSelection.collapsed(offset: (item[p.id]?.toString() ?? '').length),
+        controller: TextEditingController(text: item[p.id]?.toString() ?? '')
+          ..selection = TextSelection.collapsed(
+            offset: (item[p.id]?.toString() ?? '').length,
+          ),
       );
     }
   }

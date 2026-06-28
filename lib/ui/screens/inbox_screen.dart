@@ -24,7 +24,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _captureFocus.requestFocus());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _captureFocus.requestFocus(),
+    );
   }
 
   @override
@@ -93,22 +95,42 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               color: AppTheme.cardFillColor(context),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.primary, width: 1.5),
-              boxShadow: [BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.10), blurRadius: 12)]),
-            child: Row(children: [
-              Expanded(child: TextField(
-                controller: _captureController,
-                focusNode: _captureFocus,
-                decoration: const InputDecoration(
-                  hintText: 'O que está na sua cabeça?',
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14)),
-                style: const TextStyle(fontSize: 16),
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _capture())),
-              IconButton(onPressed: _capture,
-                icon: const Icon(Icons.send_rounded, color: AppColors.primary)),
-            ])),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.10),
+                  blurRadius: 12,
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _captureController,
+                    focusNode: _captureFocus,
+                    decoration: const InputDecoration(
+                      hintText: 'O que está na sua cabeça?',
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                    ),
+                    style: const TextStyle(fontSize: 16),
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _capture(),
+                  ),
+                ),
+                IconButton(
+                  onPressed: _capture,
+                  icon: const Icon(
+                    Icons.send_rounded,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
 
           // List
           Expanded(
@@ -199,10 +221,7 @@ class _InboxItemCard extends ConsumerWidget {
   final InboxItem item;
   final VoidCallback onTriage;
 
-  const _InboxItemCard({
-    required this.item,
-    required this.onTriage,
-  });
+  const _InboxItemCard({required this.item, required this.onTriage});
 
   String _formatDate(DateTime dt) {
     final now = DateTime.now();
@@ -219,13 +238,20 @@ class _InboxItemCard extends ConsumerWidget {
     return Dismissible(
       key: ValueKey(item.id),
       background: Container(
-        alignment: Alignment.centerLeft, padding: const EdgeInsets.only(left: 20),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
         color: AppColors.habitGreen,
-        child: const Icon(Icons.archive_rounded, color: Colors.white)),
+        child: const Icon(Icons.archive_rounded, color: Colors.white),
+      ),
       secondaryBackground: Container(
-        alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
         color: AppColors.info,
-        child: const Icon(Icons.check_circle_outline_rounded, color: Colors.white)),
+        child: const Icon(
+          Icons.check_circle_outline_rounded,
+          color: Colors.white,
+        ),
+      ),
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {
           await ref.read(inboxProvider.notifier).deleteItem(item);
@@ -317,6 +343,44 @@ class _TriageSheet extends ConsumerWidget {
   final InboxItem item;
   const _TriageSheet({required this.item});
 
+  Future<void> _openFormAndTriage(
+    BuildContext context,
+    WidgetRef ref,
+    Widget form,
+  ) async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    navigator.pop();
+
+    try {
+      final saved = await navigator.push<bool>(
+        MaterialPageRoute(builder: (_) => form),
+      );
+      if (saved == true) {
+        await ref.read(inboxProvider.notifier).triageItem(item);
+      }
+    } catch (e) {
+      debugPrint('Inbox triage failed: $e');
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Não foi possível triar este item.')),
+      );
+    }
+  }
+
+  Future<void> _deleteAndClose(BuildContext context, WidgetRef ref) async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(inboxProvider.notifier).deleteItem(item);
+      navigator.pop();
+    } catch (e) {
+      debugPrint('Inbox delete failed: $e');
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Não foi possível deletar este item.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
@@ -362,18 +426,11 @@ class _TriageSheet extends ConsumerWidget {
             label: 'Virou uma task',
             subtitle: 'Criar tarefa com este título',
             onTap: () async {
-              if (context.mounted) {
-                Navigator.pop(context);
-                final saved = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CreateTaskForm(initialTitle: item.title),
-                  ),
-                );
-                if (saved == true) {
-                  await ref.read(inboxProvider.notifier).triageItem(item);
-                }
-              }
+              await _openFormAndTriage(
+                context,
+                ref,
+                CreateTaskForm(initialTitle: item.title),
+              );
             },
           ),
           const SizedBox(height: 10),
@@ -383,18 +440,11 @@ class _TriageSheet extends ConsumerWidget {
             label: 'Era uma ideia (nota)',
             subtitle: 'Criar nota com este conteúdo',
             onTap: () async {
-              if (context.mounted) {
-                Navigator.pop(context);
-                final saved = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CreateNoteForm(initialTitle: item.title),
-                  ),
-                );
-                if (saved == true) {
-                  await ref.read(inboxProvider.notifier).triageItem(item);
-                }
-              }
+              await _openFormAndTriage(
+                context,
+                ref,
+                CreateNoteForm(initialTitle: item.title),
+              );
             },
           ),
           const SizedBox(height: 10),
@@ -404,18 +454,11 @@ class _TriageSheet extends ConsumerWidget {
             label: 'É uma entrada do journal',
             subtitle: 'Adicionar ao diário de hoje',
             onTap: () async {
-              if (context.mounted) {
-                Navigator.pop(context);
-                final saved = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CreateEntryForm(initialBody: item.title),
-                  ),
-                );
-                if (saved == true) {
-                  await ref.read(inboxProvider.notifier).triageItem(item);
-                }
-              }
+              await _openFormAndTriage(
+                context,
+                ref,
+                CreateEntryForm(initialBody: item.title),
+              );
             },
           ),
           const SizedBox(height: 10),
@@ -425,8 +468,7 @@ class _TriageSheet extends ConsumerWidget {
             label: 'Deletar',
             subtitle: 'Não era importante',
             onTap: () async {
-              await ref.read(inboxProvider.notifier).deleteItem(item);
-              if (context.mounted) Navigator.pop(context);
+              await _deleteAndClose(context, ref);
             },
           ),
           const SizedBox(height: 12),

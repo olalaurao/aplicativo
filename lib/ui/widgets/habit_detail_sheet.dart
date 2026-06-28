@@ -6,6 +6,7 @@ import '../../models/habit_model.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import '../forms/create_habit_form.dart';
+import 'steering_sheet.dart';
 
 class HabitDetailSheet extends ConsumerStatefulWidget {
   final Habit habit;
@@ -52,6 +53,10 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
 
     final color = _parseColor(currentHabit.color);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isPactExpired = currentHabit.habitMode == HabitMode.pact &&
+        currentHabit.endsAt != null &&
+        currentHabit.endsAt!.isBefore(DateTime.now()) &&
+        currentHabit.pactOutcome == null;
 
     // ─── Stats Calculations ───
     final totalCompletions = currentHabit.completionHistory
@@ -98,6 +103,10 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
                 ),
               ),
               const SizedBox(height: 16),
+              if (isPactExpired) ...[
+                _buildPactExpiredBanner(context, currentHabit),
+                const SizedBox(height: 16),
+              ],
 
               // ─── Header Section ───
               Row(
@@ -418,6 +427,60 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
               fontSize: 10,
               fontWeight: FontWeight.w600,
               color: AppTheme.textMutedColor(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPactExpiredBanner(BuildContext context, Habit habit) {
+    final endedAt = habit.endsAt;
+    final endedLabel = endedAt != null
+        ? '${endedAt.year.toString().padLeft(4, '0')}-${endedAt.month.toString().padLeft(2, '0')}-${endedAt.day.toString().padLeft(2, '0')}'
+        : 'its end date';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: AppColors.warning,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'This pact ended on $endedLabel. Review it now.',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textPrimaryColor(context),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              showSteeringSheet(context, habit);
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.warning,
+              minimumSize: const Size(48, 40),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'Review',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
             ),
           ),
         ],

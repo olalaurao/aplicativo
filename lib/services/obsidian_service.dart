@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:watcher/watcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/content_object.dart';
+import '../models/note_model.dart';
 import 'markdown_parser.dart';
 import 'package:flutter/foundation.dart';
 
@@ -126,6 +127,165 @@ class ObsidianService {
     }
     await file.writeAsString(content, encoding: utf8);
     invalidateFileCache();
+  }
+
+  Future<void> syncCollectionToBase(Note note) async {
+    if (vaultDir == null || note.subtype != NoteSubtype.collection) return;
+
+    try {
+      final decoded = jsonDecode(note.body);
+      if (decoded is! Map) return;
+
+      final schema =
+          (decoded['schema'] as List?)
+              ?.whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList() ??
+          [];
+      final items =
+          (decoded['items'] as List?)
+              ?.whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList() ??
+          [];
+      if (schema.isEmpty) return;
+
+      final collectionSlug = note.slug.isNotEmpty ? note.slug : note.id;
+      final itemFileNames = <String>{};
+      final collectionDir = Directory('${vaultDir!.path}/$collectionSlug');
+      if (!await collectionDir.exists()) {
+        await collectionDir.create(recursive: true);
+      }
+
+      for (var i = 0; i < items.length; i++) {
+        final item = items[i];
+        final rawId = item['id']?.toString().trim();
+        final itemId = _safeFileStem(
+          rawId == null || rawId.isEmpty ? 'item_${i + 1}' : rawId,
+        );
+        final fileName = '$itemId.md';
+        itemFileNames.add(fileName);
+
+        final frontmatter = <String, dynamic>{
+          'title': _collectionItemTitle(schema, item, note.title),
+          'collection_ref': '[[${note.slug}]]',
+        };
+        var body = '';
+
+        for (final prop in schema) {
+          final propId = prop['id']?.toString();
+          if (propId == null || propId.isEmpty) continue;
+
+          final propName = prop['name']?.toString().trim();
+          final key = _propertyKey(
+            propName == null || propName.isEmpty ? propId : propName,
+          );
+          final value = item[propId];
+          final propType = prop['type']?.toString();
+
+          if (propType == 'richText' && value != null) {
+            body = value.toString();
+          }
+          if (value == null || value == '') continue;
+          frontmatter[key] = value;
+        }
+
+        await writeFile(
+          '$collectionSlug/$fileName',
+          generateMarkdown(frontmatter, body),
+        );
+      }
+
+      await for (final entity in collectionDir.list(followLinks: false)) {
+        if (entity is! File || !entity.path.endsWith('.md')) continue;
+        final fileName = entity.path.replaceAll('\\', '/').split('/').last;
+        if (!itemFileNames.contains(fileName)) {
+          await entity.delete();
+        }
+      }
+
+      await writeFile(
+        '$collectionSlug.base',
+        generateMarkdown({
+          'filters': [],
+          'order': [],
+          'properties': schema.map((prop) {
+            final name = prop['name']?.toString().trim();
+            return {
+              'name': name == null || name.isEmpty
+                  ? prop['id']?.toString() ?? 'Property'
+                  : name,
+              'type': _baseTypeForCollectionProperty(prop['type']?.toString()),
+            };
+          }).toList(),
+          'source': {'type': 'folder', 'path': '$collectionSlug/'},
+        }, ''),
+      );
+    } catch (e, st) {
+      debugPrint('Collection base sync failed for ${note.id}: $e\n$st');
+    }
+  }
+
+  String _collectionItemTitle(
+    List<Map<String, dynamic>> schema,
+    Map<String, dynamic> item,
+    String fallback,
+  ) {
+    for (final prop in schema) {
+      final type = prop['type']?.toString();
+      if (type != 'text' && type != 'richText') continue;
+      final propId = prop['id']?.toString();
+      final value = propId == null ? null : item[propId];
+      if (value != null && value.toString().trim().isNotEmpty) {
+        return value.toString().trim();
+      }
+    }
+    return fallback;
+  }
+
+  String _baseTypeForCollectionProperty(String? type) {
+    switch (type) {
+      case 'quantity':
+      case 'rating':
+      case 'duration':
+        return 'number';
+      case 'date':
+        return 'date';
+      case 'selection':
+        return 'select';
+      case 'multiSelection':
+        return 'multiselect';
+      case 'checkbox':
+        return 'checkbox';
+      case 'text':
+      case 'richText':
+      case 'url':
+      case 'email':
+      case 'phone':
+      case 'time':
+      case 'relation':
+      case 'media':
+      default:
+        return 'text';
+    }
+  }
+
+  String _propertyKey(String value) {
+    final key = value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+    return key.isEmpty ? 'property' : key;
+  }
+
+  String _safeFileStem(String value) {
+    final stem = value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9_-]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    return stem.isEmpty ? 'item' : stem;
   }
 
   Future<void> appendToDailyNote(

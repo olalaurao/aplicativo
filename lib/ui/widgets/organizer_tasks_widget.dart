@@ -400,6 +400,18 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
+                        if (item.tripleCheck != null) ...[
+                          TripleCheckIconRow(
+                            tripleCheck: item.tripleCheck!,
+                            onTap: () => showTripleCheckSheet(
+                              context,
+                              ref,
+                              item,
+                              readOnly: true,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                         if (item.needsTripleCheckBadge) ...[
                           TripleCheckBadge(
                             onTap: () => showTripleCheckSheet(context, ref, item),

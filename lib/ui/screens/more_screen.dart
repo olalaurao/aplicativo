@@ -11,6 +11,7 @@ import 'category_management_screen.dart';
 import 'shopping_list_screen.dart';
 import 'vault_files_screen.dart';
 import 'object_conflicts_screen.dart';
+import 'day_theme_screen.dart';
 import '../../providers/google_calendar_provider.dart';
 import '../widgets/navigation_shortcut_picker.dart';
 import '../../providers/vault_provider.dart';
@@ -40,6 +41,12 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               !it.inBottomBar,
         )
         .toList();
+    final hasDayThemeInNav = inMoreItems.any(
+      (item) => item.route == '/day-themes',
+    );
+    final hasDayBlockInNav = inMoreItems.any(
+      (item) => item.route == '/day-blocks',
+    );
 
     // All items that CAN be in more (to show in edit mode)
     final editableItems = navItems
@@ -165,7 +172,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                 const SizedBox(height: 12),
                 _buildMenuRow(
                   context,
-                  'Lista de Mercado',
+                  'Shopping List',
                   Icons.shopping_cart_outlined,
                   AppColors.habitBlue,
                   () {
@@ -177,6 +184,42 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                     );
                   },
                 ),
+
+                if (!hasDayThemeInNav) ...[
+                  const SizedBox(height: 8),
+                  _buildMenuRow(
+                    context,
+                    'Day Themes',
+                    Icons.wb_sunny_outlined,
+                    AppColors.warning,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DayThemeScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+
+                if (!hasDayBlockInNav) ...[
+                  const SizedBox(height: 8),
+                  _buildMenuRow(
+                    context,
+                    'Day Blocks',
+                    Icons.view_day_outlined,
+                    AppColors.primary,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DayThemeScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
 
                 const SizedBox(height: 8),
                 _buildMenuRow(
@@ -197,10 +240,12 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                 const SizedBox(height: 8),
                 Consumer(
                   builder: (context, ref, child) {
-                    final conflictsCount = ref.watch(typeConflictedObjectsProvider).length;
+                    final conflictsCount = ref
+                        .watch(typeConflictedObjectsProvider)
+                        .length;
                     return _buildMenuRow(
                       context,
-                      'Conflitos de Tipo${conflictsCount > 0 ? " ($conflictsCount)" : ""}',
+                      'Type Conflicts${conflictsCount > 0 ? " ($conflictsCount)" : ""}',
                       Icons.warning_amber_rounded,
                       conflictsCount > 0 ? AppColors.error : AppColors.warning,
                       () {
@@ -351,7 +396,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
       key: key,
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
-        onTap: _isEditingNav ? null : () => context.push(item.route),
+        onTap: _isEditingNav ? null : () => context.go(item.route),
         borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: AppTheme.cardDecoration(context),

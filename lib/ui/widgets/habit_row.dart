@@ -31,10 +31,18 @@ class HabitRow extends StatelessWidget {
     if (isPact && habit.startedAt != null) {
       final now = DateTime.now();
       final todayDate = DateTime(now.year, now.month, now.day);
-      final startedAtDate = DateTime(habit.startedAt!.year, habit.startedAt!.month, habit.startedAt!.day);
+      final startedAtDate = DateTime(
+        habit.startedAt!.year,
+        habit.startedAt!.month,
+        habit.startedAt!.day,
+      );
       dayCount = todayDate.difference(startedAtDate).inDays + 1;
       if (habit.endsAt != null) {
-        final endsAtDate = DateTime(habit.endsAt!.year, habit.endsAt!.month, habit.endsAt!.day);
+        final endsAtDate = DateTime(
+          habit.endsAt!.year,
+          habit.endsAt!.month,
+          habit.endsAt!.day,
+        );
         remainingDays = endsAtDate.difference(todayDate).inDays;
       }
     }
@@ -66,7 +74,7 @@ class HabitRow extends StatelessWidget {
                   if (isPact) ...[
                     const SizedBox(width: 6),
                     _buildBadge('PACT', color),
-                  ]
+                  ],
                 ],
               ),
             ),
@@ -87,14 +95,16 @@ class HabitRow extends StatelessWidget {
             if (!isPact && habit.streak > 0)
               _buildBadge('🔥 ${habit.streak}', AppColors.habitOrange),
 
-            if (isPact && dayCount > 0)
-              _buildBadge('Dia $dayCount', color),
+            if (isPact && dayCount > 0) _buildBadge('Dia $dayCount', color),
 
             if (isPact && habit.endsAt != null)
               Padding(
                 padding: const EdgeInsets.only(left: 6),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
@@ -131,7 +141,7 @@ class HabitRow extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
         ),
         child: const Text(
-          'Feito hoje',
+          'Done today',
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w700,
@@ -141,9 +151,7 @@ class HabitRow extends StatelessWidget {
       );
     }
 
-    final color = days >= 3
-        ? AppColors.error
-        : AppTheme.textMutedColor(context);
+    const color = AppColors.error;
     final text = days == 1 ? '1 day ago' : '$days days ago';
 
     return Container(
@@ -154,7 +162,7 @@ class HabitRow extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w700,
           color: color,
@@ -214,10 +222,18 @@ class HabitProgressRow extends StatelessWidget {
     if (isPact && habit.startedAt != null) {
       final now = DateTime.now();
       final todayDate = DateTime(now.year, now.month, now.day);
-      final startedAtDate = DateTime(habit.startedAt!.year, habit.startedAt!.month, habit.startedAt!.day);
+      final startedAtDate = DateTime(
+        habit.startedAt!.year,
+        habit.startedAt!.month,
+        habit.startedAt!.day,
+      );
       dayCount = todayDate.difference(startedAtDate).inDays + 1;
       if (habit.endsAt != null) {
-        final endsAtDate = DateTime(habit.endsAt!.year, habit.endsAt!.month, habit.endsAt!.day);
+        final endsAtDate = DateTime(
+          habit.endsAt!.year,
+          habit.endsAt!.month,
+          habit.endsAt!.day,
+        );
         remainingDays = endsAtDate.difference(todayDate).inDays;
       }
     }
@@ -249,7 +265,10 @@ class HabitProgressRow extends StatelessWidget {
                       if (isPact) ...[
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1.5,
+                          ),
                           decoration: BoxDecoration(
                             color: color,
                             borderRadius: BorderRadius.circular(4),
@@ -314,7 +333,9 @@ class HabitProgressRow extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    remainingDays >= 0 ? '$remainingDays dias restantes' : 'Expirado',
+                    remainingDays >= 0
+                        ? '$remainingDays dias restantes'
+                        : 'Expirado',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,

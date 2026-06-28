@@ -13,7 +13,6 @@ import '../models/goal_model.dart';
 import '../models/tracker_model.dart';
 import 'notification_service.dart';
 
-
 class AutomationService {
   static bool _updatingKpis = false;
 
@@ -75,7 +74,8 @@ class AutomationService {
         final journalNotifier = ref.read(todayJournalProvider.notifier);
         await journalNotifier.addEntry(
           JournalEntry(
-            body: 'Acionado automaticamente após "$sourceTitle" ser concluído/atingido.',
+            body:
+                'Acionado automaticamente após "$sourceTitle" ser concluído/atingido.',
             date: DateTime.now(),
             title: 'Registro automático',
           ),
@@ -88,7 +88,9 @@ class AutomationService {
         await tasksNotifier.addTask(
           Task(
             title: 'Acompanhamento: $sourceTitle',
-            notes: ['Tarefa criada automaticamente após concluir/atingir a meta.'],
+            notes: [
+              'Tarefa criada automaticamente após concluir/atingir a meta.',
+            ],
             startDate: DateTime.now(),
             stage: TaskStage.todo,
           ),
@@ -114,7 +116,9 @@ class AutomationService {
         final notesNotifier = ref.read(notesProvider.notifier);
         await notesNotifier.addNote(
           Note(
-            title: action.params?['title'] as String? ?? 'Nota automática: $sourceTitle',
+            title:
+                action.params?['title'] as String? ??
+                'Nota automática: $sourceTitle',
             body: '',
             subtype: NoteSubtype.text,
           ),
@@ -154,9 +158,9 @@ class AutomationService {
           if (collection.body.trim().isNotEmpty) '',
           '- $itemText',
         ].join('\n');
-        await ref.read(notesProvider.notifier).updateNote(
-              collection.copyWith(body: nextBody),
-            );
+        await ref
+            .read(notesProvider.notifier)
+            .updateNote(collection.copyWith(body: nextBody));
         break;
 
       case 'view_statistics':
@@ -164,7 +168,9 @@ class AutomationService {
         // Ações de navegação pura — devem ser tratadas na camada de UI via
         // callback de navegação injetado. AutomationService não conhece o
         // contexto de roteamento; registrar apenas para rastreamento.
-        debugPrint('[AutomationService] ${action.type}: destino=${action.params?["target_id"]}');
+        debugPrint(
+          '[AutomationService] ${action.type}: destino=${action.params?["target_id"]}',
+        );
         break;
 
       case 'launch_url':
@@ -203,11 +209,24 @@ class AutomationService {
         await ref.read(peopleProvider.notifier).updatePerson(effectivePerson);
       }
 
-      if (effectivePerson.isDueForContact) {
-        final taskTitle = 'Contatar ${person.title}';
+      if (_isDueForContact(effectivePerson, now)) {
+        final taskTitle = 'Contact ${person.title}';
 
         final exists = tasks.any(
-          (t) => t.title == taskTitle && t.stage != TaskStage.finalized,
+          (task) =>
+              task.stage != TaskStage.finalized &&
+              !task.archived &&
+              (task.title.toLowerCase() == taskTitle.toLowerCase() ||
+                  (task.title.toLowerCase().contains('contact') &&
+                      task.title.toLowerCase().contains(
+                        person.title.toLowerCase(),
+                      )) ||
+                  task.organizers.any(
+                    (organizer) =>
+                        organizer.type == 'person' &&
+                        (organizer.slug == person.slug ||
+                            organizer.slug == person.id),
+                  )),
         );
         if (!exists) {
           final tasksNotifier = ref.read(tasksProvider.notifier);
@@ -216,7 +235,7 @@ class AutomationService {
               id: 'contact_${person.id}_${now.millisecondsSinceEpoch}',
               title: taskTitle,
               notes: [
-                'Tarefa criada automaticamente com base na frequência de contato configurada.',
+                'Automatically created from this person contact frequency.',
               ],
               startDate: now,
               priority: person.contactPriority,
@@ -236,14 +255,33 @@ class AutomationService {
     }
   }
 
+  static bool _isDueForContact(Person person, DateTime now) {
+    final frequency = person.contactFrequency;
+    if (frequency == null) return false;
+    final today = DateTime(now.year, now.month, now.day);
+    final lastContact = person.lastContactDate;
+    if (lastContact == null) return true;
+    final lastDate = DateTime(
+      lastContact.year,
+      lastContact.month,
+      lastContact.day,
+    );
+    final dueDate = lastDate.add(frequency);
+    return !dueDate.isAfter(today);
+  }
+
   static Future<void> checkPactExpirations(Ref ref, List<Habit> habits) async {
     final now = DateTime.now();
-    final expiredPacts = habits.where((h) =>
-        h.habitMode == HabitMode.pact &&
-        h.status == HabitStatus.active &&
-        h.endsAt != null &&
-        !h.endsAt!.isAfter(now) &&
-        h.pactOutcome == null).toList();
+    final expiredPacts = habits
+        .where(
+          (h) =>
+              h.habitMode == HabitMode.pact &&
+              h.status == HabitStatus.active &&
+              h.endsAt != null &&
+              !h.endsAt!.isAfter(now) &&
+              h.pactOutcome == null,
+        )
+        .toList();
 
     if (expiredPacts.isEmpty) return;
 

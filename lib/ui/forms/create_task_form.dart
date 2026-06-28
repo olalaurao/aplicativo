@@ -56,6 +56,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
   List<String> _socialRefs = [];
   Scheduler? _scheduler;
   int? _estimatedMinutes;
+  String? _linkedSystem;
 
   @override
   void initState() {
@@ -105,6 +106,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       _dependsOn = List.from(task.dependsOn);
       _socialRefs = List.from(task.socialRefs);
       _estimatedMinutes = task.estimatedMinutes;
+      _linkedSystem = task.linkedSystem;
     } else {
       _timeBlock = widget.initialTimeBlock;
       if (widget.initialStage != null) {
@@ -133,7 +135,9 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Descartar alterações?'),
-            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
+            content: const Text(
+              'Você possui alterações não salvas. Deseja sair mesmo assim?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -153,196 +157,238 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       },
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: CustomScrollView(
-        slivers: [
-          // ─── App Bar ───
-          SliverAppBar(
-            pinned: true,
-            leading: IconButton(
-              icon: const Icon(Icons.close_rounded),
-              onPressed: () => Navigator.maybePop(context),
-            ),
-            title: Text(
-              widget.existingTask != null ? 'Editar Tarefa' : 'Nova Tarefa',
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-            ),
-            centerTitle: true,
-            actions: [
-              IconButton(
-                icon: const Icon(
-                  Icons.copy_all_rounded,
-                  color: AppColors.primary,
+        body: CustomScrollView(
+          slivers: [
+            // ─── App Bar ───
+            SliverAppBar(
+              pinned: true,
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.maybePop(context),
+              ),
+              title: Text(
+                widget.existingTask != null ? 'Editar Tarefa' : 'Nova Tarefa',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
                 ),
-                tooltip: 'Usar Template',
-                onPressed: _showTemplatePicker,
               ),
-              IconButton(
-                icon: const Icon(Icons.inbox_rounded, color: AppColors.primary),
-                tooltip: 'Mover para Backlog',
-                onPressed: () {
-                  setState(() {
-                    _startDate = null;
-                    _endDate = null;
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Data removida (Backlog)')),
-                  );
-                },
-              ),
-              if (widget.existingTask != null)
+              centerTitle: true,
+              actions: [
                 IconButton(
                   icon: const Icon(
-                    Icons.delete_outline_rounded,
-                    color: AppColors.priorityHigh,
+                    Icons.copy_all_rounded,
+                    color: AppColors.primary,
                   ),
-                  onPressed: _deleteTask,
+                  tooltip: 'Usar Template',
+                  onPressed: _showTemplatePicker,
                 ),
-              TextButton(
-                onPressed: hasTitle ? _saveTask : null,
-                child: Text(
-                  'Salvar',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: hasTitle ? AppColors.primary : AppColors.textMuted,
+                IconButton(
+                  icon: const Icon(
+                    Icons.inbox_rounded,
+                    color: AppColors.primary,
                   ),
+                  tooltip: 'Mover para Backlog',
+                  onPressed: () {
+                    setState(() {
+                      _startDate = null;
+                      _endDate = null;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Data removida (Backlog)')),
+                    );
+                  },
                 ),
-              ),
-            ],
-          ),
-
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ─── Title ───
-                  TextField(
-                    controller: _titleController,
-                    onChanged: (_) => setState(() {}),
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
+                if (widget.existingTask != null)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: AppColors.priorityHigh,
                     ),
-                    decoration: const InputDecoration(
-                      hintText: 'Task title',
-                      hintStyle: TextStyle(
+                    onPressed: _deleteTask,
+                  ),
+                TextButton(
+                  onPressed: hasTitle ? _saveTask : null,
+                  child: Text(
+                    'Salvar',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: hasTitle ? AppColors.primary : AppColors.textMuted,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ─── Title ───
+                    TextField(
+                      controller: _titleController,
+                      onChanged: (_) => setState(() {}),
+                      style: const TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textMuted,
                         letterSpacing: -0.5,
                       ),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      filled: false,
-                      contentPadding: EdgeInsets.zero,
+                      decoration: const InputDecoration(
+                        hintText: 'Task title',
+                        hintStyle: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textMuted,
+                          letterSpacing: -0.5,
+                        ),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        filled: false,
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
 
-                  _buildNlpSuggestions(settings),
+                    _buildNlpSuggestions(settings),
 
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                  // ─── Status Selector (Card) ───
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Status',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
+                    // ─── Status Selector (Card) ───
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Status',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildStageSegmentedControl(),
-                      ],
+                          const SizedBox(height: 12),
+                          _buildStageSegmentedControl(),
+                        ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-                  // ─── Metadata Card ───
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        // Priority
-                        Row(
-                          children: [
-                            const Text(
-                              'Priority',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
+                    // ─── Metadata Card ───
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          // Priority
+                          Row(
+                            children: [
+                              const Text(
+                                'Priority',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
-                            const Spacer(),
-                            ...TaskPriority.values
-                                .where((p) => p != TaskPriority.none)
-                                .map((p) {
-                                  final selected = _priority == p;
-                                  return GestureDetector(
-                                    onTap: () => setState(
-                                      () => _priority = selected
-                                          ? TaskPriority.none
-                                          : p,
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
+                              const Spacer(),
+                              ...TaskPriority.values
+                                  .where((p) => p != TaskPriority.none)
+                                  .map((p) {
+                                    final selected = _priority == p;
+                                    return GestureDetector(
+                                      onTap: () => setState(
+                                        () => _priority = selected
+                                            ? TaskPriority.none
+                                            : p,
                                       ),
-                                      child: Icon(
-                                        Icons.flag_rounded,
-                                        size: 24,
-                                        color: selected
-                                            ? _priorityColor(p)
-                                            : AppColors.textMuted.withValues(
-                                                alpha: 0.3,
-                                              ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                        ),
+                                        child: Icon(
+                                          Icons.flag_rounded,
+                                          size: 24,
+                                          color: selected
+                                              ? _priorityColor(p)
+                                              : AppColors.textMuted.withValues(
+                                                  alpha: 0.3,
+                                                ),
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                }),
-                          ],
-                        ),
-                        const Divider(height: 24),
-                        // Date
-                        _buildDateRow(),
-                        const Divider(height: 24),
-                        // All Day & Time
-                        Row(
-                          children: [
-                            const Text(
-                              'All Day',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const Spacer(),
-                            Switch.adaptive(
-                              value: _allDay,
-                              onChanged: (v) => setState(() => _allDay = v),
-                              activeThumbColor: AppColors.primary,
-                            ),
-                          ],
-                        ),
-                        if (!_allDay) ...[
+                                    );
+                                  }),
+                            ],
+                          ),
                           const Divider(height: 24),
+                          // Date
+                          _buildDateRow(),
+                          const Divider(height: 24),
+                          // All Day & Time
+                          Row(
+                            children: [
+                              const Text(
+                                'All Day',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const Spacer(),
+                              Switch.adaptive(
+                                value: _allDay,
+                                onChanged: (v) => setState(() => _allDay = v),
+                                activeThumbColor: AppColors.primary,
+                              ),
+                            ],
+                          ),
+                          if (!_allDay) ...[
+                            const Divider(height: 24),
+                            GestureDetector(
+                              onTap: _pickTime,
+                              child: Row(
+                                children: [
+                                  const Text(
+                                    'Time',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    _scheduledTime != null
+                                        ? _scheduledTime!.format(context)
+                                        : 'Set Time',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: _scheduledTime != null
+                                          ? AppColors.primary
+                                          : AppColors.textMuted,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 18,
+                                    color: AppColors.textMuted,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          const Divider(height: 24),
+                          // Duration
                           GestureDetector(
-                            onTap: _pickTime,
+                            onTap: _editDuration,
                             child: Row(
                               children: [
                                 const Text(
-                                  'Time',
+                                  'Duration',
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w500,
@@ -350,12 +396,66 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                 ),
                                 const Spacer(),
                                 Text(
-                                  _scheduledTime != null
-                                      ? _scheduledTime!.format(context)
-                                      : 'Set Time',
+                                  '${_durationMinutes ?? 15} min',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 18,
+                                  color: AppColors.textMuted,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Divider(height: 24),
+                          // Until Done
+                          Row(
+                            children: [
+                              const Text(
+                                'Until Done',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const Spacer(),
+                              Switch.adaptive(
+                                value: _untilDone,
+                                onChanged: (v) =>
+                                    setState(() => _untilDone = v),
+                                activeThumbColor: AppColors.primary,
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 24),
+                          // Reminder configuration (Enhanced)
+                          _buildReminderSection(),
+                          const Divider(height: 24),
+                          // Pomodoro Blocks
+                          GestureDetector(
+                            onTap: _editPomodoros,
+                            child: Row(
+                              children: [
+                                const Text(
+                                  'Pomodoro Blocks',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: _scheduledTime != null
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  _pomodoroCount != null
+                                      ? '$_pomodoroCount blocks'
+                                      : 'None',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: _pomodoroCount != null
                                         ? AppColors.primary
                                         : AppColors.textMuted,
                                     fontWeight: FontWeight.w500,
@@ -370,391 +470,306 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                               ],
                             ),
                           ),
-                        ],
-                        const Divider(height: 24),
-                        // Duration
-                        GestureDetector(
-                          onTap: _editDuration,
-                          child: Row(
-                            children: [
-                              const Text(
-                                'Duration',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                '${_durationMinutes ?? 15} min',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.chevron_right_rounded,
-                                size: 18,
-                                color: AppColors.textMuted,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Divider(height: 24),
-                        // Until Done
-                        Row(
-                          children: [
-                            const Text(
-                              'Until Done',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const Spacer(),
-                            Switch.adaptive(
-                              value: _untilDone,
-                              onChanged: (v) => setState(() => _untilDone = v),
-                              activeThumbColor: AppColors.primary,
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 24),
-                        // Reminder configuration (Enhanced)
-                        _buildReminderSection(),
-                        const Divider(height: 24),
-                        // Pomodoro Blocks
-                        GestureDetector(
-                          onTap: _editPomodoros,
-                          child: Row(
-                            children: [
-                              const Text(
-                                'Pomodoro Blocks',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                _pomodoroCount != null
-                                    ? '$_pomodoroCount blocks'
-                                    : 'None',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: _pomodoroCount != null
-                                      ? AppColors.primary
-                                      : AppColors.textMuted,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.chevron_right_rounded,
-                                size: 18,
-                                color: AppColors.textMuted,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Divider(height: 24),
-                        // Tempo Estimado
-                        GestureDetector(
-                          onTap: _editEstimatedTime,
-                          child: Row(
-                            children: [
-                              const Text(
-                                'Tempo Estimado',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                _estimatedMinutes != null
-                                    ? '$_estimatedMinutes min'
-                                    : 'Não estimado',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: _estimatedMinutes != null
-                                      ? AppColors.primary
-                                      : AppColors.textMuted,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.chevron_right_rounded,
-                                size: 18,
-                                color: AppColors.textMuted,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Divider(height: 24),
-                        // Repeat / Scheduler
-                        GestureDetector(
-                          onTap: _pickScheduler,
-                          child: Row(
-                            children: [
-                              const Text(
-                                'Repeat',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                _scheduler != null ? 'On' : 'None',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: _scheduler != null
-                                      ? AppColors.primary
-                                      : AppColors.textMuted,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.chevron_right_rounded,
-                                size: 18,
-                                color: AppColors.textMuted,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Divider(height: 24),
-                        TimeBlockPicker(
-                          selectedBlockId: _timeBlock,
-                          onBlockSelected: (val) =>
-                              setState(() => _timeBlock = val),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // ─── Connections Card ───
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: OrganizerSelectorField(
-                      selectedOrganizers: _organizers,
-                      onChanged: (val) => setState(() => _organizers = val),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  _buildSocialRefsCard(),
-
-                  const SizedBox(height: 12),
-
-                  // ─── Depends On Card ───
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Text(
-                              'Depende de (Bloqueantes)',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.add_rounded,
-                                color: AppColors.primary,
-                              ),
-                              onPressed: () {
-                                showModalBottomSheet(
-                                  context: context,
-                                  isScrollControlled: true,
-                                  backgroundColor: Colors.transparent,
-                                  builder: (context) =>
-                                      UniversalSearchPickerSheet(
-                                        title: 'Depende de',
-                                        initialFilter: 'task',
-                                        onSelected: (obj) {
-                                          if (!_dependsOn.contains(obj.slug)) {
-                                            setState(
-                                              () => _dependsOn.add(obj.slug),
-                                            );
-                                          }
-                                          Navigator.pop(context);
-                                        },
-                                      ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                        if (_dependsOn.isNotEmpty) const SizedBox(height: 8),
-                        for (final slug in _dependsOn)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
+                          const Divider(height: 24),
+                          // Tempo Estimado
+                          GestureDetector(
+                            onTap: _editEstimatedTime,
                             child: Row(
                               children: [
+                                const Text(
+                                  'Tempo Estimado',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  _estimatedMinutes != null
+                                      ? '$_estimatedMinutes min'
+                                      : 'Não estimado',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: _estimatedMinutes != null
+                                        ? AppColors.primary
+                                        : AppColors.textMuted,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
                                 const Icon(
-                                  Icons.lock_rounded,
-                                  size: 16,
+                                  Icons.chevron_right_rounded,
+                                  size: 18,
                                   color: AppColors.textMuted,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Consumer(
-                                    builder: (context, ref, _) {
-                                      final objects =
-                                          ref.watch(allObjectsProvider).value ??
-                                          [];
-                                      final task = objects.firstWhere(
-                                        (o) => o is Task && o.slug == slug,
-                                        orElse: () => Task(
-                                          id: slug,
-                                          title: slug,
-                                          stage: TaskStage.todo,
-                                          createdAt: DateTime.now(),
-                                        ),
-                                      );
-                                      return Text(
-                                        task.title,
-                                        style: const TextStyle(fontSize: 14),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      );
-                                    },
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.close_rounded,
-                                    size: 16,
-                                    color: AppColors.textMuted,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _dependsOn.remove(slug);
-                                    });
-                                  },
                                 ),
                               ],
                             ),
                           ),
-                      ],
+                          const Divider(height: 24),
+                          // Repeat / Scheduler
+                          GestureDetector(
+                            onTap: _pickScheduler,
+                            child: Row(
+                              children: [
+                                const Text(
+                                  'Repeat',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  _scheduler != null ? 'On' : 'None',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: _scheduler != null
+                                        ? AppColors.primary
+                                        : AppColors.textMuted,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 18,
+                                  color: AppColors.textMuted,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Divider(height: 24),
+                          TimeBlockPicker(
+                            selectedBlockId: _timeBlock,
+                            onBlockSelected: (val) =>
+                                setState(() => _timeBlock = val),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-                  // ─── Subtasks Card ───
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
+                    // ─── Connections Card ───
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: OrganizerSelectorField(
+                        selectedOrganizers: _organizers,
+                        onChanged: (val) => setState(() => _organizers = val),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    _buildSocialRefsCard(),
+
+                    const SizedBox(height: 12),
+
+                    // ─── Depends On Card ───
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                'Depende de (Bloqueantes)',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const Spacer(),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.add_rounded,
+                                  color: AppColors.primary,
+                                ),
+                                onPressed: () {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (context) =>
+                                        UniversalSearchPickerSheet(
+                                          title: 'Depende de',
+                                          initialFilter: 'task',
+                                          onSelected: (obj) {
+                                            if (!_dependsOn.contains(
+                                              obj.slug,
+                                            )) {
+                                              setState(
+                                                () => _dependsOn.add(obj.slug),
+                                              );
+                                            }
+                                            Navigator.pop(context);
+                                          },
+                                        ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                          if (_dependsOn.isNotEmpty) const SizedBox(height: 8),
+                          for (final slug in _dependsOn)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.lock_rounded,
+                                    size: 16,
+                                    color: AppColors.textMuted,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Consumer(
+                                      builder: (context, ref, _) {
+                                        final objects =
+                                            ref
+                                                .watch(allObjectsProvider)
+                                                .value ??
+                                            [];
+                                        final task = objects.firstWhere(
+                                          (o) => o is Task && o.slug == slug,
+                                          orElse: () => Task(
+                                            id: slug,
+                                            title: slug,
+                                            stage: TaskStage.todo,
+                                            createdAt: DateTime.now(),
+                                          ),
+                                        );
+                                        return Text(
+                                          task.title,
+                                          style: const TextStyle(fontSize: 14),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      size: 16,
+                                      color: AppColors.textMuted,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _dependsOn.remove(slug);
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // ─── Subtasks Card ───
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                'Subtasks',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const Spacer(),
+                              IconButton(
+                                onPressed: _addSessionHeader,
+                                icon: const Icon(
+                                  Icons.folder_open_rounded,
+                                  color: AppColors.textMuted,
+                                  size: 20,
+                                ),
+                                tooltip: 'New Section',
+                              ),
+                              IconButton(
+                                onPressed: _addSubtask,
+                                icon: const Icon(
+                                  Icons.add_rounded,
+                                  color: AppColors.primary,
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                            ],
+                          ),
+                          if (_subtasks.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            _buildSubtaskReorderableList(),
+                          ] else ...[
+                            const SizedBox(height: 8),
                             const Text(
-                              'Subtasks',
+                              'No subtasks yet',
                               style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              onPressed: _addSessionHeader,
-                              icon: const Icon(
-                                Icons.folder_open_rounded,
+                                fontSize: 13,
                                 color: AppColors.textMuted,
-                                size: 20,
                               ),
-                              tooltip: 'New Section',
-                            ),
-                            IconButton(
-                              onPressed: _addSubtask,
-                              icon: const Icon(
-                                Icons.add_rounded,
-                                color: AppColors.primary,
-                              ),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
                             ),
                           ],
-                        ),
-                        if (_subtasks.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          _buildSubtaskReorderableList(),
-                        ] else ...[
-                          const SizedBox(height: 8),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // ─── Notes Card ───
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           const Text(
-                            'No subtasks yet',
+                            'Notes',
                             style: TextStyle(
                               fontSize: 13,
-                              color: AppColors.textMuted,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 200,
+                            child: RichTextEditor(
+                              content: _notesContent,
+                              onChanged: (val) {
+                                setState(() {
+                                  _notesContent = val;
+                                });
+                              },
+                              placeholder: 'Add details...',
+                              expands: true,
                             ),
                           ),
                         ],
-                      ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 12),
-
-                  // ─── Notes Card ───
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Notes',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          height: 200,
-                          child: RichTextEditor(
-                            content: _notesContent,
-                            onChanged: (val) {
-                              setState(() {
-                                _notesContent = val;
-                              });
-                            },
-                            placeholder: 'Add details...',
-                            expands: true,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 100),
-                ],
+                    const SizedBox(height: 100),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
   }
 
   void _addSessionHeader() {
@@ -1567,38 +1582,33 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
 
   void _saveTask() async {
     if (_endDate == null && _stage != TaskStage.idea) {
-      final shouldGoToBacklog = await showDialog<bool>(
+      final result = await showDialog<String>(
         context: context,
-        barrierDismissible: false,
+        barrierDismissible: true,
         builder: (context) => AlertDialog(
-          title: const Text('Sem data definida'),
-          content: const Text('Onde você quer colocar esta task?'),
+          title: const Text('No date set'),
+          content: const Text('Where do you want to save this task?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(context, 'backlog'),
               child: const Text('Backlog'),
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text(
-                'Hoje',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, 'today'),
+              child: const Text('Today'),
             ),
           ],
         ),
       );
       if (!mounted) return;
-      if (shouldGoToBacklog == true) {
+      if (result == 'backlog') {
         setState(() => _stage = TaskStage.backlog);
-      } else if (shouldGoToBacklog == false) {
+      } else {
         final now = DateTime.now();
         setState(() {
           _endDate = DateTime(now.year, now.month, now.day);
           _stage = TaskStage.todo;
         });
-      } else {
-        return;
       }
     }
 
@@ -1635,6 +1645,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       dependsOn: _dependsOn,
       socialRefs: _socialRefs,
       estimatedMinutes: _estimatedMinutes,
+      linkedSystem: _linkedSystem,
     );
 
     task.organizers.clear();

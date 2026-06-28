@@ -45,6 +45,11 @@ class PactCycle {
   }
 
   factory PactCycle.fromMap(Map<dynamic, dynamic> map) {
+    final now = DateTime.now();
+    final startedAt = DateTime.tryParse(map['started_at']?.toString() ?? '') ??
+        DateTime(now.year, now.month, now.day);
+    final endsAt = DateTime.tryParse(map['ends_at']?.toString() ?? '') ??
+        startedAt;
     bool? hypCorrect;
     if (map['hypothesis_correct'] != null) {
       if (map['hypothesis_correct'] is bool) {
@@ -56,8 +61,8 @@ class PactCycle {
       }
     }
     return PactCycle(
-      startedAt: DateTime.parse(map['started_at'].toString()),
-      endsAt: DateTime.parse(map['ends_at'].toString()),
+      startedAt: startedAt,
+      endsAt: endsAt,
       outcome: PactOutcome.values.firstWhere(
         (e) => e.name == map['outcome'].toString(),
         orElse: () => PactOutcome.persist,

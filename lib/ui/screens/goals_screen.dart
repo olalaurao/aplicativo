@@ -18,7 +18,6 @@ class GoalsScreen extends ConsumerStatefulWidget {
 }
 
 class _GoalsScreenState extends ConsumerState<GoalsScreen> {
-
   @override
   Widget build(BuildContext context) {
     final goals = ref.watch(goalsProvider);
@@ -45,31 +44,61 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
             floating: true,
             pinned: true,
           ),
-          SliverToBoxAdapter(child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                const Expanded(child: Text('Metas',
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800))),
-                Text('${completedGoals.length}/${goals.length}',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-                    color: AppColors.primary)),
-              ]),
-              const SizedBox(height: 10),
-              ClipRRect(borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: goals.isEmpty ? 0 : completedGoals.length / goals.length,
-                  minHeight: 6,
-                  backgroundColor: AppTheme.surfaceVariantColor(context),
-                  valueColor: const AlwaysStoppedAnimation(AppColors.primary))),
-              const SizedBox(height: 4),
-              Text('${activeGoals.length} em andamento · ${onHoldGoals.length} pausadas',
-                style: TextStyle(fontSize: 11, color: AppTheme.textMutedColor(context))),
-            ]))),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Metas',
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${completedGoals.length}/${goals.length}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: goals.isEmpty
+                          ? 0
+                          : completedGoals.length / goals.length,
+                      minHeight: 6,
+                      backgroundColor: AppTheme.surfaceVariantColor(context),
+                      valueColor: const AlwaysStoppedAnimation(
+                        AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${activeGoals.length} em andamento · ${onHoldGoals.length} pausadas',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textMutedColor(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           if (goals.isEmpty)
-            SliverFillRemaining(
-              child: _buildEmptyState(context),
-            )
+            SliverFillRemaining(child: _buildEmptyState(context))
           else
             SliverPadding(
               padding: const EdgeInsets.all(20),
@@ -168,6 +197,9 @@ class _GoalCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final color = _goalColor(goal.color);
+    final accentColor = goal.goalMode == GoalMode.plan
+        ? AppColors.primary
+        : color;
 
     return ObjectActionWrapper(
       object: goal,
@@ -186,12 +218,15 @@ class _GoalCard extends ConsumerWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                   Container(
+                  Container(
                     width: 6,
                     decoration: BoxDecoration(
-                      color: isCompleted ? AppColors.textMuted : color,
+                      color: isCompleted ? AppColors.textMuted : accentColor,
                       borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(20), bottomLeft: Radius.circular(20))),
+                        topLeft: Radius.circular(20),
+                        bottomLeft: Radius.circular(20),
+                      ),
+                    ),
                   ),
                   Expanded(
                     child: Padding(
@@ -226,6 +261,31 @@ class _GoalCard extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(width: 8),
+                              if (goal.goalMode == GoalMode.plan) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.12,
+                                    ),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: const Text(
+                                    'PLAN',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: AppColors.primary,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
                               const Icon(
                                 Icons.chevron_right_rounded,
                                 color: AppColors.textMuted,
@@ -312,7 +372,6 @@ class _GoalCard extends ConsumerWidget {
                 color: AppColors.textSecondary,
               ),
             ),
-
           ],
         ),
         if (deadline != null) ...[

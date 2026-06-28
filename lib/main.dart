@@ -491,8 +491,22 @@ Future<void> _initApp(ProviderContainer container) async {
     ),
   ]);
 
-  // Kick off vault load in background; HomeScreen handles AsyncValue loading state.
-  unawaited(container.read(allObjectsProvider.future));
+  // Kick off vault load independently from HomeScreen. Home used to watch a
+  // large dashboard tree; after the dashboard was simplified this explicit read
+  // keeps the vault scan alive even if no first-screen widget needs objects yet.
+  unawaited(
+    container
+        .read(allObjectsProvider.future)
+        .then((objects) async {
+          debugPrint('[Startup] Vault loaded: ${objects.length} objects.');
+          await container
+              .read(peopleProvider.notifier)
+              .checkPersonContactsNow();
+        })
+        .catchError((Object e, StackTrace st) {
+          debugPrint('[Startup] Vault load failed: $e\n$st');
+        }),
+  );
 
   // Update CrashReportService with the real vault path now that vault has loaded
   try {
@@ -512,6 +526,15 @@ Future<void> _initApp(ProviderContainer container) async {
       container.read(syncManagerProvider).performSync();
     }
   });
+
+  // Start Drive/vault sync before non-critical startup work. Otherwise a slow
+  // permission prompt or notification task can delay the initial pull and the
+  // filesystem watcher.
+  try {
+    container.read(syncManagerProvider).start();
+  } catch (e) {
+    debugPrint('Startup init failed: sync_manager_start: $e');
+  }
 
   // Non-critical: run in background after UI is shown
   Future.microtask(() async {
@@ -632,13 +655,6 @@ Future<void> _initApp(ProviderContainer container) async {
       ]);
     } catch (e) {
       debugPrint('Startup init failed: quick_actions_init: $e');
-    }
-
-    // Start sync manager
-    try {
-      container.read(syncManagerProvider).start();
-    } catch (e) {
-      debugPrint('Startup init failed: sync_manager_start: $e');
     }
 
     // Pomodoro background service

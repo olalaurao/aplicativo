@@ -21,6 +21,7 @@ import '../widgets/social_embed_view.dart';
 import '../widgets/social_post_grid_card.dart';
 import 'universal_detail_view.dart';
 import '../widgets/linked_objects_section.dart';
+import '../widgets/book_search_sheet.dart';
 import '../utils/social_ref_utils.dart';
 
 class SocialPostDetail extends ConsumerStatefulWidget {
@@ -89,6 +90,11 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
               ),
               actions: [
                 IconButton(
+                  tooltip: 'Save books from post',
+                  icon: const Icon(Icons.menu_book_outlined),
+                  onPressed: () => _showBookSearchSheet(post),
+                ),
+                IconButton(
                   tooltip: 'Abrir original',
                   icon: const Icon(Icons.open_in_new_rounded),
                   onPressed: () => _openOriginal(post),
@@ -154,6 +160,15 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
     return posts.firstWhere(
       (candidate) => candidate.id == widget.post.id,
       orElse: () => widget.post,
+    );
+  }
+
+  void _showBookSearchSheet(SocialPost post) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => BookSearchSheet(linkedPostId: post.id),
     );
   }
 
@@ -292,9 +307,7 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
   Future<void> _quickCreateResource(SocialPost post) async {
     final newResource = await Navigator.push<ContentObject>(
       context,
-      MaterialPageRoute(
-        builder: (_) => const CreateResourceForm(),
-      ),
+      MaterialPageRoute(builder: (_) => const CreateResourceForm()),
     );
     if (newResource != null) {
       await addSocialRef(post, newResource, ref);
@@ -309,36 +322,50 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
         onPressed: () => _addPlace(post),
       ),
       child: post.places.isEmpty
-          ? const Text('Nenhum lugar adicionado',
-              style: TextStyle(color: AppColors.textMuted))
+          ? const Text(
+              'Nenhum lugar adicionado',
+              style: TextStyle(color: AppColors.textMuted),
+            )
           : Column(
               children: post.places
-                  .map((place) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.place_rounded,
-                            color: AppColors.primary),
-                        title: Text(place.name,
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
-                        subtitle: place.address != null
-                            ? Text(place.address!,
-                                maxLines: 1, overflow: TextOverflow.ellipsis)
-                            : null,
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (place.lat != null && place.lng != null)
-                              IconButton(
-                                icon: const Icon(Icons.map_rounded),
-                                onPressed: () => _openInMaps(place),
-                              ),
+                  .map(
+                    (place) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(
+                        Icons.place_rounded,
+                        color: AppColors.primary,
+                      ),
+                      title: Text(
+                        place.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: place.address != null
+                          ? Text(
+                              place.address!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          : null,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (place.lat != null && place.lng != null)
                             IconButton(
-                              icon: const Icon(Icons.delete_outline_rounded,
-                                  color: AppColors.error),
-                              onPressed: () => _removePlace(post, place.id),
+                              icon: const Icon(Icons.map_rounded),
+                              onPressed: () => _openInMaps(place),
                             ),
-                          ],
-                        ),
-                      ))
+                          IconButton(
+                            icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: AppColors.error,
+                            ),
+                            onPressed: () => _removePlace(post, place.id),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
                   .toList(),
             ),
     );
@@ -361,8 +388,9 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
             ),
             TextField(
               controller: addressController,
-              decoration:
-                  const InputDecoration(labelText: 'Endereço (opcional)'),
+              decoration: const InputDecoration(
+                labelText: 'Endereço (opcional)',
+              ),
             ),
           ],
         ),
@@ -387,14 +415,16 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
             ? null
             : addressController.text.trim(),
       );
-      ref.read(socialPostsProvider.notifier).updatePost(
-            post.copyWith(places: [...post.places, newPlace]),
-          );
+      ref
+          .read(socialPostsProvider.notifier)
+          .updatePost(post.copyWith(places: [...post.places, newPlace]));
     }
   }
 
   void _removePlace(SocialPost post, String placeId) {
-    ref.read(socialPostsProvider.notifier).updatePost(
+    ref
+        .read(socialPostsProvider.notifier)
+        .updatePost(
           post.copyWith(
             places: post.places.where((p) => p.id != placeId).toList(),
           ),
@@ -404,7 +434,8 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
   void _openInMaps(PlaceRef place) async {
     if (place.lat == null || place.lng == null) return;
     final uri = Uri.parse(
-        'https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}');
+      'https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}',
+    );
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
@@ -566,8 +597,6 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
         .read(socialPostsProvider.notifier)
         .updatePost(post.copyWith(tags: tags));
   }
-
-
 
   Future<void> _showActionSheet(SocialPost post) async {
     await showModalBottomSheet<void>(

@@ -82,6 +82,7 @@ class AppSettings {
 
   // ── Integrations ──
   final String? huggingFaceToken; // Whisper / HuggingFace API token (E11)
+  final String googleBooksApiKey;
 
   // ── Conflict suppression ──
   final Map<String, DateTime>
@@ -144,6 +145,7 @@ class AppSettings {
     this.userName,
     this.savedFiltersRaw = const [],
     this.huggingFaceToken,
+    this.googleBooksApiKey = '',
     this.suppressedConflicts = const {},
     this.recentSearches = const [],
   });
@@ -229,6 +231,7 @@ class AppSettings {
     String? userName,
     List<Map<String, dynamic>>? savedFiltersRaw,
     String? huggingFaceToken,
+    String? googleBooksApiKey,
     Map<String, DateTime>? suppressedConflicts,
     List<String>? recentSearches,
   }) {
@@ -300,6 +303,7 @@ class AppSettings {
       userName: userName ?? this.userName,
       savedFiltersRaw: savedFiltersRaw ?? this.savedFiltersRaw,
       huggingFaceToken: huggingFaceToken ?? this.huggingFaceToken,
+      googleBooksApiKey: googleBooksApiKey ?? this.googleBooksApiKey,
       suppressedConflicts: suppressedConflicts ?? this.suppressedConflicts,
       recentSearches: recentSearches ?? this.recentSearches,
     );
@@ -425,6 +429,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
         }
       }(),
       huggingFaceToken: prefs.getString('huggingFaceToken'),
+      googleBooksApiKey: prefs.getString('google_books_api_key') ?? '',
       suppressedConflicts: () {
         final raw = prefs.getString('suppressedConflicts');
         if (raw == null) return const <String, DateTime>{};
@@ -834,6 +839,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     );
   }
 
+  Future<void> updateGoogleBooksApiKey(String apiKey) async {
+    final trimmed = apiKey.trim();
+    await _prefs.setString('google_books_api_key', trimmed);
+    state = state.copyWith(googleBooksApiKey: trimmed);
+  }
+
   Future<void> updateFolderPath(String objectType, String folder) async {
     final key = objectType.trim();
     final value = folder
@@ -957,4 +968,8 @@ final settingsProvider = StateNotifierProvider<SettingsNotifier, AppSettings>((
 ) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return SettingsNotifier(prefs);
+});
+
+final googleBooksApiKeyProvider = StateProvider<String>((ref) {
+  return ref.watch(settingsProvider.select((s) => s.googleBooksApiKey));
 });

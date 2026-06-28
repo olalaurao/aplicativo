@@ -1,8 +1,10 @@
 // lib/ui/widgets/timeline_card.dart
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import '../../models/task_model.dart';
 import '../../services/markdown_parser.dart';
 import 'journal_body_view.dart';
+import 'triple_check_sheet.dart';
 
 /// A card for journal entries on the timeline
 class JournalEntryCard extends StatelessWidget {
@@ -220,6 +222,8 @@ class TaskCard extends StatelessWidget {
   final int subtasksCount;
   final int completedSubtasksCount;
   final bool isBlocked;
+  final TripleCheck? tripleCheck;
+  final VoidCallback? onTripleCheckTap;
   final VoidCallback? onTap;
   final VoidCallback? onToggle;
 
@@ -231,6 +235,8 @@ class TaskCard extends StatelessWidget {
     this.dueDate,
     this.completed = false,
     this.isBlocked = false,
+    this.tripleCheck,
+    this.onTripleCheckTap,
     this.subtasksCount = 0,
     this.completedSubtasksCount = 0,
     this.onTap,
@@ -307,16 +313,30 @@ class TaskCard extends StatelessWidget {
 
               // Title
               Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: completed
-                        ? AppTheme.textMutedColor(context)
-                        : AppTheme.textPrimaryColor(context),
-                    decoration: completed ? TextDecoration.lineThrough : null,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: completed
+                            ? AppTheme.textMutedColor(context)
+                            : AppTheme.textPrimaryColor(context),
+                        decoration: completed ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
+                    if (tripleCheck != null) ...[
+                      const SizedBox(height: 4),
+                      TripleCheckIconRow(
+                        tripleCheck: tripleCheck!,
+                        onTap: onTripleCheckTap,
+                      ),
+                    ],
+                  ],
                 ),
               ),
 

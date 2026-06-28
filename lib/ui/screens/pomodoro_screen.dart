@@ -1,4 +1,6 @@
 // lib/ui/screens/pomodoro_screen.dart
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
@@ -18,11 +20,32 @@ class PomodoroScreen extends ConsumerStatefulWidget {
   ConsumerState<PomodoroScreen> createState() => _PomodoroScreenState();
 }
 
-class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
+class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
+    with SingleTickerProviderStateMixin {
   DateTime _scheduledDate = DateTime.now();
   TimeOfDay _scheduledTime = TimeOfDay.now();
   int _sessionCount = 4;
   bool _handledWidgetStartAction = false;
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -110,51 +133,18 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
                         _buildPhaseBadge(state.currentType),
                         const SizedBox(height: 40),
 
-                        // Circular Progress
-                        Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            SizedBox(
-                              width: 240,
-                              height: 240,
-                              child: CircularProgressIndicator(
-                                value:
-                                    state.remainingSeconds / state.totalSeconds,
-                                strokeWidth: 10,
-                                backgroundColor: AppColors.surfaceVariant,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  state.currentType == PomodoroType.work
-                                      ? AppColors.error
-                                      : AppColors.habitGreen,
-                                ),
-                              ),
+                        SizedBox(
+                          width: 240,
+                          height: 240,
+                          child: CustomPaint(
+                            painter: _PomodoroRingPainter(
+                              progress: state.totalSeconds <= 0
+                                  ? 0
+                                  : state.remainingSeconds / state.totalSeconds,
+                              phaseColor: _phaseColor(state.currentType),
                             ),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _formatTime(state.remainingSeconds),
-                                  style: const TextStyle(
-                                    fontSize: 64,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.textPrimary,
-                                    letterSpacing: -2,
-                                  ),
-                                ),
-                                Text(
-                                  state.isRunning ? 'FOCANDO' : 'PAUSADO',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 2,
-                                    color: AppColors.textMuted.withValues(
-                                      alpha: 0.6,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                            child: Center(child: _buildCountdownText(state)),
+                          ),
                         ),
 
                         const SizedBox(height: 40),
@@ -169,27 +159,14 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
                             final isCurrent =
                                 i == state.completedSessions &&
                                 state.currentType == PomodoroType.work;
-                            return Container(
-                              width: 14,
-                              height: 14,
-                              margin: const EdgeInsets.symmetric(horizontal: 6),
-                              decoration: BoxDecoration(
-                                color: completed
-                                    ? AppColors.error
-                                    : (isCurrent
-                                          ? AppColors.error.withValues(
-                                              alpha: 0.3,
-                                            )
-                                          : AppColors.surfaceVariant),
-                                shape: BoxShape.circle,
-                                border: isCurrent
-                                    ? Border.all(
-                                        color: AppColors.error,
-                                        width: 2,
-                                      )
-                                    : null,
-                              ),
+                            final dot = _sessionDot(
+                              completed: completed,
+                              isCurrent: isCurrent,
+                              color: _phaseColor(state.currentType),
                             );
+                            return isCurrent
+                                ? ScaleTransition(scale: _pulseAnim, child: dot)
+                                : dot;
                           }),
                         ),
 
@@ -199,11 +176,29 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            _presetButton(context, ref, '25/5 min', 25, PomodoroType.work),
+                            _presetButton(
+                              context,
+                              ref,
+                              '25/5 min',
+                              25,
+                              PomodoroType.work,
+                            ),
                             const SizedBox(width: 8),
-                            _presetButton(context, ref, '50/10 min', 50, PomodoroType.work),
+                            _presetButton(
+                              context,
+                              ref,
+                              '50/10 min',
+                              50,
+                              PomodoroType.work,
+                            ),
                             const SizedBox(width: 8),
-                            _presetButton(context, ref, '90/20 min', 90, PomodoroType.work),
+                            _presetButton(
+                              context,
+                              ref,
+                              '90/20 min',
+                              90,
+                              PomodoroType.work,
+                            ),
                           ],
                         ),
 
@@ -665,10 +660,8 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
               (s) => Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: InkWell(
-                  onTap: () => context.push(
-                    '/planner',
-                    extra: {'initialDate': s.date},
-                  ),
+                  onTap: () =>
+                      context.push('/planner', extra: {'initialDate': s.date}),
                   child: Row(
                     children: [
                       const Icon(
@@ -697,9 +690,13 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
                           ],
                         ),
                       ),
-                       _badge(
-                        s.state == PomodoroSessionState.completed ? 'Completed' : 'Incomplete',
-                        s.state == PomodoroSessionState.completed ? AppColors.habitGreen : AppColors.warning,
+                      _badge(
+                        s.state == PomodoroSessionState.completed
+                            ? 'Completed'
+                            : 'Incomplete',
+                        s.state == PomodoroSessionState.completed
+                            ? AppColors.habitGreen
+                            : AppColors.warning,
                       ),
                     ],
                   ),
@@ -833,7 +830,8 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
     PomodoroType type,
   ) {
     final state = ref.watch(pomodoroProvider);
-    final isSelected = state.totalSeconds == minutes * 60 && state.currentType == type;
+    final isSelected =
+        state.totalSeconds == minutes * 60 && state.currentType == type;
 
     return OutlinedButton(
       onPressed: state.isRunning
@@ -848,24 +846,81 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
             ? AppColors.error
             : AppColors.surfaceVariant.withValues(alpha: 0.3),
         side: BorderSide(
-          color: isSelected ? AppColors.error : AppColors.divider.withValues(alpha: 0.1),
+          color: isSelected
+              ? AppColors.error
+              : AppColors.divider.withValues(alpha: 0.1),
           width: 1.5,
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
       ),
     );
+  }
+
+  Widget _buildCountdownText(PomodoroState state) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          _formatTime(state.remainingSeconds),
+          style: TextStyle(
+            fontSize: 64,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.textPrimaryColor(context),
+            letterSpacing: -2,
+          ),
+        ),
+        Text(
+          state.isRunning ? 'FOCUSING' : 'PAUSED',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 2,
+            color: AppTheme.textMutedColor(context).withValues(alpha: 0.65),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _sessionDot({
+    required bool completed,
+    required bool isCurrent,
+    required Color color,
+  }) {
+    return Container(
+      width: 14,
+      height: 14,
+      margin: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        color: completed
+            ? color
+            : (isCurrent
+                  ? color.withValues(alpha: 0.3)
+                  : AppColors.surfaceVariant),
+        shape: BoxShape.circle,
+        border: isCurrent ? Border.all(color: color, width: 2) : null,
+      ),
+    );
+  }
+
+  Color _phaseColor(PomodoroType type) {
+    switch (type) {
+      case PomodoroType.work:
+        return const Color(0xFF4CAF50);
+      case PomodoroType.shortBreak:
+        return const Color(0xFFFB923C);
+      case PomodoroType.longBreak:
+        return const Color(0xFF60A5FA);
+      case PomodoroType.custom:
+        return AppColors.info;
+    }
   }
 
   void _showTaskPicker(
@@ -985,119 +1040,134 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
 
   void _showCompletionSheet(BuildContext context, PomodoroState state) {
     HapticFeedback.mediumImpact();
-    showModalBottomSheet(
+    final workedMinutes = state.currentType == PomodoroType.work
+        ? state.totalSeconds ~/ 60
+        : 0;
+    showDialog<void>(
       context: context,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.habitGreen.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.celebration_rounded,
-                color: AppColors.habitGreen,
-                size: 40,
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Excelente trabalho!',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              state.currentType == PomodoroType.work
-                  ? 'You completed a focus session.'
-                  : 'Pausa finalizada. Pronto para mais?',
-              style: const TextStyle(fontSize: 16, color: AppColors.textMuted),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _summaryStat(
-                  'Blocos',
-                  '${state.completedSessions}/${state.sessionsToLongBreak}',
-                ),
-                _summaryStat('Tempo', '${state.totalSeconds ~/ 60}m'),
-              ],
-            ),
-            const SizedBox(height: 40),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28),
+      barrierDismissible: false,
+      builder: (ctx) => Dialog.fullscreen(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        child: Container(
+          color: AppColors.success.withValues(alpha: 0.10),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: 1),
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.elasticOut,
+                    builder: (context, value, child) {
+                      return Transform.scale(scale: value, child: child);
+                    },
+                    child: Container(
+                      width: 96,
+                      height: 96,
+                      decoration: const BoxDecoration(
+                        color: AppColors.success,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check_rounded,
+                        color: Colors.white,
+                        size: 56,
+                      ),
+                    ),
                   ),
-                ),
-                child: const Text(
-                  'Continuar',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
+                  const SizedBox(height: 28),
+                  const Text(
+                    'Session complete!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${state.completedSessions} blocks · $workedMinutes min worked',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: AppTheme.textMutedColor(context),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Done',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton(
+                      onPressed: () {
+                        final minutes = (state.totalSeconds ~/ 60).clamp(
+                          1,
+                          999,
+                        );
+                        Navigator.pop(ctx);
+                        final notifier = ref.read(pomodoroProvider.notifier);
+                        notifier.setDuration(minutes, state.currentType);
+                        notifier.start();
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'One more round',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
-    );
-  }
-
-  Widget _summaryStat(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: AppColors.primary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textMuted,
-          ),
-        ),
-      ],
     );
   }
 
   void _showStopDialog(BuildContext context, WidgetRef ref) {
+    final state = ref.read(pomodoroProvider);
+    final workedMinutes = state.currentType == PomodoroType.work
+        ? ((state.totalSeconds - state.remainingSeconds) ~/ 60)
+        : 0;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Encerrar Session'),
-        content: const Text(
-          'Do you want to save the elapsed time as an incomplete session or just cancel?',
+        title: const Text('Stop session?'),
+        content: Text(
+          '${state.completedSessions} blocks · ${workedMinutes}min worked so far.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Voltar',
-              style: TextStyle(color: AppColors.textMuted),
-            ),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
@@ -1107,7 +1177,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
               Navigator.pop(ctx);
             },
             child: const Text(
-              'Cancel Session',
+              'Discard',
               style: TextStyle(color: AppColors.error),
             ),
           ),
@@ -1122,7 +1192,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
               backgroundColor: AppColors.habitGreen,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Save Partial'),
+            child: const Text('Save partial'),
           ),
         ],
       ),
@@ -1133,6 +1203,56 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen> {
     final minutes = totalSeconds ~/ 60;
     final seconds = totalSeconds % 60;
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+}
+
+class _PomodoroRingPainter extends CustomPainter {
+  final double progress;
+  final Color phaseColor;
+
+  const _PomodoroRingPainter({
+    required this.progress,
+    required this.phaseColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 8;
+    const strokeWidth = 8.0;
+    const startAngle = -pi / 2;
+
+    final bgPaint = Paint()
+      ..color = phaseColor.withValues(alpha: 0.15)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      0,
+      2 * pi,
+      false,
+      bgPaint,
+    );
+
+    final fgPaint = Paint()
+      ..color = phaseColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      progress.clamp(0.0, 1.0) * 2 * pi,
+      false,
+      fgPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_PomodoroRingPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.phaseColor != phaseColor;
   }
 }
 

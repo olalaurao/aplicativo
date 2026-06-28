@@ -17,6 +17,7 @@ class SteeringSheet extends ConsumerStatefulWidget {
 
 class _SteeringSheetState extends ConsumerState<SteeringSheet> {
   int _currentStep = 1;
+  bool _allowClose = false;
 
   // Step 1 values
   final _reflectionController = TextEditingController();
@@ -88,21 +89,24 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
     final shouldClose = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Sair da revisão?'),
-        content: const Text('Você pode revisar esse pacto depois.'),
+        title: const Text('Leave review?'),
+        content: const Text(
+          'You can review this pact later. It will remain pending.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Continuar revisão'),
+            child: const Text('Keep reviewing'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sair'),
+            child: const Text('Leave'),
           ),
         ],
       ),
     );
     if (shouldClose == true && mounted) {
+      _allowClose = true;
       Navigator.pop(context);
     }
   }
@@ -164,6 +168,7 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
     }
 
     if (mounted) {
+      _allowClose = true;
       Navigator.pop(context);
 
       if (outcome == PactOutcome.pivot) {
@@ -193,150 +198,163 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
     final color = _parseColor(widget.habit.color);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppTheme.backgroundColor(context),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+    return PopScope(
+      canPop: _allowClose,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        await _confirmClose();
+      },
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 12),
-              // Drag handle
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.15)
-                        : Colors.black.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(2),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.backgroundColor(context),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                // Drag handle
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.15)
+                          : Colors.black.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Title area
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Steering Sheet (Pacto)',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: color,
-                              letterSpacing: 1.0,
+                // Title area
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Steering Sheet (Pacto)',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: color,
+                                letterSpacing: 1.0,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            widget.habit.displayTitle,
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.textPrimaryColor(context),
-                              letterSpacing: -0.5,
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.habit.displayTitle,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.textPrimaryColor(context),
+                                letterSpacing: -0.5,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _confirmClose,
-                      icon: const Icon(Icons.close_rounded),
-                      tooltip: 'Fechar',
-                    ),
-                    // Steps progress indicator
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Etapa $_currentStep de 3',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: color,
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                      IconButton(
+                        onPressed: _confirmClose,
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: 'Fechar',
+                      ),
+                      // Steps progress indicator
+                      _buildStepDots(color),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Divider(),
+                const SizedBox(height: 8),
+                const Divider(),
 
-              // Step content
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
+                // Step content
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: _buildStepContent(context, color),
+                  ),
                 ),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: _buildStepContent(context, color),
-                ),
-              ),
 
-              const Divider(),
-              // Navigation buttons
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    if (_currentStep > 1)
-                      TextButton.icon(
-                        onPressed: _previousStep,
-                        icon: const Icon(Icons.arrow_back_rounded),
-                        label: const Text('Voltar'),
-                        style: TextButton.styleFrom(foregroundColor: color),
-                      )
-                    else
-                      const SizedBox.shrink(),
-                    const Spacer(),
-                    if (_currentStep < 3)
-                      FilledButton.icon(
-                        onPressed: _canAdvance ? _nextStep : null,
-                        icon: const Icon(Icons.arrow_forward_rounded),
-                        label: const Text('Avançar'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: color,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                const Divider(),
+                // Navigation buttons
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (_currentStep > 1)
+                        TextButton.icon(
+                          onPressed: _previousStep,
+                          icon: const Icon(Icons.arrow_back_rounded),
+                          label: const Text('Voltar'),
+                          style: TextButton.styleFrom(foregroundColor: color),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      const Spacer(),
+                      if (_currentStep < 3)
+                        FilledButton.icon(
+                          onPressed: _canAdvance ? _nextStep : null,
+                          icon: const Icon(Icons.arrow_forward_rounded),
+                          label: const Text('Avançar'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: color,
+                            disabledBackgroundColor: AppColors.textMuted
+                                .withValues(alpha: 0.25),
+                            disabledForegroundColor: AppColors.textMuted,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                        ),
-                      )
-                    else
-                      const SizedBox.shrink(),
-                  ],
+                        )
+                      else
+                        const SizedBox.shrink(),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildStepDots(Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(3, (index) {
+        final isActive = index == _currentStep - 1;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: isActive ? 8 : 6,
+          height: isActive ? 8 : 6,
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isActive ? color : color.withValues(alpha: 0.3),
+          ),
+        );
+      }),
     );
   }
 
@@ -661,6 +679,8 @@ void showSteeringSheet(BuildContext context, Habit habit) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    isDismissible: false,
+    enableDrag: false,
     backgroundColor: Colors.transparent,
     builder: (_) => SteeringSheet(habit: habit),
   );

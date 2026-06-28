@@ -3,11 +3,37 @@ Data: 2025-06-25
 Para: agente de código
 Estilo: implementar tudo sem pular etapas, sem placeholders, sem TODOs
 
+PROGRESSO
+- ✅ Feature 4 — Dashboard reset implementada.
+- ✅ Feature 7 — Exportar crash reports implementada.
+- ✅ Feature 8 — More screen com Day Themes/Day Blocks implementada.
+- ✅ Feature 19 — Task backlog dialog ajustado.
+- ✅ Feature 2 — Planner timeline header overflow corrigido.
+- ✅ Feature 1 — Conflict resolution com botões e resumo claro implementada.
+- ✅ Feature 3A+B — Seed automático e descriptions dos system moods implementados.
+- ✅ Feature 3C+D+E — Mood settings grouped UI, fullscreen custom mood form and emoji timeline implemented.
+- ✅ Feature 9A+B — Swipe para completar e days-since badge implementados.
+- ✅ Feature 9C — Banner de pacto expirado no detail sheet implementado.
+- ✅ Feature 10A+B+C — Quick-run swipe, histórico e estimated chip de Systems implementados.
+- ✅ Bugfix extra — Checkboxes de hábitos corrigidos com atualização otimista e leitura por completionHistory.
+- ✅ Feature 11 — Triple Check dismissal guard, diagnostic icons and stuck badge implemented.
+- ✅ Feature 13 — Steering Sheet visual polish implemented.
+- ✅ Feature 14 — Planner energy tints for time blocks implemented.
+- ✅ Feature 4 follow-up — Flutter dashboard widgets removed; native Android widget pipeline preserved.
+- ✅ Feature 15 — Organizer detail properties, notes tab and timeline period selector implemented.
+- ✅ Feature 18 — Goal plan mode UI implemented.
+- ✅ Feature 12 — Combined Analysis calendar emoji, heatmap, tap summary and month nav implemented.
+- ✅ Feature 16 — Pomodoro custom ring, pulse, stop summary and completion overlay implemented.
+- ✅ Feature 17 — People automatic contact tasks and completion updates implemented.
+- ✅ Feature 5 — Collection new row and Obsidian Bases export implemented.
+- ✅ Feature 6 — Save books from posts with Google Books lookup implemented.
+
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FEATURE 1 — CONFLICT RESOLUTION: BOTÕES MAIS CLAROS
 Arquivo: lib/ui/screens/universal_detail_view.dart
 Método: _showChangeTypeSheet()  +  _confirmAndChangeType()
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CONTEXTO
@@ -57,6 +83,7 @@ MUDANÇAS NECESSÁRIAS
 FEATURE 2 — PLANNER: OVERFLOW DA DATA NA TIMELINE
 Arquivo: lib/ui/screens/planner_screen.dart
 Área: SliverAppBar + timeline scroll
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CONTEXTO
@@ -107,6 +134,7 @@ Arquivos:
   lib/ui/screens/combined_analysis_screen.dart
   lib/ui/widgets/citrine_chart.dart  (já tem suporte a emoji — verificar)
   lib/models/mood_model.dart         (systemMoods já definidos — não alterar)
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CONTEXTO
@@ -117,6 +145,7 @@ estiver vazio, moodsProvider retorna lista vazia e a tela de humor fica em branc
 O campo description dos systemMoods está null (não preenchido ainda).
 
 PARTE A — SEED AUTOMÁTICO DOS SYSTEM MOODS
+Status: ✅ IMPLEMENTADO
 
 Em MoodsNotifier.build():
   — Após carregar do vault, se a lista filtrada de MoodDefinition estiver vazia
@@ -140,6 +169,7 @@ Criar método em MoodsNotifier:
   O método deve ser idempotente: checar existência antes de criar.
 
 PARTE B — DESCRIPTIONS (frases curtas) DOS SYSTEM MOODS
+Status: ✅ IMPLEMENTADO
 
 Adicionar campo description a cada MoodDefinition em systemMoods.
 Uma frase curta em inglês para cada um. Lista completa:
@@ -201,6 +231,7 @@ BLUE quadrant:
   defeated:     "Feeling that the effort was not enough"
 
 PARTE C — TELA MOOD SETTINGS: MOSTRAR SYSTEM MOODS
+Status: ✅ IMPLEMENTADO
 
 Na mood_settings_screen.dart o comportamento atual é uma lista reordenável
 sem distinção de origem, mostrando apenas moods de usuário, com um limite
@@ -253,6 +284,7 @@ total de 15. Refatorar completamente:
     (refatorado conforme abaixo).
 
 PARTE D — FORMULÁRIO DE CRIAÇÃO DE MOOD USER (refatorar _editMood)
+Status: ✅ IMPLEMENTADO
 
 O diálogo atual usa AlertDialog simples com campos básicos (nome, emoji,
 valor numérico, cor) e não suporta dois eixos separados nem quadrante.
@@ -303,6 +335,7 @@ Substituir por full-screen modal:
   Botão "Save" full-width no bottom. Disabled se nome vazio.
 
 PARTE E — VISUALIZAÇÃO DE MOODS NAS ANÁLISES (combined_analysis_screen.dart)
+Status: ✅ IMPLEMENTADO
 
 O chart já suporta emoji via ChartDataPoint.emoji e CitrineChart os renderiza
 como tooltip annotations nos pontos. O _getMoodEmojiForDate() já existe.
@@ -343,6 +376,7 @@ MUDANÇA 3: não remover a linha numérica de pleasantness do chart —
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FEATURE 4 — DASHBOARD: APAGAR TODOS OS WIDGETS
 Arquivo: lib/providers/dashboard_provider.dart
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CONTEXTO
@@ -384,6 +418,7 @@ Arquivos:
   lib/ui/widgets/collection_editor.dart
   lib/services/obsidian_service.dart  (para geração do markdown)
   lib/models/note_model.dart          (já tem NoteSubtype.collection)
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CONTEXTO
@@ -487,6 +522,7 @@ Arquivos:
   lib/services/ → criar: book_lookup_service.dart
   lib/ui/forms/create_resource_form.dart
   lib/ui/widgets/ → criar: book_search_sheet.dart
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CONTEXTO
@@ -595,6 +631,7 @@ FEATURE 7 — EXPORTAR CRASH REPORTS
 Arquivos:
   lib/ui/screens/diagnostic_reports_screen.dart
   lib/ui/screens/settings_screen.dart
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CONTEXTO
@@ -646,6 +683,7 @@ MUDANÇAS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FEATURE 8 — MORE SCREEN: DAY THEMES E DAY BLOCKS ABAIXO DO SHOPPING LIST
 Arquivo: lib/ui/screens/more_screen.dart
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CONTEXTO
@@ -687,6 +725,7 @@ MUDANÇAS
 FEATURE 9 — HABIT: SWIPE RIGHT PARA COMPLETAR + BADGES CORRETOS
 Arquivos: lib/ui/screens/habits_screen.dart
           lib/ui/widgets/habit_row.dart
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 OBJETIVO
@@ -696,6 +735,7 @@ Além disso, o "days since" badge atual usa texto em português e cor para
 dias ≥ 3, mas a spec pede #E53935 já a partir do dia 1 (qualquer gap > 0).
 
 PARTE A — SWIPE RIGHT PARA COMPLETAR
+Status: ✅ IMPLEMENTADO
 
 Em habits_screen.dart, envolver _TodayHabitCard com Dismissible:
 
@@ -736,6 +776,7 @@ Em habits_screen.dart, envolver _TodayHabitCard com Dismissible:
   antes de criar novo registro.
 
 PARTE B — DAYS SINCE BADGE: COR CORRETA
+Status: ✅ IMPLEMENTADO
 
 Em habit_row.dart, método _buildDaysSinceBadge():
   Atualizar a condição de cor: qualquer days >= 1 → AppColors.error (#E53535 ou
@@ -746,6 +787,7 @@ Em habit_row.dart, método _buildDaysSinceBadge():
   O badge "Feito hoje" (green, "Feito hoje") manter mas traduzir para "Done today".
 
 PARTE C — PACT EXPIRED: BANNER NO DETAIL SHEET
+Status: ✅ IMPLEMENTADO
 
 Em habit_detail_sheet.dart, no início do body, antes de qualquer outra seção,
 verificar se o habit é um pact expirado sem resolução:
@@ -782,6 +824,7 @@ verificar se o habit é um pact expirado sem resolução:
 FEATURE 10 — SYSTEM: QUICK-RUN SWIPE + HISTÓRICO DE TASKS
 Arquivos: lib/ui/screens/goals_screen.dart (ou onde systems são listados)
           lib/ui/screens/system_detail_screen.dart
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 OBJETIVO
@@ -791,6 +834,7 @@ Na detail view, adicionar seção "History" com as tasks geradas anteriormente
 por execuções deste System.
 
 PARTE A — SWIPE RIGHT PARA QUICK-RUN
+Status: ✅ IMPLEMENTADO
 
 Na tela que lista Systems (verificar qual screen: planner_screen, goals_screen,
 ou uma seção dedicada), envolver cada card de System com Dismissible:
@@ -804,6 +848,7 @@ ou uma seção dedicada), envolver cada card de System com Dismissible:
     fundo: AppColors.warning (laranja) a 15% de opacidade
 
 PARTE B — SEÇÃO HISTÓRICO NA DETAIL VIEW
+Status: ✅ IMPLEMENTADO
 
 Em system_detail_screen.dart, após a seção "Passos" e antes de "Notas",
 adicionar seção "HISTORY":
@@ -823,6 +868,7 @@ adicionar seção "HISTORY":
     (14pt muted, centrado)
 
 PARTE C — STATS: ADICIONAR CHIP "ESTIMATED"
+Status: ✅ IMPLEMENTADO
 
 Em system_detail_screen.dart, na stats row, adicionar chip "Estimated: Xmin":
   — Usar system.estimatedMinutes (já existe no modelo).
@@ -835,6 +881,7 @@ FEATURE 11 — TRIPLE CHECK: DISMISSAL GUARD + ÍCONES NO CARD + STUCK BADGE
 Arquivos: lib/ui/widgets/triple_check_sheet.dart
           lib/ui/widgets/timeline_card.dart
           lib/ui/screens/planner_screen.dart
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 OBJETIVO
@@ -911,6 +958,7 @@ No Planner, ao construir a lista de tasks do dia, calcular stuckDays:
 FEATURE 12 — COMBINED ANALYSIS CALENDAR: EMOJI + HEATMAP + TAP + NAV DE MÊS
 Arquivo: lib/ui/widgets/analysis_calendar.dart
          lib/ui/screens/combined_analysis_screen.dart
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 OBJETIVO
@@ -973,6 +1021,7 @@ MINI BOTTOM SHEET (ao tap numa célula):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FEATURE 13 — STEERING SHEET: VISUAL POLISH
 Arquivo: lib/ui/widgets/steering_sheet.dart
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 OBJETIVO
@@ -1018,6 +1067,7 @@ MUDANÇAS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FEATURE 14 — PLANNER: ENERGY TINTS NOS TIME BLOCKS
 Arquivo: lib/ui/screens/planner_screen.dart
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 OBJETIVO
@@ -1064,6 +1114,7 @@ MUDANÇAS EM _buildTimeBlockSection():
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FEATURE 15 — ORGANIZER DETAIL: PROPERTIES SECTION + NOTES SECTION + PERIOD SELECTOR
 Arquivo: lib/ui/screens/organizer_detail_screen.dart
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 OBJETIVO
@@ -1115,6 +1166,7 @@ Estilo dos chips: FilterChip sem borda, ativo = fundo accent, texto branco.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FEATURE 16 — POMODORO: RING CUSTOMIZADO + OVERLAY + CONCLUSÃO
 Arquivo: lib/ui/screens/pomodoro_screen.dart
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 OBJETIVO
@@ -1218,6 +1270,7 @@ substituir o dialog atual por um overlay full-screen:
 FEATURE 17 — PEOPLE: SCHEDULER AUTOMÁTICO DE CONTATOS
 Arquivo: lib/ui/screens/people_screen.dart
          lib/services/scheduler_service.dart
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 OBJETIVO
@@ -1283,6 +1336,7 @@ adicionar método checkAndCreatePeopleReminders():
 FEATURE 18 — GOAL PLAN MODE: UI DE OBJECTIVE/STRATEGY/PHASES
 Arquivo: lib/ui/screens/goals_screen.dart
          lib/ui/forms/create_goal_form.dart
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 OBJETIVO
@@ -1327,6 +1381,7 @@ Adicionar toggle "Goal mode" no formulário:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FEATURE 19 — TASK BACKLOG DIALOG: AJUSTAR PARA SPEC
 Arquivo: lib/ui/forms/create_task_form.dart
+Status: ✅ IMPLEMENTADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 OBJETIVO

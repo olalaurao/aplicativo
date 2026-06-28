@@ -15,6 +15,7 @@ import '../../models/pomodoro_session.dart';
 import '../theme.dart';
 import '../widgets/citrine_chart.dart';
 import '../widgets/analysis_calendar.dart';
+import '../widgets/mood_emoji_timeline.dart';
 
 class CombinedAnalysisScreen extends ConsumerStatefulWidget {
   const CombinedAnalysisScreen({super.key});
@@ -30,6 +31,7 @@ class _CombinedAnalysisScreenState
   CombinedAnalysis? _currentAnalysis;
   bool _loadedSavedAnalysis = false;
   final List<MetricSource> _activeSources = [];
+  final Set<String> _hiddenSourceIds = {};
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +46,7 @@ class _CombinedAnalysisScreenState
           _activeSources
             ..clear()
             ..addAll(_sourcesForAnalysis(saved));
+          _hiddenSourceIds.clear();
           _loadedSavedAnalysis = true;
         });
       });
@@ -52,15 +55,32 @@ class _CombinedAnalysisScreenState
     }
 
     // Prepare data for the chart (last 14 days)
-    final List<List<ChartDataPoint>> chartSeries = _activeSources
+    final visibleSources = _activeSources
+        .where((source) => !_hiddenSourceIds.contains(source.id))
+        .toList();
+    MetricSource? visibleMoodSource;
+    for (final source in visibleSources) {
+      if (source.type == MetricType.mood) {
+        visibleMoodSource = source;
+        break;
+      }
+    }
+    final moodTimelinePoints = visibleMoodSource == null
+        ? <ChartDataPoint>[]
+        : _getMetricData(visibleMoodSource, 14);
+
+    final List<List<ChartDataPoint>> chartSeries = visibleSources
         .map((s) => _getMetricData(s, 14))
         .toList();
-    final List<Color> chartColors = _activeSources
+    final List<Color> chartColors = visibleSources
         .map((s) => s.color ?? AppColors.primary)
         .toList();
 
     // Prepare data for the calendar
     final calendarData = _getCalendarData();
+    final calendarValues = _getCalendarValues();
+    final calendarMoodEmojis = _getCalendarMoodEmojis();
+    final calendarMoodDetails = _getCalendarMoodDetails();
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -155,7 +175,7 @@ class _CombinedAnalysisScreenState
 
                       // Main Chart
                       Container(
-                        height: 300,
+                        height: visibleMoodSource == null ? 300 : 360,
                         decoration: AppTheme.cardDecoration(context),
                         padding: const EdgeInsets.all(20),
                         child: chartSeries.isEmpty || chartSeries.first.isEmpty
@@ -165,23 +185,35 @@ class _CombinedAnalysisScreenState
                                   style: TextStyle(color: AppColors.textMuted),
                                 ),
                               )
-                            : CitrineChart(
-                                type:
-                                    _currentAnalysis
-                                        ?.charts
-                                        .firstOrNull
-                                        ?.type ??
-                                    ChartType.line,
-                                title: 'Tendência (Últimos 14 dias)',
-                                data: chartSeries.first,
-                                multiData: chartSeries,
-                                colors: chartColors,
+                            : Column(
+                                children: [
+                                  Expanded(
+                                    child: CitrineChart(
+                                      type:
+                                          _currentAnalysis
+                                              ?.charts
+                                              .firstOrNull
+                                              ?.type ??
+                                          ChartType.line,
+                                      title: 'Tendência (Últimos 14 dias)',
+                                      data: chartSeries.first,
+                                      multiData: chartSeries,
+                                      colors: chartColors,
+                                    ),
+                                  ),
+                                  if (visibleMoodSource != null) ...[
+                                    const SizedBox(height: 8),
+                                    MoodEmojiTimeline(
+                                      points: moodTimelinePoints,
+                                      days: 14,
+                                    ),
+                                  ],
+                                ],
                               ),
                       ),
 
                       const SizedBox(height: 32),
 
-                      // Monthly Calendar
                       Text(
                         'Visualização Mensal',
                         style: TextStyle(
@@ -190,46 +222,17 @@ class _CombinedAnalysisScreenState
                           color: AppTheme.textPrimaryColor(context),
                         ),
                       ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          IconButton(
-                            tooltip: 'Mês anterior',
-                            onPressed: () => setState(() {
-                              _currentMonth = DateTime(
-                                _currentMonth.year,
-                                _currentMonth.month - 1,
-                              );
-                            }),
-                            icon: const Icon(Icons.chevron_left_rounded),
-                          ),
-                          Text(
-                            DateFormat(
-                              'MMMM yyyy',
-                              'pt_BR',
-                            ).format(_currentMonth),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Próximo mês',
-                            onPressed: () => setState(() {
-                              _currentMonth = DateTime(
-                                _currentMonth.year,
-                                _currentMonth.month + 1,
-                              );
-                            }),
-                            icon: const Icon(Icons.chevron_right_rounded),
-                          ),
-                        ],
-                      ),
                       const SizedBox(height: 8),
                       AnalysisCalendar(
                         month: _currentMonth,
                         sources: _activeSources,
                         data: calendarData,
+                        values: calendarValues,
+                        moodEmojis: calendarMoodEmojis,
+                        moodDetails: calendarMoodDetails,
+                        onMonthChanged: (month) {
+                          setState(() => _currentMonth = month);
+                        },
                       ),
 
                       const SizedBox(height: 32),
@@ -513,6 +516,7 @@ class _CombinedAnalysisScreenState
             _activeSources
               ..clear()
               ..addAll(_sourcesForAnalysis(savedAnalysis));
+            _hiddenSourceIds.clear();
           });
         },
       ),
@@ -520,23 +524,42 @@ class _CombinedAnalysisScreenState
   }
 
   Widget _buildMetricChip(MetricSource source) {
-    return Chip(
-      avatar: Icon(
-        Icons.circle,
-        color: source.color ?? AppColors.primary,
-        size: 12,
-      ),
-      label: Text(
-        source.label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: AppTheme.textPrimaryColor(context),
+    final selected = !_hiddenSourceIds.contains(source.id);
+    return Opacity(
+      opacity: selected ? 1 : 0.4,
+      child: FilterChip(
+        selected: selected,
+        onSelected: (value) {
+          setState(() {
+            if (value) {
+              _hiddenSourceIds.remove(source.id);
+            } else {
+              _hiddenSourceIds.add(source.id);
+            }
+          });
+        },
+        avatar: source.type == MetricType.mood
+            ? const Text('😊', style: TextStyle(fontSize: 14))
+            : Icon(
+                Icons.circle,
+                color: source.color ?? AppColors.primary,
+                size: 12,
+              ),
+        label: Text(
+          source.label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimaryColor(context),
+          ),
         ),
+        backgroundColor: AppTheme.surfaceVariantColor(context),
+        selectedColor: (source.color ?? AppColors.primary).withValues(
+          alpha: 0.14,
+        ),
+        side: BorderSide.none,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-      backgroundColor: AppTheme.surfaceVariantColor(context),
-      side: BorderSide.none,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     );
   }
 
@@ -614,6 +637,53 @@ class _CombinedAnalysisScreenState
     return calendarData;
   }
 
+  Map<DateTime, Map<String, double>> _getCalendarValues() {
+    final values = <DateTime, Map<String, double>>{};
+    final lastDay = DateTime(_currentMonth.year, _currentMonth.month + 1, 0);
+
+    for (int day = 1; day <= lastDay.day; day++) {
+      final date = DateTime(_currentMonth.year, _currentMonth.month, day);
+      final dayValues = <String, double>{};
+
+      for (final source in _activeSources) {
+        final value = _getValueForDate(source, date);
+        if (value != null) dayValues[source.id] = value;
+      }
+
+      if (dayValues.isNotEmpty) {
+        values[_dateKey(date)] = dayValues;
+      }
+    }
+
+    return values;
+  }
+
+  Map<DateTime, String?> _getCalendarMoodEmojis() {
+    final emojis = <DateTime, String?>{};
+    final lastDay = DateTime(_currentMonth.year, _currentMonth.month + 1, 0);
+
+    for (int day = 1; day <= lastDay.day; day++) {
+      final date = DateTime(_currentMonth.year, _currentMonth.month, day);
+      final emoji = _getMoodEmojiForDate(date);
+      if (emoji != null) emojis[_dateKey(date)] = emoji;
+    }
+
+    return emojis;
+  }
+
+  Map<DateTime, MoodDefinition?> _getCalendarMoodDetails() {
+    final moods = <DateTime, MoodDefinition?>{};
+    final lastDay = DateTime(_currentMonth.year, _currentMonth.month + 1, 0);
+
+    for (int day = 1; day <= lastDay.day; day++) {
+      final date = DateTime(_currentMonth.year, _currentMonth.month, day);
+      final mood = _getMoodForDate(date);
+      if (mood != null) moods[_dateKey(date)] = mood;
+    }
+
+    return moods;
+  }
+
   List<ChartDataPoint> _getMetricData(MetricSource source, int days) {
     final today = DateTime.now();
     final List<ChartDataPoint> points = [];
@@ -634,6 +704,10 @@ class _CombinedAnalysisScreenState
 
   /// Retorna o emoji do mood mais frequente (ou único) numa data
   String? _getMoodEmojiForDate(DateTime date) {
+    return _getMoodForDate(date)?.emoji;
+  }
+
+  MoodDefinition? _getMoodForDate(DateTime date) {
     final entries = ref.read(allEntriesProvider);
     final moods = ref.read(moodsProvider);
 
@@ -660,10 +734,10 @@ class _CombinedAnalysisScreenState
         .key;
     return moods
         .where((m) => m.id == dominantSlug || m.slug == dominantSlug)
-        .firstOrNull
-        ?.emoji;
+        .firstOrNull;
   }
 
+  DateTime _dateKey(DateTime date) => DateTime(date.year, date.month, date.day);
 
   double? _getValueForDate(MetricSource source, DateTime date) {
     switch (source.type) {
@@ -714,7 +788,11 @@ class _CombinedAnalysisScreenState
     if (dayEntries.isNotEmpty) {
       final values = dayEntries
           .map(
-            (entry) => moods.where((m) => m.id == entry.moodSlug).firstOrNull,
+            (entry) => moods
+                .where(
+                  (m) => m.id == entry.moodSlug || m.slug == entry.moodSlug,
+                )
+                .firstOrNull,
           )
           .whereType<MoodDefinition>()
           .map((mood) => mood.numericValue.toDouble())
@@ -1246,7 +1324,7 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                 if (source.type == MetricType.mood) ...[
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
-                    value: source.dimension,
+                    initialValue: source.dimension,
                     style: TextStyle(
                       fontSize: 14,
                       color: AppTheme.textPrimaryColor(context),

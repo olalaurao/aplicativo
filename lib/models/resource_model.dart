@@ -15,6 +15,12 @@ class Resource extends ContentObject {
   int? year;
   int? pages;
   String? category;
+  String? isbnOriginal;
+  String? titlePtBr;
+  String? titleOriginal;
+  String? publisher;
+  String? language;
+  String? googleBooksId;
   DateTime? readDate;
   List<String> socialRefs;
 
@@ -31,10 +37,20 @@ class Resource extends ContentObject {
     this.year,
     this.pages,
     this.category,
+    this.isbnOriginal,
+    this.titlePtBr,
+    this.titleOriginal,
+    this.publisher,
+    this.language,
+    this.googleBooksId,
     this.readDate,
     List<String>? socialRefs,
     super.organizers,
     super.categories,
+    super.tags,
+    super.aliases,
+    super.links,
+    super.reminders,
     super.createdAt,
     super.updatedAt,
     super.order,
@@ -47,6 +63,15 @@ class Resource extends ContentObject {
   @override
   String toMarkdown() {
     final frontmatter = toBaseMap();
+    final aliasesForMarkdown = List<String>.from(aliases);
+    final original = titleOriginal?.trim();
+    if (original != null &&
+        original.isNotEmpty &&
+        original != title &&
+        !aliasesForMarkdown.contains(original)) {
+      aliasesForMarkdown.add(original);
+      frontmatter['aliases'] = aliasesForMarkdown;
+    }
     frontmatter['resource_type'] = resourceType;
     if (coverImage != null) frontmatter['cover'] = coverImage;
     if (sourceUrl != null) frontmatter['source_url'] = sourceUrl;
@@ -56,6 +81,12 @@ class Resource extends ContentObject {
     if (year != null) frontmatter['year'] = year;
     if (pages != null) frontmatter['pages'] = pages;
     if (category != null) frontmatter['category'] = category;
+    if (isbnOriginal != null) frontmatter['isbn'] = isbnOriginal;
+    if (titlePtBr != null) frontmatter['title_pt_br'] = titlePtBr;
+    if (titleOriginal != null) frontmatter['title_original'] = titleOriginal;
+    if (publisher != null) frontmatter['publisher'] = publisher;
+    if (language != null) frontmatter['language'] = language;
+    if (googleBooksId != null) frontmatter['google_books_id'] = googleBooksId;
     if (readDate != null) {
       frontmatter['read'] = readDate!.toIso8601String().split('T')[0];
     }
@@ -89,6 +120,12 @@ class Resource extends ContentObject {
     resource.year = _intValue(frontmatter['year']);
     resource.pages = _intValue(frontmatter['pages']);
     resource.category = _stringValue(frontmatter['category']);
+    resource.isbnOriginal = _stringValue(frontmatter['isbn']);
+    resource.titlePtBr = _stringValue(frontmatter['title_pt_br']);
+    resource.titleOriginal = _stringValue(frontmatter['title_original']);
+    resource.publisher = _stringValue(frontmatter['publisher']);
+    resource.language = _stringValue(frontmatter['language']);
+    resource.googleBooksId = _stringValue(frontmatter['google_books_id']);
     if (frontmatter['read'] != null) {
       resource.readDate = DateTime.tryParse(frontmatter['read'].toString());
     }
@@ -114,10 +151,18 @@ class Resource extends ContentObject {
     int? year,
     int? pages,
     String? category,
+    String? isbnOriginal,
+    String? titlePtBr,
+    String? titleOriginal,
+    String? publisher,
+    String? language,
+    String? googleBooksId,
     DateTime? readDate,
     List<String>? socialRefs,
     List<OrganizerReference>? organizers,
     List<String>? categories,
+    List<String>? tags,
+    List<String>? aliases,
     DateTime? createdAt,
     DateTime? updatedAt,
     int? order,
@@ -136,10 +181,18 @@ class Resource extends ContentObject {
       year: year ?? this.year,
       pages: pages ?? this.pages,
       category: category ?? this.category,
+      isbnOriginal: isbnOriginal ?? this.isbnOriginal,
+      titlePtBr: titlePtBr ?? this.titlePtBr,
+      titleOriginal: titleOriginal ?? this.titleOriginal,
+      publisher: publisher ?? this.publisher,
+      language: language ?? this.language,
+      googleBooksId: googleBooksId ?? this.googleBooksId,
       readDate: readDate ?? this.readDate,
       socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
+      tags: tags ?? this.tags,
+      aliases: aliases ?? this.aliases,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
       order: order ?? this.order,

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../models/organizer_model.dart';
 import '../../models/content_object.dart';
+import '../../models/note_model.dart';
 import '../../models/social_post.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/wiki_link_resolver_provider.dart';
@@ -62,14 +63,73 @@ class _SocialPostMiniCard extends StatelessWidget {
   }
 }
 
+class _OrganizerProperty {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _OrganizerProperty({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+}
+
+class _PropertyCell extends StatelessWidget {
+  final _OrganizerProperty property;
+  final Color color;
+
+  const _PropertyCell({required this.property, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(property.icon, size: 16, color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                property.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                property.value,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimaryColor(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  String _selectedPeriod = 'all';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -93,6 +153,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
     );
     final timelineCount = allItems.length;
     final itemsCount = allItems.where((i) => i.type != 'social_post').length;
+    final notesCount = _notesForOrganizer().length;
     final allOrganizers = ref.watch(organizersProvider);
     final childrenCount = allOrganizers
         .where((o) => o.parentId == widget.organizer.id)
@@ -233,6 +294,8 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
                     ),
                   ],
                   const SizedBox(height: 20),
+                  _buildPropertiesCard(color),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -282,6 +345,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
                     text:
                         'Children${childrenCount > 0 ? " ($childrenCount)" : ""}',
                   ),
+                  Tab(text: 'Notes${notesCount > 0 ? " ($notesCount)" : ""}'),
                 ],
               ),
             ),
@@ -294,10 +358,150 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
             _buildItemsList(context, associatedItemsAsync),
             _buildOutgoingList(context, outgoingItems),
             _buildChildrenList(context),
+            _buildNotesList(context),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildPropertiesCard(Color color) {
+    final properties = _organizerProperties();
+    if (properties.isEmpty) return const SizedBox.shrink();
+
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CreateOrganizerForm(organizer: widget.organizer),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.cardFillColor(context),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.dividerColor(context)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.tune_rounded, size: 16, color: color),
+                const SizedBox(width: 8),
+                const Text(
+                  'PROPERTIES',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final itemWidth = (constraints.maxWidth - 12) / 2;
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    for (final property in properties)
+                      SizedBox(
+                        width: itemWidth,
+                        child: _PropertyCell(property: property, color: color),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<_OrganizerProperty> _organizerProperties() {
+    final organizer = widget.organizer;
+    final properties = <_OrganizerProperty>[
+      _OrganizerProperty(
+        label: 'NAME',
+        value: organizer.title,
+        icon: _typeIcon(organizer.organizerType),
+      ),
+      _OrganizerProperty(
+        label: 'TYPE',
+        value: organizer.organizerType.name,
+        icon: Icons.category_outlined,
+      ),
+    ];
+
+    if (organizer.icon?.trim().isNotEmpty == true) {
+      properties.add(
+        _OrganizerProperty(
+          label: 'ICON',
+          value: organizer.icon!,
+          icon: Icons.emoji_symbols_outlined,
+        ),
+      );
+    }
+    if (organizer.state?.trim().isNotEmpty == true) {
+      properties.add(
+        _OrganizerProperty(
+          label: 'STATE',
+          value: organizer.state!,
+          icon: Icons.flag_outlined,
+        ),
+      );
+    }
+    if (organizer.priority?.trim().isNotEmpty == true) {
+      properties.add(
+        _OrganizerProperty(
+          label: 'PRIORITY',
+          value: organizer.priority!,
+          icon: Icons.local_fire_department_outlined,
+        ),
+      );
+    }
+    if (organizer.startDate != null) {
+      properties.add(
+        _OrganizerProperty(
+          label: 'START',
+          value: DateFormat('MMM d, yyyy').format(organizer.startDate!),
+          icon: Icons.play_arrow_rounded,
+        ),
+      );
+    }
+    if (organizer.endDate != null) {
+      properties.add(
+        _OrganizerProperty(
+          label: 'DUE',
+          value: DateFormat('MMM d, yyyy').format(organizer.endDate!),
+          icon: Icons.event_outlined,
+        ),
+      );
+    }
+    if (organizer.parentId?.trim().isNotEmpty == true) {
+      final parent = ref
+          .read(organizersProvider)
+          .where((item) => item.id == organizer.parentId)
+          .firstOrNull;
+      properties.add(
+        _OrganizerProperty(
+          label: 'PARENT',
+          value: parent?.title ?? organizer.parentId!,
+          icon: Icons.account_tree_outlined,
+        ),
+      );
+    }
+
+    return properties;
   }
 
   Widget _buildTimeline(
@@ -306,20 +510,23 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
   ) {
     return itemsAsync.when(
       data: (items) {
-        if (items.isEmpty) {
+        final filteredItems = _filterItemsByPeriod(items);
+        if (filteredItems.isEmpty) {
           return _buildEmptyState(
             'No activity yet',
             'Content tagged to this organizer will appear here',
           );
         }
-        final sortedItems = items.toList()
+        final sortedItems = filteredItems.toList()
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
         return ListView.builder(
           padding: const EdgeInsets.all(20),
-          itemCount: sortedItems.length,
+          itemCount: sortedItems.length + 1,
           itemBuilder: (context, index) {
-            final item = sortedItems[index];
+            if (index == 0) return _buildPeriodSelector();
+            final itemIndex = index - 1;
+            final item = sortedItems[itemIndex];
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: ObjectActionWrapper(
@@ -382,6 +589,57 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, s) => Center(child: Text('Error: $e')),
     );
+  }
+
+  Widget _buildPeriodSelector() {
+    const periods = [('7d', '7d'), ('1m', '1m'), ('3m', '3m'), ('all', 'All')];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final period in periods) ...[
+              FilterChip(
+                label: Text(period.$2),
+                selected: _selectedPeriod == period.$1,
+                showCheckmark: false,
+                side: BorderSide.none,
+                selectedColor: AppColors.accent,
+                backgroundColor: AppColors.surfaceVariant,
+                labelStyle: TextStyle(
+                  color: _selectedPeriod == period.$1
+                      ? Colors.white
+                      : AppColors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+                onSelected: (_) {
+                  setState(() => _selectedPeriod = period.$1);
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<ContentObject> _filterItemsByPeriod(List<ContentObject> items) {
+    final now = DateTime.now();
+    final cutoff = switch (_selectedPeriod) {
+      '7d' => now.subtract(const Duration(days: 7)),
+      '1m' => DateTime(now.year, now.month - 1, now.day),
+      '3m' => DateTime(now.year, now.month - 3, now.day),
+      _ => null,
+    };
+    if (cutoff == null) return items;
+    return items.where((item) {
+      final relevantDate = item.updatedAt.isAfter(item.createdAt)
+          ? item.updatedAt
+          : item.createdAt;
+      return !relevantDate.isBefore(cutoff);
+    }).toList();
   }
 
   Widget _buildItemsList(
@@ -623,6 +881,129 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         );
       },
     );
+  }
+
+  Widget _buildNotesList(BuildContext context) {
+    final notes = _notesForOrganizer();
+    if (notes.isEmpty) {
+      return _buildEmptyState(
+        'No notes linked to this ${widget.organizer.organizerType.name} yet.',
+        'Notes associated with this organizer will appear here',
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: notes.length,
+      itemBuilder: (context, index) {
+        final note = notes[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: ObjectActionWrapper(
+            object: note,
+            child: InkWell(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => UniversalDetailView(object: note),
+                ),
+              ),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                decoration: AppTheme.cardDecorationFlat(context),
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Text(
+                      _noteSubtypeIcon(note.subtype),
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            note.displayTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _notePreview(note),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _relativeDate(note.updatedAt),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  List<Note> _notesForOrganizer() {
+    return ref
+        .watch(notesProvider)
+        .where(
+          (note) => note.organizers.any(
+            (organizer) => organizer.matches(
+              widget.organizer.id,
+              widget.organizer.slug,
+              widget.organizer.title,
+            ),
+          ),
+        )
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }
+
+  String _noteSubtypeIcon(NoteSubtype subtype) {
+    return switch (subtype) {
+      NoteSubtype.text => '📝',
+      NoteSubtype.outline => '🗂',
+      NoteSubtype.collection => '🗃',
+    };
+  }
+
+  String _notePreview(Note note) {
+    final normalized = note.body
+        .replaceAll(RegExp(r'[#*_`\[\]{}]'), '')
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .join(' ');
+    return normalized.isEmpty ? note.subtype.name : normalized;
+  }
+
+  String _relativeDate(DateTime date) {
+    final diff = DateTime.now().difference(date);
+    if (diff.inDays == 0) return 'today';
+    if (diff.inDays == 1) return 'yesterday';
+    if (diff.inDays < 30) return '${diff.inDays}d';
+    if (diff.inDays < 365) return '${(diff.inDays / 30).floor()}mo';
+    return '${(diff.inDays / 365).floor()}y';
   }
 
   List<SocialPost> _postsForOrganizer() {

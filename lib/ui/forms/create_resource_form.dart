@@ -14,11 +14,13 @@ import '../../providers/vault_provider.dart';
 class CreateResourceForm extends ConsumerStatefulWidget {
   final String? initialTitle;
   final String? initialUrl;
+  final String? initialResourceType;
   final Resource? existingResource;
   const CreateResourceForm({
     super.key,
     this.initialTitle,
     this.initialUrl,
+    this.initialResourceType,
     this.existingResource,
   });
 
@@ -88,7 +90,11 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
           .resourceTypeFilters
           .where((type) => type.trim().isNotEmpty)
           .firstOrNull;
-      if (defaultType != null) _resourceType = defaultType;
+      if (widget.initialResourceType?.trim().isNotEmpty == true) {
+        _resourceType = widget.initialResourceType!.trim();
+      } else if (defaultType != null) {
+        _resourceType = defaultType;
+      }
     }
 
     if (widget.existingResource == null && widget.initialUrl != null) {

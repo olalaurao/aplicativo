@@ -202,7 +202,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   ),
                   if (object is Project) _buildProjectProgress(context, ref),
                   if (conflictGroup.length > 1)
-                    _buildObjectConflictBanner(context, conflictGroup),
+                    _buildObjectConflictBanner(context, ref, conflictGroup),
                   if (widget.searchSnippet != null &&
                       widget.searchSnippet!.trim().isNotEmpty)
                     Padding(
@@ -679,6 +679,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
   Widget _buildObjectConflictBanner(
     BuildContext context,
+    WidgetRef ref,
     List<ContentObject> group,
   ) {
     final labels = group
@@ -730,6 +731,14 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   ),
                 ],
               ),
+            ),
+            TextButton(
+              onPressed: () => _showChangeTypeSheet(context, ref),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              child: const Text('Resolve'),
             ),
           ],
         ),
@@ -1428,6 +1437,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (goal.goalMode == GoalMode.plan) ...[
+                  _buildGoalPlanSections(context, goal),
+                  const SizedBox(height: 24),
+                ],
                 const Text(
                   'Indicadores de Sucesso (KPIs)',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
@@ -2919,38 +2932,30 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final types = [
       {
         'type': 'task',
-        'label': 'Tarefa',
+        'label': 'Task',
         'icon': Icons.check_circle_outline_rounded,
       },
-      {'type': 'habit', 'label': 'Hábito', 'icon': Icons.loop_rounded},
-      {
-        'type': 'goal',
-        'label': 'Objetivo',
-        'icon': Icons.track_changes_rounded,
-      },
-      {'type': 'note', 'label': 'Nota', 'icon': Icons.article_outlined},
-      {'type': 'project', 'label': 'Projeto', 'icon': Icons.folder_outlined},
-      {'type': 'area', 'label': 'Área', 'icon': Icons.layers_outlined},
-      {'type': 'activity', 'label': 'Atividade', 'icon': Icons.sports_outlined},
-      {
-        'type': 'label',
-        'label': 'Etiqueta',
-        'icon': Icons.label_outline_rounded,
-      },
+      {'type': 'habit', 'label': 'Habit', 'icon': Icons.loop_rounded},
+      {'type': 'goal', 'label': 'Goal', 'icon': Icons.track_changes_rounded},
+      {'type': 'note', 'label': 'Note', 'icon': Icons.article_outlined},
+      {'type': 'project', 'label': 'Project', 'icon': Icons.folder_outlined},
+      {'type': 'area', 'label': 'Area', 'icon': Icons.layers_outlined},
+      {'type': 'activity', 'label': 'Activity', 'icon': Icons.sports_outlined},
+      {'type': 'label', 'label': 'Label', 'icon': Icons.label_outline_rounded},
       {
         'type': 'person',
-        'label': 'Pessoa',
+        'label': 'Person',
         'icon': Icons.person_outline_rounded,
       },
-      {'type': 'place', 'label': 'Lugar', 'icon': Icons.place_outlined},
+      {'type': 'place', 'label': 'Place', 'icon': Icons.place_outlined},
       {
         'type': 'resource',
-        'label': 'Recurso',
+        'label': 'Resource',
         'icon': Icons.menu_book_outlined,
       },
       {
         'type': 'tracker_definition',
-        'label': 'Rastreador',
+        'label': 'Tracker',
         'icon': Icons.analytics_outlined,
       },
     ];
@@ -2976,12 +2981,14 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Alterar Tipo de Objeto',
+              'Change Object Type',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
             Text(
-              'Converter "${object.title}" para:',
+              'Convert "${object.title}" to:',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontSize: 14,
                 color: AppColors.textSecondary,
@@ -2999,7 +3006,16 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                       t['icon'] as IconData,
                       color: AppColors.primary,
                     ),
-                    title: Text(t['label'] as String),
+                    title: Text(
+                      t['label'] as String,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      _changeTypeSubtitle(t['type'] as String),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     onTap: () async {
                       Navigator.pop(sheetContext);
                       await _confirmAndChangeType(
@@ -3025,22 +3041,58 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     String targetType,
     String targetLabel,
   ) async {
+    final currentType = _changeTypeKeyForObject(object);
+    final currentLabel = _changeTypeLabel(currentType);
+    final summary = _changeTypeSummary(currentType, targetType);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Alterar para $targetLabel?'),
-        content: Text(
-          'Tem certeza que deseja converter "${object.title}" em $targetLabel? Os dados compatíveis serão migrados.',
+        title: Text('Convert to $targetLabel?'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _changeTypePreviewCard(
+                      title: 'Current',
+                      label: currentLabel,
+                      icon: _changeTypeIcon(currentType),
+                      highlighted: false,
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Icon(
+                      Icons.arrow_forward_rounded,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                  Expanded(
+                    child: _changeTypePreviewCard(
+                      title: 'Will become',
+                      label: targetLabel,
+                      icon: _changeTypeIcon(targetType),
+                      highlighted: true,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _changeTypeSummaryText(summary),
+            ],
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancelar'),
+            child: const Text('Cancel'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-            child: const Text('Confirmar'),
+            child: Text('Convert to $targetLabel'),
           ),
         ],
       ),
@@ -3078,6 +3130,220 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         ).showSnackBar(SnackBar(content: Text('Erro ao converter tipo: $e')));
       }
     }
+  }
+
+  String _changeTypeKeyForObject(ContentObject object) {
+    if (object is Organizer) return object.organizerType.name;
+    if (object is TrackerDefinition) return 'tracker_definition';
+    return object.type;
+  }
+
+  String _changeTypeLabel(String type) {
+    switch (type) {
+      case 'task':
+        return 'Task';
+      case 'habit':
+        return 'Habit';
+      case 'goal':
+        return 'Goal';
+      case 'note':
+        return 'Note';
+      case 'project':
+        return 'Project';
+      case 'area':
+        return 'Area';
+      case 'activity':
+        return 'Activity';
+      case 'label':
+        return 'Label';
+      case 'person':
+        return 'Person';
+      case 'place':
+        return 'Place';
+      case 'resource':
+        return 'Resource';
+      case 'tracker_definition':
+      case 'tracker':
+        return 'Tracker';
+      default:
+        return type;
+    }
+  }
+
+  IconData _changeTypeIcon(String type) {
+    switch (type) {
+      case 'task':
+        return Icons.check_circle_outline_rounded;
+      case 'habit':
+        return Icons.loop_rounded;
+      case 'goal':
+        return Icons.track_changes_rounded;
+      case 'note':
+        return Icons.article_outlined;
+      case 'project':
+        return Icons.folder_outlined;
+      case 'area':
+        return Icons.layers_outlined;
+      case 'activity':
+        return Icons.sports_outlined;
+      case 'label':
+        return Icons.label_outline_rounded;
+      case 'person':
+        return Icons.person_outline_rounded;
+      case 'place':
+        return Icons.place_outlined;
+      case 'resource':
+        return Icons.menu_book_outlined;
+      case 'tracker_definition':
+      case 'tracker':
+        return Icons.analytics_outlined;
+      default:
+        return Icons.swap_horiz_rounded;
+    }
+  }
+
+  String _changeTypeSubtitle(String targetType) {
+    switch (targetType) {
+      case 'task':
+        return 'Keeps title, deadline and tags';
+      case 'note':
+        return 'Keeps title and body. Removes deadline and recurrence';
+      case 'habit':
+        return 'Keeps title. Adds frequency and streak';
+      case 'project':
+        return 'Keeps title and organizers. Removes deadline';
+      case 'goal':
+        return 'Keeps title and deadline. Adds progress';
+      case 'person':
+        return 'Keeps only title and tags';
+      case 'resource':
+        return 'Keeps title. Adds media type and status';
+      case 'tracker_definition':
+        return 'Keeps title. Adds unit and numeric values';
+      default:
+        return 'Keeps title and tags';
+    }
+  }
+
+  Map<String, List<String>> _changeTypeSummary(String fromType, String toType) {
+    final key = '$fromType->$toType';
+    switch (key) {
+      case 'task->note':
+        return {
+          'kept': ['Title', 'body', 'tags'],
+          'removed': ['Deadline', 'recurrence', 'stage'],
+          'added': ['Note subtype'],
+        };
+      case 'task->habit':
+        return {
+          'kept': ['Title', 'tags', 'organizers'],
+          'removed': ['Deadline', 'stage'],
+          'added': ['Frequency', 'streak'],
+        };
+      case 'note->task':
+        return {
+          'kept': ['Title', 'body', 'tags'],
+          'removed': ['Note subtype'],
+          'added': ['Stage', 'priority', 'deadline'],
+        };
+      case 'note->habit':
+        return {
+          'kept': ['Title', 'body', 'tags'],
+          'removed': ['Note subtype'],
+          'added': ['Frequency', 'streak'],
+        };
+      case 'habit->task':
+        return {
+          'kept': ['Title', 'tags', 'organizers'],
+          'removed': ['Streak', 'completion history'],
+          'added': ['Stage', 'priority', 'deadline'],
+        };
+      case 'habit->note':
+        return {
+          'kept': ['Title', 'description', 'tags'],
+          'removed': ['Frequency', 'streak', 'completion history'],
+          'added': ['Note subtype'],
+        };
+      case 'goal->task':
+        return {
+          'kept': ['Title', 'deadline', 'tags'],
+          'removed': ['Progress settings'],
+          'added': ['Stage', 'priority'],
+        };
+      case 'resource->note':
+        return {
+          'kept': ['Title', 'synopsis', 'tags'],
+          'removed': ['Media type', 'resource status'],
+          'added': ['Note subtype'],
+        };
+      default:
+        return {
+          'kept': ['Title', 'tags'],
+          'removed': ['Fields not supported by the target type'],
+          'added': ['Default fields for ${_changeTypeLabel(toType)}'],
+        };
+    }
+  }
+
+  Widget _changeTypePreviewCard({
+    required String title,
+    required String label,
+    required IconData icon,
+    required bool highlighted,
+  }) {
+    final color = highlighted ? AppColors.primary : AppColors.textMuted;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: highlighted ? 0.12 : 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+          ),
+          const SizedBox(height: 8),
+          Icon(icon, color: color),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _changeTypeSummaryText(Map<String, List<String>> summary) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _summaryLine('Preserved', summary['kept'] ?? const []),
+        const SizedBox(height: 8),
+        _summaryLine('Removed', summary['removed'] ?? const []),
+        const SizedBox(height: 8),
+        _summaryLine('Added', summary['added'] ?? const []),
+      ],
+    );
+  }
+
+  Widget _summaryLine(String label, List<String> values) {
+    return Text(
+      '$label: ${values.join(', ')}',
+      style: const TextStyle(fontSize: 13, height: 1.35),
+    );
   }
 
   Future<void> _exportToGoogleCalendar(
@@ -3712,6 +3978,127 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 isComplete ? AppColors.success : AppColors.primary,
               ),
               minHeight: 8,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGoalPlanSections(BuildContext context, Goal goal) {
+    final phases = goal.phases
+        .map((phase) => phase.trim())
+        .where((phase) => phase.isNotEmpty)
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildGoalPlanTextSection(
+          context: context,
+          label: 'OBJECTIVE',
+          text: goal.objective?.trim(),
+        ),
+        const SizedBox(height: 12),
+        _buildGoalPlanTextSection(
+          context: context,
+          label: 'STRATEGY',
+          text: goal.strategy?.trim(),
+        ),
+        if (phases.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            decoration: AppTheme.cardDecoration(context).copyWith(
+              border: const Border(
+                left: BorderSide(color: AppColors.primary, width: 3),
+              ),
+            ),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PHASES',
+                  style: TextStyle(
+                    color: AppTheme.textMutedColor(context),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ...phases.asMap().entries.map((entry) {
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      bottom: entry.key == phases.length - 1 ? 0 : 10,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 28,
+                          child: Text(
+                            '${entry.key + 1}.',
+                            style: TextStyle(
+                              color: AppTheme.textMutedColor(context),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: WikiTextView(
+                            text: entry.value,
+                            style: const TextStyle(fontSize: 15, height: 1.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildGoalPlanTextSection({
+    required BuildContext context,
+    required String label,
+    required String? text,
+  }) {
+    final value = text == null || text.isEmpty ? 'Not set' : text;
+
+    return Container(
+      width: double.infinity,
+      decoration: AppTheme.cardDecoration(context).copyWith(
+        border: const Border(
+          left: BorderSide(color: AppColors.primary, width: 3),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: AppTheme.textMutedColor(context),
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          WikiTextView(
+            text: value,
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.5,
+              color: text == null || text.isEmpty
+                  ? AppTheme.textMutedColor(context)
+                  : AppTheme.textPrimaryColor(context),
             ),
           ),
         ],

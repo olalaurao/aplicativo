@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme.dart';
 import '../../services/crash_report_service.dart';
 
@@ -37,19 +38,19 @@ class _DiagnosticReportsScreenState extends State<DiagnosticReportsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Limpar Relatórios?'),
+        title: const Text('Clear Reports?'),
         content: const Text(
-          'Todos os relatórios de diagnóstico locais serão apagados. A cópia no Vault não será afetada.',
+          'All local diagnostic reports will be deleted. The Vault copy will not be affected.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Limpar'),
+            child: const Text('Clear'),
           ),
         ],
       ),
@@ -61,9 +62,24 @@ class _DiagnosticReportsScreenState extends State<DiagnosticReportsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Relatórios apagados.')));
+        ).showSnackBar(const SnackBar(content: Text('Reports cleared.')));
       }
     }
+  }
+
+  Future<void> _shareReport(File file) async {
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      subject: file.path.split('/').last.split('\\').last,
+    );
+  }
+
+  Future<void> _shareAllReports() async {
+    if (_reports.isEmpty) return;
+    await Share.shareXFiles(
+      _reports.map((file) => XFile(file.path)).toList(),
+      subject: 'Citrine diagnostic reports',
+    );
   }
 
   Future<void> _exportAllReports() async {
@@ -85,14 +101,14 @@ class _DiagnosticReportsScreenState extends State<DiagnosticReportsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '${_reports.length} relatório(s) copiado(s) para a área de transferência.',
+            '${_reports.length} report(s) copied to clipboard.',
           ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao exportar relatórios: $e')),
+        SnackBar(content: Text('Error exporting reports: $e')),
       );
     }
   }
@@ -120,17 +136,19 @@ class _DiagnosticReportsScreenState extends State<DiagnosticReportsScreen> {
                 await Clipboard.setData(ClipboardData(text: content));
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Copiado para a área de transferência'),
-                    ),
+                    const SnackBar(content: Text('Copied to clipboard')),
                   );
                 }
               },
-              child: const Text('Copiar'),
+              child: const Text('Copy'),
+            ),
+            TextButton(
+              onPressed: () => _shareReport(file),
+              child: const Text('Share'),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Fechar'),
+              child: const Text('Close'),
             ),
           ],
         ),
@@ -138,7 +156,7 @@ class _DiagnosticReportsScreenState extends State<DiagnosticReportsScreen> {
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Erro ao ler: $e')));
+      ).showSnackBar(SnackBar(content: Text('Error reading report: $e')));
     }
   }
 
@@ -148,14 +166,19 @@ class _DiagnosticReportsScreenState extends State<DiagnosticReportsScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
-          'Relatórios de Diagnóstico',
+          'Diagnostic Reports',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
         actions: [
           IconButton(
+            icon: const Icon(Icons.ios_share_rounded),
+            tooltip: 'Share all',
+            onPressed: _reports.isEmpty ? null : _shareAllReports,
+          ),
+          IconButton(
             icon: const Icon(Icons.copy_all_rounded),
-            tooltip: 'Exportar tudo',
+            tooltip: 'Copy all',
             onPressed: _reports.isEmpty ? null : _exportAllReports,
           ),
           IconButton(
@@ -172,7 +195,7 @@ class _DiagnosticReportsScreenState extends State<DiagnosticReportsScreen> {
           : _reports.isEmpty
           ? const Center(
               child: Text(
-                'Nenhum relatório encontrado.',
+                'No reports found.',
                 style: TextStyle(color: AppColors.textMuted),
               ),
             )
@@ -197,10 +220,24 @@ class _DiagnosticReportsScreenState extends State<DiagnosticReportsScreen> {
                     ),
                   ),
                   subtitle: Text(
-                    '$kb KB · Caminho interno',
+                    '$kb KB · Internal storage',
                     style: const TextStyle(fontSize: 12),
                   ),
-                  trailing: const Icon(Icons.chevron_right_rounded),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.share_rounded),
+                        tooltip: 'Share',
+                        onPressed: () => _shareReport(file),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right_rounded),
+                        tooltip: 'View',
+                        onPressed: () => _viewReport(file),
+                      ),
+                    ],
+                  ),
                   onTap: () => _viewReport(file),
                 );
               },

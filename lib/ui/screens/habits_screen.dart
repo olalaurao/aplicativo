@@ -226,7 +226,7 @@ class _TodayView extends ConsumerWidget {
     int streakDays = 0;
 
     for (final habit in regularHabits) {
-      final val = habitsMap[habit.slug];
+      final val = _habitValueForDate(habit, now) ?? habitsMap[habit.slug];
       if (_isCompleted(val, habit)) completedCount++;
     }
 
@@ -287,10 +287,17 @@ class _TodayView extends ConsumerWidget {
 
         // Regular scheduled habit list
         ...dailyHabits.where((h) => h.schedulers.isNotEmpty).map((habit) {
-          final val = habitsMap[habit.slug];
+          final val = _habitValueForDate(habit, now) ?? habitsMap[habit.slug];
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: _TodayHabitCard(habit: habit, currentVal: val, date: now),
+            child: _swipeToCompleteHabitCard(
+              context,
+              ref,
+              habit: habit,
+              currentVal: val,
+              date: now,
+              child: _TodayHabitCard(habit: habit, currentVal: val, date: now),
+            ),
           );
         }),
 
@@ -299,10 +306,17 @@ class _TodayView extends ConsumerWidget {
           const _HabitSectionLabel(label: 'Periódicos', color: AppColors.info),
           const SizedBox(height: 8),
           ...flexibleHabits.map((habit) {
-            final val = habitsMap[habit.slug];
+            final val = _habitValueForDate(habit, now) ?? habitsMap[habit.slug];
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: _FlexHabitCard(habit: habit, currentVal: val, date: now),
+              child: _swipeToCompleteHabitCard(
+                context,
+                ref,
+                habit: habit,
+                currentVal: val,
+                date: now,
+                child: _FlexHabitCard(habit: habit, currentVal: val, date: now),
+              ),
             );
           }),
         ],
@@ -324,15 +338,22 @@ class _TodayView extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 ...unscheduled.map((h) {
-                  final val = habitsMap[h.slug];
+                  final val = _habitValueForDate(h, now) ?? habitsMap[h.slug];
                   return Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                     child: Opacity(
                       opacity: 0.65,
-                      child: _TodayHabitCard(
+                      child: _swipeToCompleteHabitCard(
+                        context,
+                        ref,
                         habit: h,
                         currentVal: val,
                         date: now,
+                        child: _TodayHabitCard(
+                          habit: h,
+                          currentVal: val,
+                          date: now,
+                        ),
                       ),
                     ),
                   );
@@ -383,12 +404,78 @@ class _TodayView extends ConsumerWidget {
     );
   }
 
+  Widget _swipeToCompleteHabitCard(
+    BuildContext context,
+    WidgetRef ref, {
+    required Habit habit,
+    required dynamic currentVal,
+    required DateTime date,
+    required Widget child,
+  }) {
+    final habitColor = _habitColor(habit);
+    final dateKey = date.toIso8601String().split('T').first;
+    return Dismissible(
+      key: ValueKey('habit_swipe_${habit.id}_$dateKey'),
+      direction: DismissDirection.startToEnd,
+      confirmDismiss: (_) async {
+        if (!_isCompleted(currentVal, habit)) {
+          await ref.read(habitsProvider.notifier).toggleHabit(habit, date);
+        }
+        HapticFeedback.lightImpact();
+        return false;
+      },
+      background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 24),
+        decoration: BoxDecoration(
+          color: habitColor.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.check_circle_rounded, color: habitColor, size: 28),
+            const SizedBox(width: 8),
+            Text(
+              'Done!',
+              style: TextStyle(
+                color: habitColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+      child: child,
+    );
+  }
+
+  Color _habitColor(Habit habit) {
+    try {
+      var value = habit.color.replaceAll('#', '');
+      if (value.length == 6) value = 'FF$value';
+      return Color(int.parse(value, radix: 16));
+    } catch (_) {
+      return AppColors.primary;
+    }
+  }
+
+  dynamic _habitValueForDate(Habit habit, DateTime date) {
+    final dateStr = date.toIso8601String().split('T').first;
+    final record = habit.completionHistory
+        .where((r) => r.date.toIso8601String().split('T').first == dateStr)
+        .firstOrNull;
+    if (record == null) return null;
+    return record.slotCompletions ?? record.completions;
+  }
+
   bool _isCompleted(dynamic val, Habit habit) {
     if (val == null) return false;
     if (val is bool) return val;
     if (val is num) return val >= habit.dailyGoal;
     if (val is List) {
-      return val.every((v) => v == true) && val.length >= habit.dailyGoal;
+      return val.every((v) => v == true || (v is num && v > 0)) &&
+          val.length >= habit.dailyGoal;
     }
     return false;
   }
@@ -492,14 +579,27 @@ class _TodayHabitCard extends ConsumerWidget {
   }
 
   bool get _isFullyCompleted {
-    final val = currentVal;
+    final val = _effectiveValue;
     if (val == null) return false;
     if (val is bool) return val;
     if (val is num) return val >= habit.dailyGoal;
     if (val is List) {
-      return val.every((v) => v == true) && val.length >= habit.dailyGoal;
+      return val.every(_isTruthyCompletion) && val.length >= habit.dailyGoal;
     }
     return false;
+  }
+
+  bool _isTruthyCompletion(dynamic value) {
+    return value == true || (value is num && value > 0);
+  }
+
+  dynamic get _effectiveValue {
+    final dateStr = date.toIso8601String().split('T').first;
+    final record = habit.completionHistory
+        .where((r) => r.date.toIso8601String().split('T').first == dateStr)
+        .firstOrNull;
+    if (record == null) return currentVal;
+    return record.slotCompletions ?? record.completions;
   }
 
   List<bool> get _slotStates {
@@ -508,7 +608,7 @@ class _TodayHabitCard extends ConsumerWidget {
         : habit.dailyGoal;
     if (numSlots <= 0) return [];
     final states = List<bool>.filled(numSlots, false);
-    final val = currentVal;
+    final val = _effectiveValue;
     if (val is List) {
       for (int i = 0; i < val.length && i < numSlots; i++) {
         states[i] = val[i] == true || (val[i] is num && val[i] > 0);
@@ -617,9 +717,7 @@ class _TodayHabitCard extends ConsumerWidget {
                           Icon(Icons.shield_rounded, size: 13, color: color),
                           const SizedBox(width: 2),
                           Text(
-                            habit.startedAt != null
-                                ? 'Dia ${DateTime.now().difference(DateTime(habit.startedAt!.year, habit.startedAt!.month, habit.startedAt!.day)).inDays + 1}'
-                                : 'Dia 1',
+                            'Dia $_pactDayCount',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -764,13 +862,7 @@ class _TodayHabitCard extends ConsumerWidget {
       return GestureDetector(
         onTap: () {
           HapticFeedback.lightImpact();
-          ref
-              .read(habitsProvider.notifier)
-              .toggleHabit(
-                habit,
-                date,
-                slotIndex: habit.dailyGoal > 1 ? 0 : null,
-              );
+          ref.read(habitsProvider.notifier).toggleHabit(habit, date);
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -790,14 +882,12 @@ class _TodayHabitCard extends ConsumerWidget {
         ),
       );
     }
-    // Multiple slots: show first slot as checkbox
-    final completed = slots[0];
+    // Multiple slots: the main checkbox toggles the whole habit.
+    final completed = _isFullyCompleted;
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        ref
-            .read(habitsProvider.notifier)
-            .toggleHabit(habit, date, slotIndex: 0);
+        ref.read(habitsProvider.notifier).toggleHabit(habit, date);
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -816,6 +906,15 @@ class _TodayHabitCard extends ConsumerWidget {
             : null,
       ),
     );
+  }
+
+  int get _pactDayCount {
+    final startedAt = habit.startedAt;
+    if (startedAt == null) return 1;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final startDate = DateTime(startedAt.year, startedAt.month, startedAt.day);
+    return today.difference(startDate).inDays + 1;
   }
 
   Widget _buildMultiSlotDots(

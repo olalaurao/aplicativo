@@ -87,16 +87,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       height: 34,
                       decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(8)),
-                      child: const Icon(Icons.person_outline_rounded, size: 18, color: AppColors.primary)),
-                    title: const Text('Seu nome',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.person_outline_rounded,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    title: const Text(
+                      'Seu nome',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     subtitle: Text(
                       settings.userName?.isNotEmpty == true
                           ? settings.userName!
                           : 'Como posso te chamar?',
-                      style: const TextStyle(fontSize: 12)),
-                    trailing: const Icon(Icons.edit_rounded, size: 16, color: AppColors.textMuted),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(
+                      Icons.edit_rounded,
+                      size: 16,
+                      color: AppColors.textMuted,
+                    ),
                     onTap: () => _editUserName(context, settings, notifier),
                   ),
                 ),
@@ -274,10 +290,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       decoration: BoxDecoration(
                         color: _parseColor(settings.accentColor),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Theme.of(context).dividerColor, width: 1),
+                        border: Border.all(
+                          color: Theme.of(context).dividerColor,
+                          width: 1,
+                        ),
                       ),
                     ),
-                    onTap: () => _showAccentColorPicker(context, settings, notifier),
+                    onTap: () =>
+                        _showAccentColorPicker(context, settings, notifier),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -373,6 +393,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _section('External Connections'),
                 const SizedBox(height: 12),
                 _buildGoogleCalendarTile(),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: ListTile(
+                    title: const Text(
+                      'Google Books API Key',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: Text(
+                      settings.googleBooksApiKey.isEmpty
+                          ? 'Required to search and save books from posts'
+                          : 'Configured',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(
+                      Icons.key_rounded,
+                      size: 20,
+                      color: AppColors.primary,
+                    ),
+                    onTap: () => _showGoogleBooksApiKeyDialog(
+                      context,
+                      settings,
+                      notifier,
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 24),
                 _section('Synchronization'),
                 const SizedBox(height: 12),
@@ -767,7 +816,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () => _showIdeaSettingsDialog(context, settings, notifier),
+                        onTap: () => _showIdeaSettingsDialog(
+                          context,
+                          settings,
+                          notifier,
+                        ),
                       ),
                     ],
                   ),
@@ -1017,14 +1070,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           color: AppColors.primary,
                         ),
                         title: const Text(
-                          'Relatórios de diagnóstico',
+                          'Diagnostic Reports',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                         subtitle: const Text(
-                          'Exibir relatórios de erros locais e ANRs',
+                          'View local error and ANR reports',
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: const Icon(Icons.chevron_right_rounded),
@@ -1513,7 +1566,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-
   void _showTikTokResolverDialog(
     BuildContext context,
     AppSettings settings,
@@ -1603,39 +1655,58 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 const Text('Como o sistema deve reconhecer uma ideia?'),
                 const SizedBox(height: 12),
-                RadioListTile<String>(
-                  title: const Text('Por Tag'),
-                  value: 'tag',
+                RadioGroup<String>(
                   groupValue: currentStrategy,
-                  onChanged: (v) => setDialogState(() => currentStrategy = v!),
-                ),
-                if (currentStrategy == 'tag')
-                  Padding(
-                    padding: const EdgeInsets.only(left: 32, right: 16, bottom: 8),
-                    child: TextField(
-                      controller: tagController,
-                      decoration: const InputDecoration(labelText: 'Tag (sem #)'),
-                    ),
+                  onChanged: (v) {
+                    if (v != null) {
+                      setDialogState(() => currentStrategy = v);
+                    }
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const RadioListTile<String>(
+                        title: Text('Por Tag'),
+                        value: 'tag',
+                      ),
+                      if (currentStrategy == 'tag')
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: 32,
+                            right: 16,
+                            bottom: 8,
+                          ),
+                          child: TextField(
+                            controller: tagController,
+                            decoration: const InputDecoration(
+                              labelText: 'Tag (sem #)',
+                            ),
+                          ),
+                        ),
+                      const RadioListTile<String>(
+                        title: Text('Por Pasta'),
+                        value: 'folder',
+                      ),
+                      if (currentStrategy == 'folder')
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: 32,
+                            right: 16,
+                            bottom: 8,
+                          ),
+                          child: TextField(
+                            controller: folderController,
+                            decoration: const InputDecoration(
+                              labelText: 'Caminho da Pasta',
+                            ),
+                          ),
+                        ),
+                      const RadioListTile<String>(
+                        title: Text('Toda Nota'),
+                        value: 'any_note',
+                      ),
+                    ],
                   ),
-                RadioListTile<String>(
-                  title: const Text('Por Pasta'),
-                  value: 'folder',
-                  groupValue: currentStrategy,
-                  onChanged: (v) => setDialogState(() => currentStrategy = v!),
-                ),
-                if (currentStrategy == 'folder')
-                  Padding(
-                    padding: const EdgeInsets.only(left: 32, right: 16, bottom: 8),
-                    child: TextField(
-                      controller: folderController,
-                      decoration: const InputDecoration(labelText: 'Caminho da Pasta'),
-                    ),
-                  ),
-                RadioListTile<String>(
-                  title: const Text('Toda Nota'),
-                  value: 'any_note',
-                  groupValue: currentStrategy,
-                  onChanged: (v) => setDialogState(() => currentStrategy = v!),
                 ),
               ],
             ),
@@ -1716,6 +1787,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               Navigator.pop(ctx);
             },
             child: const Text('SAVE'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showGoogleBooksApiKeyDialog(
+    BuildContext context,
+    AppSettings settings,
+    SettingsNotifier notifier,
+  ) {
+    final controller = TextEditingController(text: settings.googleBooksApiKey);
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Google Books API Key'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'API Key',
+            hintText: 'AIza...',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final value = controller.text.trim();
+              await notifier.updateGoogleBooksApiKey(value);
+              ref.read(googleBooksApiKeyProvider.notifier).state = value;
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('Save'),
           ),
         ],
       ),
@@ -1982,7 +2089,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-    Color _parseColor(String hexString) {
+  Color _parseColor(String hexString) {
     try {
       final buffer = StringBuffer();
       if (hexString.length == 6 || hexString.length == 7) buffer.write('ff');
@@ -1993,8 +2100,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  void _showAccentColorPicker(BuildContext context, AppSettings settings, SettingsNotifier notifier) {
-    final colors = ['#F97316', '#0EA5E9', '#10B981', '#8B5CF6', '#F43F5E', '#EAB308'];
+  void _showAccentColorPicker(
+    BuildContext context,
+    AppSettings settings,
+    SettingsNotifier notifier,
+  ) {
+    final colors = [
+      '#F97316',
+      '#0EA5E9',
+      '#10B981',
+      '#8B5CF6',
+      '#F43F5E',
+      '#EAB308',
+    ];
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -2004,10 +2122,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           runSpacing: 12,
           children: colors.map((hex) {
             final color = _parseColor(hex);
-            final isSelected = settings.accentColor.toUpperCase() == hex.toUpperCase();
+            final isSelected =
+                settings.accentColor.toUpperCase() == hex.toUpperCase();
             return GestureDetector(
               onTap: () {
-                notifier.updateAccentColor(hex); // Assume this method exists or we need to add it
+                notifier.updateAccentColor(
+                  hex,
+                ); // Assume this method exists or we need to add it
                 Navigator.pop(context);
               },
               child: Container(
@@ -2016,9 +2137,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 decoration: BoxDecoration(
                   color: color,
                   shape: BoxShape.circle,
-                  border: isSelected ? Border.all(color: AppColors.textPrimary, width: 3) : null,
+                  border: isSelected
+                      ? Border.all(color: AppColors.textPrimary, width: 3)
+                      : null,
                 ),
-                child: isSelected ? const Icon(Icons.check, color: Colors.white) : null,
+                child: isSelected
+                    ? const Icon(Icons.check, color: Colors.white)
+                    : null,
               ),
             );
           }).toList(),

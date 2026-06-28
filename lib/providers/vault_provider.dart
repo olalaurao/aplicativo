@@ -293,17 +293,59 @@ class TasksNotifier extends Notifier<List<Task>> {
   }
 
   Future<void> updateTask(Task task) async {
+    final previous = state
+        .where((candidate) => candidate.id == task.id)
+        .firstOrNull;
     state = [
       for (final t in state)
         if (t.id == task.id) task else t,
     ];
 
     await ref.read(vaultProvider.notifier).updateObject(task);
+    if (previous?.stage != TaskStage.finalized &&
+        task.stage == TaskStage.finalized) {
+      await _completeContactTaskIfNeeded(task);
+    }
   }
 
   Future<void> deleteTask(Task task) async {
     state = state.where((t) => t.id != task.id).toList();
     await ref.read(vaultProvider.notifier).deleteObject(task);
+  }
+
+  Future<void> _completeContactTaskIfNeeded(Task task) async {
+    final title = task.title.toLowerCase();
+    if (!title.startsWith('contact ') && !title.startsWith('contatar ')) {
+      return;
+    }
+
+    Person? person;
+    final personRef = task.organizers
+        .where((organizer) => organizer.type == 'person')
+        .firstOrNull;
+    final people = ref.read(peopleProvider);
+    if (personRef != null) {
+      person = people
+          .where(
+            (candidate) =>
+                candidate.id == personRef.slug ||
+                candidate.slug == personRef.slug ||
+                candidate.title == personRef.title,
+          )
+          .firstOrNull;
+    }
+    person ??= people
+        .where(
+          (candidate) =>
+              title == 'contact ${candidate.title.toLowerCase()}' ||
+              title == 'contatar ${candidate.title.toLowerCase()}',
+        )
+        .firstOrNull;
+    if (person == null) return;
+
+    await ref
+        .read(peopleProvider.notifier)
+        .updatePerson(person.copyWith(lastContactDate: DateTime.now()));
   }
 }
 
@@ -469,6 +511,17 @@ class HabitsNotifier extends Notifier<List<Habit>> {
         }
       }
 
+      final updatedHabit = _updateHabitCompletionState(
+        habit,
+        date,
+        habitsMap[habit.slug],
+      );
+      state = [
+        for (final h in state)
+          if (h.id == updatedHabit.id) updatedHabit else h,
+      ];
+      ref.read(allObjectsProvider.notifier).replaceObjectInMemory(updatedHabit);
+
       // Write habit completions as flat frontmatter keys (Obsidian format)
       // Remove old nested 'habits' key if it exists
       frontmatter.remove('habits');
@@ -501,17 +554,10 @@ class HabitsNotifier extends Notifier<List<Habit>> {
         frontmatter: frontmatter,
         trackers: trackers,
       );
-      final updatedHabit = _updateHabitCompletionState(
-        habit,
-        date,
-        habitsMap[habit.slug],
-      );
-      state = [
-        for (final h in state)
-          if (h.id == updatedHabit.id) updatedHabit else h,
-      ];
-
-      ref.invalidate(allObjectsProvider);
+      ref.read(allObjectsProvider.notifier).replaceObjectInMemory(updatedHabit);
+      ref.invalidate(objectsByTypeProvider('habit'));
+      ref.invalidate(habitsProvider);
+      ref.invalidate(dailyNoteDataProvider(dateStr));
 
       await syncQueue.enqueueAction(
         SyncAction(
@@ -1180,17 +1226,46 @@ final trackingRecordsProvider =
     });
 
 class MoodsNotifier extends Notifier<List<MoodDefinition>> {
+  bool _isSeedingSystemMoods = false;
+
   @override
   List<MoodDefinition> build() {
     final asyncValue = ref.watch(allObjectsProvider);
     final data = asyncValue.valueOrNull;
 
     if (data != null) {
-      return data.whereType<MoodDefinition>().toList()
+      final moods = data.whereType<MoodDefinition>().toList()
         ..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
+      final shouldSeed =
+          moods.isEmpty ||
+          !moods.any((mood) => mood.source == MoodSource.system);
+      if (shouldSeed && !_isSeedingSystemMoods) {
+        Future.microtask(seedSystemMoods);
+      }
+      return moods;
     }
 
     return [];
+  }
+
+  Future<void> seedSystemMoods() async {
+    if (_isSeedingSystemMoods) return;
+    _isSeedingSystemMoods = true;
+    try {
+      final obsidian = ref.read(obsidianServiceProvider);
+      for (final mood in MoodDefinition.systemMoods) {
+        final path = 'moods/${mood.id}.md';
+        final exists = await obsidian.fileExists(path);
+        if (!exists) {
+          await obsidian.writeFile(path, mood.toMarkdown());
+        }
+      }
+      ref.invalidate(allObjectsProvider);
+    } catch (e) {
+      debugPrint('Error seeding system moods: $e');
+    } finally {
+      _isSeedingSystemMoods = false;
+    }
   }
 
   Future<void> addMood(MoodDefinition mood) async {
@@ -1994,6 +2069,25 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
     object.updatedAt = DateTime.now();
     await service.writeFile(object.obsidianPath, object.toMarkdown());
     ref.invalidateSelf();
+  }
+
+  void replaceObjectInMemory(ContentObject object) {
+    final objects = state.valueOrNull;
+    if (objects == null) return;
+
+    var replaced = false;
+    final updated = <ContentObject>[];
+    for (final current in objects) {
+      if (current.id == object.id) {
+        updated.add(object);
+        replaced = true;
+      } else {
+        updated.add(current);
+      }
+    }
+
+    if (!replaced) updated.add(object);
+    state = AsyncData(updated);
   }
 }
 
@@ -2844,6 +2938,9 @@ class VaultNotifier extends Notifier<void> {
     }
 
     await obsidianService.writeFile(relativePath, markdown);
+    if (object is Note && object.subtype == NoteSubtype.collection) {
+      await obsidianService.syncCollectionToBase(object);
+    }
     if (operation == SyncOperation.update &&
         oldPath.isNotEmpty &&
         oldPath != relativePath) {
@@ -4044,7 +4141,10 @@ class VaultNotifier extends Notifier<void> {
   }
 
   Future<void> _completeContactTaskIfNeeded(Task task) async {
-    if (!task.title.toLowerCase().startsWith('contatar ')) return;
+    final title = task.title.toLowerCase();
+    if (!title.startsWith('contact ') && !title.startsWith('contatar ')) {
+      return;
+    }
 
     final personRef = task.organizers
         .where((organizer) => organizer.type == 'person')

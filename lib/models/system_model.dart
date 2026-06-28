@@ -22,10 +22,13 @@ class SystemStep {
   }
 
   factory SystemStep.fromMap(Map<String, dynamic> map) {
+    final rawSubsteps = map['substeps'];
     return SystemStep(
       id: map['id']?.toString(),
       title: map['title']?.toString() ?? 'Sem título',
-      substeps: List<String>.from(map['substeps'] as List? ?? []),
+      substeps: rawSubsteps is Iterable
+          ? rawSubsteps.map((item) => item.toString()).toList()
+          : const [],
     );
   }
 

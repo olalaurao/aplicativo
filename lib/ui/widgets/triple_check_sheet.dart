@@ -21,6 +21,8 @@ Future<void> showTripleCheckSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    isDismissible: readOnly,
+    enableDrag: readOnly,
     backgroundColor: Colors.transparent,
     builder: (_) => TripleCheckSheet(
       task: task,
@@ -46,7 +48,8 @@ class TripleCheckSheet extends ConsumerStatefulWidget {
   ConsumerState<TripleCheckSheet> createState() => _TripleCheckSheetState();
 }
 
-class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet> {
+class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
+    with SingleTickerProviderStateMixin {
   // Current answers — default to "yes" if a previous check existed, else null
   TripleCheckAnswer? _head;
   TripleCheckAnswer? _heart;
@@ -54,10 +57,24 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet> {
 
   bool _saved = false;
   bool _editingExistingCheck = false;
+  late final AnimationController _shakeController;
+  late final Animation<double> _shakeAnimation;
 
   @override
   void initState() {
     super.initState();
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
+    _shakeAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0, end: -4), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -4, end: 4), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: 4, end: -4), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: -4, end: 0), weight: 1),
+    ]).animate(
+      CurvedAnimation(parent: _shakeController, curve: Curves.easeInOut),
+    );
     // Pre-fill if there is an existing check result
     final prev = widget.task.tripleCheck;
     if (prev != null) {
@@ -68,10 +85,13 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet> {
     _editingExistingCheck = !widget.readOnly;
   }
 
-  bool get _isDirty =>
-      !_saved &&
-      _editingExistingCheck &&
-      (_head != null || _heart != null || _hand != null);
+  @override
+  void dispose() {
+    _shakeController.dispose();
+    super.dispose();
+  }
+
+  bool get _canClose => _saved || (widget.readOnly && !_editingExistingCheck);
 
   // ── Diagnosis logic ───────────────────────────────────────────────────────
 
@@ -273,24 +293,28 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet> {
     final isComplete = _head != null && _heart != null && _hand != null;
 
     return PopScope<void>(
-      canPop: !_isDirty,
+      canPop: _canClose,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        HapticFeedback.mediumImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Salve o diagnóstico antes de fechar.')),
-        );
+        HapticFeedback.lightImpact();
+        _shakeController.forward(from: 0);
       },
       child: DraggableScrollableSheet(
         initialChildSize: 0.72,
         minChildSize: 0.5,
         maxChildSize: 0.92,
-        builder: (_, controller) => Container(
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkSurface : AppColors.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        builder: (_, controller) => AnimatedBuilder(
+          animation: _shakeAnimation,
+          builder: (context, child) => Transform.translate(
+            offset: Offset(_shakeAnimation.value, 0),
+            child: child,
           ),
-          child: Column(
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkSurface : AppColors.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
             children: [
               // Handle pill
               Padding(
@@ -469,10 +493,17 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet> {
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
-                          onPressed: () => setState(() {
-                            _editingExistingCheck = true;
-                            _saved = false;
-                          }),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            Future<void>.delayed(
+                              const Duration(milliseconds: 180),
+                              () {
+                                if (context.mounted) {
+                                  showTripleCheckSheet(context, ref, widget.task);
+                                }
+                              },
+                            );
+                          },
                           icon: const Icon(Icons.refresh_rounded),
                           label: const Text('Re-executar diagnóstico'),
                         ),
@@ -496,6 +527,7 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet> {
                 ),
               ),
             ],
+            ),
           ),
         ),
       ),
@@ -508,6 +540,49 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet> {
     if (diff == 0) return 'hoje';
     if (diff == 1) return 'ontem';
     return 'há $diff dias';
+  }
+}
+
+class TripleCheckIconRow extends StatelessWidget {
+  final TripleCheck tripleCheck;
+  final VoidCallback? onTap;
+
+  const TripleCheckIconRow({
+    super.key,
+    required this.tripleCheck,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final icons = <IconData>[
+      if (tripleCheck.head != TripleCheckAnswer.yes)
+        Icons.psychology_outlined,
+      if (tripleCheck.heart != TripleCheckAnswer.yes)
+        Icons.favorite_outline_rounded,
+      if (tripleCheck.hand != TripleCheckAnswer.yes)
+        Icons.back_hand_outlined,
+    ];
+    if (icons.isEmpty) {
+      icons.add(Icons.check_circle_outline_rounded);
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final icon in icons) ...[
+              Icon(icon, size: 14, color: AppColors.textMuted),
+              if (icon != icons.last) const SizedBox(width: 2),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
 

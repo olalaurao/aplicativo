@@ -24,7 +24,11 @@ class CreateGoalForm extends ConsumerStatefulWidget {
 class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
   late final TextEditingController _titleController;
   late final TextEditingController _descController;
+  late final TextEditingController _objectiveController;
+  late final TextEditingController _strategyController;
+  final List<TextEditingController> _phaseControllers = [];
   GoalType _goalType = GoalType.oneTime;
+  GoalMode _goalMode = GoalMode.standard;
   DateTime? _deadline;
   String _selectedColor = '#10B981';
 
@@ -57,17 +61,32 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
       context: context,
       text: widget.existingGoal?.description ?? '',
     );
+    _objectiveController = WikiLinkTextController(
+      context: context,
+      text: widget.existingGoal?.objective ?? '',
+    );
+    _strategyController = WikiLinkTextController(
+      context: context,
+      text: widget.existingGoal?.strategy ?? '',
+    );
 
     if (widget.existingGoal != null) {
       final goal = widget.existingGoal!;
       _titleController.text = goal.title;
       _selectedColor = goal.color ?? '#10B981';
       _goalType = goal.goalType;
+      _goalMode = goal.goalMode;
       _deadline = goal.deadline;
       _state = goal.state;
       _kpis = List.from(goal.kpis);
       _organizers = List.from(goal.organizers);
       _socialRefs = List.from(goal.socialRefs);
+      for (final phase in goal.phases) {
+        _phaseControllers.add(TextEditingController(text: phase));
+      }
+    }
+    if (_phaseControllers.isEmpty) {
+      _phaseControllers.add(TextEditingController());
     }
   }
 
@@ -75,6 +94,11 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
   void dispose() {
     _titleController.dispose();
     _descController.dispose();
+    _objectiveController.dispose();
+    _strategyController.dispose();
+    for (final controller in _phaseControllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -92,7 +116,9 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Descartar alterações?'),
-            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
+            content: const Text(
+              'Você possui alterações não salvas. Deseja sair mesmo assim?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -110,401 +136,408 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
           Navigator.pop(context, result);
         }
       },
-      child:  Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            pinned: true,
-            leading: IconButton(
-              icon: const Icon(Icons.close_rounded),
-              onPressed: () => Navigator.pop(context),
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              pinned: true,
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: const Text(
+                'Novo Goal',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
+              centerTitle: true,
             ),
-            title: const Text(
-              'Novo Goal',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-            ),
-            centerTitle: true,
-          ),
 
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // âÂ”Â€âÂ”Â€âÂ”Â€ Title âÂ”Â€âÂ”Â€âÂ”Â€
-                  TextField(
-                    controller: _titleController,
-                    onChanged: (_) => setState(() {}),
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: 'Goal title',
-                      hintStyle: TextStyle(
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // âÂ”Â€âÂ”Â€âÂ”Â€ Title âÂ”Â€âÂ”Â€âÂ”Â€
+                    TextField(
+                      controller: _titleController,
+                      onChanged: (_) => setState(() {}),
+                      style: const TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textMuted,
                         letterSpacing: -0.5,
                       ),
-                      border: InputBorder.none,
-                      filled: false,
-                      contentPadding: EdgeInsets.zero,
+                      decoration: const InputDecoration(
+                        hintText: 'Goal title',
+                        hintStyle: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textMuted,
+                          letterSpacing: -0.5,
+                        ),
+                        border: InputBorder.none,
+                        filled: false,
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // âÂ”Â€âÂ”Â€âÂ”Â€ Color Swatches âÂ”Â€âÂ”Â€âÂ”Â€
-                  SizedBox(
-                    height: 44,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _colorSwatches.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final hex = _colorSwatches[index];
-                        final color = _parseColor(hex);
-                        final selected = _selectedColor == hex;
-                        return GestureDetector(
-                          onTap: () => setState(() => _selectedColor = hex),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: color,
-                              borderRadius: BorderRadius.circular(10),
-                              border: selected
-                                  ? Border.all(color: Colors.white, width: 3)
+                    // âÂ”Â€âÂ”Â€âÂ”Â€ Color Swatches âÂ”Â€âÂ”Â€âÂ”Â€
+                    SizedBox(
+                      height: 44,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _colorSwatches.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final hex = _colorSwatches[index];
+                          final color = _parseColor(hex);
+                          final selected = _selectedColor == hex;
+                          return GestureDetector(
+                            onTap: () => setState(() => _selectedColor = hex),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: color,
+                                borderRadius: BorderRadius.circular(10),
+                                border: selected
+                                    ? Border.all(color: Colors.white, width: 3)
+                                    : null,
+                                boxShadow: selected
+                                    ? [
+                                        BoxShadow(
+                                          color: color.withValues(alpha: 0.5),
+                                          blurRadius: 8,
+                                        ),
+                                      ]
+                                    : [],
+                              ),
+                              child: selected
+                                  ? const Icon(
+                                      Icons.check_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    )
                                   : null,
-                              boxShadow: selected
-                                  ? [
-                                      BoxShadow(
-                                        color: color.withValues(alpha: 0.5),
-                                        blurRadius: 8,
-                                      ),
-                                    ]
-                                  : [],
                             ),
-                            child: selected
-                                ? const Icon(
-                                    Icons.check_rounded,
-                                    color: Colors.white,
-                                    size: 18,
-                                  )
-                                : null,
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                  // âÂ”Â€âÂ”Â€âÂ”Â€ Status âÂ”Â€âÂ”Â€âÂ”Â€
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        const Text(
-                          'Status',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const Spacer(),
-                        DropdownButton<GoalStatus>(
-                          value: _state,
-                          underline: const SizedBox(),
-                          items: GoalStatus.values
-                              .map(
-                                (s) => DropdownMenuItem(
-                                  value: s,
-                                  child: Text(
-                                    s.name.toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (v) {
-                            if (v != null) setState(() => _state = v);
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // âÂ”Â€âÂ”Â€âÂ”Â€ Goal Type Card âÂ”Â€âÂ”Â€âÂ”Â€
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Tipo de Goal',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            _typeButton(
-                              GoalType.oneTime,
-                              'One time',
-                              Icons.flag_rounded,
-                            ),
-                            const SizedBox(width: 12),
-                            _typeButton(
-                              GoalType.repeating,
-                              'Recorrente',
-                              Icons.cached_rounded,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // âÂ”Â€âÂ”Â€âÂ”Â€ Deadline Card âÂ”Â€âÂ”Â€âÂ”Â€
-                  GestureDetector(
-                    onTap: _pickDate,
-                    child: Container(
+                    // âÂ”Â€âÂ”Â€âÂ”Â€ Status âÂ”Â€âÂ”Â€âÂ”Â€
+                    Container(
                       decoration: AppTheme.cardDecoration(context),
                       padding: const EdgeInsets.all(16),
                       child: Row(
                         children: [
                           const Text(
-                            'Prazo',
+                            'Status',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                           const Spacer(),
-                          Text(
-                            _deadline != null
-                                ? DateFormat('d MMM, yyyy').format(_deadline!)
-                                : 'Definir prazo',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: _deadline != null
-                                  ? AppColors.primary
-                                  : AppColors.textMuted,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.chevron_right_rounded,
-                            size: 18,
-                            color: AppColors.textMuted,
+                          DropdownButton<GoalStatus>(
+                            value: _state,
+                            underline: const SizedBox(),
+                            items: GoalStatus.values
+                                .map(
+                                  (s) => DropdownMenuItem(
+                                    value: s,
+                                    child: Text(
+                                      s.name.toUpperCase(),
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) {
+                              if (v != null) setState(() => _state = v);
+                            },
                           ),
                         ],
                       ),
                     ),
-                  ),
 
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-                  // âÂ”Â€âÂ”Â€âÂ”Â€ KPIs âÂ”Â€âÂ”Â€âÂ”Â€
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Indicadores de Desempenho (KPIs)',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
+                    // âÂ”Â€âÂ”Â€âÂ”Â€ Goal Type Card âÂ”Â€âÂ”Â€âÂ”Â€
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Tipo de Goal',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        ..._kpis.asMap().entries.map((e) {
-                          final isPrimary = e.key == 0;
-                          final kpi = e.value;
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppColors.background,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.divider),
-                            ),
-                            child: Row(
-                              children: [
-                                if (isPrimary)
-                                  const Icon(
-                                    Icons.star_rounded,
-                                    size: 16,
-                                    color: AppColors.warning,
-                                  ),
-                                if (isPrimary) const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        kpi.title,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Meta: ${kpi.targetValue} (${kpi.sourceType.label})',
-                                        style: const TextStyle(
-                                          color: AppColors.textMuted,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    size: 20,
-                                    color: AppColors.error,
-                                  ),
-                                  onPressed: () =>
-                                      setState(() => _kpis.removeAt(e.key)),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                        GestureDetector(
-                          onTap: _addKpi,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: AppColors.primary.withValues(alpha: 0.3),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              _typeButton(
+                                GoalType.oneTime,
+                                'One time',
+                                Icons.flag_rounded,
                               ),
-                            ),
-                            child: const Text(
-                              '+ Add KPI',
+                              const SizedBox(width: 12),
+                              _typeButton(
+                                GoalType.repeating,
+                                'Recorrente',
+                                Icons.cached_rounded,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // âÂ”Â€âÂ”Â€âÂ”Â€ Deadline Card âÂ”Â€âÂ”Â€âÂ”Â€
+                    GestureDetector(
+                      onTap: _pickDate,
+                      child: Container(
+                        decoration: AppTheme.cardDecoration(context),
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            const Text(
+                              'Prazo',
                               style: TextStyle(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              _deadline != null
+                                  ? DateFormat('d MMM, yyyy').format(_deadline!)
+                                  : 'Definir prazo',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: _deadline != null
+                                    ? AppColors.primary
+                                    : AppColors.textMuted,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              size: 18,
+                              color: AppColors.textMuted,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    _buildGoalModeSection(),
+
+                    const SizedBox(height: 12),
+
+                    // âÂ”Â€âÂ”Â€âÂ”Â€ KPIs âÂ”Â€âÂ”Â€âÂ”Â€
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Indicadores de Desempenho (KPIs)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          ..._kpis.asMap().entries.map((e) {
+                            final isPrimary = e.key == 0;
+                            final kpi = e.value;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.background,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.divider),
+                              ),
+                              child: Row(
+                                children: [
+                                  if (isPrimary)
+                                    const Icon(
+                                      Icons.star_rounded,
+                                      size: 16,
+                                      color: AppColors.warning,
+                                    ),
+                                  if (isPrimary) const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          kpi.title,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Meta: ${kpi.targetValue} (${kpi.sourceType.label})',
+                                          style: const TextStyle(
+                                            color: AppColors.textMuted,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete_outline,
+                                      size: 20,
+                                      color: AppColors.error,
+                                    ),
+                                    onPressed: () =>
+                                        setState(() => _kpis.removeAt(e.key)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                          GestureDetector(
+                            onTap: _addKpi,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                ),
+                              ),
+                              child: const Text(
+                                '+ Add KPI',
+                                style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-                  _buildSocialRefsSection(),
+                    _buildSocialRefsSection(),
 
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-                  // âÂ”Â€âÂ”Â€âÂ”Â€ Organizers âÂ”Â€âÂ”Â€âÂ”Â€
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 4,
+                    // âÂ”Â€âÂ”Â€âÂ”Â€ Organizers âÂ”Â€âÂ”Â€âÂ”Â€
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      child: OrganizerSelectorField(
+                        selectedOrganizers: _organizers,
+                        onChanged: (val) => setState(() => _organizers = val),
+                      ),
                     ),
-                    child: OrganizerSelectorField(
-                      selectedOrganizers: _organizers,
-                      onChanged: (val) => setState(() => _organizers = val),
-                    ),
-                  ),
 
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-                  // âÂ”Â€âÂ”Â€âÂ”Â€ Description âÂ”Â€âÂ”Â€âÂ”Â€
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Description',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
+                    // âÂ”Â€âÂ”Â€âÂ”Â€ Description âÂ”Â€âÂ”Â€âÂ”Â€
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Description',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _descController,
-                          maxLines: 4,
-                          style: const TextStyle(fontSize: 14),
-                          decoration: const InputDecoration(
-                            hintText: 'What do you want to achieve?',
-                            border: InputBorder.none,
-                            filled: false,
-                            contentPadding: EdgeInsets.zero,
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _descController,
+                            maxLines: 4,
+                            style: const TextStyle(fontSize: 14),
+                            decoration: const InputDecoration(
+                              hintText: 'What do you want to achieve?',
+                              border: InputBorder.none,
+                              filled: false,
+                              contentPadding: EdgeInsets.zero,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 100),
-                ],
+                    const SizedBox(height: 100),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
 
-      // âÂ”Â€âÂ”Â€âÂ”Â€ Save Button âÂ”Â€âÂ”Â€âÂ”Â€
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-          child: SizedBox(
-            height: 52,
-            child: FilledButton(
-              onPressed: hasTitle ? _saveGoal : null,
-              style: FilledButton.styleFrom(
-                backgroundColor: _parseColor(_selectedColor),
-                disabledBackgroundColor: AppColors.textMuted.withValues(
-                  alpha: 0.2,
+        // âÂ”Â€âÂ”Â€âÂ”Â€ Save Button âÂ”Â€âÂ”Â€âÂ”Â€
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+            child: SizedBox(
+              height: 52,
+              child: FilledButton(
+                onPressed: hasTitle ? _saveGoal : null,
+                style: FilledButton.styleFrom(
+                  backgroundColor: _parseColor(_selectedColor),
+                  disabledBackgroundColor: AppColors.textMuted.withValues(
+                    alpha: 0.2,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                child: const Text(
+                  'Criar Goal',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
-              ),
-              child: const Text(
-                'Criar Goal',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
           ),
         ),
       ),
-    ));
+    );
   }
 
   Widget _typeButton(GoalType type, String label, IconData icon) {
@@ -546,6 +579,173 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
         ),
       ),
     );
+  }
+
+  Widget _buildGoalModeSection() {
+    final isPlan = _goalMode == GoalMode.plan;
+
+    return Container(
+      decoration: AppTheme.cardDecoration(context),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Goal mode',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SegmentedButton<GoalMode>(
+            segments: const [
+              ButtonSegment(
+                value: GoalMode.standard,
+                label: Text('Standard'),
+                icon: Icon(Icons.flag_rounded),
+              ),
+              ButtonSegment(
+                value: GoalMode.plan,
+                label: Text('Plan'),
+                icon: Icon(Icons.route_rounded),
+              ),
+            ],
+            selected: {_goalMode},
+            onSelectionChanged: (selection) {
+              setState(() => _goalMode = selection.first);
+            },
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            child: isPlan
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildPlanTextField(
+                          controller: _objectiveController,
+                          label: 'Objective',
+                          hintText: 'What specifically do you want to achieve?',
+                        ),
+                        const SizedBox(height: 12),
+                        _buildPlanTextField(
+                          controller: _strategyController,
+                          label: 'Strategy',
+                          hintText: 'How will you get there?',
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Phases',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: _addPhaseField,
+                              icon: const Icon(Icons.add_rounded, size: 16),
+                              label: const Text('Add phase'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ..._phaseControllers.asMap().entries.map((entry) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 14),
+                                  child: Text(
+                                    '${entry.key + 1}.',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: entry.value,
+                                    minLines: 1,
+                                    maxLines: 3,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Describe this phase',
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Remove phase',
+                                  onPressed: _phaseControllers.length == 1
+                                      ? null
+                                      : () => _removePhaseField(entry.key),
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlanTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hintText,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          minLines: 2,
+          maxLines: 5,
+          decoration: InputDecoration(
+            hintText: hintText,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _addPhaseField() {
+    setState(() => _phaseControllers.add(TextEditingController()));
+  }
+
+  void _removePhaseField(int index) {
+    final controller = _phaseControllers.removeAt(index);
+    controller.dispose();
+    setState(() {});
   }
 
   void _pickDate() async {
@@ -647,6 +847,19 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
       kpis: _kpis,
       organizers: _organizers,
       socialRefs: _socialRefs,
+      goalMode: _goalMode,
+      objective: _goalMode == GoalMode.plan
+          ? _objectiveController.text.trim()
+          : null,
+      strategy: _goalMode == GoalMode.plan
+          ? _strategyController.text.trim()
+          : null,
+      phases: _goalMode == GoalMode.plan
+          ? _phaseControllers
+                .map((controller) => controller.text.trim())
+                .where((phase) => phase.isNotEmpty)
+                .toList()
+          : const [],
       obsidianPath: widget.existingGoal?.obsidianPath ?? '',
     );
 

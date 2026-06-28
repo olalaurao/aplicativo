@@ -6,393 +6,798 @@ import '../../models/mood_model.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import '../widgets/app_color_picker.dart';
-import 'universal_detail_view.dart';
 
 class MoodSettingsScreen extends ConsumerWidget {
   const MoodSettingsScreen({super.key});
 
-  static const int _maxMoods = 15;
+  static const int _maxUserMoods = 15;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final moods = ref.watch(moodsProvider);
-    final sortedMoods = List<MoodDefinition>.from(moods)
-      ..sort((a, b) {
-        final byOrder = (a.order ?? a.numericValue).compareTo(
-          b.order ?? b.numericValue,
-        );
-        if (byOrder != 0) return byOrder;
-        return a.numericValue.compareTo(b.numericValue);
-      });
-    final canAdd = moods.length < _maxMoods;
+    final userMoodCount = moods
+        .where((mood) => mood.source == MoodSource.user)
+        .length;
+    final canAdd = userMoodCount < _maxUserMoods;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Definições de humor'),
+        title: const Text('Mood Settings'),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: FilledButton.icon(
-              onPressed: canAdd
-                  ? () => _editMood(context, ref, null)
-                  : () => _showMaxMoodsMessage(context),
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('Adicionar'),
-            ),
+          TextButton.icon(
+            onPressed: canAdd
+                ? () => _openMoodForm(context, ref, null)
+                : () => _showMaxMoodsMessage(context),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add'),
           ),
         ],
       ),
       body: SafeArea(
         child: moods.isEmpty
-            ? _MoodEmptyState(onAdd: () => _editMood(context, ref, null))
-            : ReorderableListView.builder(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                itemCount: sortedMoods.length,
-                header: _MoodHeader(
-                  configured: moods.length,
-                  max: _maxMoods,
-                  missingValues: _missingValues(moods),
-                ),
-                onReorder: (oldIdx, newIdx) async {
-                  if (oldIdx < newIdx) newIdx -= 1;
-                  final list = List<MoodDefinition>.from(sortedMoods);
-                  final item = list.removeAt(oldIdx);
-                  list.insert(newIdx, item);
-
-                  for (int i = 0; i < list.length; i++) {
-                    final updated = list[i].copyWith(order: i);
-                    await ref.read(moodsProvider.notifier).updateMood(updated);
-                  }
-                },
-                itemBuilder: (context, index) {
-                  final mood = sortedMoods[index];
-                  return _MoodTile(
-                    key: ValueKey(mood.id),
-                    mood: mood,
-                    onOpen: () => _openMood(context, mood),
-                    onEdit: () => _editMood(context, ref, mood),
-                    onDelete: () => _confirmDeleteMood(context, ref, mood),
-                  );
-                },
+            ? _MoodEmptyState(onAdd: () => _openMoodForm(context, ref, null))
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  _MoodHeader(configured: userMoodCount, max: _maxUserMoods),
+                  const SizedBox(height: 12),
+                  for (final quadrant in MoodQuadrant.values)
+                    _MoodQuadrantSection(
+                      quadrant: quadrant,
+                      moods: _moodsForQuadrant(moods, quadrant),
+                      onToggleHidden: (mood) => ref
+                          .read(moodsProvider.notifier)
+                          .updateMood(mood.copyWith(hidden: !mood.hidden)),
+                      onOpen: (mood) => _showMoodDetails(context, ref, mood),
+                    ),
+                ],
               ),
       ),
       floatingActionButton: moods.isEmpty
           ? null
           : FloatingActionButton(
               onPressed: canAdd
-                  ? () => _editMood(context, ref, null)
+                  ? () => _openMoodForm(context, ref, null)
                   : () => _showMaxMoodsMessage(context),
               child: const Icon(Icons.add_rounded),
             ),
     );
   }
 
-  void _openMood(BuildContext context, MoodDefinition mood) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => UniversalDetailView(object: mood)),
-    );
+  List<MoodDefinition> _moodsForQuadrant(
+    List<MoodDefinition> moods,
+    MoodQuadrant quadrant,
+  ) {
+    return moods.where((mood) => mood.quadrant == quadrant).toList()
+      ..sort((a, b) {
+        final bySource = a.source.index.compareTo(b.source.index);
+        if (bySource != 0) return bySource;
+        final byOrder = (a.order ?? a.pleasantness).compareTo(
+          b.order ?? b.pleasantness,
+        );
+        if (byOrder != 0) return byOrder;
+        return a.title.compareTo(b.title);
+      });
   }
 
-  void _editMood(BuildContext context, WidgetRef ref, MoodDefinition? mood) {
-    final currentMoods = ref.read(moodsProvider);
-    if (mood == null && currentMoods.length >= _maxMoods) {
-      _showMaxMoodsMessage(context);
-      return;
+  void _openMoodForm(
+    BuildContext context,
+    WidgetRef ref,
+    MoodDefinition? mood,
+  ) {
+    if (mood == null) {
+      final userMoodCount = ref
+          .read(moodsProvider)
+          .where((m) => m.source == MoodSource.user)
+          .length;
+      if (userMoodCount >= _maxUserMoods) {
+        _showMaxMoodsMessage(context);
+        return;
+      }
     }
 
-    final isNew = mood == null;
-    final defaultValue = _nextAvailableValue(currentMoods);
-    final titleController = TextEditingController(text: mood?.title ?? '');
-    final emojiController = TextEditingController(text: mood?.emoji ?? '');
-    final valueController = TextEditingController(
-      text: (mood?.numericValue ?? defaultValue).toString(),
-    );
-    String selectedColor = AppColorPicker.normalizeHex(
-      mood?.color ?? _defaultColorForValue(defaultValue),
-    );
-
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: Text(isNew ? 'Novo humor' : 'Editar humor'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColorPicker.parseHex(
-                      selectedColor,
-                    ).withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        emojiController.text.trim().isEmpty
-                            ? '😐'
-                            : emojiController.text.trim(),
-                        style: const TextStyle(fontSize: 28),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          titleController.text.trim().isEmpty
-                              ? 'Preview do humor'
-                              : titleController.text.trim(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: AppColorPicker.parseHex(selectedColor),
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: titleController,
-                  decoration: const InputDecoration(labelText: 'Nome'),
-                  textCapitalization: TextCapitalization.words,
-                  onChanged: (_) => setDialogState(() {}),
-                ),
-                const SizedBox(height: 12),
-                const SizedBox(height: 12),
-                const Text(
-                  'Selecione um Emoji',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 4,
-                  children: [
-                    '😁', '😀', '🙂', '😐', '🙁', '😢', '😭',
-                    '😡', '🤬', '😴', '🥱', '🤢', '🤮', '🤕',
-                    '🥳', '😎', '🤔', '🥰', '😍', '🤩', '🤯',
-                  ].map((e) => GestureDetector(
-                    onTap: () {
-                      emojiController.text = e;
-                      setDialogState(() {});
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: emojiController.text == e
-                            ? AppColors.primary.withValues(alpha: 0.2)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                        border: emojiController.text == e
-                            ? Border.all(color: AppColors.primary)
-                            : Border.all(color: Colors.transparent),
-                      ),
-                      child: Text(e, style: const TextStyle(fontSize: 24)),
-                    ),
-                  )).toList(),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: valueController,
-                  decoration: const InputDecoration(
-                    labelText: 'Valor numérico (1-15)',
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                AppColorPicker(
-                  value: selectedColor,
-                  onChanged: (color) =>
-                      setDialogState(() => selectedColor = color),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final title = titleController.text.trim();
-                if (title.isEmpty) return;
-
-                final numericValue =
-                    ((int.tryParse(valueController.text.trim()) ?? defaultValue)
-                            .clamp(1, _maxMoods))
-                        .toInt();
-                if (_hasDuplicateValue(
-                  ref.read(moodsProvider),
-                  numericValue,
-                  mood?.id,
-                )) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('O valor $numericValue já está em uso.'),
-                    ),
-                  );
-                  return;
-                }
-
-                final id = mood?.id ?? _uniqueMoodId(ref, title);
-                final updatedMood = MoodDefinition(
-                  id: id,
-                  title: title,
-                  label: title,
-                  emoji: emojiController.text.trim().isEmpty
-                      ? '😐'
-                      : emojiController.text.trim(),
-                  numericValue: numericValue,
-                  color: selectedColor,
-                  order: mood?.order ?? numericValue - 1,
-                  obsidianPath: mood?.obsidianPath ?? 'moods/$id.md',
-                );
-
-                try {
-                  if (isNew) {
-                    await ref.read(moodsProvider.notifier).addMood(updatedMood);
-                  } else {
-                    await ref
-                        .read(moodsProvider.notifier)
-                        .updateMood(updatedMood);
-                  }
-                  if (!dialogContext.mounted) return;
-                  Navigator.pop(dialogContext);
-                } catch (e) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erro ao salvar humor: $e')),
-                  );
-                }
-              },
-              style: AppTheme.primaryButtonStyle,
-              child: const Text('Salvar'),
-            ),
-          ],
-        ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _MoodFormScreen(mood: mood),
       ),
-    ).whenComplete(() {
-      titleController.dispose();
-      emojiController.dispose();
-      valueController.dispose();
-    });
+    );
   }
 
-  Future<void> _confirmDeleteMood(
+  void _showMoodDetails(
     BuildContext context,
     WidgetRef ref,
     MoodDefinition mood,
-  ) async {
-    final confirmed = await showDialog<bool>(
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => _MoodDetailSheet(
+        mood: mood,
+        onUpdate: (updated) =>
+            ref.read(moodsProvider.notifier).updateMood(updated),
+        onEdit: mood.source == MoodSource.user
+            ? () {
+                Navigator.pop(sheetContext);
+                _openMoodForm(context, ref, mood);
+              }
+            : null,
+        onDelete: mood.source == MoodSource.user
+            ? () async {
+                final confirmed = await _confirmDeleteMood(sheetContext, mood);
+                if (confirmed != true) return;
+                await ref.read(moodsProvider.notifier).deleteMood(mood);
+                if (sheetContext.mounted) Navigator.pop(sheetContext);
+              }
+            : null,
+      ),
+    );
+  }
+
+  Future<bool?> _confirmDeleteMood(BuildContext context, MoodDefinition mood) {
+    return showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Excluir humor?'),
-        content: Text(
-          '${mood.emoji} ${mood.title} será movido para a lixeira por 30 dias.',
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
+        title: Text('Delete ${mood.label}?'),
+        content: const Text(
+          "Historical records are preserved, but this mood won't appear in the picker.",
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancelar'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Excluir'),
+            child: const Text('Delete'),
           ),
         ],
-      ),
-    );
-
-    if (confirmed != true) return;
-    final originalPath = mood.obsidianPath.isNotEmpty
-        ? mood.obsidianPath
-        : 'moods/${mood.slug}.md';
-    await ref.read(moodsProvider.notifier).deleteMood(mood);
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${mood.title} excluído'),
-        duration: const Duration(seconds: 5),
-        action: SnackBarAction(
-          label: 'Desfazer',
-          textColor: AppColors.accent,
-          onPressed: () {
-            ref.read(vaultProvider.notifier).restoreObject(mood, originalPath);
-          },
-        ),
       ),
     );
   }
 
   void _showMaxMoodsMessage(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Você já configurou 15 humores.')),
+      const SnackBar(content: Text('You already have 15 custom moods.')),
+    );
+  }
+}
+
+class _MoodQuadrantSection extends StatelessWidget {
+  final MoodQuadrant quadrant;
+  final List<MoodDefinition> moods;
+  final ValueChanged<MoodDefinition> onToggleHidden;
+  final ValueChanged<MoodDefinition> onOpen;
+
+  const _MoodQuadrantSection({
+    required this.quadrant,
+    required this.moods,
+    required this.onToggleHidden,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = MoodDefinition.quadrantColor(quadrant);
+    final visible = moods.where((mood) => !mood.hidden).length;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: AppTheme.cardDecoration(context),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        initiallyExpanded: true,
+        shape: const Border(),
+        collapsedShape: const Border(),
+        iconColor: color,
+        collapsedIconColor: color,
+        title: Row(
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _quadrantTitle(quadrant),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Text(
+              '$visible of ${moods.length} visible',
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+          ],
+        ),
+        subtitle: Text(
+          _quadrantDescription(quadrant),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+        ),
+        children: moods.isEmpty
+            ? const [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'No moods in this quadrant yet.',
+                      style: TextStyle(color: AppColors.textMuted),
+                    ),
+                  ),
+                ),
+              ]
+            : moods
+                  .map(
+                    (mood) => _MoodRow(
+                      mood: mood,
+                      color: color,
+                      onToggleHidden: () => onToggleHidden(mood),
+                      onTap: () => onOpen(mood),
+                    ),
+                  )
+                  .toList(),
+      ),
     );
   }
 
-  List<int> _missingValues(List<MoodDefinition> moods) {
-    final used = moods.map((mood) => mood.numericValue).toSet();
-    return [
-      for (int value = 1; value <= _maxMoods; value++)
-        if (!used.contains(value)) value,
+  String _quadrantTitle(MoodQuadrant quadrant) => switch (quadrant) {
+    MoodQuadrant.red => 'Red',
+    MoodQuadrant.yellow => 'Yellow',
+    MoodQuadrant.green => 'Green',
+    MoodQuadrant.blue => 'Blue',
+  };
+
+  String _quadrantDescription(MoodQuadrant quadrant) => switch (quadrant) {
+    MoodQuadrant.red => 'High energy · Unpleasant',
+    MoodQuadrant.yellow => 'High energy · Pleasant',
+    MoodQuadrant.green => 'Low energy · Pleasant',
+    MoodQuadrant.blue => 'Low energy · Unpleasant',
+  };
+}
+
+class _MoodRow extends StatelessWidget {
+  final MoodDefinition mood;
+  final Color color;
+  final VoidCallback onToggleHidden;
+  final VoidCallback onTap;
+
+  const _MoodRow({
+    required this.mood,
+    required this.color,
+    required this.onToggleHidden,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      leading: Text(mood.emoji, style: const TextStyle(fontSize: 22)),
+      title: Text(
+        mood.label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+      ),
+      subtitle: Text(
+        mood.description?.trim().isNotEmpty == true
+            ? mood.description!.trim()
+            : 'Pleasantness ${mood.pleasantness}/5 · Energy ${mood.energy}/5',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (mood.source == MoodSource.user)
+            const Icon(Icons.drag_handle_rounded, color: AppColors.textMuted),
+          Switch.adaptive(
+            value: !mood.hidden,
+            activeThumbColor: color,
+            onChanged: (_) => onToggleHidden(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MoodDetailSheet extends StatefulWidget {
+  final MoodDefinition mood;
+  final ValueChanged<MoodDefinition> onUpdate;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+
+  const _MoodDetailSheet({
+    required this.mood,
+    required this.onUpdate,
+    this.onEdit,
+    this.onDelete,
+  });
+
+  @override
+  State<_MoodDetailSheet> createState() => _MoodDetailSheetState();
+}
+
+class _MoodDetailSheetState extends State<_MoodDetailSheet> {
+  late MoodDefinition _mood;
+
+  @override
+  void initState() {
+    super.initState();
+    _mood = widget.mood;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = MoodDefinition.quadrantColor(_mood.quadrant);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.textMuted.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Center(
+              child: Text(_mood.emoji, style: const TextStyle(fontSize: 36)),
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                _mood.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (_mood.description?.trim().isNotEmpty == true) ...[
+              const SizedBox(height: 6),
+              Center(
+                child: Text(
+                  _mood.description!.trim(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            _InfoRow(
+              title: 'Quadrant',
+              child: Chip(
+                label: Text(_mood.quadrant.name.toUpperCase()),
+                backgroundColor: color.withValues(alpha: 0.14),
+                labelStyle: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            _InfoRow(
+              title: 'Values',
+              child: Text(
+                'Pleasantness: ${_mood.pleasantness}/5 · Energy: ${_mood.energy}/5',
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Aliases',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final alias in _mood.aliases)
+                  InputChip(
+                    label: Text(alias),
+                    onDeleted: () => _updateAliases(
+                      _mood.aliases.where((item) => item != alias).toList(),
+                    ),
+                  ),
+                ActionChip(
+                  avatar: const Icon(Icons.add_rounded, size: 16),
+                  label: const Text('Add alias'),
+                  onPressed: _addAlias,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              value: !_mood.hidden,
+              activeThumbColor: color,
+              title: const Text('Show in picker'),
+              subtitle: const Text('Hiding preserves all historical records.'),
+              onChanged: (_) => _update(_mood.copyWith(hidden: !_mood.hidden)),
+            ),
+            if (widget.onEdit != null) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: widget.onEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Edit mood'),
+                ),
+              ),
+            ],
+            if (widget.onDelete != null) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: widget.onDelete,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  label: const Text('Delete mood'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Center(
+              child: Text(
+                _mood.source == MoodSource.system
+                    ? 'System moods cannot be fully edited. You can add aliases and hide.'
+                    : 'Custom moods can be edited or hidden at any time.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addAlias() async {
+    final controller = TextEditingController();
+    final alias = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Add alias'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Search alias'),
+          onSubmitted: (value) => Navigator.pop(dialogContext, value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    final trimmed = alias?.trim();
+    if (trimmed == null || trimmed.isEmpty) return;
+    _updateAliases({..._mood.aliases, trimmed}.toList());
+  }
+
+  void _updateAliases(List<String> aliases) {
+    _update(_mood.copyWith(aliases: aliases));
+  }
+
+  void _update(MoodDefinition mood) {
+    setState(() => _mood = mood);
+    widget.onUpdate(mood);
+  }
+}
+
+class _MoodFormScreen extends ConsumerStatefulWidget {
+  final MoodDefinition? mood;
+
+  const _MoodFormScreen({this.mood});
+
+  @override
+  ConsumerState<_MoodFormScreen> createState() => _MoodFormScreenState();
+}
+
+class _MoodFormScreenState extends ConsumerState<_MoodFormScreen> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _descriptionController;
+  late final TextEditingController _aliasController;
+  String _emoji = '😐';
+  MoodQuadrant _quadrant = MoodQuadrant.green;
+  int _pleasantness = 4;
+  int _energy = 2;
+  String _color = '#66BB6A';
+  final List<String> _aliases = [];
+
+  @override
+  void initState() {
+    super.initState();
+    final mood = widget.mood;
+    _nameController = TextEditingController(text: mood?.label ?? '');
+    _descriptionController = TextEditingController(
+      text: mood?.description ?? '',
+    );
+    _aliasController = TextEditingController();
+    if (mood != null) {
+      _emoji = mood.emoji;
+      _quadrant = mood.quadrant;
+      _pleasantness = mood.pleasantness;
+      _energy = mood.energy;
+      _color = mood.color;
+      _aliases.addAll(mood.aliases);
+    }
+    _nameController.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _aliasController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isNew = widget.mood == null;
+    final canSave = _nameController.text.trim().isNotEmpty;
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(isNew ? 'New mood' : 'Edit mood'),
+        actions: [
+          TextButton(
+            onPressed: canSave ? _save : null,
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 96),
+          children: [
+            const _SectionLabel(
+              title: 'What do you call this feeling?',
+              helper: 'This name will appear in the picker.',
+            ),
+            TextField(
+              controller: _nameController,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                hintText: 'e.g. Flow, Nostalgic, Focused',
+              ),
+            ),
+            const SizedBox(height: 24),
+            const _SectionLabel(title: 'Emoji'),
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(_emoji, style: const TextStyle(fontSize: 28)),
+                ),
+                const SizedBox(width: 12),
+                TextButton(
+                  onPressed: _showEmojiPicker,
+                  child: const Text('Choose emoji'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            const _SectionLabel(title: 'How do you feel?'),
+            _QuadrantGrid(
+              selected: _quadrant,
+              onSelected: (quadrant) {
+                setState(() {
+                  _quadrant = quadrant;
+                  _color = _hexForColor(MoodDefinition.quadrantColor(quadrant));
+                  final pleasantRange = _pleasantRange(quadrant);
+                  final energyRange = _energyRange(quadrant);
+                  _pleasantness = pleasantRange.start;
+                  _energy = energyRange.start;
+                });
+              },
+            ),
+            const SizedBox(height: 24),
+            const _SectionLabel(title: 'Fine-tune'),
+            _MoodSlider(
+              label: 'Pleasantness',
+              value: _pleasantness,
+              range: _pleasantRange(_quadrant),
+              minLabel: 'Less pleasant',
+              maxLabel: 'More pleasant',
+              onChanged: (value) => setState(() => _pleasantness = value),
+            ),
+            _MoodSlider(
+              label: 'Energy',
+              value: _energy,
+              range: _energyRange(_quadrant),
+              minLabel: 'Less energy',
+              maxLabel: 'More energy',
+              onChanged: (value) => setState(() => _energy = value),
+            ),
+            const SizedBox(height: 24),
+            const _SectionLabel(title: 'Description'),
+            TextField(
+              controller: _descriptionController,
+              minLines: 3,
+              maxLines: null,
+              decoration: const InputDecoration(
+                hintText: "How do you usually feel when you're like this?",
+              ),
+            ),
+            const SizedBox(height: 24),
+            const _SectionLabel(
+              title: 'Aliases',
+              helper: 'You can search this mood by any of these names.',
+            ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final alias in _aliases)
+                  InputChip(
+                    label: Text(alias),
+                    onDeleted: () => setState(() => _aliases.remove(alias)),
+                  ),
+              ],
+            ),
+            TextField(
+              controller: _aliasController,
+              decoration: const InputDecoration(
+                hintText: 'Type and press Enter',
+              ),
+              onSubmitted: _addAlias,
+            ),
+            const SizedBox(height: 24),
+            const _SectionLabel(title: 'Color'),
+            AppColorPicker(
+              value: _color,
+              onChanged: (value) => setState(() => _color = value),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: FilledButton(
+            onPressed: canSave ? _save : null,
+            style: AppTheme.primaryButtonStyle,
+            child: const Text('Save'),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _addAlias(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return;
+    setState(() {
+      if (!_aliases.contains(trimmed)) _aliases.add(trimmed);
+      _aliasController.clear();
+    });
+  }
+
+  Future<void> _showEmojiPicker() async {
+    const emojis = [
+      '😁',
+      '😀',
+      '🙂',
+      '😐',
+      '🙁',
+      '😢',
+      '😭',
+      '😡',
+      '🤬',
+      '😴',
+      '🥱',
+      '🤔',
+      '🥰',
+      '😍',
+      '🤩',
+      '😌',
+      '😤',
+      '😰',
+      '😎',
+      '✨',
+      '🔥',
+      '🌊',
+      '🌱',
+      '🧘',
     ];
-  }
-
-  int _nextAvailableValue(List<MoodDefinition> moods) {
-    final missing = _missingValues(moods);
-    return missing.isEmpty ? _maxMoods : missing.first;
-  }
-
-  bool _hasDuplicateValue(
-    List<MoodDefinition> moods,
-    int value,
-    String? currentId,
-  ) {
-    return moods.any(
-      (mood) => mood.numericValue == value && mood.id != currentId,
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => GridView.count(
+        padding: const EdgeInsets.all(20),
+        crossAxisCount: 6,
+        children: [
+          for (final emoji in emojis)
+            InkWell(
+              onTap: () => Navigator.pop(context, emoji),
+              child: Center(
+                child: Text(emoji, style: const TextStyle(fontSize: 28)),
+              ),
+            ),
+        ],
+      ),
     );
+    if (selected != null) setState(() => _emoji = selected);
   }
 
-  String _slugFromTitle(String title) {
-    const accents = {
-      'á': 'a',
-      'à': 'a',
-      'ã': 'a',
-      'â': 'a',
-      'é': 'e',
-      'ê': 'e',
-      'í': 'i',
-      'ó': 'o',
-      'ô': 'o',
-      'õ': 'o',
-      'ú': 'u',
-      'ç': 'c',
-    };
-    var slug = title.toLowerCase().trim();
-    accents.forEach((from, to) => slug = slug.replaceAll(from, to));
-    slug = slug
-        .replaceAll(RegExp(r'\s+'), '-')
-        .replaceAll(RegExp(r'[^a-z0-9-]'), '')
-        .replaceAll(RegExp(r'-+'), '-')
-        .replaceAll(RegExp(r'^-+|-+$'), '');
-    return slug.isEmpty
-        ? DateTime.now().millisecondsSinceEpoch.toString()
-        : slug;
+  Future<void> _save() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) return;
+    final existing = widget.mood;
+    final id = existing?.id ?? _uniqueMoodId(ref, name);
+    final mood = MoodDefinition(
+      id: id,
+      title: name,
+      label: name,
+      emoji: _emoji,
+      color: _color,
+      source: MoodSource.user,
+      hidden: existing?.hidden ?? false,
+      description: _descriptionController.text.trim().isEmpty
+          ? null
+          : _descriptionController.text.trim(),
+      quadrant: _quadrant,
+      pleasantness: _pleasantness,
+      energy: _energy,
+      aliases: _aliases,
+      order: existing?.order,
+      obsidianPath: existing?.obsidianPath ?? 'moods/$id.md',
+    );
+    if (existing == null) {
+      await ref.read(moodsProvider.notifier).addMood(mood);
+    } else {
+      await ref.read(moodsProvider.notifier).updateMood(mood);
+    }
+    if (mounted) Navigator.pop(context);
   }
 
   String _uniqueMoodId(WidgetRef ref, String title) {
@@ -406,185 +811,254 @@ class MoodSettingsScreen extends ConsumerWidget {
     return '$base-$index';
   }
 
-  String _defaultColorForValue(int value) {
-    if (value <= 3) return '#EF4444';
-    if (value <= 6) return '#F59E0B';
-    if (value <= 9) return '#6B7280';
-    if (value <= 12) return '#22C55E';
-    return '#3B82F6';
+  String _slugFromTitle(String title) {
+    return title
+        .toLowerCase()
+        .trim()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+  }
+
+  ({int start, int end}) _pleasantRange(MoodQuadrant quadrant) =>
+      switch (quadrant) {
+        MoodQuadrant.red => (start: 1, end: 2),
+        MoodQuadrant.blue => (start: 1, end: 2),
+        MoodQuadrant.green => (start: 4, end: 5),
+        MoodQuadrant.yellow => (start: 4, end: 5),
+      };
+
+  ({int start, int end}) _energyRange(MoodQuadrant quadrant) =>
+      switch (quadrant) {
+        MoodQuadrant.red => (start: 3, end: 5),
+        MoodQuadrant.yellow => (start: 3, end: 5),
+        MoodQuadrant.green => (start: 1, end: 3),
+        MoodQuadrant.blue => (start: 1, end: 3),
+      };
+
+  String _hexForColor(Color color) {
+    final value = color.toARGB32() & 0xFFFFFF;
+    return '#${value.toRadixString(16).padLeft(6, '0').toUpperCase()}';
   }
 }
 
-class _MoodHeader extends StatelessWidget {
-  final int configured;
-  final int max;
-  final List<int> missingValues;
+class _MoodSlider extends StatelessWidget {
+  final String label;
+  final int value;
+  final ({int start, int end}) range;
+  final String minLabel;
+  final String maxLabel;
+  final ValueChanged<int> onChanged;
 
-  const _MoodHeader({
-    required this.configured,
-    required this.max,
-    required this.missingValues,
+  const _MoodSlider({
+    required this.label,
+    required this.value,
+    required this.range,
+    required this.minLabel,
+    required this.maxLabel,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    final progress = configured / max;
-    final missingText = missingValues.isEmpty
-        ? 'Escala completa'
-        : 'Faltam: ${missingValues.join(', ')}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text(label)),
+            Text(
+              '$value/5',
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+        Slider(
+          min: range.start.toDouble(),
+          max: range.end.toDouble(),
+          divisions: range.end - range.start,
+          value: value.clamp(range.start, range.end).toDouble(),
+          onChanged: (next) => onChanged(next.round()),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                minLabel,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ),
+            Text(
+              maxLabel,
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+      ],
+    );
+  }
+}
 
+class _QuadrantGrid extends StatelessWidget {
+  final MoodQuadrant selected;
+  final ValueChanged<MoodQuadrant> onSelected;
+
+  const _QuadrantGrid({required this.selected, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 2.4,
+      children: [
+        for (final quadrant in MoodQuadrant.values)
+          _QuadrantButton(
+            quadrant: quadrant,
+            selected: selected == quadrant,
+            onTap: () => onSelected(quadrant),
+          ),
+      ],
+    );
+  }
+}
+
+class _QuadrantButton extends StatelessWidget {
+  final MoodQuadrant quadrant;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _QuadrantButton({
+    required this.quadrant,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = MoodDefinition.quadrantColor(quadrant);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: selected ? color : color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.30)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _quadrantIcon(quadrant),
+              color: selected ? AppColors.textOnPrimary : color,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                quadrant.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? AppColors.textOnPrimary : color,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _quadrantIcon(MoodQuadrant quadrant) => switch (quadrant) {
+    MoodQuadrant.red => Icons.bolt_rounded,
+    MoodQuadrant.yellow => Icons.wb_sunny_rounded,
+    MoodQuadrant.green => Icons.spa_rounded,
+    MoodQuadrant.blue => Icons.water_drop_rounded,
+  };
+}
+
+class _InfoRow extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const _InfoRow({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            '$configured/$max humores configurados',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 4,
-              backgroundColor: Theme.of(context).brightness == Brightness.dark
-                  ? AppColors.darkDivider
-                  : AppColors.divider,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.info),
+          SizedBox(
+            width: 92,
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textMuted,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            missingText,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-          ),
+          Expanded(child: child),
         ],
       ),
     );
   }
 }
 
-class _MoodTile extends StatelessWidget {
-  final MoodDefinition mood;
-  final VoidCallback onOpen;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+class _SectionLabel extends StatelessWidget {
+  final String title;
+  final String? helper;
 
-  const _MoodTile({
-    super.key,
-    required this.mood,
-    required this.onOpen,
-    required this.onEdit,
-    required this.onDelete,
-  });
+  const _SectionLabel({required this.title, this.helper});
 
   @override
   Widget build(BuildContext context) {
-    final moodColor = _colorFromHex(mood.color);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: AppTheme.cardDecoration(
-        context,
-      ).copyWith(borderRadius: BorderRadius.circular(14)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onOpen,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 32,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: moodColor.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  mood.numericValue.toString(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: moodColor,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(mood.emoji, style: const TextStyle(fontSize: 22)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      mood.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: moodColor,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Valor ${mood.numericValue}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.textMuted,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                tooltip: 'Editar',
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined, size: 18),
-              ),
-              IconButton(
-                tooltip: 'Excluir',
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded, size: 18),
-              ),
-            ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
           ),
-        ),
+          if (helper != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              helper!,
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+          ],
+        ],
       ),
     );
   }
+}
 
-  Color _colorFromHex(String value) {
-    final hex = value.replaceAll('#', '').trim();
-    if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(hex)) {
-      return AppColors.textMuted;
-    }
-    return Color(int.parse('FF$hex', radix: 16));
+class _MoodHeader extends StatelessWidget {
+  final int configured;
+  final int max;
+
+  const _MoodHeader({required this.configured, required this.max});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '$configured/$max custom moods configured',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+    );
   }
 }
 
@@ -608,25 +1082,21 @@ class _MoodEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Nenhum humor cadastrado',
+              'No moods yet',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 8),
             const Text(
-              'Crie uma escala de até 15 humores para usar no diário.',
+              'Create a custom mood to use in journal entries.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textMuted),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: onAdd,
               style: AppTheme.primaryButtonStyle,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Adicionar humor'),
+              label: const Text('Add mood'),
             ),
           ],
         ),
