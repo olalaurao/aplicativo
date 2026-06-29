@@ -510,9 +510,13 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
               Icon(icon, size: 18, color: AppColors.textSecondary),
               const SizedBox(width: 12),
             ],
-            Text(
-              text,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
             ),
           ],
         ),
@@ -913,9 +917,8 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     required bool isPrimary,
   }) {
     if (isPrimary) {
-      return SizedBox(
-        width: 140,
-        height: 56,
+      return ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 160, minHeight: 56),
         child: ElevatedButton.icon(
           onPressed: () {
             HapticFeedback.lightImpact();
@@ -937,9 +940,8 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
         ),
       );
     }
-    return SizedBox(
-      width: 120,
-      height: 56,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 140, minHeight: 56),
       child: OutlinedButton.icon(
         onPressed: () {
           HapticFeedback.lightImpact();
