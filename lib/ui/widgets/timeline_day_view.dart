@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../models/task_model.dart';
 import '../../models/day_theme_model.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/pomodoro_provider.dart';
 import '../theme.dart';
 import 'package:googleapis/calendar/v3.dart' as google_calendar;
 import '../../models/habit_model.dart';
@@ -12,6 +13,7 @@ import 'object_action_wrapper.dart';
 import '../screens/google_event_detail_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../screens/universal_detail_view.dart';
+import '../screens/pomodoro_screen.dart';
 
 class TimeLineDayView extends ConsumerStatefulWidget {
   final List<Task> tasks;
@@ -487,11 +489,9 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
 
                     // ─── Current Time Indicator ───
                     if (_isToday(widget.selectedDate))
-                      IgnorePointer(
-                        child: _buildCurrentTimeIndicator(
-                          hourHeight,
-                          leftColumnWidth,
-                        ),
+                      _buildCurrentTimeIndicator(
+                        hourHeight,
+                        leftColumnWidth,
                       ),
                   ],
                 );
@@ -635,12 +635,113 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
   }
 
   Widget _buildTaskBlock(BuildContext context, Task task, double height) {
+    final isPomodoro = task.pomodoroCount != null && task.pomodoroCount! > 0;
+    final isShort = height < 45;
+    final isTiny = height < 34;
+
+    if (isPomodoro) {
+      final baseColor = AppColors.error;
+      return Opacity(
+        opacity: 0.75,
+        child: ObjectActionWrapper(
+          object: task,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                _showPomodoroActionSheet(context, task);
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: CustomPaint(
+                painter: DashedBorderPainter(
+                  color: baseColor.withValues(alpha: 0.6),
+                  borderRadius: 10,
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: baseColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Stack(
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isShort ? 8 : 12,
+                          vertical: isTiny ? 0 : (isShort ? 2 : 12),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              '🍅',
+                              style: TextStyle(fontSize: isTiny ? 12 : 16),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    task.title,
+                                    style: TextStyle(
+                                      fontSize: isTiny ? 10 : (isShort ? 11 : 13),
+                                      fontWeight: FontWeight.w800,
+                                      color: baseColor,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (!isShort && !isTiny) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${task.scheduledTime} • ${task.pomodoroCount} ciclos (${task.duration} min)',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: baseColor.withValues(alpha: 0.8),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            if (!isTiny)
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.play_arrow_rounded,
+                                  color: AppColors.error,
+                                ),
+                                iconSize: isShort ? 20 : 24,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                onPressed: () {
+                                  ref.read(pomodoroProvider.notifier).setCurrentItem(
+                                    task.id,
+                                    task.title,
+                                  );
+                                  ref.read(pomodoroProvider.notifier).start();
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const PomodoroScreen()),
+                                  );
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final baseColor = widget.colorMode == 'priority'
         ? _getPriorityColor(task.priority)
         : AppColors.secondary;
-
-    final isShort = height < 45;
-    final isTiny = height < 34;
 
     return ObjectActionWrapper(
       object: task,
@@ -831,6 +932,83 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showPomodoroActionSheet(BuildContext context, Task task) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade400,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.play_arrow_rounded, color: AppColors.error),
+              title: const Text('Iniciar agora', style: TextStyle(fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.pop(ctx);
+                ref.read(pomodoroProvider.notifier).setCurrentItem(task.id, task.title);
+                ref.read(pomodoroProvider.notifier).start();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PomodoroScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Editar agendamento'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PomodoroScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+              title: const Text('Excluir agendamento', style: TextStyle(color: AppColors.error)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (dialogCtx) => AlertDialog(
+                    title: const Text('Excluir Pomodoro Agendado?'),
+                    content: const Text('Tem certeza que deseja excluir este bloco pomodoro?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogCtx, false),
+                        child: const Text('Cancelar'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogCtx, true),
+                        style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                        child: const Text('Excluir'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true) {
+                  await ref.read(vaultProvider.notifier).deleteObject(task);
+                }
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -1216,40 +1394,42 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
       top: topOffset - 1,
       left: 0,
       right: 0,
-      child: Row(
-        children: [
-          Container(
-            width: leftColumnWidth,
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 4),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.priorityHigh,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                DateFormat('HH:mm').format(now),
-                style: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
+      child: IgnorePointer(
+        child: Row(
+          children: [
+            Container(
+              width: leftColumnWidth,
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.priorityHigh,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  DateFormat('HH:mm').format(now),
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
-          ),
-          const Expanded(
-            child: Divider(color: AppColors.priorityHigh, thickness: 1),
-          ),
-          Container(
-            width: 8,
-            height: 8,
-            decoration: const BoxDecoration(
-              color: AppColors.priorityHigh,
-              shape: BoxShape.circle,
+            const Expanded(
+              child: Divider(color: AppColors.priorityHigh, thickness: 1),
             ),
-          ),
-        ],
+            Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: AppColors.priorityHigh,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1272,4 +1452,57 @@ class TimelineItem {
     required this.id,
     this.slotIndex,
   });
+}
+
+class DashedBorderPainter extends CustomPainter {
+  final Color color;
+  final double strokeWidth;
+  final double gap;
+  final double dash;
+  final double borderRadius;
+
+  DashedBorderPainter({
+    required this.color,
+    this.strokeWidth = 1.5,
+    this.gap = 4.0,
+    this.dash = 6.0,
+    this.borderRadius = 10.0,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        Radius.circular(borderRadius),
+      ));
+
+    // Draw dashed path
+    final dashPath = Path();
+    for (final metric in path.computeMetrics()) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        dashPath.addPath(
+          metric.extractPath(distance, (distance + dash).clamp(0.0, metric.length)),
+          Offset.zero,
+        );
+        distance += dash + gap;
+      }
+    }
+    canvas.drawPath(dashPath, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant DashedBorderPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.gap != gap ||
+        oldDelegate.dash != dash ||
+        oldDelegate.borderRadius != borderRadius;
+  }
 }

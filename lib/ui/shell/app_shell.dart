@@ -13,7 +13,6 @@ import '../widgets/create_menu_sheet.dart';
 import '../../providers/history_provider.dart';
 import '../screens/universal_detail_view.dart';
 import '../screens/home_screen.dart';
-import '../../providers/auth_provider.dart';
 import '../widgets/command_center_overlay.dart';
 import '../../providers/widget_sync_provider.dart';
 
@@ -32,6 +31,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   DateTime? _lastCommandCenterOverscrollAt;
   double _commandCenterOverscroll = 0;
   bool _commandCenterOpenedThisScroll = false;
+  DateTime? _lastBackPressTime;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +41,6 @@ class _AppShellState extends ConsumerState<AppShell> {
     ref.watch(widgetSyncProvider);
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isLocked = ref.watch(lockProvider);
 
     // Determine current path
     String location = '/';
@@ -60,7 +59,29 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     final leftPane = _lastListChild ?? const HomeScreen();
 
-    return Shortcuts(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          final now = DateTime.now();
+          if (_lastBackPressTime == null ||
+              now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+            _lastBackPressTime = now;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Pressione novamente para sair'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          } else {
+            SystemNavigator.pop();
+          }
+        }
+      },
+      child: Shortcuts(
       shortcuts: const <ShortcutActivator, Intent>{
         SingleActivator(LogicalKeyboardKey.keyK, control: true):
             _OpenCommandCenterIntent(),
@@ -300,10 +321,10 @@ class _AppShellState extends ConsumerState<AppShell> {
                 );
               },
             ),
-            if (isLocked) _buildLockOverlay(context, ref),
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -606,61 +627,6 @@ class _AppShellState extends ConsumerState<AppShell> {
     showCommandCenter(context);
   }
 
-  Widget _buildLockOverlay(BuildContext context, WidgetRef ref) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      color: isDark ? AppColors.darkBackground : AppColors.background,
-      width: double.infinity,
-      height: double.infinity,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.lock_outline_rounded,
-                size: 64,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 32),
-            const Text(
-              'Citrine is locked',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Use biometrics to unlock',
-              style: TextStyle(color: AppColors.textMuted),
-            ),
-            const SizedBox(height: 48),
-            ElevatedButton.icon(
-              onPressed: () => ref.read(lockProvider.notifier).unlock(),
-              icon: const Icon(Icons.fingerprint_rounded),
-              label: const Text('Unlock'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   int _calculateSelectedIndex(String location, List<NavigationItem> items) {
     for (int i = 0; i < items.length; i++) {

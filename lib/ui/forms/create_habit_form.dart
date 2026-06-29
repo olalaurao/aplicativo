@@ -16,11 +16,13 @@ class CreateHabitForm extends ConsumerStatefulWidget {
   final String? initialTitle;
   final Habit? existingHabit;
   final String? initialTimeBlock;
+  final List<OrganizerReference>? initialOrganizers;
   const CreateHabitForm({
     super.key,
     this.initialTitle,
     this.existingHabit,
     this.initialTimeBlock,
+    this.initialOrganizers,
   });
 
   @override
@@ -118,6 +120,9 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
       }
     } else {
       _timeBlock = widget.initialTimeBlock;
+      if (widget.initialOrganizers != null) {
+        _organizers = List.from(widget.initialOrganizers!);
+      }
     }
   }
 

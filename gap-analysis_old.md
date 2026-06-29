@@ -1,3 +1,1481 @@
+IMPLEMENTATION DOC — APLICATIVO
+Data: 2025-06-25
+Para: agente de código
+Estilo: implementar tudo sem pular etapas, sem placeholders, sem TODOs
+
+PROGRESSO
+- ✅ Feature 4 — Dashboard reset implementada.
+- ✅ Feature 7 — Exportar crash reports implementada.
+- ✅ Feature 8 — More screen com Day Themes/Day Blocks implementada.
+- ✅ Feature 19 — Task backlog dialog ajustado.
+- ✅ Feature 2 — Planner timeline header overflow corrigido.
+- ✅ Feature 1 — Conflict resolution com botões e resumo claro implementada.
+- ✅ Feature 3A+B — Seed automático e descriptions dos system moods implementados.
+- ✅ Feature 3C+D+E — Mood settings grouped UI, fullscreen custom mood form and emoji timeline implemented.
+- ✅ Feature 9A+B — Swipe para completar e days-since badge implementados.
+- ✅ Feature 9C — Banner de pacto expirado no detail sheet implementado.
+- ✅ Feature 10A+B+C — Quick-run swipe, histórico e estimated chip de Systems implementados.
+- ✅ Bugfix extra — Checkboxes de hábitos corrigidos com atualização otimista e leitura por completionHistory.
+- ✅ Feature 11 — Triple Check dismissal guard, diagnostic icons and stuck badge implemented.
+- ✅ Feature 13 — Steering Sheet visual polish implemented.
+- ✅ Feature 14 — Planner energy tints for time blocks implemented.
+- ✅ Feature 4 follow-up — Flutter dashboard widgets removed; native Android widget pipeline preserved.
+- ✅ Feature 15 — Organizer detail properties, notes tab and timeline period selector implemented.
+- ✅ Feature 18 — Goal plan mode UI implemented.
+- ✅ Feature 12 — Combined Analysis calendar emoji, heatmap, tap summary and month nav implemented.
+- ✅ Feature 16 — Pomodoro custom ring, pulse, stop summary and completion overlay implemented.
+- ✅ Feature 17 — People automatic contact tasks and completion updates implemented.
+- ✅ Feature 5 — Collection new row and Obsidian Bases export implemented.
+- ✅ Feature 6 — Save books from posts with Google Books lookup implemented.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 1 — CONFLICT RESOLUTION: BOTÕES MAIS CLAROS
+Arquivo: lib/ui/screens/universal_detail_view.dart
+Método: _showChangeTypeSheet()  +  _confirmAndChangeType()
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CONTEXTO
+O sheet "Change Object Type" mostra uma lista genérica de tipos.
+O usuário não entende o que vai acontecer com os campos do objeto atual.
+O banner de conflito de tipo existe mas não tem CTA claro.
+
+MUDANÇAS NECESSÁRIAS
+
+1. _showChangeTypeSheet(): adicionar subtítulo explicativo por item
+   — Cada ListTile do sheet deve mostrar, abaixo do label, uma linha
+     pequena descrevendo o que muda. Exemplos:
+       • "Task"      → subtitle: "Keeps title, deadline and tags"
+       • "Note"      → subtitle: "Keeps title and body. Removes deadline and recurrence"
+       • "Habit"     → subtitle: "Keeps title. Adds frequency and streak"
+       • "Project"   → subtitle: "Keeps title and organizers. Removes deadline"
+       • "Goal"      → subtitle: "Keeps title and deadline. Adds progress"
+       • "Person"    → subtitle: "Keeps only title and tags"
+       • "Resource"  → subtitle: "Keeps title. Adds media type and status"
+       • "Tracker"   → subtitle: "Keeps title. Adds unit and numeric values"
+     Os demais tipos (área, atividade, etiqueta, lugar) já são auto-explicativos;
+     use subtitle: "Keeps title and tags".
+
+2. _confirmAndChangeType(): reescrever o diálogo de confirmação
+   Antes: diálogo genérico "tem certeza?"
+   Depois: diálogo com duas seções visuais lado a lado (ou em coluna em mobile):
+     — Seção esquerda/topo: "Current" — tipo atual com ícone
+     — Seta → ou ícone de transformação
+     — Seção direita/baixo: "Will become" — tipo alvo com ícone e label em destaque
+     — Corpo: texto dinâmico listando o que É PRESERVADO e o que É REMOVIDO/ADICIONADO
+       Ex: "✓ Title, tags and organizers are preserved\n✗ Deadline and recurrence will be removed"
+     — Botões: "Cancel" (textButton) e "Convert to [Label]" (FilledButton, cor primária)
+   
+   Para gerar o texto dinâmico, criar função privada:
+     String _changeTypeSummary(String fromType, String toType)
+   que retorna um Map com listas kept/removed/added para os pares relevantes.
+   Cobrir pelo menos: task→note, task→habit, note→task, note→habit,
+   habit→task, habit→note, goal→task, resource→note e o padrão genérico.
+
+3. Banner de conflito de tipo (já existente, _buildObjectConflictBanner):
+   — Adicionar botão "Resolve" inline no banner (TextButton pequeno, alinhado direita)
+     que chama _showChangeTypeSheet() diretamente.
+   — Isso evita que o usuário precise ir no menu ⋯ para descobrir a ação.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 2 — PLANNER: OVERFLOW DA DATA NA TIMELINE
+Arquivo: lib/ui/screens/planner_screen.dart
+Área: SliverAppBar + timeline scroll
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CONTEXTO
+O SliverAppBar tem floating: true e pinned: true.
+Ao rolar a timeline para baixo, o header (data + day theme) fica com overflow
+visual — o conteúdo da timeline aparece por baixo/em cima do título.
+
+DIAGNÓSTICO PROVÁVEL
+O CustomScrollView + SliverAppBar com pinned:true precisa que o SliverAppBar
+declare um expandedHeight correto ou que o título seja limitado em altura.
+A coluna do título (Planning + activeTheme.title) não tem height definida,
+causando que o pinned header sobreponha o primeiro item da lista sem paddingTop.
+
+CORREÇÕES
+
+1. No SliverAppBar:
+   — Adicionar: toolbarHeight: activeTheme != null ? 56.0 : 44.0
+     (altura maior quando há subtítulo de theme ativo)
+   — Remover floating: true (manter só pinned: true)
+     Motivo: floating + pinned juntos em CustomScrollView com muitos slivers
+     causa o comportamento de overlap. Pinned sozinho é o correto aqui.
+
+2. No primeiro SliverList ou SliverPadding que contém a timeline:
+   — Garantir que o primeiro item tem padding top suficiente.
+   — Adicionar SliverPadding(padding: EdgeInsets.only(top: 8)) antes do
+     primeiro sliver de conteúdo se não existir.
+
+3. A linha de data selecionada que fica fixa ao rolar:
+   — Se o widget de data (ex: chips de dia da semana ou o texto "Tue, Jun 24")
+     está dentro do SliverAppBar como parte do title:
+     Mover a exibição da data formatada para dentro do title Column, com
+     overflow: TextOverflow.ellipsis e maxLines: 1, para não crescer.
+   — Se há um widget de seleção de data separado (Row com chips dos 7 dias),
+     ele deve estar num SliverPersistentHeader dedicado com pinned: true e
+     height fixa (ex: 52px), ABAIXO do SliverAppBar, não dentro dele.
+     Isso impede o overflow porque cada header tem seu próprio layer.
+
+4. Testar cenário: rolar com day theme ativo (2 linhas no título) e sem theme
+   ativo (1 linha). Em ambos os casos o conteúdo da timeline não deve passar
+   por trás do header.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 3 — MOODS: PRÉ-CONFIGURADOS + VISUALIZAÇÃO NAS ANÁLISES
+Arquivos:
+  lib/providers/vault_provider.dart  (MoodsNotifier.build)
+  lib/ui/screens/mood_settings_screen.dart
+  lib/ui/screens/combined_analysis_screen.dart
+  lib/ui/widgets/citrine_chart.dart  (já tem suporte a emoji — verificar)
+  lib/models/mood_model.dart         (systemMoods já definidos — não alterar)
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CONTEXTO
+MoodDefinition.systemMoods já tem 48 moods completos com emoji, quadrante,
+pleasantness e energy, alinhados ao How We Feel.
+Porém MoodsNotifier.build() lê só do vault (allObjectsProvider) — se o vault
+estiver vazio, moodsProvider retorna lista vazia e a tela de humor fica em branco.
+O campo description dos systemMoods está null (não preenchido ainda).
+
+PARTE A — SEED AUTOMÁTICO DOS SYSTEM MOODS
+Status: ✅ IMPLEMENTADO
+
+Em MoodsNotifier.build():
+  — Após carregar do vault, se a lista filtrada de MoodDefinition estiver vazia
+    E não houver nenhum arquivo em moods/ no vault ainda:
+    disparar seedSystemMoods() como side-effect após o frame.
+  — Se a lista tiver itens mas nenhum com source == MoodSource.system:
+    mesmo comportamento (vault só tem moods de usuário de versão anterior).
+
+Criar método em MoodsNotifier:
+  Future<void> seedSystemMoods() async {
+    for (final mood in MoodDefinition.systemMoods) {
+      final path = 'moods/${mood.id}.md';
+      final exists = await obsidian.fileExists(path);
+      if (!exists) {
+        await obsidian.writeFile(path, mood.toMarkdown());
+      }
+    }
+    ref.invalidate(allObjectsProvider);
+  }
+
+  O método deve ser idempotente: checar existência antes de criar.
+
+PARTE B — DESCRIPTIONS (frases curtas) DOS SYSTEM MOODS
+Status: ✅ IMPLEMENTADO
+
+Adicionar campo description a cada MoodDefinition em systemMoods.
+Uma frase curta em inglês para cada um. Lista completa:
+
+RED quadrant:
+  enraged:     "Intense rage, feeling out of control"
+  panicked:    "Acute fear with a sense of losing control"
+  livid:       "Deep anger that is hard to hold back"
+  furious:     "Intense irritation with tension in the body"
+  terrified:   "Terror in the face of a real or imagined threat"
+  shocked:     "Extreme surprise that leaves you frozen"
+  anxious:     "Anticipatory worry about what might go wrong"
+  stressed:    "Accumulated pressure weighing on body and mind"
+  frustrated:  "Obstacles blocking what you are trying to achieve"
+  agitated:    "Restlessness that is hard to settle"
+  irritated:   "Small things bothering you more than they should"
+  jittery:     "Physical nervousness, like before something important"
+
+YELLOW quadrant:
+  ecstatic:     "Joy so intense it overflows"
+  elated:       "Light, luminous euphoria — everything feels possible"
+  excited:      "Positive energy directed at something coming up"
+  enthusiastic: "Eagerness to act and engage with what you are doing"
+  energized:    "Physical and mental readiness above your usual baseline"
+  happy:        "Quiet, genuine sense of wellbeing"
+  joyful:       "Spontaneous joy without any particular reason"
+  upbeat:       "Lightness and good spirits throughout the day"
+  inspired:     "Connected to an idea or vision that moves you"
+  motivated:    "Clear inner drive to take action"
+  optimistic:   "Confidence that things will work out"
+  proud:        "Satisfaction with something you did or who you are"
+
+GREEN quadrant:
+  calm:         "Absence of tension, a natural resting state"
+  content:      "Satisfied with what you have and where you are"
+  peaceful:     "Inner harmony without conflict"
+  serene:       "Deep stillness, almost meditative"
+  grateful:     "Recognizing the good in your life"
+  relaxed:      "Tension released, body and mind loose"
+  comfortable:  "Comfort in your surroundings and in yourself"
+  at_ease:      "No pressure, moving at your own pace"
+  balanced:     "Energy and emotions in balance"
+  loving:       "Openness and warmth toward what and who surrounds you"
+  thoughtful:   "Reflective presence, turned inward"
+  secure:       "Feeling of stability and belonging"
+
+BLUE quadrant:
+  sad:          "Simple sadness, sometimes without a clear reason"
+  depressed:    "Persistent heaviness draining energy and meaning"
+  hopeless:     "Difficulty seeing a way out or improvement"
+  lonely:       "Feeling isolated even when surrounded by people"
+  bored:        "Lack of stimulation or interest in what is around you"
+  disconnected: "Emotional distance from yourself and others"
+  exhausted:    "Complete depletion of physical and mental energy"
+  discouraged:  "Will weakened by repeated setbacks"
+  disappointed: "Unmet expectation leaving an empty feeling"
+  numb:         "Absence of feeling, as if numbed"
+  melancholic:  "Gentle sadness mixed with nostalgia"
+  defeated:     "Feeling that the effort was not enough"
+
+PARTE C — TELA MOOD SETTINGS: MOSTRAR SYSTEM MOODS
+Status: ✅ IMPLEMENTADO
+
+Na mood_settings_screen.dart o comportamento atual é uma lista reordenável
+sem distinção de origem, mostrando apenas moods de usuário, com um limite
+total de 15. Refatorar completamente:
+
+  — Agrupar moods por quadrante (RED / YELLOW / GREEN / BLUE) com cabeçalhos
+    coloridos usando a cor de cada quadrante (MoodDefinition.quadrantColor).
+    Cada seção é collapsible (ExpansionTile ou similar). Estado inicial: expandido.
+    Header da seção mostra: nome do quadrante + "Alta/Baixa energia · Agradável/Desagradável"
+    + contagem "X of Y visible" alinhada à direita.
+
+  — Moods com source == MoodSource.system:
+      • Mostrar emoji (22pt) + label (15pt) + description (12pt muted, 1 linha ellipsis)
+      • Trailing: Switch iOS-style de visibilidade (on = cor do quadrante, off = cinza)
+        Toggle grava campo hidden: true/false no arquivo do vault via
+        ref.read(moodsProvider.notifier).updateMood(mood.copyWith(hidden: !mood.hidden))
+      • Tap no row abre bottom sheet de detalhes (não navegar para UniversalDetailView):
+          - handle pill no topo
+          - emoji grande (36pt) + label (20pt semibold) + description (14pt muted)
+          - Seção "Quadrant": chip colorido com nome do quadrante
+          - Seção "Values": "Pleasantness: N/5  ·  Energy: N/5" (14pt)
+          - Seção "Aliases": chips editáveis (texto do alias + X para remover).
+            "＋ Add alias" (accent, 13pt). Salva via updateMood ao confirmar cada alias.
+          - Seção "Visibility": Toggle "Show in picker" + descrição
+            "Hiding preserves all historical records." (12pt muted)
+          - Nota ao fundo: "System moods cannot be fully edited. You can add aliases and hide."
+            (12pt muted, centrado)
+          - Sem botão de deletar.
+      • NÃO mostrar drag handle — system moods têm ordem fixa dentro do quadrante.
+
+  — Moods com source == MoodSource.user:
+      • Mesmo layout de row, mas trailing: Row com drag handle (≡) + Switch de visibilidade
+      • Tap no row abre bottom sheet igual ao de system, MAS com todos os campos editáveis:
+          - Nome: text field editável inline
+          - Emoji: tap abre emoji picker
+          - Quadrante: grade 2×2 tappável
+          - Values: dois Sliders (pleasantness 1–5, energy 1–5), range limitado ao quadrante
+          - Description: text area editável
+          - Aliases: chip input editável
+          - Cor: grid de swatches circulares
+          - Botão "Delete mood" (vermelho, full-width outline) com confirmation alert:
+            "Delete [label]? Historical records are preserved, but this mood won't appear in the picker."
+            Botões: "Delete" (vermelho) + "Cancel"
+
+  — Limite _maxMoods aplica-se apenas a moods de usuário:
+      canAdd = moods.where((m) => m.source == MoodSource.user).length < 15
+    Atualizar a lógica que bloqueia o botão "Add" no AppBar.
+
+  — "Add" button no AppBar continua abrindo o formulário de criação de mood user
+    (refatorado conforme abaixo).
+
+PARTE D — FORMULÁRIO DE CRIAÇÃO DE MOOD USER (refatorar _editMood)
+Status: ✅ IMPLEMENTADO
+
+O diálogo atual usa AlertDialog simples com campos básicos (nome, emoji,
+valor numérico, cor) e não suporta dois eixos separados nem quadrante.
+Substituir por full-screen modal:
+
+  Apresentação: Navigator.push com MaterialPageRoute fullscreenDialog: true.
+  AppBar: X no top-left (cancelar), título "New mood" (centro),
+  "Save" no top-right (accent, disabled até nome preenchido).
+
+  Campos em scroll (padding 20pt horizontal):
+
+  1. Nome
+     - Label "What do you call this feeling?" (14pt semibold)
+     - TextField full-width, placeholder "e.g. Flow, Nostalgic, Focused"
+     - Helper: "This name will appear in the picker." (12pt muted)
+
+  2. Emoji
+     - Label "Emoji" (14pt semibold)
+     - Row: quadrado preview 48×48pt (border radius 12, emoji 28pt) + "Choose emoji" (accent)
+     - Tap → modal emoji picker pesquisável (grid, 6 colunas, 40pt por célula)
+
+  3. Quadrant
+     - Label "How do you feel?" (14pt semibold)
+     - Grade 2×2 de radio buttons com visual igual ao Mood Picker Passo 1:
+       fundo da cor a 15%, borda a 30%, ícone de energia + label de agradabilidade
+     - Selecionado: fundo 100% da cor, texto branco
+
+  4. Fine-tune sliders (slide down 200ms ao selecionar quadrante)
+     - Título "Fine-tune" (13pt semibold muted all-caps)
+     - Slider Pleasantness: range limitado ao quadrante selecionado
+       (red: 1–2, yellow: 4–5, green: 4–5, blue: 1–2; ajustar conforme systemMoods)
+       Labels extremos: "Less pleasant" / "More pleasant"
+       Pill flutuante acima do thumb com valor "N/5"
+     - Slider Energy: range limitado ao quadrante (red/yellow: 3–5, green/blue: 1–3)
+       Labels extremos: "Less energy" / "More energy"
+
+  5. Description (opcional)
+     - TextArea mínimo 3 linhas, expansível
+     - Placeholder "How do you usually feel when you're like this?"
+
+  6. Aliases
+     - Chip input: digitar + Enter adiciona chip, X remove
+     - Helper: "You can search this mood by any of these names." (12pt muted)
+
+  7. Color
+     - Grid de swatches: pré-selecionar cor do quadrante escolhido. Nunca HEX direto.
+
+  Botão "Save" full-width no bottom. Disabled se nome vazio.
+
+PARTE E — VISUALIZAÇÃO DE MOODS NAS ANÁLISES (combined_analysis_screen.dart)
+Status: ✅ IMPLEMENTADO
+
+O chart já suporta emoji via ChartDataPoint.emoji e CitrineChart os renderiza
+como tooltip annotations nos pontos. O _getMoodEmojiForDate() já existe.
+O chip de legenda (Chip) não é tappável e não tem toggle de visibilidade.
+
+MUDANÇA 1: chips de legenda com toggle de visibilidade
+  — Transformar _buildMetricChip em FilterChip com onSelected.
+  — Manter Set<String> _hiddenSourceIds no estado.
+  — Quando chip é toggled off: opacidade 40%, série removida de chartSeries
+    e chartColors ao construir o gráfico.
+  — Chip de mood: adicionar ícone de emoji (texto "😊", 14pt) antes do label
+    quando MetricType.mood está ativo, para indicar a timeline extra abaixo.
+
+MUDANÇA 2: MoodEmojiTimeline widget
+  Criar lib/ui/widgets/mood_emoji_timeline.dart
+
+  StatelessWidget que recebe:
+    final List<ChartDataPoint> points;  // série mood com emoji preenchido
+    final int days;                      // N dias do período selecionado
+
+  UI: Row horizontal com N colunas iguais, scroll horizontal se N > 14.
+  Cada coluna (LayoutBuilder para width = totalWidth / min(N, 14)):
+    — Data abreviada no bottom: "24/6", fontSize 9, muted
+    — Emoji no centro: fontSize 18
+    — Se ponto nulo: "·" em 12pt muted cinza
+    — Sem borda, fundo transparente
+
+  Posicionamento: inserir imediatamente abaixo do CitrineChart, dentro do mesmo
+  card container (SizedBox height 52pt para a timeline de emojis).
+  Visível apenas quando MetricType.mood está em _activeSources e não está
+  em _hiddenSourceIds.
+
+MUDANÇA 3: não remover a linha numérica de pleasantness do chart —
+  manter ambas (linha + emoji timeline abaixo). O usuário pode correlacionar
+  tracker numérico com humor visualmente.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 4 — DASHBOARD: APAGAR TODOS OS WIDGETS
+Arquivo: lib/providers/dashboard_provider.dart
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CONTEXTO
+DashboardNotifier carrega blocos de SharedPreferences (chave 'dashboard_blocks_v3').
+_withRequiredNativeBlocks() força a presença de 'home-calendar', 'home-area' e
+'home-pomodoro-week' mesmo se o usuário os remove. Isso impede o reset total.
+
+MUDANÇAS
+
+1. Remover _withRequiredNativeBlocks() completamente.
+   — Não há mais blocos obrigatórios. Se o usuário quer dashboard vazio, ok.
+
+2. Atualizar build():
+   — Se jsonStr != null e decodificação ok: retornar a lista salva sem nenhum merge forçado.
+   — Se jsonStr == null (primeira vez): retornar lista vazia [] (não _defaultBlocks).
+   — _defaultBlocks pode continuar existindo como referência para o usuário
+     adicionar blocos manualmente, mas não é mais carregado automaticamente.
+
+3. Adicionar método público no DashboardNotifier:
+   Future<void> clearAll() async {
+     state = AsyncData([]);
+     final prefs = await SharedPreferences.getInstance();
+     await prefs.remove('dashboard_blocks_v3');
+   }
+
+4. Na home_screen.dart (ou onde o dashboard é renderizado):
+   — Quando a lista de blocos está vazia, mostrar EmptyState com:
+     title: "Empty dashboard"
+     subtitle: "Tap + to add blocks"
+     button: "Add block" → abre o sheet de seleção de blocos
+   — Não mostrar mensagem de erro, não redirecionar.
+
+NOTA: A laura vai recriar os blocos manualmente. Não recriar defaults automaticamente.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 5 — NOTE COLLECTION: ADICIONAR LINHAS + OBSIDIAN BASES
+Arquivos:
+  lib/ui/widgets/collection_editor.dart
+  lib/services/obsidian_service.dart  (para geração do markdown)
+  lib/models/note_model.dart          (já tem NoteSubtype.collection)
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CONTEXTO
+CollectionEditor renderiza uma tabela JSON com schema (colunas) e items (linhas).
+Ao abrir uma collection no app, o usuário não vê nenhum botão claro para
+adicionar nova linha. _isConfiguringSchema = true na abertura mostra a tela
+de configuração de schema, não a tabela.
+
+PARTE A — ADICIONAR NOVA LINHA NA COLLECTION
+
+Em _CollectionEditorState:
+
+1. Fluxo corrigido de primeira abertura:
+   — Se _schema.isEmpty → mostrar tela de configuração de schema (comportamento atual).
+   — Se _schema.isNotEmpty → ir direto para a tabela (_isConfiguringSchema = false).
+   Atualmente _isConfiguringSchema começa true sempre. Corrigir em _parseContent():
+     if (_schema.isNotEmpty) _isConfiguringSchema = false;
+
+2. Na tela de tabela (quando _isConfiguringSchema == false):
+   — Adicionar FloatingActionButton com Icons.add_rounded e label "New row".
+   — On tap: add an empty Map to _items e chamar _save().
+   — Cada linha deve ser editável inline (ao tocar na célula, abrir um campo
+     de texto / seletor dependendo do PropertyType).
+
+3. Schema config button (⚙) must be accessible via AppBar action,
+   não substituindo a tela toda.
+
+PARTE B — OBSIDIAN BASES COMPATIBILITY
+
+O plugin Obsidian Bases (oficial, lançado 2025) usa arquivos .base com frontmatter
+YAML que define uma "database view" sobre notas existentes em uma pasta.
+Cada linha da tabela é uma nota Obsidian separada em uma pasta.
+
+ESTRATÉGIA (sem alterar o modelo de dados interno do app):
+
+Quando uma Note com subtype == collection é salva no vault via obsidian_service.dart,
+além do arquivo .md da nota (que contém o JSON), gerar também:
+
+a) Uma pasta: <note_slug>/   (ex: "minha-colecao/")
+b) Para cada item em _items: uma nota .md individual dentro dessa pasta.
+   Nome do arquivo: item['id'] ?? uuid gerado.md
+   Frontmatter: cada PropertyDefinition vira uma propriedade YAML.
+   Exemplo de item com schema {name:text, status:selection, rating:rating}:
+     ---
+     title: "Value of the name field"
+     status: "In progress"
+     rating: 4
+     collection_ref: "[[minha-colecao]]"
+     ---
+   Body: vazio ou valor do campo richText se houver.
+
+c) Um arquivo .base na raiz da pasta (ou ao lado da nota):
+   <note_slug>.base
+   Conteúdo do .base:
+     ---
+     filters: []
+     order: []
+     properties:
+       <para cada PropertyDefinition>
+       - name: <prop.name>
+         type: <mapeamento de PropertyType para tipo Bases>
+     source:
+       type: folder
+       path: "<note_slug>/"
+     ---
+
+   Mapeamento de PropertyType → Bases type:
+     text, richText, url, email, phone → "text"
+     quantity, rating → "number"
+     date → "date"
+     time → "text"
+     duration → "number"
+     selection → "select"
+     multiSelection → "multiselect"
+     checkbox → "checkbox"
+     relation → "text"  (wikilink como texto)
+     media → "text"
+
+d) Criar método em ObsidianService:
+   Future<void> syncCollectionToBase(Note note) async { ... }
+   Chamar esse método no vault_provider quando uma note do tipo collection
+   é criada ou atualizada.
+
+e) Quando o usuário edita um item no app:
+   — Atualizar o arquivo .md individual correspondente na pasta.
+   — NÃO re-gerar todos os arquivos, só o que mudou.
+   — Se um item é adicionado: criar novo .md na pasta.
+   — Se um item é removido: deletar o .md correspondente.
+
+f) Sincronização reversa (Obsidian → app):
+   Não implementar na v1. O fluxo é unidirecional: app → Obsidian.
+   Documentar isso como limitação conhecida.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 6 — SALVAR LIVROS DE POSTS: BUSCA MANUAL + GOOGLE BOOKS
+Arquivos:
+  lib/ui/screens/social_post_detail.dart
+  lib/ui/screens/resources_screen.dart
+  lib/models/resource_model.dart
+  lib/services/ → criar: book_lookup_service.dart
+  lib/ui/forms/create_resource_form.dart
+  lib/ui/widgets/ → criar: book_search_sheet.dart
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CONTEXTO
+A laura salva posts (foto/vídeo) de recomendações de livros.
+Ela quer, estando no post, abrir um sheet, digitar o título de um livro,
+buscar e salvar como Resource já preenchido com capa, título PT-BR, autor etc.
+Sem OCR / visão computacional — é busca manual por título.
+
+PARTE A — RESOURCE MODEL: novos campos
+
+Em lib/models/resource_model.dart, adicionar:
+  String? isbnOriginal;
+  String? titlePtBr;
+  String? titleOriginal;
+  String? publisher;
+  String? language;
+  String? googleBooksId;
+
+Atualizar toMarkdown(), fromMarkdown() e copyWith().
+  Chaves YAML: isbn, title_pt_br, title_original, publisher, language, google_books_id
+
+O campo title (já existente em ContentObject) vai receber o título em PT-BR se
+disponível, ou o original caso contrário.
+Os aliases devem incluir titleOriginal se diferente.
+
+PARTE B — BookLookupService
+
+Criar lib/services/book_lookup_service.dart
+
+class BookSearchResult {
+  final String googleBooksId;
+  final String titleOriginal;
+  final String? titlePtBr;
+  final String? author;
+  final String? coverUrl;
+  final String? coverUrlLarge;
+  final int? year;
+  final int? pages;
+  final String? synopsis;
+  final String? publisher;
+  final String? language;
+  final String? isbn;
+}
+
+Método principal:
+  Future<List<BookSearchResult>> search(String query, {String apiKey}) async {
+    // GET https://www.googleapis.com/books/v1/volumes
+    // params: q=<query>, maxResults=10, key=<apiKey>
+    // Parsear volumeInfo de cada item
+    // Para cada resultado, tentar detectar se há edição PT-BR:
+    //   segundo request: q=<titleOriginal> inauthor:<author>, langRestrict=pt
+    //   timeout de 3s, falha silenciosa (titlePtBr fica null)
+  }
+
+  String _stripHtml(String html) { ... }
+
+PARTE C — BookSearchSheet widget
+
+Criar lib/ui/widgets/book_search_sheet.dart
+
+StatefulWidget que recebe:
+  final String? linkedPostId;
+  final VoidCallback? onSaved;
+
+UI do sheet:
+  1. Campo de busca com TextField e botão "Search" (ou submit no teclado).
+  2. Loading indicator enquanto busca.
+  3. Lista de resultados: cada item mostra:
+     — Thumbnail (Image.network com placeholder cinza se null, 40×60pt)
+     — Título original + título PT-BR se diferente (em cinza menor, 12pt)
+     — Autor, ano (13pt muted)
+     — Botão "Add" no lado direito
+  4. Ao tocar "Add" num resultado:
+     a. Criar Resource com todos os campos preenchidos
+     b. socialRefs: [linkedPostId] se linkedPostId != null
+     c. Salvar via resourcesProvider.notifier.addResource(resource)
+     d. SnackBar: "📚 [title] added to your library"
+     e. Manter sheet aberto para mais livros. "Close" button top-right.
+  5. Se apiKey está vazia: warning + botão "Add manually" que abre
+     create_resource_form com resourceType pré-preenchido como 'Livro'.
+
+PARTE D — Integração no SocialPostDetail
+
+Em lib/ui/screens/social_post_detail.dart:
+  — Adicionar action no AppBar com label "Save books from post"
+    ícone: Icons.menu_book_outlined
+  — showModalBottomSheet com BookSearchSheet(linkedPostId: post.id)
+
+PARTE E — API Key nas Settings
+
+Em lib/ui/screens/settings_screen.dart:
+  — Adicionar campo "Google Books API Key" em seção "Integrations".
+  — Salvar em SharedPreferences com chave 'google_books_api_key'.
+  — Provider: googleBooksApiKeyProvider (StateProvider<String> lendo de prefs).
+
+PARTE F — Resources screen: mostrar capa
+
+Em lib/ui/screens/resources_screen.dart:
+  — Se resource.coverImage != null e resource.resourceType == 'Livro':
+    mostrar thumbnail na lista (Image.network, 40×60pt, border-radius 4).
+  — Verificar se o list tile atual usa coverImage; se não, adicionar leading.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 7 — EXPORTAR CRASH REPORTS
+Arquivos:
+  lib/ui/screens/diagnostic_reports_screen.dart
+  lib/ui/screens/settings_screen.dart
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CONTEXTO
+CrashReportService salva reports em internal storage inacessível ao usuário.
+DiagnosticReportsScreen lista reports mas só oferece "Copiar" para clipboard.
+Strings da tela estão em português.
+
+MUDANÇAS
+
+1. Adicionar dependência share_plus ao pubspec.yaml se não existir.
+   Verificar: grep 'share_plus' pubspec.yaml
+   Se ausente: share_plus: ^10.0.0 em dependencies.
+
+2. Adicionar _shareReport(File file):
+   Future<void> _shareReport(File file) async {
+     await Share.shareXFiles(
+       [XFile(file.path)],
+       subject: file.path.split('/').last,
+     );
+   }
+
+3. No ListTile de cada report: trailing com dois botões (Row, MainAxisSize.min):
+   — Icons.share_rounded → _shareReport(file)
+   — Icons.chevron_right_rounded → _viewReport(file) (já existe)
+
+4. No dialog de _viewReport: botão "Share" entre "Copy" e "Close".
+
+5. Botão "Share All" no AppBar (ícone ios_share_rounded):
+   — Desabilitado se _reports.isEmpty
+   — Share.shareXFiles com todos os XFile
+
+6. Corrigir strings em português:
+   "Relatórios de diagnóstico"     → "Diagnostic Reports"
+   "Exibir relatórios de erros..."  → "View local error and ANR reports"
+   "Limpar Relatórios?"             → "Clear Reports?"
+   "Todos os relatórios..."         → "All local diagnostic reports will be deleted. The Vault copy will not be affected."
+   "Cancelar"                       → "Cancel"
+   "Limpar"                         → "Clear"
+   "Relatórios apagados."           → "Reports cleared."
+   "Relatórios de Diagnóstico"      → "Diagnostic Reports" (AppBar title)
+   "Nenhum relatório encontrado."   → "No reports found."
+   "Caminho interno"                → "Internal storage"
+   "Copiado para a área de transferência" → "Copied to clipboard"
+   "Copiar"                         → "Copy"
+   "Fechar"                         → "Close"
+   "Erro ao ler: $e"                → "Error reading file: $e"
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 8 — MORE SCREEN: DAY THEMES E DAY BLOCKS ABAIXO DO SHOPPING LIST
+Arquivo: lib/ui/screens/more_screen.dart
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CONTEXTO
+Day Themes (DayThemeScreen) e Day Blocks (AlarmScreen) só são acessíveis via
+navigation items dinâmicos, que podem não estar visíveis. Devem aparecer
+fixamente abaixo do Shopping List na more_screen.
+
+MUDANÇAS
+
+1. Adicionar imports se não existirem:
+   import 'day_theme_screen.dart';
+   import 'alarm_screen.dart';
+
+2. Corrigir strings em português:
+   'Lista de Mercado' → 'Shopping List'
+   'Conflitos de Tipo' → 'Type Conflicts'
+
+3. Após o _buildMenuRow do Shopping List (verificar NavSection para nomes exatos):
+   final hasDayThemeInNav = inMoreItems.any((it) => it.section == NavSection.dayTheme);
+   final hasDayBlockInNav  = inMoreItems.any((it) => it.section == NavSection.alarm);
+
+   if (!hasDayThemeInNav) ...[
+     const SizedBox(height: 8),
+     _buildMenuRow(context, 'Day Themes', Icons.wb_sunny_outlined,
+       AppColors.warning, () => Navigator.push(context,
+         MaterialPageRoute(builder: (_) => const DayThemeScreen()))),
+   ],
+   if (!hasDayBlockInNav) ...[
+     const SizedBox(height: 8),
+     _buildMenuRow(context, 'Day Blocks', Icons.view_day_outlined,
+       AppColors.primary, () => Navigator.push(context,
+         MaterialPageRoute(builder: (_) => const AlarmScreen()))),
+   ],
+
+   Ordem final da seção: Shopping List → Day Themes → Day Blocks → Vault Files → Type Conflicts
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 9 — HABIT: SWIPE RIGHT PARA COMPLETAR + BADGES CORRETOS
+Arquivos: lib/ui/screens/habits_screen.dart
+          lib/ui/widgets/habit_row.dart
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OBJETIVO
+Ao deslizar um habit/pact card para a direita, o habit é marcado como
+completo para hoje sem precisar abrir o detail sheet. Feedback visual imediato.
+Além disso, o "days since" badge atual usa texto em português e cor para
+dias ≥ 3, mas a spec pede #E53935 já a partir do dia 1 (qualquer gap > 0).
+
+PARTE A — SWIPE RIGHT PARA COMPLETAR
+Status: ✅ IMPLEMENTADO
+
+Em habits_screen.dart, envolver _TodayHabitCard com Dismissible:
+
+  Dismissible(
+    key: ValueKey('habit_swipe_${habit.id}'),
+    direction: DismissDirection.startToEnd,
+    confirmDismiss: (_) async {
+      // Não dismissar o card da lista — apenas executar a ação.
+      // Completar o habit via provider e retornar false para
+      // não remover o item.
+      final notifier = ref.read(vaultProvider.notifier);
+      // Lógica idêntica ao tap no checkbox do _TodayHabitCard.
+      // Registrar CompletionRecord para hoje com completions = habit.dailyGoal.
+      await notifier.recordHabitCompletion(habit, DateTime.now());
+      HapticFeedback.lightImpact();
+      return false;  // não remove o card
+    },
+    background: Container(
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.only(left: 24),
+      decoration: BoxDecoration(
+        color: habitColor.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle_rounded, color: habitColor, size: 28),
+          const SizedBox(width: 8),
+          Text('Done!', style: TextStyle(color: habitColor,
+            fontSize: 14, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    ),
+    child: _TodayHabitCard(habit: habit, currentVal: val, date: now),
+  )
+
+  A função recordHabitCompletion deve verificar se já foi completado hoje
+  antes de criar novo registro.
+
+PARTE B — DAYS SINCE BADGE: COR CORRETA
+Status: ✅ IMPLEMENTADO
+
+Em habit_row.dart, método _buildDaysSinceBadge():
+  Atualizar a condição de cor: qualquer days >= 1 → AppColors.error (#E53535 ou
+  o equivalente, verificar AppColors.error hex).
+  Texto: days == 0 → "Today" (sem badge vermelho)
+         days == 1 → "1 day ago" (badge #E53935)
+         days >= 2 → "$days days ago" (badge #E53935)
+  O badge "Feito hoje" (green, "Feito hoje") manter mas traduzir para "Done today".
+
+PARTE C — PACT EXPIRED: BANNER NO DETAIL SHEET
+Status: ✅ IMPLEMENTADO
+
+Em habit_detail_sheet.dart, no início do body, antes de qualquer outra seção,
+verificar se o habit é um pact expirado sem resolução:
+
+  final isPactExpired = habit.habitMode == HabitMode.pact
+    && habit.endsAt != null
+    && habit.endsAt!.isBefore(DateTime.now())
+    && habit.pactOutcome == null;
+
+  Se isPactExpired, inserir banner amarelo no topo do sheet:
+    Container(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: Colors.amber.shade100,
+      child: Row(children: [
+        Icon(Icons.warning_amber_rounded, color: Colors.amber.shade800, size: 18),
+        SizedBox(width: 8),
+        Expanded(child: Text(
+          'This pact ended on ${habit.endsAt!...}. Review it now.',
+          style: TextStyle(fontSize: 13, color: Colors.amber.shade900),
+        )),
+        TextButton(
+          onPressed: () {
+            Navigator.pop(context); // fechar detail
+            showSteeringSheet(context, ref, habit);
+          },
+          child: Text('Review', style: TextStyle(color: Colors.amber.shade900,
+            fontWeight: FontWeight.w700, fontSize: 13)),
+        ),
+      ]),
+    )
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 10 — SYSTEM: QUICK-RUN SWIPE + HISTÓRICO DE TASKS
+Arquivos: lib/ui/screens/goals_screen.dart (ou onde systems são listados)
+          lib/ui/screens/system_detail_screen.dart
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OBJETIVO
+Swipe direito em um System na lista → abre o bottom sheet de quick-run (Via C)
+sem precisar entrar na detail view.
+Na detail view, adicionar seção "History" com as tasks geradas anteriormente
+por execuções deste System.
+
+PARTE A — SWIPE RIGHT PARA QUICK-RUN
+Status: ✅ IMPLEMENTADO
+
+Na tela que lista Systems (verificar qual screen: planner_screen, goals_screen,
+ou uma seção dedicada), envolver cada card de System com Dismissible:
+
+  direction: DismissDirection.startToEnd
+  confirmDismiss: (_) async {
+    showSystemQuickRunSheet(context, ref, system);
+    return false;  // não remove
+  }
+  background: Container com ícone ▶ e label "Quick run"
+    fundo: AppColors.warning (laranja) a 15% de opacidade
+
+PARTE B — SEÇÃO HISTÓRICO NA DETAIL VIEW
+Status: ✅ IMPLEMENTADO
+
+Em system_detail_screen.dart, após a seção "Passos" e antes de "Notas",
+adicionar seção "HISTORY":
+
+  — Label "HISTORY" (12pt semibold muted all-caps) + contagem de tasks geradas.
+  — Buscar tasks do vault onde task.linkedSystem == system.id.
+    Ordenar cronologicamente reverso (updatedAt desc). Mostrar máximo 5.
+  — Se mais de 5: botão "View all (N)" (accent, 13pt) que navega para
+    tasks_screen filtrado por linkedSystem.
+  — Cada row:
+      • Ícone de task (16pt, azul) + título da task (15pt) + data relativa (13pt muted trailing)
+      • Subtítulo (13pt muted): duração total de Pomodoro (se task.pomodoroCount > 0:
+        "⏱ Xmin") + badge de stage (pill 11pt, cor por stage)
+      • Tap → navega para a Task via object navigation
+
+  — Se nenhuma task gerada ainda: "No runs yet. Use Quick Run or Create Task to get started."
+    (14pt muted, centrado)
+
+PARTE C — STATS: ADICIONAR CHIP "ESTIMATED"
+Status: ✅ IMPLEMENTADO
+
+Em system_detail_screen.dart, na stats row, adicionar chip "Estimated: Xmin":
+  — Usar system.estimatedMinutes (já existe no modelo).
+  — Inserir após o chip "Execuções", antes de "Tempo médio".
+  — Se estimatedMinutes == null ou == 0: não exibir o chip.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 11 — TRIPLE CHECK: DISMISSAL GUARD + ÍCONES NO CARD + STUCK BADGE
+Arquivos: lib/ui/widgets/triple_check_sheet.dart
+          lib/ui/widgets/timeline_card.dart
+          lib/ui/screens/planner_screen.dart
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OBJETIVO
+O Triple Check sheet atualmente é dismissível por swipe mesmo antes de salvar.
+Tasks com diagnóstico salvo devem mostrar ícones no card.
+Tasks paradas há 7+ dias devem ter badge ⚠ que abre o sheet diretamente.
+
+PARTE A — PREVENT DISMISS ANTES DE SALVAR
+
+Em triple_check_sheet.dart, envolver o sheet com PopScope:
+
+  PopScope(
+    canPop: _saved,  // _saved começa false, vira true após salvar
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop && !_saved) {
+        // Não salvou ainda: haptic + shake animation no container
+        HapticFeedback.lightImpact();
+        _shakeController.forward(from: 0.0);  // AnimationController existente ou criar
+      }
+    },
+    child: ...
+  )
+
+  Criar AnimationController _shakeController que anima o container horizontalmente
+  ±4pt duas vezes (150ms total) usando SlideTransition ou Transform.translate.
+
+PARTE B — ÍCONES DE DIAGNÓSTICO NO CARD DA TASK
+
+Em timeline_card.dart (ou onde as tasks são renderizadas no Planner),
+após o build da Row principal do card, adicionar Positioned no Stack
+(ou no bottom-left do card se não for Stack):
+
+  Se task.tripleCheck != null:
+    Row com ícones 14pt, cor muted, gap 2pt:
+      • head != yes → 🧠 (texto emoji) ou Icon(Icons.psychology_outlined)
+      • heart != yes → ❤️ (texto emoji) ou Icon(Icons.favorite_outline)
+      • hand != yes → ✋ (texto emoji) ou Icon(Icons.back_hand_outlined)
+
+  O row inteiro é tappável e abre o Triple Check em modo read-only:
+    showModalBottomSheet com TripleCheckSheet(task: task, readOnly: true)
+  
+  Adicionar parâmetro bool readOnly = false ao TripleCheckSheet.
+  Quando readOnly = true:
+    — Todos os radio buttons disabled
+    — Botão no bottom: "Re-run diagnostic" (outline accent)
+    — Ao tocar "Re-run": fecha e reabre o sheet sem readOnly
+
+PARTE C — BADGE ⚠ EM TASKS PARADAS
+
+No Planner, ao construir a lista de tasks do dia, calcular stuckDays:
+  Número de dias desde que a task foi criada ou desde a última mudança de stage
+  (usar task.updatedAt). Se stuckDays >= 7 e task.stage é todo|in_progress|pending:
+
+  Adicionar um pequeno Container no top-right do card da task:
+    Container(
+      padding: EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(children: [
+        Icon(Icons.warning_amber_rounded, size: 11, color: AppColors.warning),
+        SizedBox(width: 2),
+        Text('${stuckDays}d', style: TextStyle(fontSize: 9,
+          fontWeight: FontWeight.w700, color: AppColors.warning)),
+      ]),
+    )
+
+  Tap no badge → abre Triple Check sheet para essa task.
+  Calcular stuckDays usando task.updatedAt como proxy de última mudança de stage.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 12 — COMBINED ANALYSIS CALENDAR: EMOJI + HEATMAP + TAP + NAV DE MÊS
+Arquivo: lib/ui/widgets/analysis_calendar.dart
+         lib/ui/screens/combined_analysis_screen.dart
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OBJETIVO
+O calendário atual da Combined Analysis mostra apenas número do dia e dots
+coloridos. Precisa de: emoji do mood por célula, heatmap de fundo proporcional
+ao valor da série principal, tap em célula abre mini bottom sheet, navegação de mês.
+
+REFATORAR analysis_calendar.dart completamente:
+
+PARÂMETROS DO WIDGET:
+  final DateTime month;
+  final List<MetricSource> sources;
+  final Map<DateTime, List<MetricSource>> data;
+  final Map<DateTime, String?> moodEmojis;   // novo: emoji do mood por data
+  final ValueChanged<DateTime>? onMonthChanged; // novo: callback de nav de mês
+
+HEADER DE NAVEGAÇÃO DE MÊS:
+  Row: IconButton "‹" + Text "May 2026" (15pt semibold) + IconButton "›"
+  Ao tap em ‹/›: chamar onMonthChanged(newMonth) para o pai atualizar o estado.
+  Em combined_analysis_screen.dart: manter DateTime _calendarMonth em state,
+  inicializado com o mês atual. Atualizar ao receber o callback e reconstruir.
+
+CADA CÉLULA DO DIA (refatorar GridView item):
+  GestureDetector com onTap → _showDaySummarySheet(context, date, dayData, moodEmojis[date])
+
+  Layout interno da célula (Column, mainAxisAlignment: start):
+    — Número do dia: 9pt medium, topo, centrado. Cor: today → accent, futuro → muted 40%
+    — Emoji do mood: 16pt, centralizado no espaço restante.
+      Se moodEmojis[date] != null: exibir emoji
+      Se nulo: SizedBox vazio (sem "–")
+    — Dots row: no fundo da célula, Row centralizada, gap 2pt.
+      Um dot 4pt por fonte com dados naquele dia (máximo 4; 5+ → mostrar "+" em 8pt muted).
+      Cor: source.color ?? AppColors.primary
+      Opacidade do dot: proporcional ao valor se disponível (min 35%, max 100%),
+      ou 80% se valor binário.
+
+  Fundo heatmap da célula:
+    — Determinar série principal: primeira fonte não-mood em sources (ex: tracker de fluxo).
+    — Se há dado dessa fonte na data: fundo = source.color ?? AppColors.primary,
+      opacidade = (value / maxValueInMonth) * 0.12, mínimo 0.03.
+    — Se não há: fundo transparente.
+
+  Estado hoje: borda 1pt accent, fundo accent withValues(alpha: 0.10).
+  Estado futuro (sem dados): número do dia a 40% de opacidade.
+
+MINI BOTTOM SHEET (ao tap numa célula):
+  showModalBottomSheet, height ~35% da tela, handle pill.
+  Conteúdo:
+    — Data completa: "Monday, May 19" (17pt semibold)
+    — Se há emoji de mood: emoji grande (32pt) + label do mood (15pt semibold)
+      + "Pleasantness N · Energy N" (13pt muted)
+      Buscar label do mood via moodsProvider usando o slug armazenado.
+    — Para cada fonte com dados: nome da fonte (11pt semibold muted all-caps)
+      + valor formatado (15pt)
+    — Link "View entries for this day →" (accent, 14pt) que fecha o sheet
+      e navega para planner_screen na data correspondente.
+    — Se sem dados: "No data recorded for this day." (14pt muted, centrado)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 13 — STEERING SHEET: VISUAL POLISH
+Arquivo: lib/ui/widgets/steering_sheet.dart
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OBJETIVO
+A steering sheet funciona (3 etapas, endedReason, previousCycles), mas faltam:
+dots de progresso visuais, confirmação ao fechar, e botão "Continuar" da Etapa 1
+desabilitado quando text area vazia.
+
+MUDANÇAS
+
+1. Substituir o texto "Etapa X de 3" por indicador de 3 dots lineares:
+   Row(mainAxisAlignment: center, children: List.generate(3, (i) => Container(
+     width: i == _currentStep - 1 ? 8 : 6,
+     height: i == _currentStep - 1 ? 8 : 6,
+     margin: EdgeInsets.symmetric(horizontal: 3),
+     decoration: BoxDecoration(
+       shape: BoxShape.circle,
+       color: i == _currentStep - 1 ? habitColor : habitColor.withValues(alpha: 0.3),
+     ),
+   )))
+
+2. Botão "Continuar →" da Etapa 1 desabilitar quando _reflectionController.text.isEmpty.
+   Já existe a verificação parcial; garantir que o botão fica cinza e não-clicável.
+
+3. PopScope com confirmação ao fechar:
+   PopScope(
+     canPop: false,
+     onPopInvokedWithResult: (_, __) async {
+       final confirm = await showDialog<bool>(context: context, builder: (_) =>
+         AlertDialog(
+           title: Text('Leave review?'),
+           content: Text('You can review this pact later. It will remain pending.'),
+           actions: [
+             TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Keep reviewing')),
+             TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Leave')),
+           ],
+         ));
+       if (confirm == true && context.mounted) Navigator.pop(context);
+     },
+     child: ...
+   )
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 14 — PLANNER: ENERGY TINTS NOS TIME BLOCKS
+Arquivo: lib/ui/screens/planner_screen.dart
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OBJETIVO
+O modelo TimeBlock já tem energyLevel (high|medium|low|null) mas o Planner
+não aplica nenhum tint visual ao bloco correspondente.
+Quando ativo, tasks longas (duration >= 60min) ou alta prioridade em bloco
+high energy recebem label "↑ Best time".
+
+O EnergyMap widget já existe e é renderizável no Dashboard.
+
+MUDANÇAS EM _buildTimeBlockSection():
+
+1. Após calcular `block`, verificar block.energyLevel.
+   Se energyLevel != null:
+     Aplicar decoration ao Container externo do ExpansionTile:
+       color: energyTintColor(block.energyLevel).withValues(alpha: 0.08)
+
+   Criar função:
+     Color energyTintColor(EnergyLevel level) => switch(level) {
+       EnergyLevel.high   => const Color(0xFF4CAF50),
+       EnergyLevel.medium => const Color(0xFFFFC107),
+       EnergyLevel.low    => const Color(0xFFFF7043),
+     }
+
+2. Label de energia no header do bloco (após o título):
+   Se energyLevel == EnergyLevel.high:
+     adicionar pequeno chip após o título do bloco:
+     Container(
+       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+       decoration: BoxDecoration(
+         color: Color(0xFF4CAF50).withValues(alpha: 0.15),
+         borderRadius: BorderRadius.circular(6),
+       ),
+       child: Text('⚡ High energy', style: TextStyle(fontSize: 10,
+         color: Color(0xFF4CAF50), fontWeight: FontWeight.w700)),
+     )
+
+3. Para tasks individuais dentro de um bloco high energy:
+   Se task.priority == TaskPriority.high OU task.duration >= 60:
+     Adicionar label inline "↑ Best time" (10pt, verde, muted) abaixo do título
+     da task dentro do card.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 15 — ORGANIZER DETAIL: PROPERTIES SECTION + NOTES SECTION + PERIOD SELECTOR
+Arquivo: lib/ui/screens/organizer_detail_screen.dart
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OBJETIVO
+O OrganizerDetailScreen tem 4 tabs (Timeline, Items, Outgoing, Children) mas
+não tem Properties section dedicada nem Notes section separada. O tab "Timeline"
+também não tem seletor de período.
+
+MUDANÇAS
+
+PARTE A — PROPERTIES SECTION (topo, fora das tabs)
+
+Antes do TabBar, inserir Properties card:
+  Card com border radius 16, padding 16, margem 16 horizontal.
+
+  Para cada tipo de organizer, exibir propriedades relevantes em grid 2 colunas:
+    Area/Activity/Label:  nome, description, ícone
+    Project: state (badge colorida), priority (badge), start_date, due_date,
+             progress bar (se há primary_kpi associado)
+    Goal: status badge, KPI principal (barra linear + %)
+    Habit: status badge, streak ("Ndays"), habitMode badge ("PACT" se pact),
+           days since (badge colorida conforme Feature 9)
+    Tracker: description, número de sections
+
+  Cada propriedade: label (12pt semibold muted all-caps) + valor (15pt) embaixo.
+  Se propriedade is null ou vazia: não exibir.
+  Tap em qualquer propriedade editável → abrir CreateOrganizerForm pre-preenchido.
+
+PARTE B — NOTES SECTION
+
+Adicionar 5º tab "Notes" ao TabController (length: 5).
+Conteúdo: lista de Notes que têm este organizer em seus organizers[] (via WikiLink).
+  Buscar com: ref.watch(notesForOrganizerProvider(organizer.id))
+  Se provider não existir: criar derivado de allObjectsProvider filtrando
+  Note onde note.organizers.any((o) => o.id == organizer.id || o.slug == organizer.slug)
+
+  Cada row: ícone do subtipo (📝/🗂/🗃) + título (15pt) + preview 1 linha (13pt muted)
+  + data relativa (12pt muted trailing). Tap → navega para a Note.
+  Empty state: "No notes linked to this [type] yet."
+
+PARTE C — PERIOD SELECTOR NA TAB TIMELINE
+
+No topo do content da tab Timeline (dentro do _buildTimeline widget),
+adicionar row de chips horizontais: "7d" | "1m" | "3m" | "All"
+Manter _selectedPeriod em state (default: "all").
+Filtrar allItems por data de criação/atualização de acordo com o período.
+Estilo dos chips: FilterChip sem borda, ativo = fundo accent, texto branco.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 16 — POMODORO: RING CUSTOMIZADO + OVERLAY + CONCLUSÃO
+Arquivo: lib/ui/screens/pomodoro_screen.dart
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OBJETIVO
+O timer usa CircularProgressIndicator nativo sem strokeLineCap round e sem
+cores distintas por fase. A tela é um Scaffold normal, não um overlay.
+O diálogo de parar não mostra quantos blocos/minutos serão salvos.
+A conclusão não tem animação nem opção "One more round".
+
+PARTE A — RING COM CUSTOM PAINTER
+
+Substituir o CircularProgressIndicator + SizedBox(240×240) por CustomPaint:
+
+  CustomPaint(
+    size: Size(240, 240),
+    painter: _PomodoroRingPainter(
+      progress: state.remainingSeconds / state.totalSeconds,
+      phaseColor: _phaseColor(state.currentType),
+    ),
+    child: Center(child: _buildCountdownText(state)),
+  )
+
+  class _PomodoroRingPainter extends CustomPainter {
+    final double progress;  // 1.0 = início, 0.0 = fim
+    final Color phaseColor;
+
+    @override
+    void paint(Canvas canvas, Size size) {
+      final center = Offset(size.width / 2, size.height / 2);
+      final radius = size.width / 2 - 8;
+      const strokeWidth = 8.0;
+      const startAngle = -pi / 2;  // começa no topo
+
+      // Fundo do ring (15% da cor)
+      final bgPaint = Paint()
+        ..color = phaseColor.withValues(alpha: 0.15)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round;
+      canvas.drawArc(Rect.fromCircle(center: center, radius: radius),
+        0, 2 * pi, false, bgPaint);
+
+      // Progresso
+      final fgPaint = Paint()
+        ..color = phaseColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round;
+      canvas.drawArc(Rect.fromCircle(center: center, radius: radius),
+        startAngle, progress * 2 * pi, false, fgPaint);
+    }
+
+    @override
+    bool shouldRepaint(_PomodoroRingPainter old) =>
+      old.progress != progress || old.phaseColor != phaseColor;
+  }
+
+  Cores por fase (criar _phaseColor):
+    PomodoroType.work       → Color(0xFF4CAF50)  // verde
+    PomodoroType.shortBreak → Color(0xFFFB923C)  // laranja
+    PomodoroType.longBreak  → Color(0xFF60A5FA)  // azul
+
+PARTE B — DOT ATUAL COM ANIMAÇÃO DE PULSO
+
+Nos session dots, envolver o dot atual com AnimatedBuilder usando um
+AnimationController que faz scale 1.0 → 1.15 → 1.0 em loop (2s):
+
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnim;
+
+  @override void initState() {
+    _pulseController = AnimationController(
+      vsync: this, duration: const Duration(seconds: 2))..repeat();
+    _pulseAnim = Tween(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
+  }
+
+  Para o dot atual: ScaleTransition(scale: _pulseAnim, child: dot)
+
+PARTE C — DIÁLOGO DE PARAR: MOSTRAR BLOCOS/MIN SALVOS
+
+Em _showStopDialog(), atualizar conteúdo:
+  title: "Stop session?"
+  content: "${state.completedSessions} blocks · ${state.workedMinutes}min worked so far."
+  Botões: "Cancel" (textButton) | "Discard" (vermelho, sem salvar) | "Save partial" (verde)
+
+PARTE D — OVERLAY DE CONCLUSÃO ANIMADO
+
+Ao completar todos os blocos (verificar onde o provider emite este estado),
+substituir o dialog atual por um overlay full-screen:
+  — Verde tint 10% sobre a tela
+  — Ícone ✓ com AnimationController: scale 0 → 1.2 → 1.0 (400ms spring)
+  — "Session complete!" (22pt semibold)
+  — "X blocks · Y min worked" (15pt muted)
+  — Dois botões full-width em coluna:
+      "Done" (outline, border radius 12pt, 16pt)
+      "One more round" (fundo accent, branco, 16pt semibold)
+    Tap "One more round" → reinicia sessão com os mesmos parâmetros.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 17 — PEOPLE: SCHEDULER AUTOMÁTICO DE CONTATOS
+Arquivo: lib/ui/screens/people_screen.dart
+         lib/services/scheduler_service.dart
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OBJETIVO
+Quando lastContactDate + contactFrequency <= hoje, o app deve criar
+automaticamente uma Task "Contact [Name]". Completar a task atualiza
+lastContactDate da pessoa.
+
+A people_screen.dart já tem urgencyColor e urgencyLabel funcionando (verde/amarelo/vermelho).
+Falta: a criação automática da Task.
+
+IMPLEMENTAÇÃO
+
+Em scheduler_service.dart (ou criar método dedicado em vault_provider.dart),
+adicionar método checkAndCreatePeopleReminders():
+
+  Future<void> checkAndCreatePeopleReminders() async {
+    final people = ref.read(peopleProvider);
+    final tasks = ref.read(tasksProvider);
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+
+    for (final person in people) {
+      if (person.contactFrequency == null) continue;
+
+      final lastContact = person.lastContactDate;
+      final freq = person.contactFrequency!;
+      final dueDate = lastContact != null
+        ? lastContact.add(freq)
+        : DateTime(2000); // nunca contatado → sempre devido
+
+      if (!dueDate.isBefore(todayDate)) continue; // não venceu ainda
+
+      // Verificar se já existe task ativa de contato para essa pessoa
+      final alreadyExists = tasks.any((t) =>
+        t.title.contains(person.title) &&
+        t.title.toLowerCase().contains('contact') &&
+        t.stage != TaskStage.finalized &&
+        !t.archived);
+      if (alreadyExists) continue;
+
+      // Criar task
+      final task = Task(
+        title: 'Contact ${person.title}',
+        stage: TaskStage.todo,
+        priority: TaskPriority.none,
+        endDate: todayDate,
+        organizers: person.organizers,
+      );
+      await ref.read(vaultProvider.notifier).addObject(task);
+    }
+  }
+
+  Chamar checkAndCreatePeopleReminders() no startup do app, após o vault carregar.
+  Também chamar quando o vault é atualizado (usar ref.listen).
+
+  Ao completar uma Task "Contact [Name]":
+    — Verificar se o title começa com "Contact " e se há pessoa com esse nome.
+    — Se sim, atualizar person.lastContactDate = DateTime.now() e salvar.
+    — Fazer isso em vault_provider quando um Task é marcado como finalized.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 18 — GOAL PLAN MODE: UI DE OBJECTIVE/STRATEGY/PHASES
+Arquivo: lib/ui/screens/goals_screen.dart
+         lib/ui/forms/create_goal_form.dart
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OBJETIVO
+O modelo Goal já tem goalMode, objective, strategy e phases, mas a UI
+de detalhe e o formulário de criação não renderizam essas seções quando
+goalMode == GoalMode.plan.
+
+PARTE A — DETAIL VIEW (goals_screen.dart ou universal_detail_view.dart)
+
+Ao exibir um Goal com goalMode == GoalMode.plan, adicionar seções extras
+na detail view após as seções padrão (KPIs, tasks, etc.):
+
+  — Seção OBJECTIVE:
+    Label "OBJECTIVE" (12pt semibold muted all-caps)
+    Text field read-only com o texto de goal.objective (15pt, line-height 1.5)
+    Borda-esquerda 3pt accent
+
+  — Seção STRATEGY:
+    Label "STRATEGY" (12pt semibold muted all-caps)
+    Text field read-only com goal.strategy (15pt, line-height 1.5)
+    Borda-esquerda 3pt accent
+
+  — Seção PHASES:
+    Label "PHASES" (12pt semibold muted all-caps)
+    Lista numerada de goal.phases (cada phase: índice 14pt semibold muted
+    + texto 15pt). Borda-esquerda 3pt na cor do goal.
+
+  Header visual: o card do goal em modo plan deve ter borda-esquerda 3pt roxa
+  (cor do goal ou AppColors.primary) para distinguir visualmente do standard.
+
+PARTE B — FORMULÁRIO DE CRIAÇÃO (create_goal_form.dart)
+
+Adicionar toggle "Goal mode" no formulário:
+  SegmentedButton com opções "Standard" | "Plan"
+  Quando "Plan" selecionado, revelar com slide down (200ms):
+    — TextField "Objective": "What specifically do you want to achieve?"
+    — TextField "Strategy": "How will you get there?"
+    — Multi-item input "Phases": lista de text fields onde cada um é uma fase.
+      "＋ Add phase" ao final. X para remover cada fase.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE 19 — TASK BACKLOG DIALOG: AJUSTAR PARA SPEC
+Arquivo: lib/ui/forms/create_task_form.dart
+Status: ✅ IMPLEMENTADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OBJETIVO
+O diálogo de backlog já existe mas é um AlertDialog genérico com "Keep in list" /
+"Go to Backlog". A spec pede: "Backlog or Today" com default "Today" se dismissido.
+
+MUDANÇAS EM _saveTask():
+
+  Substituir o showDialog atual por:
+  final result = await showDialog<String>(
+    context: context,
+    barrierDismissible: true,  // dismiss = "Today"
+    builder: (_) => AlertDialog(
+      title: Text('No date set'),
+      content: Text('Where do you want to save this task?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, 'backlog'),
+          child: Text('Backlog'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, 'today'),
+          child: Text('Today'),
+        ),
+      ],
+    ),
+  );
+  // result == null significa que o usuário dismissou (default = 'today')
+  if (result == 'backlog') {
+    setState(() => _stage = TaskStage.backlog);
+  } else {
+    // 'today' ou null: atribuir endDate = hoje se ainda nulo
+    setState(() => _endDate = DateTime.now());
+  }
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ORDEM DE IMPLEMENTAÇÃO SUGERIDA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Do menos arriscado ao mais complexo:
+
+ 1. Feature 4  — Dashboard reset (cirúrgico, sem risco)
+ 2. Feature 7  — Crash reports share (adicionar share_plus + strings)
+ 3. Feature 8  — More screen: Day Themes + Day Blocks (simples inserção)
+ 4. Feature 19 — Task backlog dialog (1 método, 10 linhas)
+ 5. Feature 2  — Planner overflow (bug fix de layout)
+ 6. Feature 1  — Conflict buttons (UI only)
+ 7. Feature 3A+B — Mood seed + descriptions (dados, sem UI nova)
+ 8. Feature 3C  — Mood settings: quadrantes + system moods + toggle hidden
+ 9. Feature 3D  — Mood formulário usuário (full-screen)
+10. Feature 3E  — Mood no chart: chip toggle + MoodEmojiTimeline
+11. Feature 9A  — Habit swipe right para completar
+12. Feature 9B  — Habit days since badge cor correta + "Done today"
+13. Feature 9C  — Pact expired banner no detail sheet
+14. Feature 10A — System swipe right quick-run
+15. Feature 10B — System histórico de tasks
+16. Feature 10C — System stats: chip "Estimated"
+17. Feature 11  — Triple check: dismissal guard + ícones no card + stuck badge
+18. Feature 13  — Steering sheet: dots + PopScope + botão disabled
+19. Feature 14  — Planner: energy tints
+20. Feature 15  — Organizer detail: Properties + Notes + period selector
+21. Feature 18  — Goal plan mode UI
+22. Feature 12  — Combined Analysis calendar: emoji + heatmap + tap + nav mês
+23. Feature 16  — Pomodoro: ring custom + conclusão overlay
+24. Feature 17  — People: scheduler automático de contatos
+25. Feature 5   — Collection: add row + Obsidian Bases
+26. Feature 6   — Salvar livros (novo serviço + widget, maior escopo)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NOTAS GERAIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- Não usar o Anthropic API / Claude Vision em nenhuma feature (app é 100% gratuito).
+- Google Books API: free tier, 1000 req/dia. Requer API key do Google Cloud Console.
+- Obsidian Bases: plugin oficial, nativo no Obsidian 1.8+. Formato .base experimental;
+  gerar arquivos conservadores (só source + properties).
+- Todos os textos da UI em inglês (padrão do app). Corrigir qualquer string em
+  português encontrada durante a implementação de cada feature.
+- Ao criar novos arquivos em lib/services/ ou lib/ui/widgets/, registrar no
+  arquivo correspondente de providers se necessário.
+- CitrineChart já suporta emoji annotations via ChartDataPoint.emoji e belowBarData
+  com fill — não duplicar lógica existente, apenas estender.
+- habit_row.dart e habits_screen.dart: HabitRow é usado em outros lugares além
+  da habits_screen (timeline, dashboard). O swipe Dismissible deve ser aplicado
+  apenas em habits_screen._TodayHabitCard, não no HabitRow genérico.
+- Triple Check batch via PMN (tasks paradas 7+ dias em formato de lista com
+  checkbox no PMN form + indicador de progresso "Task 2 of 5") é um escopo
+  adicional que pode ser implementado após as Features 11 e a Feature de PMN
+  form estiverem completas. Não incluído nesta versão do doc por dependência.
+
+
+
 ================================================================================
 GAP ANALYSIS — ADENDO V2 (Phases 12–16 consolidadas)
 Audiência: agente de IA com acesso total ao repositório.

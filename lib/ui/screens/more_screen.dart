@@ -44,9 +44,6 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     final hasDayThemeInNav = inMoreItems.any(
       (item) => item.route == '/day-themes',
     );
-    final hasDayBlockInNav = inMoreItems.any(
-      (item) => item.route == '/day-blocks',
-    );
 
     // All items that CAN be in more (to show in edit mode)
     final editableItems = navItems
@@ -189,27 +186,9 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                   const SizedBox(height: 8),
                   _buildMenuRow(
                     context,
-                    'Day Themes',
-                    Icons.wb_sunny_outlined,
+                    'Day Themes & Blocks',
+                    Icons.wb_sunny_rounded,
                     AppColors.warning,
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const DayThemeScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-
-                if (!hasDayBlockInNav) ...[
-                  const SizedBox(height: 8),
-                  _buildMenuRow(
-                    context,
-                    'Day Blocks',
-                    Icons.view_day_outlined,
-                    AppColors.primary,
                     () {
                       Navigator.push(
                         context,

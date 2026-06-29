@@ -149,9 +149,8 @@ class NotificationService with WidgetsBindingObserver {
       return;
     }
     tz.initializeTimeZones();
-    final timeZoneInfo = await FlutterTimezone.getLocalTimezone();
-    final timeZoneName = timeZoneInfo.identifier;
-    tz.setLocalLocation(tz.getLocation(timeZoneName));
+    final timeZoneName = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timeZoneName.identifier));
 
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/launcher_icon');
@@ -998,7 +997,7 @@ class _ForegroundEntry {
 void notificationTapBackground(NotificationResponse response) async {
   WidgetsFlutterBinding.ensureInitialized();
   tz.initializeTimeZones();
-  final timeZoneInfo = await FlutterTimezone.getLocalTimezone();
-  tz.setLocalLocation(tz.getLocation(timeZoneInfo.identifier));
+  final timeZoneName = await FlutterTimezone.getLocalTimezone();
+  tz.setLocalLocation(tz.getLocation(timeZoneName.identifier));
   await NotificationService._handleNotificationResponse(response);
 }

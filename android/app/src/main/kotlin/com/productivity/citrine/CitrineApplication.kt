@@ -15,7 +15,7 @@ class CitrineApplication : FlutterApplication() {
     companion object {
         private const val TAG = "CitrineApplication"
         // Timeout before declaring ANR
-        private const val ANR_TIMEOUT_MS = 5000L
+        private const val ANR_TIMEOUT_MS = 30000L
         // Cooldown between consecutive ANR reports (avoid spam)
         private const val ANR_COOLDOWN_MS = 30_000L
     }

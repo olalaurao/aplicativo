@@ -25,6 +25,8 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
   DateTime _scheduledDate = DateTime.now();
   TimeOfDay _scheduledTime = TimeOfDay.now();
   int _sessionCount = 4;
+  String? _linkedObjectId;
+  String? _linkedObjectTitle;
   bool _handledWidgetStartAction = false;
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnim;
@@ -173,8 +175,10 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                         const SizedBox(height: 24),
 
                         // Presets Row
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          runSpacing: 8,
                           children: [
                             _presetButton(
                               context,
@@ -183,7 +187,6 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                               25,
                               PomodoroType.work,
                             ),
-                            const SizedBox(width: 8),
                             _presetButton(
                               context,
                               ref,
@@ -191,7 +194,6 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                               50,
                               PomodoroType.work,
                             ),
-                            const SizedBox(width: 8),
                             _presetButton(
                               context,
                               ref,
@@ -205,8 +207,10 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                         const SizedBox(height: 32),
 
                         // Main Action
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 16,
+                          runSpacing: 12,
                           children: [
                             _actionButton(
                               onPressed: state.isRunning
@@ -219,17 +223,15 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                               color: AppColors.error,
                               isPrimary: true,
                             ),
-                            if (state.isRunning) ...[
-                              const SizedBox(width: 16),
+                            if (state.isRunning)
                               _actionButton(
                                 onPressed: () => _showStopDialog(context, ref),
                                 icon: Icons.stop_rounded,
                                 label: 'Parar',
                                 color: AppColors.textMuted,
                                 isPrimary: false,
-                              ),
-                            ] else ...[
-                              const SizedBox(width: 16),
+                              )
+                            else
                               _actionButton(
                                 onPressed: () => _handleSkip(context, ref),
                                 icon: Icons.skip_next_rounded,
@@ -237,7 +239,6 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                                 color: AppColors.textMuted,
                                 isPrimary: false,
                               ),
-                            ],
                           ],
                         ),
                       ],
@@ -264,23 +265,27 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              Row(
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  ...List.generate(
-                                    state.sessionsToLongBreak,
-                                    (i) => Container(
-                                      width: 12,
-                                      height: 12,
-                                      margin: const EdgeInsets.only(right: 8),
-                                      decoration: BoxDecoration(
-                                        color: i < state.completedSessions
-                                            ? AppColors.error
-                                            : AppColors.surfaceVariant,
-                                        shape: BoxShape.circle,
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 6,
+                                    children: List.generate(
+                                      state.sessionsToLongBreak,
+                                      (i) => Container(
+                                        width: 12,
+                                        height: 12,
+                                        decoration: BoxDecoration(
+                                          color: i < state.completedSessions
+                                              ? AppColors.error
+                                              : AppColors.surfaceVariant,
+                                          shape: BoxShape.circle,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(height: 8),
                                   Text(
                                     '${state.completedSessions}/${state.sessionsToLongBreak} completados',
                                     style: const TextStyle(
@@ -379,21 +384,87 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
             ],
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
+          _buildSessionSummary(_sessionCount),
 
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.info.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Text(
-              '2 horas = 4 pomodoros (trabalho) + 3 pausas curtas (5 min cada)\nDuration total: ~2h 15min',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.info,
-                fontWeight: FontWeight.w500,
-                height: 1.4,
+          const SizedBox(height: 16),
+
+          // Linked object picker
+          InkWell(
+            onTap: () async {
+              final result = await showModalBottomSheet<Map<String, String>>(
+                context: context,
+                isScrollControlled: true,
+                builder: (_) => UniversalSearchPickerSheet(
+                  title: 'Vincular objeto',
+                  onSelected: (obj) {
+                    Navigator.pop(context, {
+                      'id': obj.id,
+                      'title': obj.title,
+                    });
+                  },
+                ),
+              );
+              if (result != null) {
+                setState(() {
+                  _linkedObjectId = result['id'];
+                  _linkedObjectTitle = result['title'];
+                });
+              }
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _linkedObjectId != null
+                      ? AppColors.info.withValues(alpha: 0.6)
+                      : AppColors.textMuted.withValues(alpha: 0.4),
+                ),
+                color: _linkedObjectId != null
+                    ? AppColors.info.withValues(alpha: 0.07)
+                    : null,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _linkedObjectId != null
+                        ? Icons.link_rounded
+                        : Icons.add_link_rounded,
+                    size: 18,
+                    color: _linkedObjectId != null
+                        ? AppColors.info
+                        : AppColors.textMuted,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _linkedObjectTitle ?? 'Vincular a um objeto (opcional)',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: _linkedObjectId != null
+                            ? AppColors.info
+                            : AppColors.textMuted,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (_linkedObjectId != null)
+                    GestureDetector(
+                      onTap: () => setState(() {
+                        _linkedObjectId = null;
+                        _linkedObjectTitle = null;
+                      }),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        size: 16,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -505,13 +576,17 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
       _scheduledTime.minute,
     );
 
+    // Use linked object if provided, else fall back to current running item
+    final linkedId = _linkedObjectId ?? ref.read(pomodoroProvider).currentItemId;
+    final linkedTitle = _linkedObjectTitle ?? ref.read(pomodoroProvider).currentItemTitle;
+
     ref
         .read(pomodoroProvider.notifier)
         .scheduleSessions(
           startTime: startTime,
           count: _sessionCount,
-          taskTitle: ref.read(pomodoroProvider).currentItemTitle,
-          taskId: ref.read(pomodoroProvider).currentItemId,
+          taskTitle: linkedTitle,
+          taskId: linkedId,
         );
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -520,6 +595,58 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
           'Agendado: $_sessionCount pomodoros para ${DateFormat('dd/MM HH:mm').format(startTime)}',
         ),
       ),
+    );
+  }
+
+  /// Dynamic session summary card
+  Widget _buildSessionSummary(int count) {
+    final shortBreaks = count - 1;
+    final longBreaks = 1;
+    // Using default 25min work / 5min short break / 15min long break
+    final totalMin = count * 25 + shortBreaks * 5 + longBreaks * 15;
+    final hours = totalMin ~/ 60;
+    final mins = totalMin % 60;
+    final durationStr = hours > 0 ? '${hours}h${mins > 0 ? '${mins}min' : ''}' : '${mins}min';
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.info.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.info.withValues(alpha: 0.2)),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceAround,
+        spacing: 12,
+        runSpacing: 8,
+        children: [
+          _summaryChip('🍅', '$count', 'pomodoros'),
+          _summaryChip('☕', '$shortBreaks', 'pausas curtas'),
+          _summaryChip('🛋', '$longBreaks', 'pausa longa'),
+          _summaryChip('⏱', durationStr, 'total'),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryChip(String emoji, String value, String label) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 18)),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: AppColors.info,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+        ),
+      ],
     );
   }
 
@@ -610,10 +737,22 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                           ],
                         ),
                       ),
-                      const Icon(
-                        Icons.calendar_today_rounded,
-                        size: 16,
-                        color: AppColors.textMuted,
+                      IconButton(
+                        icon: const Icon(
+                          Icons.play_arrow_rounded,
+                          color: AppColors.error,
+                        ),
+                        iconSize: 28,
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
+                          ref.read(pomodoroProvider.notifier).setCurrentItem(
+                            s.id,
+                            s.title,
+                          );
+                          ref.read(pomodoroProvider.notifier).start();
+                          context.go('/pomodoro');
+                        },
+                        tooltip: 'Iniciar agora',
                       ),
                     ],
                   ),

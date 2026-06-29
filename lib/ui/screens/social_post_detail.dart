@@ -350,11 +350,6 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (place.lat != null && place.lng != null)
-                            IconButton(
-                              icon: const Icon(Icons.map_rounded),
-                              onPressed: () => _openInMaps(place),
-                            ),
                           IconButton(
                             icon: const Icon(
                               Icons.delete_outline_rounded,
@@ -431,13 +426,7 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
         );
   }
 
-  void _openInMaps(PlaceRef place) async {
-    if (place.lat == null || place.lng == null) return;
-    final uri = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}',
-    );
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
+  void _openInMaps(PlaceRef place) {}
 
   Widget _buildTagsSection(SocialPost post) {
     return _section(

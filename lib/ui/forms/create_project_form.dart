@@ -13,7 +13,8 @@ import '../theme.dart';
 class CreateProjectForm extends ConsumerStatefulWidget {
   final String? initialTitle;
   final Project? existingProject;
-  const CreateProjectForm({super.key, this.initialTitle, this.existingProject});
+  final List<OrganizerReference>? initialOrganizers;
+  const CreateProjectForm({super.key, this.initialTitle, this.existingProject, this.initialOrganizers});
 
   @override
   ConsumerState<CreateProjectForm> createState() => _CreateProjectFormState();
@@ -62,6 +63,10 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
       _endDate = project.endDate;
       _selectedColor = project.color ?? '#3B82F6';
       _organizers = List.from(project.organizers);
+    } else {
+      if (widget.initialOrganizers != null) {
+        _organizers = List.from(widget.initialOrganizers!);
+      }
     }
   }
 

@@ -252,11 +252,11 @@ class _BootstrapAppState extends State<BootstrapApp> {
         unawaited(_checkPendingSharedTextFromNative());
         unawaited(_checkPendingWidgetUriFromNative());
         // 1.4 — check person contacts on resume (moved out of PeopleNotifier.build)
-        unawaited(
+        Future.delayed(const Duration(seconds: 1), () {
           widget.container
               .read(peopleProvider.notifier)
-              .checkPersonContactsNow(),
-        );
+              .checkPersonContactsNow();
+        });
       },
     );
     _initShareIntentHandling();
@@ -499,9 +499,11 @@ Future<void> _initApp(ProviderContainer container) async {
         .read(allObjectsProvider.future)
         .then((objects) async {
           debugPrint('[Startup] Vault loaded: ${objects.length} objects.');
-          await container
-              .read(peopleProvider.notifier)
-              .checkPersonContactsNow();
+          Future.delayed(const Duration(seconds: 3), () {
+            container
+                .read(peopleProvider.notifier)
+                .checkPersonContactsNow();
+          });
         })
         .catchError((Object e, StackTrace st) {
           debugPrint('[Startup] Vault load failed: $e\n$st');
@@ -813,10 +815,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/archive',
             builder: (context, state) => const ArchiveScreen(),
           ),
-          GoRoute(
-            path: '/map',
-            builder: (context, state) => const MapPlaceholderScreen(),
-          ),
+
           GoRoute(
             path: '/search',
             builder: (context, state) => const SearchScreen(),
@@ -912,35 +911,7 @@ class MyApp extends ConsumerWidget {
   }
 }
 
-class MapPlaceholderScreen extends StatelessWidget {
-  const MapPlaceholderScreen({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Map'), centerTitle: true),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.map_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text(
-              'Coming soon',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Map view of your tasks and goals',
-              style: TextStyle(color: Colors.grey),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _ObjectDetailResolver extends ConsumerWidget {
   final String id;

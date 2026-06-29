@@ -422,6 +422,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: ListTile(
+                    title: const Text(
+                      'OMDb API Key (IMDb)',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                    subtitle: Text(
+                      settings.omdbApiKey.isEmpty
+                          ? 'Needed for IMDb title/poster (free at omdbapi.com)'
+                          : 'Configured ✓',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: Icon(
+                      Icons.movie_outlined,
+                      size: 20,
+                      color: settings.omdbApiKey.isEmpty ? AppColors.warning : AppColors.primary,
+                    ),
+                    onTap: () => _showOmdbApiKeyDialog(context, settings, notifier),
+                  ),
+                ),
                 const SizedBox(height: 24),
                 _section('Synchronization'),
                 const SizedBox(height: 12),
@@ -1354,52 +1376,85 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.textMuted.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  'Selecione o Template de Daily Review',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.6,
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.textMuted.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: entryTemplates.isEmpty
-                    ? const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(20.0),
-                          child: Text(
-                            'Nenhum template de Entry encontrado.\nCrie um template em Templates primeiro.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: AppColors.textMuted),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'Selecione o Template de Daily Review',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: entryTemplates.isEmpty
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20.0),
+                            child: Text(
+                              'Nenhum template de Entry encontrado.\nCrie um template em Templates primeiro.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: AppColors.textMuted),
+                            ),
                           ),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: entryTemplates.length + 1,
-                        itemBuilder: (context, index) {
-                          if (index == 0) {
-                            final isSelected = currentId.isEmpty;
+                        )
+                      : ListView.builder(
+                          itemCount: entryTemplates.length + 1,
+                          itemBuilder: (context, index) {
+                            if (index == 0) {
+                              final isSelected = currentId.isEmpty;
+                              return ListTile(
+                                title: const Text(
+                                  'Nenhum',
+                                  style: TextStyle(fontWeight: FontWeight.w500),
+                                ),
+                                trailing: isSelected
+                                    ? const Icon(
+                                        Icons.check_circle,
+                                        color: AppColors.primary,
+                                      )
+                                    : null,
+                                onTap: () {
+                                  ref
+                                      .read(settingsProvider.notifier)
+                                      .updateReviewDailyTemplateId('');
+                                  Navigator.pop(ctx);
+                                },
+                              );
+                            }
+                            final template = entryTemplates[index - 1];
+                            final isSelected = template.id == currentId;
                             return ListTile(
-                              title: const Text(
-                                'Nenhum',
-                                style: TextStyle(fontWeight: FontWeight.w500),
+                              title: Text(
+                                template.title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              subtitle: const Text(
+                                'Prompt de revisão diária',
+                                style: TextStyle(
+                                  color: AppColors.textMuted,
+                                  fontSize: 12,
+                                ),
                               ),
                               trailing: isSelected
                                   ? const Icon(
@@ -1410,44 +1465,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               onTap: () {
                                 ref
                                     .read(settingsProvider.notifier)
-                                    .updateReviewDailyTemplateId('');
+                                    .updateReviewDailyTemplateId(template.id);
                                 Navigator.pop(ctx);
                               },
                             );
-                          }
-                          final template = entryTemplates[index - 1];
-                          final isSelected = template.id == currentId;
-                          return ListTile(
-                            title: Text(
-                              template.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            subtitle: const Text(
-                              'Prompt de revisão diária',
-                              style: TextStyle(
-                                color: AppColors.textMuted,
-                                fontSize: 12,
-                              ),
-                            ),
-                            trailing: isSelected
-                                ? const Icon(
-                                    Icons.check_circle,
-                                    color: AppColors.primary,
-                                  )
-                                : null,
-                            onTap: () {
-                              ref
-                                  .read(settingsProvider.notifier)
-                                  .updateReviewDailyTemplateId(template.id);
-                              Navigator.pop(ctx);
-                            },
-                          );
-                        },
-                      ),
-              ),
-            ],
+                          },
+                        ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -1828,6 +1854,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
+
+  void _showOmdbApiKeyDialog(
+    BuildContext context,
+    AppSettings settings,
+    SettingsNotifier notifier,
+  ) {
+    final controller = TextEditingController(text: settings.omdbApiKey);
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('OMDb API Key'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'API Key',
+            hintText: 'e.g. 1a2b3c4d',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final value = controller.text.trim();
+              await notifier.updateOmdbApiKey(value);
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   Future<void> _showDriveFolderPicker(
     BuildContext context,

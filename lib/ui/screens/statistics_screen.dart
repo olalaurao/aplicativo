@@ -753,11 +753,15 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        '${moodDef.emoji} ${moodDef.label}: ${e.value} dia(s)',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textPrimary,
+                      Expanded(
+                        child: Text(
+                          '${moodDef.emoji} ${moodDef.label}: ${e.value} dia(s)',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -900,24 +904,36 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Progresso do KPI Principal',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              const Expanded(
+                child: Text(
+                  'Progresso do KPI Principal',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              DropdownButton<Goal>(
-                value: currentGoal,
-                items: goalsWithKPIs.map((g) {
-                  return DropdownMenuItem<Goal>(
-                    value: g,
-                    child: Text(g.title, style: const TextStyle(fontSize: 12)),
-                  );
-                }).toList(),
-                onChanged: (g) {
-                  setState(() {
-                    _selectedGoalForKPIChart = g;
-                  });
-                },
-                underline: const SizedBox(),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 150,
+                child: DropdownButton<Goal>(
+                  value: currentGoal,
+                  isExpanded: true,
+                  items: goalsWithKPIs.map((g) {
+                    return DropdownMenuItem<Goal>(
+                      value: g,
+                      child: Text(
+                        g.title,
+                        style: const TextStyle(fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (g) {
+                    setState(() {
+                      _selectedGoalForKPIChart = g;
+                    });
+                  },
+                  underline: const SizedBox(),
+                ),
               ),
             ],
           ),

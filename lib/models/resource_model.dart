@@ -1,6 +1,7 @@
 // lib/models/resource_model.dart
 import 'content_object.dart';
 import 'shared_types.dart';
+import 'task_model.dart'; // For TaskPriority
 
 enum ResourceStatus { toConsume, inProgress, completed, dropped }
 
@@ -21,8 +22,10 @@ class Resource extends ContentObject {
   String? publisher;
   String? language;
   String? googleBooksId;
+  String? imdbId;
   DateTime? readDate;
   List<String> socialRefs;
+  TaskPriority priority;
 
   Resource({
     super.id,
@@ -43,8 +46,10 @@ class Resource extends ContentObject {
     this.publisher,
     this.language,
     this.googleBooksId,
+    this.imdbId,
     this.readDate,
     List<String>? socialRefs,
+    this.priority = TaskPriority.none,
     super.organizers,
     super.categories,
     super.tags,
@@ -77,6 +82,7 @@ class Resource extends ContentObject {
     if (sourceUrl != null) frontmatter['source_url'] = sourceUrl;
     frontmatter['status'] = status.name;
     frontmatter['rating'] = rating;
+    frontmatter['priority'] = priority.name;
     if (author != null) frontmatter['author'] = author;
     if (year != null) frontmatter['year'] = year;
     if (pages != null) frontmatter['pages'] = pages;
@@ -87,6 +93,7 @@ class Resource extends ContentObject {
     if (publisher != null) frontmatter['publisher'] = publisher;
     if (language != null) frontmatter['language'] = language;
     if (googleBooksId != null) frontmatter['google_books_id'] = googleBooksId;
+    if (imdbId != null) frontmatter['imdb_id'] = imdbId;
     if (readDate != null) {
       frontmatter['read'] = readDate!.toIso8601String().split('T')[0];
     }
@@ -116,6 +123,12 @@ class Resource extends ContentObject {
       );
     }
     resource.rating = _intValue(frontmatter['rating']) ?? 0;
+    if (frontmatter['priority'] != null) {
+      resource.priority = TaskPriority.values.firstWhere(
+        (e) => e.name == frontmatter['priority']?.toString(),
+        orElse: () => TaskPriority.none,
+      );
+    }
     resource.author = _stringValue(frontmatter['author']);
     resource.year = _intValue(frontmatter['year']);
     resource.pages = _intValue(frontmatter['pages']);
@@ -126,6 +139,7 @@ class Resource extends ContentObject {
     resource.publisher = _stringValue(frontmatter['publisher']);
     resource.language = _stringValue(frontmatter['language']);
     resource.googleBooksId = _stringValue(frontmatter['google_books_id']);
+    resource.imdbId = _stringValue(frontmatter['imdb_id']);
     if (frontmatter['read'] != null) {
       resource.readDate = DateTime.tryParse(frontmatter['read'].toString());
     }
@@ -157,8 +171,10 @@ class Resource extends ContentObject {
     String? publisher,
     String? language,
     String? googleBooksId,
+    String? imdbId,
     DateTime? readDate,
     List<String>? socialRefs,
+    TaskPriority? priority,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     List<String>? tags,
@@ -187,8 +203,10 @@ class Resource extends ContentObject {
       publisher: publisher ?? this.publisher,
       language: language ?? this.language,
       googleBooksId: googleBooksId ?? this.googleBooksId,
+      imdbId: imdbId ?? this.imdbId,
       readDate: readDate ?? this.readDate,
       socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
+      priority: priority ?? this.priority,
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       tags: tags ?? this.tags,

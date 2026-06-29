@@ -14,6 +14,13 @@ import '../widgets/social_post_grid_card.dart';
 import 'social_post_detail.dart';
 import 'universal_detail_view.dart';
 import '../forms/create_organizer_form.dart';
+import '../forms/create_task_form.dart';
+import '../forms/create_note_form.dart';
+import '../forms/create_goal_form.dart';
+import '../forms/create_habit_form.dart';
+import '../forms/create_resource_form.dart';
+import '../forms/create_project_form.dart';
+import '../../models/shared_types.dart';
 
 class OrganizerDetailScreen extends ConsumerStatefulWidget {
   final Organizer organizer;
@@ -362,6 +369,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
           ],
         ),
       ),
+      bottomNavigationBar: _buildAddButtons(context),
     );
   }
 
@@ -1202,5 +1210,145 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
     } catch (_) {
       return AppColors.primary;
     }
+  }
+
+  Widget _buildAddButtons(BuildContext context) {
+    final refRef = OrganizerReference(
+      slug: widget.organizer.slug,
+      title: widget.organizer.title,
+      type: widget.organizer.type,
+    );
+
+    Widget chipButton({
+      required String label,
+      required IconData icon,
+      required Color color,
+      required VoidCallback onTap,
+    }) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: ActionChip(
+          onPressed: onTap,
+          avatar: Icon(icon, size: 16, color: color),
+          label: Text(label),
+          labelStyle: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimaryColor(context),
+          ),
+          backgroundColor: color.withValues(alpha: 0.08),
+          side: BorderSide(color: color.withValues(alpha: 0.2)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: AppTheme.cardFillColor(context),
+        border: Border(
+          top: BorderSide(color: AppTheme.dividerColor(context), width: 0.5),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            Text(
+              'Add to Organizer:',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textMutedColor(context),
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(width: 12),
+            chipButton(
+              label: 'Tarefa',
+              icon: Icons.check_circle_outline,
+              color: AppColors.info,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CreateTaskForm(
+                    initialOrganizers: [refRef],
+                  ),
+                ),
+              ),
+            ),
+            chipButton(
+              label: 'Nota',
+              icon: Icons.article_outlined,
+              color: AppColors.habitPurple,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CreateNoteForm(
+                    initialOrganizers: [refRef],
+                  ),
+                ),
+              ),
+            ),
+            chipButton(
+              label: 'Objetivo',
+              icon: Icons.flag_outlined,
+              color: AppColors.habitOrange,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CreateGoalForm(
+                    initialOrganizers: [refRef],
+                  ),
+                ),
+              ),
+            ),
+            chipButton(
+              label: 'Hábito',
+              icon: Icons.cached_rounded,
+              color: AppColors.habitGreen,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CreateHabitForm(
+                    initialOrganizers: [refRef],
+                  ),
+                ),
+              ),
+            ),
+            chipButton(
+              label: 'Recurso',
+              icon: Icons.auto_stories_rounded,
+              color: AppColors.habitPink,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CreateResourceForm(
+                    initialOrganizers: [refRef],
+                  ),
+                ),
+              ),
+            ),
+            chipButton(
+              label: 'Projeto',
+              icon: Icons.folder_outlined,
+              color: AppColors.primary,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CreateProjectForm(
+                    initialOrganizers: [refRef],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

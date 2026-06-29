@@ -21,6 +21,7 @@ class CreateNoteForm extends ConsumerStatefulWidget {
   final List<String>? initialTags;
   final String? initialFolder;
   final NoteType? initialType;
+  final List<OrganizerReference>? initialOrganizers;
   const CreateNoteForm({
     super.key,
     this.initialTitle,
@@ -28,6 +29,7 @@ class CreateNoteForm extends ConsumerStatefulWidget {
     this.initialTags,
     this.initialFolder,
     this.initialType,
+    this.initialOrganizers,
   });
 
   @override
@@ -80,6 +82,9 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
     } else {
       if (widget.initialType != null) {
         _noteType = widget.initialType!;
+      }
+      if (widget.initialOrganizers != null) {
+        _organizers = List.from(widget.initialOrganizers!);
       }
     }
   }

@@ -23,12 +23,14 @@ class CreateTaskForm extends ConsumerStatefulWidget {
   final Task? existingTask;
   final String? initialTimeBlock;
   final TaskStage? initialStage;
+  final List<OrganizerReference>? initialOrganizers;
   const CreateTaskForm({
     super.key,
     this.initialTitle,
     this.existingTask,
     this.initialTimeBlock,
     this.initialStage,
+    this.initialOrganizers,
   });
 
   @override
@@ -111,6 +113,9 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       _timeBlock = widget.initialTimeBlock;
       if (widget.initialStage != null) {
         _stage = widget.initialStage!;
+      }
+      if (widget.initialOrganizers != null) {
+        _organizers = List.from(widget.initialOrganizers!);
       }
     }
   }

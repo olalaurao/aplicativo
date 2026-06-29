@@ -119,12 +119,14 @@ class _PropertyCardWidget extends StatelessWidget {
           decoration: BoxDecoration(
             color: _backgroundColor(cs, isDark),
             borderRadius: BorderRadius.circular(12),
-            border: Border(
-              left: BorderSide(
-                color: card.leftBorderColor ?? Colors.transparent,
-                width: card.leftBorderColor == null ? 0 : 3,
-              ),
-            ),
+            border: card.leftBorderColor == null
+                ? null
+                : Border(
+                    left: BorderSide(
+                      color: card.leftBorderColor!,
+                      width: 3,
+                    ),
+                  ),
           ),
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: Column(

@@ -1,4 +1,5 @@
 // lib/ui/screens/search_screen.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -46,6 +47,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   String? _selectedType;
   String? _socialPlatformFilter;
   String? _socialCreatorFilter;
+  Timer? _debounce;
 
   final Map<String, String> _typeLabels = {
     'task': 'Tasks',
@@ -149,6 +151,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -170,9 +173,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           controller: _searchController,
           autofocus: true,
           onChanged: (query) {
-            allObjectsAsync.whenData(
-              (objects) => _onSearchChanged(query, objects),
-            );
+            _debounce?.cancel();
+            _debounce = Timer(const Duration(milliseconds: 300), () {
+              allObjectsAsync.whenData(
+                (objects) => _onSearchChanged(query, objects),
+              );
+            });
           },
           decoration: const InputDecoration(
             hintText: 'Search...',

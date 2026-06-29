@@ -49,7 +49,6 @@ class AppSettings {
   final String defaultPlannerView;
   final Map<String, String> categoryColors;
   final List<AutoCategoryRule> autoCategoryRules;
-  final bool biometricsEnabled;
   final String driveSyncFolder;
   final String driveSyncFolderId;
   final String driveSyncFolderPath;
@@ -83,6 +82,7 @@ class AppSettings {
   // ── Integrations ──
   final String? huggingFaceToken; // Whisper / HuggingFace API token (E11)
   final String googleBooksApiKey;
+  final String omdbApiKey;
 
   // ── Conflict suppression ──
   final Map<String, DateTime>
@@ -103,7 +103,6 @@ class AppSettings {
     this.defaultPlannerView = 'day',
     this.categoryColors = const {},
     this.autoCategoryRules = const [],
-    this.biometricsEnabled = false,
     this.driveSyncFolder = 'CitrineVault',
     this.driveSyncFolderId = '',
     this.driveSyncFolderPath = '',
@@ -113,7 +112,7 @@ class AppSettings {
     this.universalWidgetSize = 'medium',
     this.universalWidgetObjectTypes = const ['task', 'goal'],
     this.visibleResourceFields = const ['author', 'rating', 'type'],
-    this.resourceTypeFilters = const ['General'],
+    this.resourceTypeFilters = const ['Book', 'Movie', 'Show', 'General'],
     this.sleepInTomorrow = false,
     this.sleepInUntil = '10:00',
     this.sleepInDate = '',
@@ -146,6 +145,7 @@ class AppSettings {
     this.savedFiltersRaw = const [],
     this.huggingFaceToken,
     this.googleBooksApiKey = '',
+    this.omdbApiKey = '55335ca0',
     this.suppressedConflicts = const {},
     this.recentSearches = const [],
   });
@@ -189,7 +189,6 @@ class AppSettings {
     String? defaultPlannerView,
     Map<String, String>? categoryColors,
     List<AutoCategoryRule>? autoCategoryRules,
-    bool? biometricsEnabled,
     String? driveSyncFolder,
     String? driveSyncFolderId,
     String? driveSyncFolderPath,
@@ -232,6 +231,7 @@ class AppSettings {
     List<Map<String, dynamic>>? savedFiltersRaw,
     String? huggingFaceToken,
     String? googleBooksApiKey,
+    String? omdbApiKey,
     Map<String, DateTime>? suppressedConflicts,
     List<String>? recentSearches,
   }) {
@@ -247,7 +247,6 @@ class AppSettings {
       defaultPlannerView: defaultPlannerView ?? this.defaultPlannerView,
       categoryColors: categoryColors ?? this.categoryColors,
       autoCategoryRules: autoCategoryRules ?? this.autoCategoryRules,
-      biometricsEnabled: biometricsEnabled ?? this.biometricsEnabled,
       driveSyncFolder: driveSyncFolder ?? this.driveSyncFolder,
       driveSyncFolderId: driveSyncFolderId ?? this.driveSyncFolderId,
       driveSyncFolderPath: driveSyncFolderPath ?? this.driveSyncFolderPath,
@@ -304,6 +303,7 @@ class AppSettings {
       savedFiltersRaw: savedFiltersRaw ?? this.savedFiltersRaw,
       huggingFaceToken: huggingFaceToken ?? this.huggingFaceToken,
       googleBooksApiKey: googleBooksApiKey ?? this.googleBooksApiKey,
+      omdbApiKey: omdbApiKey ?? this.omdbApiKey,
       suppressedConflicts: suppressedConflicts ?? this.suppressedConflicts,
       recentSearches: recentSearches ?? this.recentSearches,
     );
@@ -363,7 +363,6 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       defaultPlannerView: prefs.getString('defaultPlannerView') ?? 'day',
       categoryColors: colors,
       autoCategoryRules: rules,
-      biometricsEnabled: prefs.getBool('biometricsEnabled') ?? false,
       driveSyncFolder: prefs.getString('driveSyncFolder') ?? 'CitrineVault',
       driveSyncFolderId: prefs.getString('driveSyncFolderId') ?? '',
       driveSyncFolderPath: prefs.getString('driveSyncFolderPath') ?? '',
@@ -379,7 +378,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
           prefs.getStringList('visibleResourceFields') ??
           const ['author', 'rating', 'type'],
       resourceTypeFilters:
-          prefs.getStringList('resourceTypeFilters') ?? const ['General'],
+          prefs.getStringList('resourceTypeFilters') ?? const ['Book', 'Movie', 'Show', 'General'],
       sleepInTomorrow: prefs.getBool('sleepInTomorrow') ?? false,
       sleepInUntil: prefs.getString('sleepInUntil') ?? '10:00',
       sleepInDate: prefs.getString('sleepInDate') ?? '',
@@ -430,6 +429,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       }(),
       huggingFaceToken: prefs.getString('huggingFaceToken'),
       googleBooksApiKey: prefs.getString('google_books_api_key') ?? '',
+      omdbApiKey: prefs.getString('omdb_api_key') ?? '',
       suppressedConflicts: () {
         final raw = prefs.getString('suppressedConflicts');
         if (raw == null) return const <String, DateTime>{};
@@ -622,11 +622,6 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> updatePlannerColorMode(String mode) async {
     await _prefs.setString('plannerColorMode', mode);
     state = state.copyWith(plannerColorMode: mode);
-  }
-
-  Future<void> updateBiometrics(bool value) async {
-    await _prefs.setBool('biometricsEnabled', value);
-    state = state.copyWith(biometricsEnabled: value);
   }
 
   Future<void> updateDriveSyncFolder(String folder) async {
@@ -843,6 +838,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     final trimmed = apiKey.trim();
     await _prefs.setString('google_books_api_key', trimmed);
     state = state.copyWith(googleBooksApiKey: trimmed);
+  }
+
+  Future<void> updateOmdbApiKey(String apiKey) async {
+    final trimmed = apiKey.trim();
+    await _prefs.setString('omdb_api_key', trimmed);
+    state = state.copyWith(omdbApiKey: trimmed);
   }
 
   Future<void> updateFolderPath(String objectType, String folder) async {

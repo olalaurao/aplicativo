@@ -350,6 +350,7 @@ class _TriageSheet extends ConsumerWidget {
   ) async {
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
+    final inboxNotifier = ref.read(inboxProvider.notifier);
     navigator.pop();
 
     try {
@@ -357,7 +358,7 @@ class _TriageSheet extends ConsumerWidget {
         MaterialPageRoute(builder: (_) => form),
       );
       if (saved == true) {
-        await ref.read(inboxProvider.notifier).triageItem(item);
+        await inboxNotifier.triageItem(item);
       }
     } catch (e) {
       debugPrint('Inbox triage failed: $e');
@@ -370,8 +371,9 @@ class _TriageSheet extends ConsumerWidget {
   Future<void> _deleteAndClose(BuildContext context, WidgetRef ref) async {
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
+    final inboxNotifier = ref.read(inboxProvider.notifier);
     try {
-      await ref.read(inboxProvider.notifier).deleteItem(item);
+      await inboxNotifier.deleteItem(item);
       navigator.pop();
     } catch (e) {
       debugPrint('Inbox delete failed: $e');
@@ -392,87 +394,92 @@ class _TriageSheet extends ConsumerWidget {
         24,
         0,
         24,
-        MediaQuery.of(context).viewInsets.bottom + 32,
+        MediaQuery.of(context).viewInsets.bottom + 16,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.textMuted.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(2),
-            ),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.textMuted.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'O que é isso?',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                item.title,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+              ),
+              const SizedBox(height: 24),
+              _TriageOption(
+                icon: Icons.check_box_outlined,
+                color: AppColors.info,
+                label: 'Virou uma task',
+                subtitle: 'Criar tarefa com este título',
+                onTap: () async {
+                  await _openFormAndTriage(
+                    context,
+                    ref,
+                    CreateTaskForm(initialTitle: item.title),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              _TriageOption(
+                icon: Icons.description_outlined,
+                color: AppColors.habitPink,
+                label: 'Era uma ideia (nota)',
+                subtitle: 'Criar nota com este conteúdo',
+                onTap: () async {
+                  await _openFormAndTriage(
+                    context,
+                    ref,
+                    CreateNoteForm(initialTitle: item.title),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              _TriageOption(
+                icon: Icons.menu_book_rounded,
+                color: AppColors.primary,
+                label: 'É uma entrada do journal',
+                subtitle: 'Adicionar ao diário de hoje',
+                onTap: () async {
+                  await _openFormAndTriage(
+                    context,
+                    ref,
+                    CreateEntryForm(initialBody: item.title),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              _TriageOption(
+                icon: Icons.delete_outline_rounded,
+                color: AppColors.error,
+                label: 'Deletar',
+                subtitle: 'Não era importante',
+                onTap: () async {
+                  await _deleteAndClose(context, ref);
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
           ),
-          const SizedBox(height: 20),
-          const Text(
-            'O que é isso?',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            item.title,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 14),
-          ),
-          const SizedBox(height: 24),
-          _TriageOption(
-            icon: Icons.check_box_outlined,
-            color: AppColors.info,
-            label: 'Virou uma task',
-            subtitle: 'Criar tarefa com este título',
-            onTap: () async {
-              await _openFormAndTriage(
-                context,
-                ref,
-                CreateTaskForm(initialTitle: item.title),
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          _TriageOption(
-            icon: Icons.description_outlined,
-            color: AppColors.habitPink,
-            label: 'Era uma ideia (nota)',
-            subtitle: 'Criar nota com este conteúdo',
-            onTap: () async {
-              await _openFormAndTriage(
-                context,
-                ref,
-                CreateNoteForm(initialTitle: item.title),
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          _TriageOption(
-            icon: Icons.menu_book_rounded,
-            color: AppColors.primary,
-            label: 'É uma entrada do journal',
-            subtitle: 'Adicionar ao diário de hoje',
-            onTap: () async {
-              await _openFormAndTriage(
-                context,
-                ref,
-                CreateEntryForm(initialBody: item.title),
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          _TriageOption(
-            icon: Icons.delete_outline_rounded,
-            color: AppColors.error,
-            label: 'Deletar',
-            subtitle: 'Não era importante',
-            onTap: () async {
-              await _deleteAndClose(context, ref);
-            },
-          ),
-          const SizedBox(height: 12),
-        ],
+        ),
       ),
     );
   }

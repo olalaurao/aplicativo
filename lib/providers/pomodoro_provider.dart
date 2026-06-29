@@ -84,8 +84,10 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       final list = next.value ?? const [];
       final history = list.whereType<PomodoroSession>().toList()
         ..sort((a, b) => b.date.compareTo(a.date));
-      state = state.copyWith(history: history);
-      _updateWeeklyWidget();
+      Future.microtask(() {
+        state = state.copyWith(history: history);
+        _updateWeeklyWidget();
+      });
     });
 
     final initialList = ref.read(allObjectsProvider).value ?? const [];

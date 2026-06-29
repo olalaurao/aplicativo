@@ -15,7 +15,8 @@ import '../theme.dart';
 class CreateGoalForm extends ConsumerStatefulWidget {
   final String? initialTitle;
   final Goal? existingGoal;
-  const CreateGoalForm({super.key, this.initialTitle, this.existingGoal});
+  final List<OrganizerReference>? initialOrganizers;
+  const CreateGoalForm({super.key, this.initialTitle, this.existingGoal, this.initialOrganizers});
 
   @override
   ConsumerState<CreateGoalForm> createState() => _CreateGoalFormState();
@@ -31,6 +32,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
   GoalMode _goalMode = GoalMode.standard;
   DateTime? _deadline;
   String _selectedColor = '#10B981';
+  bool _ignoreDirty = false;
 
   static const _colorSwatches = [
     '#DC2626',
@@ -84,6 +86,10 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
       for (final phase in goal.phases) {
         _phaseControllers.add(TextEditingController(text: phase));
       }
+    } else {
+      if (widget.initialOrganizers != null) {
+        _organizers = List.from(widget.initialOrganizers!);
+      }
     }
     if (_phaseControllers.isEmpty) {
       _phaseControllers.add(TextEditingController());
@@ -106,7 +112,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
   Widget build(BuildContext context) {
     final hasTitle = _titleController.text.trim().isNotEmpty;
 
-    final isDirty = _titleController.text.trim().isNotEmpty;
+    final isDirty = !_ignoreDirty && _titleController.text.trim().isNotEmpty;
 
     return PopScope(
       canPop: !isDirty,
@@ -133,6 +139,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
           ),
         );
         if ((discard ?? false) && context.mounted) {
+          setState(() => _ignoreDirty = true);
           Navigator.pop(context, result);
         }
       },

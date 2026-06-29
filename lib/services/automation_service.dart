@@ -12,6 +12,7 @@ import '../services/kpi_engine.dart';
 import '../models/goal_model.dart';
 import '../models/tracker_model.dart';
 import 'notification_service.dart';
+import 'markdown_parser.dart';
 
 class AutomationService {
   static bool _updatingKpis = false;
@@ -196,16 +197,53 @@ class AutomationService {
     final entries = ref.read(allEntriesProvider);
     final now = DateTime.now();
 
+    // Pre-calculate latest contact date for each person slug to avoid O(N * M) string contains searches
+    final latestContactMap = <String, DateTime>{};
+
+    void updateLatest(String slug, DateTime date) {
+      final existing = latestContactMap[slug];
+      if (existing == null || date.isAfter(existing)) {
+        latestContactMap[slug] = date;
+      }
+    }
+
+    for (final entry in entries) {
+      final links = MarkdownParser.extractWikiLinks(entry.body);
+      for (final slug in links) {
+        updateLatest(slug, entry.date);
+      }
+      for (final org in entry.organizers) {
+        updateLatest(org.slug, entry.date);
+      }
+    }
+
+    for (final task in tasks) {
+      if (task.stage == TaskStage.finalized) {
+        for (final note in task.notes) {
+          final links = MarkdownParser.extractWikiLinks(note);
+          for (final slug in links) {
+            updateLatest(slug, task.updatedAt);
+          }
+        }
+        for (final org in task.organizers) {
+          updateLatest(org.slug, task.updatedAt);
+        }
+      }
+    }
+
     for (final person in people) {
-      final latestContact = _latestContactFromBacklinks(person, entries, tasks);
+      // Yield control to the event loop to prevent ANR and allow UI to render
+      await Future.delayed(Duration.zero);
+
+      final latestContact = latestContactMap[person.slug];
       final effectivePerson =
           latestContact != null &&
-              (person.lastContactDate == null ||
-                  latestContact.isAfter(person.lastContactDate!))
-          ? person.copyWith(lastContactDate: latestContact)
-          : person;
-      if (effectivePerson.id == person.id &&
-          effectivePerson.lastContactDate != person.lastContactDate) {
+                  (person.lastContactDate == null ||
+                      latestContact.isAfter(person.lastContactDate!))
+              ? person.copyWith(lastContactDate: latestContact)
+              : person;
+
+      if (effectivePerson.lastContactDate != person.lastContactDate) {
         await ref.read(peopleProvider.notifier).updatePerson(effectivePerson);
       }
 
@@ -219,8 +257,8 @@ class AutomationService {
               (task.title.toLowerCase() == taskTitle.toLowerCase() ||
                   (task.title.toLowerCase().contains('contact') &&
                       task.title.toLowerCase().contains(
-                        person.title.toLowerCase(),
-                      )) ||
+                            person.title.toLowerCase(),
+                          )) ||
                   task.organizers.any(
                     (organizer) =>
                         organizer.type == 'person' &&
@@ -295,37 +333,6 @@ class AutomationService {
         payload: 'steering_sheet?id=${pact.id}',
       );
     }
-  }
-
-  static DateTime? _latestContactFromBacklinks(
-    Person person,
-    List<JournalEntry> entries,
-    List<Task> tasks,
-  ) {
-    final wiki = '[[${person.slug}]]';
-    DateTime? latest;
-
-    void include(DateTime date) {
-      if (latest == null || date.isAfter(latest!)) latest = date;
-    }
-
-    for (final entry in entries) {
-      final mentionsPerson =
-          entry.body.contains(wiki) ||
-          entry.organizers.any((org) => org.slug == person.slug);
-      if (mentionsPerson) include(entry.date);
-    }
-
-    for (final task in tasks) {
-      final mentionsPerson =
-          task.notes.any((note) => note.contains(wiki)) ||
-          task.organizers.any((org) => org.slug == person.slug);
-      if (mentionsPerson && task.stage == TaskStage.finalized) {
-        include(task.updatedAt);
-      }
-    }
-
-    return latest;
   }
 
   static Future<void> updateAllKPIs(Ref ref) async {

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:geolocator/geolocator.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
@@ -695,15 +694,6 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
           autofocus: true,
         ),
         actions: [
-          TextButton.icon(
-            onPressed: () async {
-              final locationText = await _detectCurrentLocation();
-              if (!mounted || locationText == null) return;
-              controller.text = locationText;
-            },
-            icon: const Icon(Icons.my_location_rounded),
-            label: const Text('Auto GPS'),
-          ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
@@ -718,58 +708,6 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
         ],
       ),
     );
-  }
-
-  Future<String?> _detectCurrentLocation() async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    // #region agent log
-    _appendDebugLog(
-      runId: 'run2',
-      hypothesisId: 'H1',
-      location: 'create_entry_form.dart:_detectCurrentLocation',
-      message: 'checked_location_service_state',
-      data: {'serviceEnabled': serviceEnabled},
-    );
-    // #endregion
-    if (!serviceEnabled) {
-      _showInfoSnackBar('Enable GPS to detect your location.');
-      return null;
-    }
-
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      // #region agent log
-      _appendDebugLog(
-        runId: 'run2',
-        hypothesisId: 'H1',
-        location: 'create_entry_form.dart:_detectCurrentLocation',
-        message: 'location_permission_blocked',
-        data: {'permission': permission.name},
-      );
-      // #endregion
-      _showInfoSnackBar('Location permission was not granted.');
-      return null;
-    }
-
-    final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.medium,
-      ),
-    );
-    // #region agent log
-    _appendDebugLog(
-      runId: 'run2',
-      hypothesisId: 'H1',
-      location: 'create_entry_form.dart:_detectCurrentLocation',
-      message: 'location_detected_successfully',
-      data: {'latitude': position.latitude, 'longitude': position.longitude},
-    );
-    // #endregion
-    return '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
   }
 
   void _showInfoSnackBar(String message) {

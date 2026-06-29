@@ -14,7 +14,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/filter_sort_sheet.dart';
 import 'universal_detail_view.dart';
 
-enum ResourceViewMode { shelfHighlights, listHighlights }
+enum ResourceViewMode { shelfHighlights, list, grid }
 
 class ResourcesScreen extends ConsumerStatefulWidget {
   const ResourcesScreen({super.key});
@@ -22,6 +22,16 @@ class ResourcesScreen extends ConsumerStatefulWidget {
   @override
   ConsumerState<ResourcesScreen> createState() => _ResourcesScreenState();
 }
+
+// Quick-access type filters shown as chips
+const _resourceTypeFilters = [
+  (label: 'Todos os tipos', emoji: '✨', values: <String>[]),
+  (label: 'Livro', emoji: '📗', values: ['book', 'livro']),
+  (label: 'Filme', emoji: '🎬', values: ['movie', 'filme']),
+  (label: 'Série', emoji: '📺', values: ['series', 'série', 'tv show', 'show']),
+  (label: 'Podcast', emoji: '🎙️', values: ['podcast']),
+  (label: 'Artigo', emoji: '📄', values: ['article', 'artigo']),
+];
 
 class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   ResourceViewMode _resourceViewMode = ResourceViewMode.shelfHighlights;
@@ -31,6 +41,8 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
 
   SavedFilter? _activeFilter;
   List<SavedFilter> _savedFilters = [];
+  // Index into _resourceTypeFilters; 0 = "All types" (no type filter)
+  int _selectedTypeIndex = 0;
 
   @override
   void initState() {
@@ -50,9 +62,18 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   }
 
   List<T> _applyFilterAndSort<T>(List<T> all) {
+    final typeFilter = _resourceTypeFilters[_selectedTypeIndex];
     var result = (_activeFilter?.apply(all) ?? all).where((item) {
-      if (_searchQuery.isEmpty) return true;
       final res = item as Resource;
+      // Type filter
+      if (typeFilter.values.isNotEmpty) {
+        final rt = res.resourceType.toLowerCase();
+        if (!typeFilter.values.any((v) => rt.contains(v) || v.contains(rt))) {
+          return false;
+        }
+      }
+      // Search query
+      if (_searchQuery.isEmpty) return true;
       final haystack = [
         res.title,
         res.author,
@@ -108,9 +129,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
       _savedFilters = ref.read(settingsProvider).filtersFor('resource');
       if (f != null) {
         if (f.viewMode == ViewMode.grid) {
-          _resourceViewMode = ResourceViewMode.shelfHighlights;
+          _resourceViewMode = ResourceViewMode.grid;
         } else {
-          _resourceViewMode = ResourceViewMode.listHighlights;
+          _resourceViewMode = ResourceViewMode.list;
         }
       }
     }),
@@ -137,15 +158,23 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
               ),
               IconButton(
                 icon: Icon(
-                  _resourceViewMode == ResourceViewMode.listHighlights
-                      ? Icons.view_list_rounded
-                      : Icons.grid_view_rounded,
+                  _resourceViewMode == ResourceViewMode.shelfHighlights
+                      ? Icons.auto_awesome_mosaic_rounded
+                      : _resourceViewMode == ResourceViewMode.list
+                          ? Icons.view_list_rounded
+                          : Icons.grid_view_rounded,
                 ),
+                tooltip: _resourceViewMode == ResourceViewMode.shelfHighlights
+                    ? 'Visualização Geral'
+                    : _resourceViewMode == ResourceViewMode.list
+                        ? 'Visualização em Lista'
+                        : 'Visualização em Grade',
                 onPressed: () => setState(() {
-                  _resourceViewMode =
-                      _resourceViewMode == ResourceViewMode.shelfHighlights
-                      ? ResourceViewMode.listHighlights
-                      : ResourceViewMode.shelfHighlights;
+                  _resourceViewMode = switch (_resourceViewMode) {
+                    ResourceViewMode.shelfHighlights => ResourceViewMode.list,
+                    ResourceViewMode.list => ResourceViewMode.grid,
+                    ResourceViewMode.grid => ResourceViewMode.shelfHighlights,
+                  };
                 }),
               ),
               IconButton(
@@ -160,16 +189,18 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
             ],
           ),
           SliverToBoxAdapter(child: _buildSearchField()),
+          // ── Saved-filter chips ──────────────────────────────────────────────
           SliverToBoxAdapter(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
               child: Row(
                 children: [
                   _chip(
                     'Todos',
                     _activeFilter == null,
                     () => setState(() => _activeFilter = null),
+                    emoji: '🗂️',
                   ),
                   ..._savedFilters.map(
                     (f) => _chip(
@@ -179,6 +210,24 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+          // ── Quick type-filter chips ─────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+              child: Row(
+                children: List.generate(_resourceTypeFilters.length, (i) {
+                  final tf = _resourceTypeFilters[i];
+                  return _chip(
+                    tf.label,
+                    _selectedTypeIndex == i,
+                    () => setState(() => _selectedTypeIndex = i),
+                    emoji: tf.emoji,
+                  );
+                }),
               ),
             ),
           ),
@@ -196,7 +245,23 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
           else if (_resourceViewMode == ResourceViewMode.shelfHighlights) ...[
             SliverToBoxAdapter(child: _buildShelf(filtered)),
             SliverToBoxAdapter(child: _buildHighlightsFeed(filtered)),
-          ] else
+          ] else if (_resourceViewMode == ResourceViewMode.grid)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 0.58,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => _buildResourceGridTile(context, filtered[index]),
+                  childCount: filtered.length,
+                ),
+              ),
+            )
+          else
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               sliver: SliverList(
@@ -216,28 +281,41 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     );
   }
 
-  Widget _chip(String label, bool selected, VoidCallback onTap) =>
-      GestureDetector(
+  Widget _chip(
+    String label,
+    bool selected,
+    VoidCallback onTap, {
+    String? emoji,
+  }) => GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           margin: const EdgeInsets.only(right: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
             color: selected
                 ? AppColors.primary
                 : AppTheme.surfaceVariantColor(context),
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: selected
-                  ? Colors.black
-                  : AppTheme.textSecondaryColor(context),
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (emoji != null) ...[
+                Text(emoji, style: const TextStyle(fontSize: 12)),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: selected
+                      ? Colors.black
+                      : AppTheme.textSecondaryColor(context),
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -283,7 +361,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
         ),
       ),
       SizedBox(
-        height: 108,
+        height: 148,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -307,22 +385,21 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     child: SizedBox(
       width: 72,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            width: 64,
-            child: AspectRatio(
-              aspectRatio: 1 / 1.414,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: resource.coverImage?.isNotEmpty == true
-                    ? Image.network(
-                        resource.coverImage!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (ctx, err, stack) =>
-                            _fallbackIcon(resource),
-                      )
-                    : _fallbackIcon(resource),
-              ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: 64,
+              height: 90,
+              child: resource.coverImage?.isNotEmpty == true
+                  ? Image.network(
+                      resource.coverImage!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (ctx, err, stack) =>
+                          _fallbackIcon(resource),
+                    )
+                  : _fallbackIcon(resource),
             ),
           ),
           const SizedBox(height: 4),
@@ -505,6 +582,72 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
             ],
           ),
           trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResourceGridTile(BuildContext context, Resource resource) {
+    return GestureDetector(
+      onTap: () {
+        context.push('/detail/${resource.id}', extra: {'object': resource});
+      },
+      child: Container(
+        decoration: AppTheme.cardDecoration(context),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: resource.coverImage?.isNotEmpty == true
+                  ? Image.network(
+                      resource.coverImage!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          _fallbackIcon(resource),
+                    )
+                  : _fallbackIcon(resource),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    resource.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    resource.author ?? 'Unknown',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: AppTheme.textMutedColor(context),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildRatingRow(resource),
+                      Text(
+                        _resourceEmoji(resource),
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

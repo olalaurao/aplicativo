@@ -58,12 +58,15 @@ class ResourceMetadataService {
   static bool isResourceUrl(String url) =>
       detectSource(url) != ResourceSource.unknown;
 
-  static Future<ResourceDraft> fetchMetadata(String url) async {
+  static Future<ResourceDraft> fetchMetadata(
+    String url, {
+    String? omdbApiKey,
+  }) async {
     final source = detectSource(url);
     return switch (source) {
       ResourceSource.openLibrary => _fetchOpenLibrary(url),
       ResourceSource.googleBooks => _fetchGoogleBooks(url),
-      ResourceSource.imdb => _fetchImdb(url),
+      ResourceSource.imdb => _fetchImdb(url, omdbApiKey: omdbApiKey),
       ResourceSource.amazon => _fetchViaOpenGraph(url, 'Amazon'),
       ResourceSource.goodreads => _fetchViaOpenGraph(url, 'Goodreads'),
       ResourceSource.unknown => _fetchViaOpenGraph(url, 'Web'),
@@ -138,7 +141,7 @@ class ResourceMetadataService {
       return ResourceDraft(
         title: _cleanTitle(data['title']?.toString()),
         author: author,
-        resourceType: 'Livro',
+        resourceType: 'Book',
         synopsis: _cleanText(synopsis),
         coverUrl: _normalizeImageUrl(coverUrl),
         year: year,
@@ -181,7 +184,7 @@ class ResourceMetadataService {
       return ResourceDraft(
         title: _cleanTitle(info['title']?.toString()),
         author: _cleanText(authors),
-        resourceType: 'Livro',
+        resourceType: 'Book',
         synopsis: _cleanText(info['description']?.toString()),
         coverUrl: _normalizeImageUrl(coverUrl),
         year: _parseYear(info['publishedDate']?.toString()),
@@ -198,19 +201,100 @@ class ResourceMetadataService {
     }
   }
 
-  static Future<ResourceDraft> _fetchImdb(String url) async {
+  static Future<ResourceDraft> _fetchImdb(
+    String url, {
+    String? omdbApiKey,
+  }) async {
     try {
       final ttId = RegExp(r'/(tt\d+)').firstMatch(url)?.group(1);
-      final draft = await _fetchViaOpenGraph(url, 'IMDB');
       final lower = url.toLowerCase();
-      final resourceType =
-          lower.contains('episodes') || lower.contains('series')
-          ? 'Série'
-          : 'Filme';
+      final isSeriesUrl =
+          lower.contains('/episodes') || lower.contains('/series');
 
+      final effectiveKey =
+          (omdbApiKey != null && omdbApiKey.isNotEmpty)
+              ? omdbApiKey
+              : '55335ca0';
+
+      // ── OMDb JSON API (preferred when key is available) ──
+      if (ttId != null) {
+        try {
+          final omdbResp = await http
+              .get(
+                Uri.parse(
+                  'https://www.omdbapi.com/?i=$ttId&apikey=$effectiveKey&plot=full',
+                ),
+              )
+              .timeout(const Duration(seconds: 10));
+
+          if (omdbResp.statusCode == 200) {
+            final data = jsonDecode(omdbResp.body) as Map<String, dynamic>;
+            if (data['Response'] == 'True') {
+              final typeRaw = data['Type']?.toString().toLowerCase() ?? '';
+              String resourceType;
+              if (isSeriesUrl || typeRaw == 'series') {
+                resourceType = 'Show';
+              } else if (typeRaw == 'episode') {
+                resourceType = 'Show';
+              } else {
+                resourceType = 'Movie';
+              }
+
+              final yearRaw = data['Year']?.toString();
+              final year = int.tryParse(
+                (yearRaw ?? '').replaceAll(RegExp(r'[^\d].*'), ''),
+              );
+
+              // poster URL cleanup: remove _UX300... size modifier
+              var poster = data['Poster']?.toString();
+              if (poster == 'N/A' || poster == null) poster = null;
+
+              final genres = data['Genre']?.toString();
+              final director = data['Director']?.toString();
+              final writer = data['Writer']?.toString();
+              final author =
+                  director != null && director != 'N/A'
+                  ? director
+                  : (writer != null && writer != 'N/A' ? writer : null);
+
+              var plot = data['Plot']?.toString();
+              if (plot == 'N/A') plot = null;
+
+              var title = data['Title']?.toString();
+              if (title == 'N/A' || title == null || title.isEmpty) {
+                title = null;
+              }
+
+              return ResourceDraft(
+                title: title,
+                author: author,
+                resourceType: resourceType,
+                synopsis: plot,
+                coverUrl: poster,
+                year: year,
+                sourceUrl: url,
+                sourceId: ttId,
+                sourceName: 'IMDB',
+                category: genres,
+              );
+            }
+          }
+        } catch (_) {
+          // Fall through to HTML scrape
+        }
+      }
+
+      // ── HTML/OpenGraph fallback (no key or OMDb failed) ──
+      final draft = await _fetchViaOpenGraph(url, 'IMDB');
       var title = draft.title;
       var year = draft.year;
       if (title != null) {
+        title = title
+            .replaceAll(
+              RegExp(r'\s*-\s*IMDb\s*$', caseSensitive: false),
+              '',
+            )
+            .trim();
         final match = RegExp(r'\((\d{4})\)$').firstMatch(title.trim());
         if (match != null) {
           year ??= int.tryParse(match.group(1) ?? '');
@@ -221,7 +305,7 @@ class ResourceMetadataService {
       return ResourceDraft(
         title: title,
         author: draft.author,
-        resourceType: resourceType,
+        resourceType: isSeriesUrl ? 'Show' : 'Movie',
         synopsis: draft.synopsis,
         coverUrl: draft.coverUrl,
         year: year,
@@ -243,7 +327,7 @@ class ResourceMetadataService {
           .get(
             Uri.parse(url),
             headers: const {
-              'User-Agent': 'Mozilla/5.0 (compatible; Citrine/1.0)',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
               'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
             },
           )
@@ -276,15 +360,15 @@ class ResourceMetadataService {
       final ldType = bestJsonLd['@type']?.toString().toLowerCase() ?? '';
       var resourceType = 'General';
       if (ldType.contains('book')) {
-        resourceType = 'Livro';
+        resourceType = 'Book';
       } else if (ldType.contains('movie')) {
-        resourceType = 'Filme';
+        resourceType = 'Movie';
       } else if (ldType.contains('tvseries') || ldType.contains('series')) {
-        resourceType = 'Série';
+        resourceType = 'Show';
       } else if (sourceName == 'Goodreads') {
-        resourceType = 'Livro';
+        resourceType = 'Book';
       } else if (sourceName == 'IMDB') {
-        resourceType = 'Filme';
+        resourceType = 'Movie';
       }
 
       final year = _parseYear(

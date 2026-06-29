@@ -15,98 +15,116 @@ class DayThemeScreen extends ConsumerWidget {
     final blocks = [...ref.watch(timeBlocksProvider)]
       ..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Temas de Dia'),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.add_rounded),
-            onSelected: (value) {
-              if (value == 'block') _showBlockDialog(context, ref);
-              if (value == 'theme') _showThemeDialog(context, ref);
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'block', child: Text('Novo bloco')),
-              PopupMenuItem(value: 'theme', child: Text('Novo tema')),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(
+          title: const Text('Day Themes & Blocks'),
+          actions: [
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.add_rounded),
+              onSelected: (value) {
+                if (value == 'block') _showBlockDialog(context, ref);
+                if (value == 'theme') _showThemeDialog(context, ref);
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'block', child: Text('Novo bloco')),
+                PopupMenuItem(value: 'theme', child: Text('Novo tema')),
+              ],
+            ),
+          ],
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Themes', icon: Icon(Icons.wb_sunny_outlined)),
+              Tab(text: 'Blocks', icon: Icon(Icons.view_day_outlined)),
             ],
+            indicatorColor: AppColors.primary,
+            labelColor: AppColors.primary,
           ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          _section('Blocos de Tempo'),
-          const SizedBox(height: 12),
-          blocks.isEmpty
-              ? _buildEmptyCard('Nenhum bloco definido')
-              : ReorderableListView(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  onReorder: (oldIndex, newIndex) {
-                    if (oldIndex < newIndex) {
-                      newIndex -= 1;
-                    }
-                    final reordered = [...blocks];
-                    final item = reordered.removeAt(oldIndex);
-                    reordered.insert(newIndex, item);
-                    for (int i = 0; i < reordered.length; i++) {
-                      ref
-                          .read(timeBlocksProvider.notifier)
-                          .updateTimeBlock(reordered[i]..order = i);
-                    }
-                  },
-                  children: blocks
-                      .asMap().entries.map(
-                        (entry) => Container(
-                          key: ValueKey(entry.value.id),
-                          child: _buildBlockTile(context, ref, entry.value, entry.key),
-                        ),
-                      )
-                      .toList(),
+        ),
+        body: TabBarView(
+          children: [
+            // Tab 1: Themes
+            ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                themes.isEmpty
+                    ? _buildEmptyCard('Nenhum tema definido')
+                    : Column(
+                        children: themes
+                            .map((t) => _buildThemeTile(context, ref, t, blocks))
+                            .toList(),
+                      ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.add_rounded, size: 16),
+                    label: const Text('Novo Tema do Dia'),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+                      foregroundColor: AppColors.primary,
+                    ),
+                    onPressed: () => _showThemeDialog(context, ref),
+                  ),
                 ),
-          const SizedBox(height: 12),
-          SizedBox(width: double.infinity, child: OutlinedButton.icon(
-            icon: const Icon(Icons.add_rounded, size: 16),
-            label: const Text('Novo Bloco de Tempo'),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
-              foregroundColor: AppColors.primary),
-            onPressed: () => _showBlockDialog(context, ref))),
-          const SizedBox(height: 32),
-          _section('Temas do Dia'),
-          const SizedBox(height: 12),
-          themes.isEmpty
-              ? _buildEmptyCard('Nenhum tema definido')
-              : Column(
-                  children: themes
-                      .map((t) => _buildThemeTile(context, ref, t, blocks))
-                      .toList(),
+              ],
+            ),
+            // Tab 2: Blocks
+            ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                blocks.isEmpty
+                    ? _buildEmptyCard('Nenhum bloco definido')
+                    : ReorderableListView(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        onReorder: (oldIndex, newIndex) {
+                          if (oldIndex < newIndex) {
+                            newIndex -= 1;
+                          }
+                          final reordered = [...blocks];
+                          final item = reordered.removeAt(oldIndex);
+                          reordered.insert(newIndex, item);
+                          for (int i = 0; i < reordered.length; i++) {
+                            ref
+                                .read(timeBlocksProvider.notifier)
+                                .updateTimeBlock(reordered[i]..order = i);
+                          }
+                        },
+                        children: blocks
+                            .asMap()
+                            .entries
+                            .map(
+                              (entry) => Container(
+                                key: ValueKey(entry.value.id),
+                                child: _buildBlockTile(context, ref, entry.value, entry.key),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.add_rounded, size: 16),
+                    label: const Text('Novo Bloco de Tempo'),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+                      foregroundColor: AppColors.primary,
+                    ),
+                    onPressed: () => _showBlockDialog(context, ref),
+                  ),
                 ),
-          const SizedBox(height: 12),
-          SizedBox(width: double.infinity, child: OutlinedButton.icon(
-            icon: const Icon(Icons.add_rounded, size: 16),
-            label: const Text('Novo Tema do Dia'),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
-              foregroundColor: AppColors.primary),
-            onPressed: () => _showThemeDialog(context, ref))),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _section(String title) {
-    return Text(
-      title.toUpperCase(),
-      style: const TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.bold,
-        color: AppColors.textMuted,
-        letterSpacing: 1.2,
-      ),
-    );
-  }
 
   Widget _buildEmptyCard(String text) {
     return Container(

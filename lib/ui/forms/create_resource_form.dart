@@ -4,10 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/resource_model.dart';
 import '../../models/shared_types.dart';
+import '../../models/task_model.dart'; // TaskPriority
 import '../../services/resource_metadata_service.dart';
 import '../theme.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/organizer_selector_field.dart';
+import '../widgets/universal_search_picker.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/vault_provider.dart';
 
@@ -16,12 +18,14 @@ class CreateResourceForm extends ConsumerStatefulWidget {
   final String? initialUrl;
   final String? initialResourceType;
   final Resource? existingResource;
+  final List<OrganizerReference>? initialOrganizers;
   const CreateResourceForm({
     super.key,
     this.initialTitle,
     this.initialUrl,
     this.initialResourceType,
     this.existingResource,
+    this.initialOrganizers,
   });
 
   @override
@@ -39,12 +43,14 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
   DateTime? _readDate;
   String _resourceType = 'Book';
   ResourceStatus _status = ResourceStatus.toConsume;
+  TaskPriority _priority = TaskPriority.none;
   int _rating = 0;
   List<OrganizerReference> _organizers = [];
   bool _isFetchingUrl = false;
   String? _fetchError;
   String? _sourceUrl;
   String? _sourceName;
+  String? _imdbId;
 
   @override
   void initState() {
@@ -80,10 +86,12 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
       final resource = widget.existingResource!;
       _resourceType = resource.resourceType;
       _status = resource.status;
+      _priority = resource.priority;
       _rating = resource.rating;
       _readDate = resource.readDate;
       _organizers = List.from(resource.organizers);
       _sourceUrl = resource.sourceUrl;
+      _imdbId = resource.imdbId;
     } else {
       final defaultType = ref
           .read(settingsProvider)
@@ -94,6 +102,9 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
         _resourceType = widget.initialResourceType!.trim();
       } else if (defaultType != null) {
         _resourceType = defaultType;
+      }
+      if (widget.initialOrganizers != null) {
+        _organizers = List.from(widget.initialOrganizers!);
       }
     }
 
@@ -227,6 +238,8 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
                         children: [
                           _buildTypeRow(),
                           const Divider(height: 16),
+                          _buildPriorityRow(),
+                          const Divider(height: 16),
                           _buildRow(
                             'Author',
                             _authorController,
@@ -259,6 +272,29 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
                             'Category',
                             _categoryController,
                             hint: 'Genre or category',
+                            trailing: IconButton(
+                              onPressed: () {
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (sheetContext) => UniversalSearchPickerSheet(
+                                    title: 'Vincular Categoria/Objeto',
+                                    onSelected: (obj) {
+                                      setState(() {
+                                        _categoryController.text = '[[${obj.slug}]]';
+                                      });
+                                      Navigator.pop(sheetContext);
+                                    },
+                                  ),
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.link_rounded,
+                                size: 18,
+                              ),
+                              tooltip: 'Vincular objeto',
+                            ),
                           ),
                           const Divider(height: 16),
                           _buildRow(
@@ -403,6 +439,36 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPriorityRow() {
+    return Row(
+      children: [
+        const Text(
+          'Priority',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+        const Spacer(),
+        DropdownButton<TaskPriority>(
+          value: _priority,
+          underline: const SizedBox(),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.primary,
+          ),
+          onChanged: (val) => setState(() => _priority = val!),
+          items: TaskPriority.values
+              .map(
+                (p) => DropdownMenuItem(
+                  value: p,
+                  child: Text(p.name.toUpperCase()),
                 ),
               )
               .toList(),
@@ -628,10 +694,13 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
       author: _authorController.text.trim(),
       year: int.tryParse(_yearController.text.trim()),
       pages: int.tryParse(_pagesController.text.trim()),
-      category: _categoryController.text.trim(),
+      category: _categoryController.text.trim().isEmpty ? null : _categoryController.text.trim(),
       readDate: _readDate,
+      priority: _priority,
       coverImage: coverUrl.isEmpty ? null : coverUrl,
       sourceUrl: _sourceUrl,
+      googleBooksId: widget.existingResource?.googleBooksId,
+      imdbId: _imdbId,
       obsidianPath: widget.existingResource?.obsidianPath ?? '',
       organizers: _organizers,
       categories: widget.existingResource?.categories,
@@ -681,7 +750,11 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
     });
 
     try {
-      final draft = await ResourceMetadataService.fetchMetadata(url);
+      final omdbKey = ref.read(settingsProvider).omdbApiKey;
+      final draft = await ResourceMetadataService.fetchMetadata(
+        url,
+        omdbApiKey: omdbKey.isEmpty ? null : omdbKey,
+      );
       if (!mounted) return;
       setState(() {
         _isFetchingUrl = false;
@@ -711,6 +784,10 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
         if ((draft.resourceType ?? '').trim().isNotEmpty) {
           _resourceType = _normalizeResourceType(draft.resourceType!);
         }
+        // Persist IMDb id when sourced from IMDB
+        if (_sourceName == 'IMDB' && (draft.sourceId ?? '').isNotEmpty) {
+          _imdbId = draft.sourceId;
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -724,11 +801,19 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
   String _normalizeResourceType(String value) {
     final trimmed = value.trim();
     final configured = ref.read(settingsProvider).resourceTypeFilters;
+    // First check for exact case-insensitive match in configured list
     final match = configured.firstWhere(
       (type) => type.toLowerCase() == trimmed.toLowerCase(),
       orElse: () => '',
     );
-    return match.isNotEmpty ? match : 'General';
+    if (match.isNotEmpty) return match;
+    // Accept well-known types directly even if not in configured list
+    const knownTypes = ['Book', 'Movie', 'Show', 'General'];
+    final known = knownTypes.firstWhere(
+      (type) => type.toLowerCase() == trimmed.toLowerCase(),
+      orElse: () => '',
+    );
+    return known.isNotEmpty ? known : trimmed;
   }
 
   Future<void> _pasteCoverUrl() async {

@@ -771,7 +771,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       ],
       'project': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
       'person': ['edit', 'change_type', 'merge_note', 'delete'],
-      'resource': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
+      'resource': ['focus', 'edit', 'change_type', 'merge_note', 'archive', 'delete'],
       'entry': ['edit', 'change_type', 'save_template', 'delete', 'obsidian'],
       'goal': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
     };
@@ -1006,6 +1006,11 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           value: resource.status.name.toUpperCase(),
           onTap: () => _showResourceStatusPicker(context, ref, resource),
         ),
+        PropertyGridItem(
+          label: 'Priority',
+          value: resource.priority.name.toUpperCase(),
+          onTap: () => _showResourcePriorityPicker(context, ref, resource),
+        ),
         PropertyGridItem(label: 'Author', value: resource.author ?? 'Unknown'),
         PropertyGridItem(
           label: 'Year',
@@ -1014,10 +1019,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         PropertyGridItem(
           label: 'Pages',
           value: resource.pages?.toString() ?? 'N/A',
-        ),
-        PropertyGridItem(
-          label: 'Category',
-          value: resource.category ?? 'Uncategorized',
         ),
         PropertyGridItem(
           label: 'Read Date',
@@ -1564,6 +1565,22 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.timer_outlined, size: 18),
+              label: const Text('Start Pomodoro Session'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                minimumSize: const Size(double.infinity, 48),
+              ),
+              onPressed: () => _startFocusSession(context, ref),
             ),
           ),
         ),
@@ -3612,6 +3629,23 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       onSelected: (value) {
         resource.status = value;
         ref.read(vaultProvider.notifier).updateObject(resource);
+      },
+    );
+  }
+
+  void _showResourcePriorityPicker(
+    BuildContext context,
+    WidgetRef ref,
+    Resource resource,
+  ) {
+    _showOptionSheet<TaskPriority>(
+      context: context,
+      title: 'Priority',
+      values: TaskPriority.values,
+      label: (value) => value.name,
+      onSelected: (value) {
+        final updated = resource.copyWith(priority: value);
+        ref.read(vaultProvider.notifier).updateObject(updated);
       },
     );
   }

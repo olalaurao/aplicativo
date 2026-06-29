@@ -23,13 +23,11 @@ import '../models/social_post.dart';
 import '../models/people_model.dart';
 import '../models/project_model.dart';
 import '../models/snapshot_model.dart';
-import '../models/system_model.dart';
 import '../models/scheduler.dart';
 import '../models/day_theme_model.dart';
 import '../models/template_model.dart';
 import '../models/idea_model.dart';
 import '../models/inbox_model.dart';
-import '../models/event_model.dart';
 import '../models/calendar_session.dart';
 import '../models/pomodoro_session.dart';
 
@@ -45,6 +43,7 @@ import '../services/widget_service.dart';
 import '../services/dataview_generator.dart';
 import 'pomodoro_provider.dart';
 import '../services/google_drive_sync_service.dart';
+import 'vault_isolate.dart';
 
 final obsidianServiceProvider = Provider<ObsidianService>((ref) {
   // 1.2 — Only recreate when vaultName or vaultPath change, not on every
@@ -556,7 +555,6 @@ class HabitsNotifier extends Notifier<List<Habit>> {
       );
       ref.read(allObjectsProvider.notifier).replaceObjectInMemory(updatedHabit);
       ref.invalidate(objectsByTypeProvider('habit'));
-      ref.invalidate(habitsProvider);
       ref.invalidate(dailyNoteDataProvider(dateStr));
 
       await syncQueue.enqueueAction(
@@ -1578,490 +1576,50 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
   Future<List<ContentObject>> build() async {
     final service = ref.watch(obsidianServiceProvider);
     final settings = ref.watch(settingsProvider);
-    final typeSignatures = settings.typeSignatures;
 
-    List<ContentObject> results = [];
-    Map<String, List<Map<String, dynamic>>> dailyHabitCompletions = {};
-    Map<String, List<Map<String, dynamic>>> dailyTrackerRecords = {};
-
-    // Run journal entry migration
-    await service.fixEntryTypeMigration();
+    // 1. Run migrations on the main thread that require SharedPreferences/platform channels.
+    // migrateDailyHabitCompletions uses SharedPreferences, so we keep it here.
     await service.migrateDailyHabitCompletions(
       ref.read(sharedPreferencesProvider),
     );
 
-    // 1. Fetch markdown files, prioritizing user-configured object folders.
-    final scannedPaths = <String>{};
-    final mdFiles = <File>[];
-    for (final folder in settings.folderPaths.values) {
-      final files = await service.getFilesInFolder(folder);
-      for (final file in files) {
-        final normalized = file.path.replaceAll('\\', '/');
-        if (scannedPaths.add(normalized)) mdFiles.add(file);
-      }
-    }
-    final defaultFiles = await service.getFilesInFolder('');
-    for (final file in defaultFiles) {
-      final normalized = file.path.replaceAll('\\', '/');
-      if (scannedPaths.add(normalized) && file.path.endsWith('.md')) {
-        mdFiles.add(file);
-      }
-    }
+    // 2. Offload listing, reading, parsing and post-processing to the background isolate.
+    final parsedVault = await parseVaultInIsolate(
+      VaultIsolateParams(
+        vaultName: settings.vaultName,
+        vaultPath: service.vaultPath, // Use the resolved absolute vault path!
+        folderPaths: settings.folderPaths,
+        typeSignatures: settings.typeSignatures,
+        dailyNoteFolder: settings.dailyNoteFolder,
+        dailyNoteIdentifier: settings.dailyNoteIdentifier,
+        dailyNoteDateFormat: settings.dailyNoteDateFormat,
+      ),
+    );
 
-    // 2. Read and parse files in parallel batches (max 50 concurrent I/O ops)
-    const batchSize = 50;
-    final Map<String, Map<String, dynamic>> dailyMap = {};
-
-    for (int i = 0; i < mdFiles.length; i += batchSize) {
-      final end = (i + batchSize < mdFiles.length)
-          ? i + batchSize
-          : mdFiles.length;
-      final batch = mdFiles.sublist(i, end);
-
-      await Future.wait(
-        batch.map((file) async {
-          try {
-            final relativePath = service.getRelativePath(file.path);
-            final content = await file.readAsString();
-            final frontmatter = MarkdownParser.parseFrontmatter(content);
-            final body = MarkdownParser.extractBody(content);
-
-            final isDaily = _isDailyNote(relativePath, frontmatter, settings);
-            final String? literalType = frontmatter['type']?.toString();
-            String? type = literalType;
-
-            final entries = typeSignatures.entries.toList();
-            final organizerIdx = entries.indexWhere(
-              (e) => e.key == 'organizer',
-            );
-            if (organizerIdx != -1) {
-              final orgEntry = entries.removeAt(organizerIdx);
-              entries.add(orgEntry);
-            }
-
-            for (final entry in entries) {
-              if (MarkdownParser.matchesSignature(
-                frontmatter,
-                body,
-                relativePath,
-                entry.value,
-              )) {
-                type = entry.key;
-                break;
-              }
-            }
-
-            final pmnMatch = RegExp(
-              r'(\d{4})-(\d{2})-W(\d{2})',
-            ).firstMatch(relativePath);
-            final isPmnFile =
-                pmnMatch != null && relativePath.split('/').contains('daily');
-
-            if (isPmnFile) {
-              final yearStr = pmnMatch.group(1)!;
-              final weekStr = pmnMatch.group(3)!;
-              final canonicalId = 'pmn-$yearStr-W$weekStr';
-              final entry = JournalEntry(
-                id: frontmatter['id']?.toString() ?? canonicalId,
-                body: '',
-                date:
-                    DateTime.tryParse(
-                      frontmatter['date_range_start']?.toString() ?? '',
-                    ) ??
-                    DateTime.now(),
-                title: 'PMN ${frontmatter['week'] ?? weekStr}',
-                entryType: JournalEntryType.pmn,
-                obsidianPath: relativePath,
-              );
-              entry.week = frontmatter['week']?.toString();
-              entry.dateRangeStart = DateTime.tryParse(
-                frontmatter['date_range_start']?.toString() ?? '',
-              );
-              entry.dateRangeEnd = DateTime.tryParse(
-                frontmatter['date_range_end']?.toString() ?? '',
-              );
-              entry.referencedDates =
-                  (frontmatter['referenced_dates'] as List? ?? [])
-                      .map((d) => DateTime.tryParse(d.toString()))
-                      .whereType<DateTime>()
-                      .toList();
-              entry.pactRefs = (frontmatter['pact_refs'] as List? ?? [])
-                  .map((p) => p.toString())
-                  .toList();
-              final pmnSections = MarkdownParser.parsePmnSections(body);
-              entry.plus = pmnSections['plus'] ?? [];
-              entry.minus = pmnSections['minus'] ?? [];
-              entry.next = pmnSections['next'] ?? [];
-              results.add(entry);
-            } else if (isDaily || type == 'daily_note') {
-              final dateMatch = RegExp(
-                r'(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{2})',
-              ).firstMatch(relativePath);
-              if (dateMatch != null) {
-                final dateStr = _normalizeDailyDate(dateMatch.group(1)!);
-                final entriesData = MarkdownParser.parseJournalEntries(
-                  body,
-                  dateStr,
-                );
-                final List<JournalEntry> journalEntries = [];
-
-                for (final data in entriesData) {
-                  // Resolve entry_type from inline Dataview field
-                  JournalEntryType resolvedEntryType =
-                      JournalEntryType.standard;
-                  final rawEntryType = data['entry_type']
-                      ?.toString()
-                      .replaceAll('_', '')
-                      .toLowerCase();
-                  if (rawEntryType == 'fieldnote') {
-                    resolvedEntryType = JournalEntryType.fieldNote;
-                  }
-                  if (rawEntryType == 'pmn') {
-                    resolvedEntryType = JournalEntryType.pmn;
-                  }
-
-                  final entry = JournalEntry(
-                    id: data['id'],
-                    body: data['body'],
-                    date: _journalEntryDateFromDaily(
-                      dateStr,
-                      data['time']?.toString(),
-                    ),
-                    timeOfDay: data['time']?.toString(),
-                    title: data['title']?.toString().isNotEmpty == true
-                        ? data['title']
-                        : data['time'],
-                    moodSlug: data['mood'],
-                    obsidianPath: relativePath,
-                    entryType: resolvedEntryType,
-                    category: data['category']?.toString(),
-                    energyValue: data['energy_value'] is int
-                        ? data['energy_value'] as int
-                        : int.tryParse(data['energy_value']?.toString() ?? ''),
-                  );
-                  if (data['organizers'] != null) {
-                    entry.organizers = (data['organizers'] as List)
-                        .map<OrganizerReference>(
-                          (o) => o is OrganizerReference
-                              ? o
-                              : OrganizerReference.fromWikiLink(o.toString()),
-                        )
-                        .toList();
-                  }
-                  journalEntries.add(entry);
-                  results.add(entry);
-                }
-
-                final habits = MarkdownParser.parseHabitCompletions(
-                  frontmatter,
-                );
-                if (habits.isNotEmpty) {
-                  dailyHabitCompletions[dateStr] = habits.entries
-                      .map((e) => {'slug': e.key, 'value': e.value})
-                      .toList();
-                }
-
-                final trackers = MarkdownParser.parseTrackerRecords(
-                  frontmatter,
-                );
-                if (trackers.isNotEmpty) {
-                  dailyTrackerRecords[dateStr] = trackers.entries
-                      .map((e) => {'slug': e.key, 'values': e.value})
-                      .toList();
-                }
-
-                final parsedDay = DateTime.tryParse(dateStr) ?? DateTime.now();
-                final pomodorosData = MarkdownParser.parsePomodoros(body);
-                for (final pom in pomodorosData) {
-                  final timeStr = pom['time'] as String? ?? '00:00';
-                  final title = pom['title'] as String? ?? 'Focus Session';
-                  final hours = int.tryParse(timeStr.split(':').first) ?? 0;
-                  final minutes = int.tryParse(timeStr.split(':').last) ?? 0;
-                  final sessionDate = DateTime(
-                    parsedDay.year,
-                    parsedDay.month,
-                    parsedDay.day,
-                    hours,
-                    minutes,
-                  );
-
-                  final blocks =
-                      int.tryParse(pom['blocks']?.toString() ?? '') ?? 0;
-                  final worked =
-                      int.tryParse(pom['worked']?.toString() ?? '') ?? 0;
-                  final breakTime =
-                      int.tryParse(pom['break']?.toString() ?? '') ?? 0;
-                  final linkedItem = pom['linked_item'] as String?;
-
-                  final session = PomodoroSession(
-                    id: 'pomodoro_${dateStr}_${timeStr.replaceAll(':', '_')}',
-                    taskTitle: title,
-                    date: sessionDate,
-                    linkedItemSlug: linkedItem,
-                    blocksCompleted: blocks,
-                    minutesWorked: worked,
-                    minutesBreak: breakTime,
-                    state: PomodoroSessionState.completed,
-                  );
-                  results.add(session);
-                }
-
-                // Store in dailyMap for the O(1) provider
-                dailyMap[dateStr] = {
-                  'entries': journalEntries,
-                  'habitCompletions': habits,
-                  'habits': habits,
-                  'trackerRecords': trackers,
-                  'frontmatter': frontmatter,
-                };
-              }
-            } else {
-              // Normal content object
-              final fallbackTitle = relativePath
-                  .split('/')
-                  .last
-                  .replaceAll('.md', '');
-              final stableId = relativePath
-                  .replaceAll('/', '_')
-                  .replaceAll('.md', '');
-              ContentObject? obj;
-
-              if (type == 'task' && !relativePath.startsWith('organizers/')) {
-                obj = Task.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'shopping_item') {
-                obj = ShoppingItem.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'shopping_list') {
-                obj = shopping_list_model.ShoppingList.fromMarkdown(
-                  frontmatter,
-                  body,
-                )..obsidianPath = relativePath;
-              } else if (type == 'habit' &&
-                  !relativePath.startsWith('organizers/')) {
-                obj = Habit.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'project' ||
-                  (type == 'organizer' &&
-                      frontmatter['organizer_type'] == 'project')) {
-                obj = Project.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'person' ||
-                  (type == 'organizer' &&
-                      frontmatter['organizer_type'] == 'person')) {
-                obj = Person.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'organizer' ||
-                  type == 'area' ||
-                  type == 'activity' ||
-                  type == 'place' ||
-                  type == 'label' ||
-                  (type == 'task' && relativePath.startsWith('organizers/')) ||
-                  (type == 'goal' && relativePath.startsWith('organizers/')) ||
-                  (type == 'habit' && relativePath.startsWith('organizers/')) ||
-                  (type == 'tracker' &&
-                      relativePath.startsWith('organizers/'))) {
-                if (frontmatter['organizer_type'] == null &&
-                    type != 'organizer') {
-                  frontmatter['organizer_type'] = type;
-                }
-                obj = organizer_model.Organizer.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'resource') {
-                obj = Resource.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'event') {
-                obj = Event.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'social_post') {
-                obj = SocialPost.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'goal' &&
-                  !relativePath.startsWith('organizers/')) {
-                obj = Goal.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'entry') {
-                obj = JournalEntry.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'note') {
-                obj = Note.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'idea') {
-                obj = IdeaDefinition.fromMarkdown(
-                  frontmatter,
-                  body,
-                  relativePath,
-                );
-              } else if (type == 'tracker_definition') {
-                obj = TrackerDefinition.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'mood_definition') {
-                obj = MoodDefinition.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'reminder') {
-                obj = Reminder.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'tracker_record') {
-                obj = TrackingRecord.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'combined_analysis') {
-                obj = CombinedAnalysis.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'snapshot') {
-                obj = Snapshot.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'system') {
-                obj = SystemDefinition.fromMarkdown(
-                  frontmatter,
-                  body,
-                  relativePath,
-                );
-              } else if (type == 'calendar_session') {
-                obj = CalendarSession.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'time_block') {
-                obj = TimeBlock.fromMap(frontmatter, body: body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'day_theme') {
-                obj = DayTheme.fromMap(frontmatter, body: body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'template') {
-                obj = TemplateDefinition.fromMap(
-                  frontmatter,
-                  stableId,
-                  body: body,
-                )..obsidianPath = relativePath;
-              } else {
-                obj = Note(
-                  id: stableId,
-                  title: frontmatter['title'] ?? fallbackTitle,
-                  body: body,
-                  subtype: NoteSubtype.text,
-                  organizers: const [],
-                )..obsidianPath = relativePath;
-              }
-
-              obj.loadBaseMap(frontmatter, fallbackId: stableId);
-              obj.literalType = literalType;
-              if (literalType != null && literalType != type) {
-                obj.hasTypeConflict = true;
-                obj.conflictReason =
-                    'Tipo no frontmatter ("$literalType") diverge do tipo detectado pela assinatura ("$type").';
-              }
-              if (obj.title == 'Untitled' ||
-                  obj.title.toLowerCase() == 'untitled' ||
-                  obj.title.isEmpty) {
-                obj.title = fallbackTitle;
-              }
-              results.add(obj);
-              // If the YAML was repaired in memory, rewrite the file so it stays fixed
-              if (frontmatter['__needs_rewrite__'] == true) {
-                final objSnapshot = obj;
-                Future.microtask(() async {
-                  try {
-                    await service.writeFile(
-                      relativePath,
-                      objSnapshot.toMarkdown(),
-                    );
-                    debugPrint('[Vault] Rewrote repaired YAML: $relativePath');
-                  } catch (e) {
-                    debugPrint('[Vault] Failed to rewrite repaired YAML: $e');
-                  }
-                });
-              }
-            }
-          } catch (e, st) {
-            debugPrint('Error processing file ${file.path}: $e\n$st');
-          }
-        }),
+    // 3. Write repaired YAML files on the main thread (asynchronously via microtask)
+    for (final relativePath in parsedVault.needsRewritePaths) {
+      final obj = parsedVault.objects.firstWhere(
+        (o) => o.obsidianPath == relativePath,
       );
-    }
-
-    // 3. Update the daily data map
-    Future.microtask(() {
-      ref.read(_dailyNoteDataMapProvider.notifier).state = dailyMap;
-    });
-
-    // Deduplicate by ID
-    final uniqueResults = <String, ContentObject>{};
-    for (final r in results) {
-      uniqueResults[r.id] = r;
-    }
-    List<ContentObject> finalResults = uniqueResults.values.toList();
-
-    // Post-process Habits and Trackers
-    for (final habit in finalResults.whereType<Habit>()) {
-      habit.completionHistory.clear();
-      dailyHabitCompletions.forEach((dateStr, completions) {
-        final completion = completions.firstWhere(
-          (c) => c['slug'] == habit.slug,
-          orElse: () => {},
-        );
-        if (completion.isNotEmpty) {
-          final val = completion['value'];
-          bool successful = false;
-          int count = 0;
-          List<bool>? slotCompletions;
-
-          if (val is bool) {
-            successful = val;
-            count = val ? habit.dailyGoal : 0;
-            slotCompletions = List.filled(habit.dailyGoal, val);
-          } else if (val is num) {
-            count = val.toInt();
-            successful = count >= habit.dailyGoal;
-            slotCompletions = List.generate(habit.dailyGoal, (i) => i < count);
-          } else if (val is List) {
-            slotCompletions = val.map((v) => v == true).toList();
-            count = slotCompletions.where((v) => v).length;
-            successful = count >= habit.dailyGoal;
-          }
-
-          habit.completionHistory.add(
-            CompletionRecord(
-              date: DateTime.parse(dateStr),
-              completions: count,
-              slotCompletions: slotCompletions,
-              successful: successful,
-            ),
+      Future.microtask(() async {
+        try {
+          await service.writeFile(
+            relativePath,
+            obj.toMarkdown(),
           );
+          debugPrint('[Vault] Rewrote repaired YAML: $relativePath');
+        } catch (e) {
+          debugPrint('[Vault] Failed to rewrite repaired YAML: $e');
         }
       });
-      habit.completionHistory.sort((a, b) => a.date.compareTo(b.date));
     }
 
-    final List<TrackingRecord> newRecords = [];
-    for (final dateStr in dailyTrackerRecords.keys) {
-      for (final recordData in dailyTrackerRecords[dateStr]!) {
-        final trackerSlug = recordData['slug'];
-        final values = Map<String, dynamic>.from(recordData['values'] as Map);
-        newRecords.add(
-          TrackingRecord(
-            title: 'Record from $dateStr',
-            trackerId: trackerSlug,
-            date: DateTime.parse(dateStr),
-            fieldValues: values,
-          )..obsidianPath = 'daily/$dateStr.md',
-        );
-      }
-    }
+    // 4. Update the daily data map on the main thread (asynchronously via microtask)
+    Future.microtask(() {
+      ref.read(_dailyNoteDataMapProvider.notifier).state = parsedVault.dailyMap;
+    });
 
-    finalResults.addAll(newRecords);
-
-    // Final deduplication just in case
-    final Map<String, ContentObject> deduplicated = {};
-    for (final obj in finalResults) {
-      if (obj.id.isNotEmpty) {
-        deduplicated[obj.id] = obj;
-      }
-    }
-    final objects = deduplicated.values.toList()
-      ..sort((a, b) {
-        final updated = b.updatedAt.compareTo(a.updatedAt);
-        if (updated != 0) return updated;
-        return a.title.toLowerCase().compareTo(b.title.toLowerCase());
-      });
-    return objects;
+    return parsedVault.objects;
   }
 
   Future<void> updateObject(ContentObject object) async {
