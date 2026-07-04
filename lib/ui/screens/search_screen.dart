@@ -716,8 +716,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           return 'Etiqueta';
         case OrganizerType.person:
           return 'Pessoa';
-        case OrganizerType.place:
-          return 'Lugar';
         case OrganizerType.task:
           return 'Tarefa';
         case OrganizerType.goal:

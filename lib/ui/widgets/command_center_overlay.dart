@@ -15,7 +15,8 @@ import '../../models/journal_entry.dart';
 import '../../models/task_model.dart';
 import '../../models/organizer_model.dart';
 import '../../models/system_model.dart';
-import '../../models/calendar_session.dart';
+import '../../models/event_model.dart';
+import '../../services/search_service.dart';
 
 import '../forms/create_task_form.dart';
 import '../forms/create_entry_form.dart';
@@ -94,7 +95,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
         return AppColors.error;
       case 'system':
         return AppColors.primary;
-      case 'calendar_session':
+      case 'event':
         return AppColors.info;
       default:
         return Colors.grey;
@@ -129,7 +130,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
       case 'system':
         icon = Icons.account_tree_outlined;
         break;
-      case 'calendar_session':
+      case 'event':
         icon = Icons.event_rounded;
         break;
       default:
@@ -156,8 +157,8 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
         return 'Trackers';
       case 'system':
         return 'Systems';
-      case 'calendar_session':
-        return 'Sessões';
+      case 'event':
+        return 'Events';
       case 'reminder':
         return 'Lembretes';
       case 'person':
@@ -209,21 +210,21 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
     final notes = ref.watch(notesProvider);
     final organizers = ref.watch(organizersProvider);
     final topSystems = ref.watch(topSystemsProvider);
-    final sessions = ref.watch(calendarSessionsProvider);
+    final events = allObjects.whereType<Event>().toList();
 
-    // Próximas Sessões: upcoming (date after yesterday), top 3
+    // Upcoming events: upcoming (date after yesterday), top 3
     final now = DateTime.now();
-    final upcomingSessions =
-        sessions
+    final upcomingEvents =
+        events
             .where(
               (s) =>
                   s.date.isAfter(now.subtract(const Duration(days: 1))) &&
-                  s.state != CalendarSessionState.completed &&
-                  s.state != CalendarSessionState.cancelled,
+                  s.state != EventState.completed &&
+                  s.state != EventState.cancelled,
             )
             .toList()
           ..sort((a, b) => a.date.compareTo(b.date));
-    final nextSessions = upcomingSessions.take(3).toList();
+    final nextEvents = upcomingEvents.take(3).toList();
 
     // Notes sorted by updated at
     final sortedNotes = List<Note>.from(notes)
@@ -446,7 +447,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                                   recentObjects,
                                   history,
                                   topSystems,
-                                  nextSessions,
+      nextEvents,
                                   recentNotes,
                                   topOrganizers,
                                 ),
@@ -463,25 +464,11 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
     );
   }
 
+  // F3.2: Use shared SearchService instead of custom implementation
   bool _matchesQuery(ContentObject object, String query) {
-    if (object.title.toLowerCase().contains(query)) return true;
-    if (object.aliases.any((alias) => alias.toLowerCase().contains(query))) {
-      return true;
-    }
-    final snippet = object.snippet;
-    if (snippet != null && snippet.toLowerCase().contains(query)) return true;
-
-    String body = '';
-    if (object is Note) {
-      body = object.body;
-    } else if (object is JournalEntry) {
-      body = object.body;
-    } else if (object is Task) {
-      body = object.notes.join('\n');
-    }
-    if (body.isEmpty) return false;
-    final preview = body.length > 200 ? body.substring(0, 200) : body;
-    return preview.toLowerCase().contains(query);
+    final searchService = SearchService();
+    final results = searchService.search([object], query);
+    return results.isNotEmpty;
   }
 
   Widget _buildQuickAction(
@@ -528,7 +515,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
     List<ContentObject> recent,
     List<HistoryEntry> history,
     List<SystemDefinition> topSystems,
-    List<CalendarSession> nextSessions,
+    List<Event> nextEvents,
     List<Note> notes,
     List<Organizer> organizers,
   ) {
@@ -541,8 +528,8 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
         // ── Systems (quick-run chips) ──
         if (topSystems.isNotEmpty) _buildSystemsSection(topSystems),
 
-        // ── Próximas Sessões ──
-        if (nextSessions.isNotEmpty) _buildSessionsSection(nextSessions),
+        // ── Upcoming events ──
+        if (nextEvents.isNotEmpty) _buildEventsSection(nextEvents),
 
         // ── Notas Recentes ──
         if (notes.isNotEmpty)
@@ -745,8 +732,8 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
     );
   }
 
-  // ─── Próximas Sessões ────────────────────────────────────────────────────
-  Widget _buildSessionsSection(List<CalendarSession> sessions) {
+  // ─── Upcoming events ─────────────────────────────────────────────────────
+  Widget _buildEventsSection(List<Event> events) {
     return Padding(
       padding: const EdgeInsets.only(top: 20),
       child: Column(
@@ -755,7 +742,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 20),
             child: Text(
-              'Próximas Sessões',
+              'Upcoming Events',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -764,34 +751,26 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
             ),
           ),
           const SizedBox(height: 12),
-          ...sessions.map((session) => _buildSessionTile(session)),
+          ...events.map((event) => _buildEventTile(event)),
         ],
       ),
     );
   }
 
-  Widget _buildSessionTile(CalendarSession session) {
-    final colorHex = session.color;
-    Color dotColor = AppColors.info;
-    if (colorHex != null && colorHex.isNotEmpty) {
-      try {
-        final hex = colorHex.replaceAll('#', '');
-        dotColor = Color(int.parse('FF$hex', radix: 16));
-      } catch (_) {}
-    }
-
+  Widget _buildEventTile(Event event) {
+    final dotColor = AppColors.info;
     final isToday =
-        session.date.day == DateTime.now().day &&
-        session.date.month == DateTime.now().month &&
-        session.date.year == DateTime.now().year;
+        event.date.day == DateTime.now().day &&
+        event.date.month == DateTime.now().month &&
+        event.date.year == DateTime.now().year;
 
     final dateLabel = isToday
-        ? 'Hoje ${session.timeOfDay ?? ""}'.trim()
-        : '${DateFormat('d/M').format(session.date)} ${session.timeOfDay ?? ""}'
+        ? 'Today ${event.timeOfDay ?? ""}'.trim()
+        : '${DateFormat('d/M').format(event.date)} ${event.timeOfDay ?? ""}'
               .trim();
 
     return InkWell(
-      onTap: () => _openObject(session),
+      onTap: () => _openObject(event),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
         child: Row(
@@ -807,7 +786,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                session.title,
+                event.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -1022,3 +1001,6 @@ void showCommandCenter(BuildContext context) {
     },
   );
 }
+
+
+

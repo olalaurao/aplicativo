@@ -17,6 +17,9 @@ class InboxItem extends ContentObject {
   String get type => 'inbox';
 
   @override
+  bool get isIncomplete => title.trim().isEmpty;
+
+  @override
   String toMarkdown() {
     final frontmatter = toBaseMap();
     return generateMarkdown(frontmatter, content);

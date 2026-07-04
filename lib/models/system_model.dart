@@ -78,6 +78,9 @@ class SystemDefinition extends ContentObject {
   String get type => 'system';
 
   @override
+  bool get isIncomplete => title.trim().isEmpty || steps.isEmpty;
+
+  @override
   String toMarkdown() {
     final map = toBaseMap();
     map['trigger'] = trigger;
@@ -99,9 +102,6 @@ class SystemDefinition extends ContentObject {
       title: frontmatter['title']?.toString() ?? 'Sem título',
       trigger: frontmatter['trigger']?.toString() ?? '',
       estimatedMinutes: int.tryParse(frontmatter['estimated_minutes']?.toString() ?? '0') ?? 0,
-      runCount: int.tryParse(frontmatter['run_count']?.toString() ?? '0') ?? 0,
-      lastRun: frontmatter['last_run'] != null ? DateTime.tryParse(frontmatter['last_run'].toString()) : null,
-      averageMinutes: int.tryParse(frontmatter['average_minutes']?.toString() ?? '0') ?? 0,
       description: body.trim(),
       obsidianPath: filePath,
     );

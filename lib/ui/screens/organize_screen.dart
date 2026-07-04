@@ -12,6 +12,7 @@ import '../../models/habit_model.dart';
 import '../../models/tracker_model.dart';
 import 'universal_detail_view.dart';
 import '../widgets/object_action_wrapper.dart';
+import '../widgets/overdue_section.dart';
 
 class OrganizeScreen extends ConsumerStatefulWidget {
   const OrganizeScreen({super.key});
@@ -181,14 +182,6 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
             .toList(),
       ),
       _OrganizerSection(
-        'Places',
-        Icons.place_outlined,
-        AppColors.habitOrange,
-        organizers
-            .where((o) => o.organizerType == OrganizerType.place)
-            .toList(),
-      ),
-      _OrganizerSection(
         'Labels',
         Icons.label_outline_rounded,
         AppTheme.textSecondaryColor(context),
@@ -227,11 +220,49 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
       }
     } else {
       for (final section in filteredSections) {
-        if (section.items.isEmpty) continue; // Hide empty sections
+        if (section.items.isEmpty && section.title != 'Projetos') continue;
+        if (section.title == 'Projetos') {
+          widgets.add(
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
+                child: OverdueSection(filterTypes: ['project']),
+              ),
+            ),
+          );
+        }
+        if (section.items.isEmpty) continue;
         widgets.add(
           SliverToBoxAdapter(child: _buildSectionCard(context, section)),
         );
       }
+    }
+
+    if (widgets.isEmpty &&
+        (_activeFilter == 'Goals' ||
+            _activeFilter == 'Projects' ||
+            _activeFilter == 'People')) {
+      final emptyLabel = switch (_activeFilter) {
+        'Goals' => 'Nenhuma meta encontrada',
+        'Projects' => 'Nenhum projeto encontrado',
+        'People' => 'Nenhuma pessoa encontrada',
+        _ => 'Nenhum item encontrado',
+      };
+      widgets.add(
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Text(
+              _searchQuery.isEmpty ? emptyLabel : 'Nenhum resultado encontrado',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textMutedColor(context),
+              ),
+            ),
+          ),
+        ),
+      );
     }
 
     if (organizers.isEmpty &&
@@ -486,8 +517,6 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
         return Icons.sports_outlined;
       case OrganizerType.person:
         return Icons.person_outline_rounded;
-      case OrganizerType.place:
-        return Icons.place_outlined;
       case OrganizerType.label:
         return Icons.label_outline_rounded;
       case OrganizerType.task:

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:googleapis/calendar/v3.dart' as calendar;
 
+import 'overdue_provider.dart';
 import '../models/content_object.dart';
 import '../models/goal_model.dart';
 import '../models/habit_model.dart';
@@ -17,7 +18,7 @@ import '../models/organizer_model.dart';
 import '../models/pomodoro_session.dart';
 import '../models/reminder_model.dart';
 import '../models/task_model.dart';
-import '../models/shopping_item.dart';
+import '../models/shopping_list_model.dart' as shopping_list_model;
 import '../models/journal_entry.dart';
 import '../models/note_model.dart';
 import '../models/resource_model.dart';
@@ -48,12 +49,13 @@ class _Debouncer {
 }
 
 final widgetSyncProvider = Provider<void>((ref) {
-  final debouncer = _Debouncer(delay: const Duration(milliseconds: 700));
+  final debouncer = _Debouncer(delay: const Duration(milliseconds: 2000));
 
-  final allObjects = ref.watch(allObjectsProvider).valueOrNull;
-  final pomodoro = ref.watch(pomodoroProvider);
-  final blocks = ref.watch(dashboardProvider).valueOrNull ?? [];
-  final settings = ref.watch(settingsProvider);
+  // Use select to only watch specific data that affects widgets, not entire vault
+  final allObjects = ref.watch(allObjectsProvider.select((data) => data.valueOrNull));
+  final pomodoro = ref.watch(pomodoroProvider.select((data) => data));
+  final blocks = ref.watch(dashboardProvider.select((data) => data.valueOrNull ?? []));
+  final settings = ref.watch(settingsProvider.select((data) => data));
 
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
@@ -63,12 +65,13 @@ final widgetSyncProvider = Provider<void>((ref) {
   final googleEventsAsync = ref.watch(
     googleCalendarRangeEventsProvider(
       GoogleCalendarParams(startDate: googleStart, days: googleDays),
-    ),
+    ).select((data) => data.valueOrNull ?? []),
   );
-  final googleEvents = googleEventsAsync.valueOrNull ?? [];
+  final googleEvents = googleEventsAsync;
 
-  final prefs = ref.watch(sharedPreferencesProvider);
-  final offset = prefs.getInt('calendarWidgetOffset') ?? 0;
+  final prefs = ref.watch(sharedPreferencesProvider.select((data) => data.getInt('calendarWidgetOffset') ?? 0));
+  final offset = prefs;
+  final overdueItems = ref.watch(overdueProvider.select((data) => data));
 
   if (allObjects != null) {
     debouncer.run(() async {
@@ -79,6 +82,7 @@ final widgetSyncProvider = Provider<void>((ref) {
         settings,
         googleEvents,
         offset,
+        overdueItems,
       );
     });
   }
@@ -110,6 +114,7 @@ Future<void> forceWidgetSync(ProviderContainer container) async {
 
     final prefs = container.read(sharedPreferencesProvider);
     final offset = prefs.getInt('calendarWidgetOffset') ?? 0;
+    final overdueItems = container.read(overdueProvider);
 
     await _updateAllWidgets(
       allObjects,
@@ -118,6 +123,7 @@ Future<void> forceWidgetSync(ProviderContainer container) async {
       settings,
       googleEvents,
       offset,
+      overdueItems,
     );
   } catch (e, st) {
     debugPrint('[WidgetSync] forceWidgetSync failed: $e\n$st');
@@ -130,14 +136,16 @@ Future<void> _updateAllWidgets(
   List<DashboardBlock> dashboardBlocks,
   AppSettings settings,
   List<calendar.Event> googleEvents,
-  int offset,
-) async {
+  int offset, [
+  List<OverdueItem> overdueItems = const [],
+]) async {
   try {
     final calendar = _buildCalendarSnapshot(
       allObjects,
       settings,
       googleEvents,
       offset,
+      overdueItems,
     );
     final shopping = _buildShoppingSnapshot(allObjects);
     final pomodoro = _buildPomodoroSnapshot(pomodoroHistory);
@@ -156,9 +164,16 @@ Map<String, dynamic> buildCalendarSnapshotForTest(
   List<ContentObject> objects,
   AppSettings settings,
   List<calendar.Event> googleEvents,
-  int offset,
-) {
-  return _buildCalendarSnapshot(objects, settings, googleEvents, offset);
+  int offset, [
+  List<OverdueItem> overdueItems = const [],
+]) {
+  return _buildCalendarSnapshot(
+    objects,
+    settings,
+    googleEvents,
+    offset,
+    overdueItems,
+  );
 }
 
 @visibleForTesting
@@ -181,8 +196,9 @@ Map<String, dynamic> _buildCalendarSnapshot(
   List<ContentObject> objects,
   AppSettings settings,
   List<calendar.Event> googleEvents,
-  int offset,
-) {
+  int offset, [
+  List<OverdueItem> overdueItems = const [],
+]) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final tasks = objects.whereType<Task>().toList();
@@ -200,6 +216,7 @@ Map<String, dynamic> _buildCalendarSnapshot(
 
   const mode = 'week';
   const dayHeaders = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+  final overdueSnapshot = _overdueSnapshot(overdueItems);
 
   if (mode == 'day') {
     // offset shifts by days
@@ -224,6 +241,7 @@ Map<String, dynamic> _buildCalendarSnapshot(
       'subtitle': '${items.length} ${items.length == 1 ? 'tarefa' : 'tarefas'}',
       'items': items.take(_maxWidgetDayItems).toList(),
       'days': <Map<String, dynamic>>[], // strip hidden in day mode
+      ...overdueSnapshot,
     };
   } else if (mode == 'week') {
     // offset shifts by weeks
@@ -286,6 +304,7 @@ Map<String, dynamic> _buildCalendarSnapshot(
           'Hoje · ${selectedItems.length} ${selectedItems.length == 1 ? 'tarefa' : 'tarefas'}',
       'items': selectedItems.take(_maxWidgetDayItems).toList(),
       'days': days,
+      ...overdueSnapshot,
     };
   } else {
     // month mode — offset shifts by months
@@ -448,6 +467,7 @@ List<Map<String, dynamic>> _dayItems(
   if (settings.calendarWidgetShowHabits) {
     for (final habit in habits) {
       if (habit.status != HabitStatus.active) continue;
+      if (habit.isNegative) continue; // F2.6: Exclude negative habits from widgets
       final scheduled =
           habit.schedulers.isEmpty ||
           habit.schedulers.any(
@@ -455,7 +475,7 @@ List<Map<String, dynamic>> _dayItems(
           );
       if (!scheduled) continue;
       final slotTimes = habit.slots
-          .map((slot) => slot.reminderTime ?? _timeOfDate(slot.time))
+          .map((slot) => slot.primaryReminderTime ?? _timeOfDate(slot.time))
           .where((t) => t != null)
           .toList();
       if (slotTimes.isEmpty) {
@@ -537,21 +557,23 @@ List<Map<String, dynamic>> _dayItems(
 Map<String, dynamic> _buildShoppingSnapshot(
   List<ContentObject> allObjects,
 ) {
-  final shoppingItems = allObjects.whereType<ShoppingItem>().where((item) => !item.isCompleted && !item.archived).toList()
-    ..sort((a, b) {
-      if (a.order != null || b.order != null) {
-        return (a.order ?? 9999).compareTo(b.order ?? 9999);
-      }
-      return b.updatedAt.compareTo(a.updatedAt);
-    });
+  final shoppingLists = allObjects
+      .whereType<shopping_list_model.ShoppingList>()
+      .where((list) => !list.archived)
+      .toList();
 
-  final items = shoppingItems.map((item) => {
-    'id': item.id,
-    'title': item.title,
-    'type': 'shopping_item',
-    'completed': false,
-    'toggleUri': 'citrine://widget-toggle?type=shopping_item&id=${Uri.encodeComponent(item.id)}',
-  }).toList();
+  final List<Map<String, dynamic>> items = [];
+  for (final list in shoppingLists) {
+    for (final item in list.activeItems) {
+      items.add({
+        'id': '${list.id}/${item.id}',
+        'title': item.name,
+        'type': 'shopping_item',
+        'completed': false,
+        'toggleUri': 'citrine://widget-toggle?type=shopping_list_item&listId=${Uri.encodeComponent(list.id)}&itemId=${Uri.encodeComponent(item.id)}',
+      });
+    }
+  }
 
   return {
     'title': 'Lista de Mercado',
@@ -750,6 +772,24 @@ String _userFacingText(String value, {String fallback = ''}) {
   final clean = displayTitleFromValue(text);
   if (clean == null || clean.isEmpty) return fallback;
   return clean;
+}
+
+Map<String, dynamic> _overdueSnapshot(List<OverdueItem> overdueItems) {
+  return {
+    'overdue': overdueItems
+        .map((item) => {
+              'id': item.object.id,
+              'title': item.object.title,
+              'type': item.itemType,
+              'daysLate': item.daysLate,
+              'linkUri': 'citrine:///detail/${item.object.id}',
+              if (item.itemType == 'task')
+                'toggleUri':
+                    'citrine://widget-toggle?type=task&id=${Uri.encodeComponent(item.object.id)}&action=complete',
+            })
+        .toList(),
+    'overdueCount': overdueItems.length,
+  };
 }
 
 String _dateKey(DateTime date) {

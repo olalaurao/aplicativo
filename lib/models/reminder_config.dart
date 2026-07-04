@@ -33,6 +33,49 @@ class ReminderConfig {
     this.vibrate = true,
   });
 
+  ReminderConfig copyWith({
+    String? id,
+    DateTime? triggerTime,
+    bool clearTriggerTime = false,
+    int? minutesBefore,
+    bool clearMinutesBefore = false,
+    int? daysBefore,
+    bool clearDaysBefore = false,
+    String? timeOfDay,
+    bool clearTimeOfDay = false,
+    NotificationType? type,
+    String? notificationBody,
+    bool clearNotificationBody = false,
+    String? sound,
+    bool clearSound = false,
+    bool? ringOnSilent,
+    int? snoozeMinutes,
+    Color? popupColor,
+    bool clearPopupColor = false,
+    bool? playSound,
+    bool? vibrate,
+  }) {
+    return ReminderConfig(
+      id: id ?? this.id,
+      triggerTime: clearTriggerTime ? null : (triggerTime ?? this.triggerTime),
+      minutesBefore: clearMinutesBefore
+          ? null
+          : (minutesBefore ?? this.minutesBefore),
+      daysBefore: clearDaysBefore ? null : (daysBefore ?? this.daysBefore),
+      timeOfDay: clearTimeOfDay ? null : (timeOfDay ?? this.timeOfDay),
+      type: type ?? this.type,
+      notificationBody: clearNotificationBody
+          ? null
+          : (notificationBody ?? this.notificationBody),
+      sound: clearSound ? null : (sound ?? this.sound),
+      ringOnSilent: ringOnSilent ?? this.ringOnSilent,
+      snoozeMinutes: snoozeMinutes ?? this.snoozeMinutes,
+      popupColor: clearPopupColor ? null : (popupColor ?? this.popupColor),
+      playSound: playSound ?? this.playSound,
+      vibrate: vibrate ?? this.vibrate,
+    );
+  }
+
   DateTime calculateTriggerTime(DateTime base) {
     if (triggerTime != null) return triggerTime!;
     if (daysBefore != null || timeOfDay != null) {

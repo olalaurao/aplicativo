@@ -626,12 +626,12 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        subtitle: slotConfig.reminderEnabled && slotConfig.reminderTime != null
+        subtitle: slotConfig.hasReminders && slotConfig.primaryReminderTime != null
             ? Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    slotConfig.notificationType.name == 'alarm'
+                    slotConfig.primaryReminderType.name == 'alarm'
                         ? Icons.alarm_rounded
                         : Icons.notifications_active_outlined,
                     size: 12,
@@ -639,7 +639,7 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    slotConfig.reminderTime!.format(context),
+                    slotConfig.primaryReminderTime!.format(context),
                     style: const TextStyle(
                       fontSize: 11,
                       color: AppColors.textMuted,

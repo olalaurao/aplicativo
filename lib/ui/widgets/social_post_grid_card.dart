@@ -64,7 +64,7 @@ class SocialPostGridCard extends StatelessWidget {
                   Row(
                     children: [
                       SocialPlatformBadge(platform: post.platform, fontSize: 9),
-                      if (post.socialRefs.isNotEmpty) ...[
+                      if (post.links.isNotEmpty) ...[
                         const SizedBox(width: 4),
                         const Icon(
                           Icons.link_rounded,

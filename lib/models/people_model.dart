@@ -3,6 +3,8 @@ import 'content_object.dart';
 import 'organizer_model.dart';
 import 'task_model.dart'; // For TaskPriority
 import 'shared_types.dart';
+import 'scheduler.dart';
+import '../services/scheduler_service.dart';
 
 class Person extends Organizer {
   String? photo;
@@ -12,6 +14,8 @@ class Person extends Organizer {
   DateTime? lastContactDate;
   Duration? contactFrequency;
   TaskPriority contactPriority;
+  /// F2.13: Scheduler for automatic contact reminders using days_after_reference_field
+  Scheduler? scheduler;
 
   Person({
     super.id,
@@ -23,6 +27,7 @@ class Person extends Organizer {
     this.lastContactDate,
     this.contactFrequency,
     this.contactPriority = TaskPriority.none,
+    this.scheduler,
     super.parentId,
     super.startDate,
     super.endDate,
@@ -38,10 +43,41 @@ class Person extends Organizer {
   @override
   String get type => 'person';
 
+  /// F2.13: Check if person is due for contact using scheduler
   bool get isDueForContact {
-    if (lastContactDate == null || contactFrequency == null) return false;
-    final dueDate = lastContactDate!.add(contactFrequency!);
-    return DateTime.now().isAfter(dueDate);
+    if (scheduler == null || lastContactDate == null) return false;
+    
+    // Check if any rule in the scheduler fires for today
+    final today = DateTime.now();
+    for (final rule in scheduler!.rules) {
+      if (rule.repeatType == RepeatType.daysAfterReferenceField &&
+          rule.targetType == 'person' &&
+          rule.fieldName == 'last_contact_date') {
+        if (SchedulerService.shouldFireReferenceFieldRule(rule, today, lastContactDate)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// F2.13: Generate or update scheduler from contactFrequency
+  /// This creates a daysAfterReferenceField rule targeting last_contact_date
+  Scheduler? get schedulerFromContactFrequency {
+    if (contactFrequency == null) return null;
+    
+    final rule = SchedulerRule(
+      repeatType: RepeatType.daysAfterReferenceField,
+      interval: contactFrequency!.inDays,
+      targetType: 'person',
+      fieldName: 'last_contact_date',
+    );
+    
+    return Scheduler(
+      rules: [rule],
+      startDate: DateTime.now(),
+      itemType: ItemType.reminder,
+    );
   }
 
   @override
@@ -58,6 +94,10 @@ class Person extends Organizer {
       frontmatter['contact_frequency_days'] = contactFrequency!.inDays;
     }
     frontmatter['contact_priority'] = contactPriority.name;
+    // F2.13: Serialize scheduler
+    if (scheduler != null) {
+      frontmatter['scheduler'] = scheduler!.toMap();
+    }
 
     return generateMarkdown(frontmatter, notes ?? '');
   }
@@ -84,6 +124,12 @@ class Person extends Organizer {
       person.contactPriority = TaskPriority.values.firstWhere(
         (e) => e.name == frontmatter['contact_priority'],
         orElse: () => TaskPriority.none,
+      );
+    }
+    // F2.13: Parse scheduler
+    if (frontmatter['scheduler'] != null) {
+      person.scheduler = Scheduler.fromMap(
+        frontmatter['scheduler'] as Map<String, dynamic>,
       );
     }
 
@@ -113,6 +159,7 @@ class Person extends Organizer {
     DateTime? lastContactDate,
     Duration? contactFrequency,
     TaskPriority? contactPriority,
+    Scheduler? scheduler,
   }) {
     final p = Person(
       id: id,
@@ -124,6 +171,7 @@ class Person extends Organizer {
       lastContactDate: lastContactDate ?? this.lastContactDate,
       contactFrequency: contactFrequency ?? this.contactFrequency,
       contactPriority: contactPriority ?? this.contactPriority,
+      scheduler: scheduler ?? this.scheduler,
       parentId: parentId ?? this.parentId,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,

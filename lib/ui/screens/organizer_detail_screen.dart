@@ -1093,8 +1093,6 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         return Icons.sports_outlined;
       case OrganizerType.person:
         return Icons.person_outline_rounded;
-      case OrganizerType.place:
-        return Icons.place_outlined;
       case OrganizerType.label:
         return Icons.label_outline_rounded;
       case OrganizerType.task:
@@ -1125,7 +1123,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         return Icons.flag_outlined;
       case 'entry':
         return Icons.auto_stories_rounded;
-      case 'calendar_session':
+      case 'event':
         return Icons.calendar_today_outlined;
       case 'area':
         return Icons.layers_outlined;
@@ -1135,10 +1133,14 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         return Icons.sports_outlined;
       case 'person':
         return Icons.person_outline_rounded;
-      case 'place':
-        return Icons.place_outlined;
       case 'label':
         return Icons.label_outline_rounded;
+      case 'reminder':
+        return Icons.notifications_outlined;
+      case 'system':
+        return Icons.settings_outlined;
+      case 'social_post':
+        return Icons.bookmarks_outlined;
       default:
         return Icons.article_outlined;
     }
@@ -1154,7 +1156,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         return AppColors.habitOrange;
       case 'entry':
         return AppColors.habitPurple;
-      case 'calendar_session':
+      case 'event':
         return AppColors.primary;
       case 'area':
         return AppColors.primary;
@@ -1164,10 +1166,14 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         return AppColors.habitGreen;
       case 'person':
         return AppColors.habitPink;
-      case 'place':
-        return AppColors.info;
       case 'label':
         return AppColors.textSecondary;
+      case 'reminder':
+        return AppColors.textMuted;
+      case 'system':
+        return AppColors.primary;
+      case 'social_post':
+        return AppColors.habitPink;
       default:
         return AppColors.textSecondary;
     }
@@ -1183,8 +1189,8 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         return 'Goals';
       case 'entry':
         return 'Journal';
-      case 'calendar_session':
-        return 'Sessions';
+      case 'event':
+        return 'Events';
       case 'area':
         return 'Áreas';
       case 'project':
@@ -1195,8 +1201,12 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         return 'Etiquetas';
       case 'person':
         return 'Pessoas';
-      case 'place':
-        return 'Lugares';
+      case 'reminder':
+        return 'Lembretes';
+      case 'system':
+        return 'Sistemas';
+      case 'social_post':
+        return 'Posts';
       default:
         return type.isEmpty
             ? ''
@@ -1352,3 +1362,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
     );
   }
 }
+
+
+
+

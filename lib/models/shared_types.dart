@@ -1,7 +1,51 @@
 // lib/models/shared_types.dart
 import 'package:uuid/uuid.dart';
 
+// ---------------------------------------------------------------------------
+// ObjectTypes — canonical type string constants (V5 complete enum, Part 20).
+// Use these instead of raw string literals to avoid typos across the codebase.
+// ---------------------------------------------------------------------------
+abstract final class ObjectTypes {
+  // Content objects
+  static const String task         = 'task';
+  static const String habit        = 'habit';
+  static const String tracker      = 'tracker';
+  static const String goal         = 'goal';
+  static const String note         = 'note';
+  static const String entry        = 'entry';
+  static const String event        = 'event';
+  static const String reminder     = 'reminder';
+  static const String system       = 'system';
+  static const String socialPost   = 'social_post';
+  static const String moodDef      = 'mood_definition';
+  static const String idea         = 'idea';
+  static const String inbox        = 'inbox';
+  static const String shoppingList = 'shopping_list';
+  static const String template     = 'template';
+  static const String dailyNote    = 'daily_note';
+  static const String analysis     = 'analysis';
+  static const String wellbeingIndicator = 'wellbeing_indicator';
+
+  // Organizer objects
+  static const String area         = 'area';
+  static const String project      = 'project';
+  static const String activity     = 'activity';
+  static const String label        = 'label';
+  static const String person       = 'person';
+
+  /// All canonical types in insertion order.
+  static const List<String> all = [
+    task, habit, tracker, goal, note, entry, event, reminder, system,
+    socialPost, moodDef, idea, inbox, shoppingList, template, dailyNote,
+    analysis, wellbeingIndicator, area, project, activity, label, person,
+  ];
+
+  /// Returns true if [type] is a known canonical type string.
+  static bool isKnown(String type) => all.contains(type);
+}
+
 enum MarkerType { tag, property, folder }
+
 
 class TypeSignature {
   final String objectType;
@@ -249,3 +293,181 @@ class KPI {
     this.unit = '',
   });
 }
+
+class VaultLinkRef {
+  final String? objectSlug;
+  final String? objectType;
+  final String? noteSlug;
+  final String? blockId;
+  final String displayTitle;
+
+  const VaultLinkRef({
+    this.objectSlug,
+    this.objectType,
+    this.noteSlug,
+    this.blockId,
+    required this.displayTitle,
+  });
+
+  bool get isRow => noteSlug != null && blockId != null;
+
+  String toWikiLink() =>
+      isRow ? '[[$noteSlug^$blockId]]' : '[[$objectSlug]]';
+
+  Map<String, dynamic> toMap() => {
+    'link': toWikiLink(),
+    'display_title': displayTitle,
+    if (objectType != null) 'object_type': objectType,
+  };
+
+  factory VaultLinkRef.fromMap(Map<String, dynamic> map) {
+    final inner = (map['link']?.toString() ?? '')
+        .replaceAll('[[', '')
+        .replaceAll(']]', '');
+    if (inner.contains('^')) {
+      final parts = inner.split('^');
+      return VaultLinkRef(
+        noteSlug: parts[0],
+        blockId: parts.length > 1 ? parts[1] : null,
+        displayTitle: map['display_title']?.toString() ?? parts[0],
+      );
+    }
+    return VaultLinkRef(
+      objectSlug: inner,
+      objectType: map['object_type']?.toString(),
+      displayTitle: map['display_title']?.toString() ?? inner,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// DataSourceReference — V5 unified data-source schema (Part 1.4 / Part 16)
+// Used by KPI, Combined Analysis, Dashboard Panels and Wellbeing Indicator.
+// Replaces the two incompatible V4 per-feature schemas.
+// ---------------------------------------------------------------------------
+
+enum DataSourceType {
+  trackerField,
+  habit,
+  journalMood,
+  subtasks,
+  collection,
+  entry,
+  timeSpent,
+  manualQuantity,
+}
+
+enum DataSourceAggregation { sum, average, count, max, min, streak }
+
+class DataSourceReference {
+  final DataSourceType sourceType;
+
+  /// WikiLink to the tracker or habit slug.
+  /// Omitted for subtasks / entry / timeSpent / manualQuantity.
+  final String? sourceId;
+
+  /// Only for [DataSourceType.trackerField] — identifies the specific field.
+  final String? fieldId;
+
+  /// Only for [DataSourceType.journalMood] — `pleasantness` or `energy`.
+  final String? dimension;
+
+  /// Only for categorical tracker fields: maps string labels to numeric values.
+  final Map<String, dynamic>? valueMapping;
+
+  /// Used by KPI. Combined Analysis ignores this (uses raw series).
+  final DataSourceAggregation? aggregation;
+
+  const DataSourceReference({
+    required this.sourceType,
+    this.sourceId,
+    this.fieldId,
+    this.dimension,
+    this.valueMapping,
+    this.aggregation,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'source_type': _sourceTypeToString(sourceType),
+    if (sourceId != null) 'source_id': sourceId,
+    if (fieldId != null) 'field_id': fieldId,
+    if (dimension != null) 'dimension': dimension,
+    if (valueMapping != null && valueMapping!.isNotEmpty)
+      'value_mapping': valueMapping,
+    if (aggregation != null) 'aggregation': aggregation!.name,
+  };
+
+  factory DataSourceReference.fromMap(Map<String, dynamic> map) {
+    final rawType = map['source_type']?.toString() ?? '';
+    final sourceType = _sourceTypeFromString(rawType);
+    final rawAgg = map['aggregation']?.toString();
+    return DataSourceReference(
+      sourceType: sourceType,
+      sourceId: map['source_id']?.toString(),
+      fieldId: map['field_id']?.toString(),
+      dimension: map['dimension']?.toString(),
+      valueMapping: map['value_mapping'] is Map
+          ? Map<String, dynamic>.from(map['value_mapping'] as Map)
+          : null,
+      aggregation: rawAgg == null
+          ? null
+          : DataSourceAggregation.values.firstWhere(
+              (e) => e.name == rawAgg,
+              orElse: () => DataSourceAggregation.sum,
+            ),
+    );
+  }
+
+  static String _sourceTypeToString(DataSourceType t) {
+    switch (t) {
+      case DataSourceType.trackerField:
+        return 'tracker_field';
+      case DataSourceType.habit:
+        return 'habit';
+      case DataSourceType.journalMood:
+        return 'journal_mood';
+      case DataSourceType.subtasks:
+        return 'subtasks';
+      case DataSourceType.collection:
+        return 'collection';
+      case DataSourceType.entry:
+        return 'entry';
+      case DataSourceType.timeSpent:
+        return 'time_spent';
+      case DataSourceType.manualQuantity:
+        return 'manual_quantity';
+    }
+  }
+
+  static DataSourceType _sourceTypeFromString(String s) {
+    switch (s) {
+      case 'tracker_field':
+        return DataSourceType.trackerField;
+      case 'habit':
+        return DataSourceType.habit;
+      case 'journal_mood':
+        return DataSourceType.journalMood;
+      case 'subtasks':
+        return DataSourceType.subtasks;
+      case 'collection':
+        return DataSourceType.collection;
+      case 'entry':
+        return DataSourceType.entry;
+      case 'time_spent':
+        return DataSourceType.timeSpent;
+      case 'manual_quantity':
+        return DataSourceType.manualQuantity;
+      default:
+        // Legacy KPI source_type mapping
+        if (s.contains('habit')) return DataSourceType.habit;
+        if (s.contains('tracker')) return DataSourceType.trackerField;
+        if (s.contains('entry') || s.contains('journal')) return DataSourceType.entry;
+        if (s.contains('time')) return DataSourceType.timeSpent;
+        if (s.contains('subtask') || s.contains('goal')) return DataSourceType.subtasks;
+        if (s.contains('collection')) return DataSourceType.collection;
+        if (s.contains('mood')) return DataSourceType.journalMood;
+        return DataSourceType.manualQuantity;
+    }
+  }
+}
+

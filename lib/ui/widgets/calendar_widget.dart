@@ -620,8 +620,8 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
       if (slot.time != null) {
         return DateFormat('HH:mm').format(slot.time!);
       }
-      if (slot.reminderTime != null) {
-        final reminder = slot.reminderTime!;
+      if (slot.primaryReminderTime != null) {
+        final reminder = slot.primaryReminderTime!;
         return '${reminder.hour.toString().padLeft(2, '0')}:${reminder.minute.toString().padLeft(2, '0')}';
       }
     }

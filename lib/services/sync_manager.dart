@@ -66,7 +66,6 @@ class SyncManager {
     Timer(const Duration(minutes: 5), () async {
       final backupService = _ref.read(backupServiceProvider);
       await backupService.createBackup();
-      await backupService.cleanOldBackups();
     });
   }
 
@@ -75,18 +74,31 @@ class SyncManager {
     final watchStream = obsidian.watchVaultDebounced();
     if (watchStream != null) {
       watchStream.listen((events) {
+        // Batch multiple file changes into a single invalidation
+        var hasMdChanges = false;
+        var hasDailyChanges = false;
+        String? dailyDateStr;
+        
         for (final event in events) {
           if (event.path.endsWith('.md')) {
-            _ref.invalidate(allObjectsProvider);
+            hasMdChanges = true;
             if (event.path.contains('daily')) {
+              hasDailyChanges = true;
               final dateMatch = RegExp(
                 r'(\d{4}-\d{2}-\d{2})',
               ).firstMatch(event.path);
               if (dateMatch != null) {
-                final dateStr = dateMatch.group(1)!;
-                _ref.invalidate(dailyNoteDataProvider(dateStr));
+                dailyDateStr = dateMatch.group(1);
               }
             }
+          }
+        }
+        
+        // Only invalidate if there were actual changes
+        if (hasMdChanges) {
+          _ref.invalidate(allObjectsProvider);
+          if (hasDailyChanges && dailyDateStr != null) {
+            _ref.invalidate(dailyNoteDataProvider(dailyDateStr));
           }
         }
       });
@@ -97,7 +109,6 @@ class SyncManager {
     Timer.periodic(const Duration(hours: 24), (timer) async {
       final backupService = _ref.read(backupServiceProvider);
       await backupService.createBackup();
-      await backupService.cleanOldBackups();
     });
   }
 
@@ -255,7 +266,9 @@ class SyncManager {
     try {
       debugPrint('[SyncManager] Regenerating Dataview indexes.');
       final gen = DataviewGenerator(obsidian);
-      await gen.regenerateAll();
+      final projects = _ref.read(projectsProvider);
+      final tasks = _ref.read(tasksProvider);
+      await gen.regenerateAll(projects: projects, tasks: tasks);
     } catch (e) {
       debugPrint('[SyncManager] Failed to regenerate Dataview during sync: $e');
     }
@@ -464,7 +477,6 @@ class SyncManager {
     final zipFile = await backupService.createBackup();
     if (zipFile != null) {
       await driveSync.createBackupFromFile(zipFile);
-      await backupService.cleanOldBackups(keepCount: 1);
     }
     await driveSync.cleanOldRemoteBackups(keepCount: 1);
     _preSyncBackupCreated = true;
@@ -518,12 +530,8 @@ class SyncManager {
     if (action.objectType == 'daily_note') {
       return 'daily/${action.objectId}.md';
     }
-    // For habits/tasks, if the object is gone from memory,
-    // we try to guess based on standard folders
-    if (action.objectType == 'habit') return 'habits/${action.objectId}.md';
-    if (action.objectType == 'task') return 'tasks/${action.objectId}.md';
-
-    return null;
+    // For all other types, use the flat app/ folder (V5)
+    return 'app/${action.objectId}.md';
   }
 
   Future<String?> _relativePathForAction(SyncAction action) async {

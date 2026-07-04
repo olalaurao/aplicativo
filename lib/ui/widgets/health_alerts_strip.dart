@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/health_alerts_provider.dart';
+import '../../providers/wellbeing_indicator_provider.dart';
+import '../../models/wellbeing_indicator_model.dart';
 import '../theme.dart';
 import '../forms/create_record_form.dart';
 import '../../models/tracker_model.dart';
@@ -11,8 +13,12 @@ class HealthAlertsStrip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final alerts = ref.watch(healthAlertsProvider);
-    if (alerts.isEmpty) return const SizedBox.shrink();
+    final trackerAlerts = ref.watch(healthAlertsProvider);
+    final wellbeingAlerts = ref.watch(activeHealthAlertsProvider);
+    
+    // Combine both alert types
+    final allAlerts = [...trackerAlerts, ...wellbeingAlerts];
+    if (allAlerts.isEmpty) return const SizedBox.shrink();
 
     if (compact) {
       // Versão horizontal para dashboard
@@ -21,9 +27,9 @@ class HealthAlertsStrip extends ConsumerWidget {
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: alerts.length,
+          itemCount: allAlerts.length,
           separatorBuilder: (context, sep) => const SizedBox(width: 8),
-          itemBuilder: (ctx, i) => _AlertCard(alert: alerts[i], compact: true)));
+          itemBuilder: (ctx, i) => _buildAlertCard(allAlerts[i], compact: true)));
     }
 
     // Versão expandida para HabitsScreen
@@ -33,23 +39,32 @@ class HealthAlertsStrip extends ConsumerWidget {
         child: Row(children: [
           const Text('🔔', style: TextStyle(fontSize: 14)),
           const SizedBox(width: 6),
-          Text('SAÚDE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+          Text('HEALTH ALERTS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
             letterSpacing: 0.10, color: AppTheme.textMutedColor(context))),
           const Spacer(),
-          Text('${alerts.length} alerta${alerts.length == 1 ? "" : "s"}',
+          Text('${allAlerts.length} alert${allAlerts.length == 1 ? "" : "s"}',
             style: const TextStyle(fontSize: 11, color: AppColors.warning)),
         ])),
-      ...alerts.map((a) => Padding(
+      ...allAlerts.map((a) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-        child: _AlertCard(alert: a, compact: false))),
+        child: _buildAlertCard(a, compact: false))),
     ]);
+  }
+  
+  Widget _buildAlertCard(dynamic alert, {required bool compact}) {
+    if (alert is HealthAlert) {
+      return _TrackerAlertCard(alert: alert, compact: compact);
+    } else if (alert is WellbeingSignalStatus) {
+      return _WellbeingAlertCard(alert: alert, compact: compact);
+    }
+    return const SizedBox.shrink();
   }
 }
 
-class _AlertCard extends ConsumerWidget {
+class _TrackerAlertCard extends ConsumerWidget {
   final HealthAlert alert;
   final bool compact;
-  const _AlertCard({required this.alert, required this.compact});
+  const _TrackerAlertCard({required this.alert, required this.compact});
 
   Color get _color => switch (alert.level) {
     FieldAlertLevel.critical => AppColors.error,
@@ -123,6 +138,72 @@ class _AlertCard extends ConsumerWidget {
               borderRadius: BorderRadius.circular(20)),
             child: Text('Registrar', style: TextStyle(
               fontSize: 11, fontWeight: FontWeight.w700, color: _color)))),
+      ]));
+  }
+}
+
+class _WellbeingAlertCard extends ConsumerWidget {
+  final WellbeingSignalStatus alert;
+  final bool compact;
+  const _WellbeingAlertCard({required this.alert, required this.compact});
+
+  Color get _color {
+    if (alert.status == SignalStatus.alert) return AppColors.error;
+    if (alert.status == SignalStatus.watch) return AppColors.warning;
+    return AppColors.success;
+  }
+
+  String get _icon {
+    if (alert.status == SignalStatus.alert) return '🚨';
+    if (alert.status == SignalStatus.watch) return '⚠️';
+    return '✓';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (compact) {
+      return Container(
+        width: 140,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: _color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _color.withValues(alpha: 0.25))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text(_icon, style: const TextStyle(fontSize: 14)),
+            const SizedBox(width: 4),
+            Expanded(child: Text(alert.sourceTitle ?? 'Signal',
+              maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _color))),
+          ]),
+          const SizedBox(height: 4),
+          Text(alert.message ?? 'Needs attention', maxLines: 2, overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 10, color: AppTheme.textSecondaryColor(context))),
+        ]));
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: _color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _color.withValues(alpha: 0.25))),
+      child: Row(children: [
+        Text(_icon, style: const TextStyle(fontSize: 20)),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(alert.sourceTitle ?? 'Wellbeing Signal',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _color)),
+          const SizedBox(height: 2),
+          Text(alert.message ?? 'Needs attention',
+            style: TextStyle(fontSize: 11, color: AppTheme.textSecondaryColor(context))),
+          if (alert.currentValue != null) ...[
+            const SizedBox(height: 3),
+            Text('Current: ${alert.currentValue?.toStringAsFixed(1)}', style: TextStyle(fontSize: 10,
+              color: AppTheme.textMutedColor(context), fontStyle: FontStyle.italic)),
+          ],
+        ])),
       ]));
   }
 }

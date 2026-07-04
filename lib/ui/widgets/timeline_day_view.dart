@@ -6,6 +6,7 @@ import '../../models/task_model.dart';
 import '../../models/day_theme_model.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/pomodoro_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../theme.dart';
 import 'package:googleapis/calendar/v3.dart' as google_calendar;
 import '../../models/habit_model.dart';
@@ -114,8 +115,8 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                     slotIndex++
                   ) {
                     final slot = habit.slots[slotIndex];
-                    if (slot.reminderEnabled && slot.reminderTime != null) {
-                      final rTime = slot.reminderTime!;
+                    if (slot.hasReminders && slot.primaryReminderTime != null) {
+                      final rTime = slot.primaryReminderTime!;
                       final start = rTime.hour * 60 + rTime.minute;
                       items.add(
                         TimelineItem(
@@ -602,11 +603,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                     if (block.energyLevel != null)
                       Positioned.fill(
                         child: Container(
-                          color: switch (block.energyLevel!) {
-                            EnergyLevel.high => const Color(0xFF4CAF50).withValues(alpha: 0.08),
-                            EnergyLevel.medium => const Color(0xFFFFC107).withValues(alpha: 0.08),
-                            EnergyLevel.low => const Color(0xFFFF7043).withValues(alpha: 0.08),
-                          },
+                          color: _energyColor(block.energyLevel!).withValues(alpha: 0.08),
                         ),
                       ),
                     Padding(
@@ -739,9 +736,20 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
       );
     }
 
-    final baseColor = widget.colorMode == 'priority'
-        ? _getPriorityColor(task.priority)
-        : AppColors.secondary;
+    Color baseColor;
+    if (widget.colorMode == 'priority') {
+      baseColor = _getPriorityColor(task.priority);
+    } else {
+      // Category mode - use category colors from settings
+      final settings = ref.watch(settingsProvider);
+      final category = task.organizers.isNotEmpty 
+          ? task.organizers.first.title 
+          : 'default';
+      final colorHex = settings.categoryColors[category];
+      baseColor = colorHex != null 
+          ? _parseColor(colorHex) 
+          : AppColors.secondary;
+    }
 
     return ObjectActionWrapper(
       object: task,
@@ -1150,7 +1158,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
     final allDayItems = widget.allDayEvents.where((event) {
       if (event is Habit) {
         final hasScheduledSlots = event.slots.any(
-          (slot) => slot.reminderEnabled && slot.reminderTime != null,
+          (slot) => slot.hasReminders && slot.primaryReminderTime != null,
         );
         return !hasScheduledSlots;
       }
@@ -1379,6 +1387,21 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
     }
   }
 
+  Color _parseColor(String colorHex) {
+    try {
+      final colorStr = colorHex.trim().replaceAll('#', '');
+      if (colorStr.length == 6) {
+        return Color(int.parse('0xFF$colorStr'));
+      }
+      if (colorStr.length == 8) {
+        return Color(int.parse('0x$colorStr'));
+      }
+    } catch (_) {
+      debugPrint('Invalid color: $colorHex');
+    }
+    return AppColors.secondary;
+  }
+
   bool _isToday(DateTime date) {
     final now = DateTime.now();
     return date.year == now.year &&
@@ -1505,4 +1528,12 @@ class DashedBorderPainter extends CustomPainter {
         oldDelegate.dash != dash ||
         oldDelegate.borderRadius != borderRadius;
   }
+}
+
+Color _energyColor(int level) {
+  // Convert 0-10 scale to color
+  // 0-3: low (orange), 4-6: medium (yellow), 7-10: high (green)
+  if (level <= 3) return const Color(0xFFFF7043);
+  if (level <= 6) return const Color(0xFFFFC107);
+  return const Color(0xFF4CAF50);
 }

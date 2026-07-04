@@ -1,14 +1,18 @@
 // lib/models/resource_model.dart
 import 'content_object.dart';
 import 'shared_types.dart';
-import 'task_model.dart'; // For TaskPriority
+
+/// V5: Priority levels for Resource (replaces TaskPriority dependency)
+enum ResourcePriority { none, low, medium, high }
 
 enum ResourceStatus { toConsume, inProgress, completed, dropped }
 
 class Resource extends ContentObject {
   String? coverImage;
   String? sourceUrl;
-  String resourceType; // Book, Movie, etc.
+  /// V5: renamed from resourceType to media_type (user-extensible freeform string).
+  /// e.g. 'Book', 'Movie', 'Podcast', 'Article', 'Course', 'Video'
+  String mediaType;
   ResourceStatus status;
   int rating; // 1-5 or 1-10
   String? synopsis;
@@ -24,13 +28,12 @@ class Resource extends ContentObject {
   String? googleBooksId;
   String? imdbId;
   DateTime? readDate;
-  List<String> socialRefs;
-  TaskPriority priority;
+  ResourcePriority priority;
 
   Resource({
     super.id,
     required super.title,
-    required this.resourceType,
+    required this.mediaType,
     this.coverImage,
     this.sourceUrl,
     this.status = ResourceStatus.toConsume,
@@ -48,8 +51,7 @@ class Resource extends ContentObject {
     this.googleBooksId,
     this.imdbId,
     this.readDate,
-    List<String>? socialRefs,
-    this.priority = TaskPriority.none,
+    this.priority = ResourcePriority.none,
     super.organizers,
     super.categories,
     super.tags,
@@ -60,10 +62,13 @@ class Resource extends ContentObject {
     super.updatedAt,
     super.order,
     super.obsidianPath,
-  }) : socialRefs = socialRefs ?? [];
+  });
 
   @override
   String get type => 'resource';
+
+  @override
+  bool get isIncomplete => title.trim().isEmpty;
 
   @override
   String toMarkdown() {
@@ -77,7 +82,7 @@ class Resource extends ContentObject {
       aliasesForMarkdown.add(original);
       frontmatter['aliases'] = aliasesForMarkdown;
     }
-    frontmatter['resource_type'] = resourceType;
+    frontmatter['media_type'] = mediaType;
     if (coverImage != null) frontmatter['cover'] = coverImage;
     if (sourceUrl != null) frontmatter['source_url'] = sourceUrl;
     frontmatter['status'] = status.name;
@@ -97,9 +102,6 @@ class Resource extends ContentObject {
     if (readDate != null) {
       frontmatter['read'] = readDate!.toIso8601String().split('T')[0];
     }
-    if (socialRefs.isNotEmpty) {
-      frontmatter['social_refs'] = socialRefs;
-    }
 
     return generateMarkdown(frontmatter, synopsis ?? '');
   }
@@ -107,7 +109,10 @@ class Resource extends ContentObject {
   factory Resource.fromMarkdown(Map<String, dynamic> frontmatter, String body) {
     final resource = Resource(
       title: _stringValue(frontmatter['title']) ?? '',
-      resourceType: _stringValue(frontmatter['resource_type']) ?? 'General',
+      // V5: read media_type, fallback to legacy resource_type, then 'General'
+      mediaType: _stringValue(frontmatter['media_type'])
+          ?? _stringValue(frontmatter['resource_type'])
+          ?? 'General',
     );
     resource.loadBaseMap(frontmatter);
 
@@ -124,9 +129,9 @@ class Resource extends ContentObject {
     }
     resource.rating = _intValue(frontmatter['rating']) ?? 0;
     if (frontmatter['priority'] != null) {
-      resource.priority = TaskPriority.values.firstWhere(
+      resource.priority = ResourcePriority.values.firstWhere(
         (e) => e.name == frontmatter['priority']?.toString(),
-        orElse: () => TaskPriority.none,
+        orElse: () => ResourcePriority.none,
       );
     }
     resource.author = _stringValue(frontmatter['author']);
@@ -143,11 +148,6 @@ class Resource extends ContentObject {
     if (frontmatter['read'] != null) {
       resource.readDate = DateTime.tryParse(frontmatter['read'].toString());
     }
-    if (frontmatter['social_refs'] != null) {
-      resource.socialRefs = (frontmatter['social_refs'] as List)
-          .map((e) => e.toString())
-          .toList();
-    }
     resource.synopsis = body;
 
     return resource;
@@ -155,7 +155,7 @@ class Resource extends ContentObject {
 
   Resource copyWith({
     String? title,
-    String? resourceType,
+    String? mediaType,
     String? coverImage,
     String? sourceUrl,
     ResourceStatus? status,
@@ -173,12 +173,12 @@ class Resource extends ContentObject {
     String? googleBooksId,
     String? imdbId,
     DateTime? readDate,
-    List<String>? socialRefs,
-    TaskPriority? priority,
+    ResourcePriority? priority,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     List<String>? tags,
     List<String>? aliases,
+    List<String>? links,
     DateTime? createdAt,
     DateTime? updatedAt,
     int? order,
@@ -187,7 +187,7 @@ class Resource extends ContentObject {
     return Resource(
       id: id,
       title: title ?? this.title,
-      resourceType: resourceType ?? this.resourceType,
+      mediaType: mediaType ?? this.mediaType,
       coverImage: coverImage ?? this.coverImage,
       sourceUrl: sourceUrl ?? this.sourceUrl,
       status: status ?? this.status,
@@ -205,12 +205,12 @@ class Resource extends ContentObject {
       googleBooksId: googleBooksId ?? this.googleBooksId,
       imdbId: imdbId ?? this.imdbId,
       readDate: readDate ?? this.readDate,
-      socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
       priority: priority ?? this.priority,
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       tags: tags ?? this.tags,
       aliases: aliases ?? this.aliases,
+      links: links ?? this.links,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
       order: order ?? this.order,

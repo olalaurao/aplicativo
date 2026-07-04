@@ -8,7 +8,7 @@ enum GroupField { none, type, status, organizer, tag, date }
 
 enum FilterOperator { equals, contains, notEquals, greaterThan, lessThan, isEmpty }
 
-enum ViewMode { grid, list, grouped, matrix }
+enum ViewMode { grid, list, grouped }
 
 class FilterRule {
   final String property;
@@ -21,45 +21,6 @@ class FilterRule {
     property: j['property'], op: FilterOperator.values.byName(j['op']), value: j['value']);
 }
 
-class MatrixConfig {
-  final String title;
-  final String axisXProperty;
-  final List<String> axisXValues;
-  final String axisYProperty;
-  final List<String> axisYValues;
-
-  const MatrixConfig({
-    required this.title,
-    required this.axisXProperty,
-    required this.axisXValues,
-    required this.axisYProperty,
-    required this.axisYValues,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'title': title,
-    'axisXProperty': axisXProperty,
-    'axisXValues': axisXValues,
-    'axisYProperty': axisYProperty,
-    'axisYValues': axisYValues,
-  };
-
-  factory MatrixConfig.fromJson(Map<String, dynamic> j) => MatrixConfig(
-    title: j['title'],
-    axisXProperty: j['axisXProperty'],
-    axisXValues: List<String>.from(j['axisXValues'] ?? []),
-    axisYProperty: j['axisYProperty'],
-    axisYValues: List<String>.from(j['axisYValues'] ?? []),
-  );
-
-  static const eisenhower = MatrixConfig(
-    title: 'Eisenhower Matrix',
-    axisXProperty: 'urgency',
-    axisXValues: ['urgent', 'not_urgent'],
-    axisYProperty: 'importance',
-    axisYValues: ['important', 'not_important'],
-  );
-}
 
 class SavedFilter {
   final String id;
@@ -70,13 +31,12 @@ class SavedFilter {
   final bool sortAscending;
   final GroupField groupBy;
   final ViewMode viewMode;
-  final MatrixConfig? matrixConfig;
 
   const SavedFilter({
     required this.id, required this.name, required this.targetType,
     this.rules = const [], this.sortBy = SortField.modified,
     this.sortAscending = false, this.groupBy = GroupField.none,
-    this.viewMode = ViewMode.grid, this.matrixConfig,
+    this.viewMode = ViewMode.grid,
   });
 
   List<T> apply<T>(List<T> items) =>
@@ -120,13 +80,11 @@ class SavedFilter {
   SavedFilter copyWith({
     String? name, List<FilterRule>? rules, SortField? sortBy,
     bool? sortAscending, GroupField? groupBy, ViewMode? viewMode,
-    MatrixConfig? matrixConfig,
   }) => SavedFilter(
     id: id, name: name ?? this.name, targetType: targetType,
     rules: rules ?? this.rules, sortBy: sortBy ?? this.sortBy,
     sortAscending: sortAscending ?? this.sortAscending,
     groupBy: groupBy ?? this.groupBy, viewMode: viewMode ?? this.viewMode,
-    matrixConfig: matrixConfig ?? this.matrixConfig,
   );
 
   Map<String, dynamic> toJson() => {
@@ -134,7 +92,6 @@ class SavedFilter {
     'rules': rules.map((r) => r.toJson()).toList(),
     'sortBy': sortBy.name, 'sortAscending': sortAscending,
     'groupBy': groupBy.name, 'viewMode': viewMode.name,
-    if (matrixConfig != null) 'matrixConfig': matrixConfig!.toJson(),
   };
 
   factory SavedFilter.fromJson(Map<String, dynamic> j) => SavedFilter(
@@ -144,7 +101,6 @@ class SavedFilter {
     sortAscending: j['sortAscending'] ?? false,
     groupBy: GroupField.values.byName(j['groupBy'] ?? 'none'),
     viewMode: ViewMode.values.byName(j['viewMode'] ?? 'grid'),
-    matrixConfig: j['matrixConfig'] != null ? MatrixConfig.fromJson(j['matrixConfig']) : null,
   );
 }
 

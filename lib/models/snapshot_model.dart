@@ -2,7 +2,9 @@
 import 'content_object.dart';
 
 class Snapshot extends ContentObject {
-  final String parentId; // Goal or Project ID
+  /// V5: subject can reference Goal, Project, Task, or Note.
+  /// Stored as a WikiLink string e.g. "[[my-project-slug]]".
+  final String parentId;
   final Map<String, double> kpiValues;
   final String reflection;
   final DateTime date;

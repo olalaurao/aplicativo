@@ -112,12 +112,6 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
       inBottomBar: false,
     ),
     NavigationItem(
-      section: NavSection.map,
-      label: 'Map',
-      route: '/map',
-      inBottomBar: false,
-    ),
-    NavigationItem(
       section: NavSection.reminders,
       label: 'Reminders',
       route: '/reminders',
@@ -176,7 +170,8 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
     ];
 
     final bottomItems = normalized.where((item) => item.inBottomBar).toList();
-    if (bottomItems.length <= 5) return normalized;
+    // Allow up to 6 items (Home + up to 4 custom + More)
+    if (bottomItems.length <= 6) return normalized;
 
     final keptKeys = <String>{};
     for (final item in normalized) {
@@ -186,7 +181,7 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
       }
     }
     for (final item in normalized) {
-      if (keptKeys.length >= 5) break;
+      if (keptKeys.length >= 6) break;
       if (!item.inBottomBar ||
           item.section == NavSection.home ||
           item.section == NavSection.more) {
@@ -253,7 +248,7 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
     ];
 
     if (targetWillBePinned &&
-        toggled.where((item) => item.inBottomBar).length > 5) {
+        toggled.where((item) => item.inBottomBar).length > 6) {
       final targetKey = _itemKey(target);
       for (var i = toggled.length - 1; i >= 0; i--) {
         final item = toggled[i];

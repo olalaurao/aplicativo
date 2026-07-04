@@ -1,4 +1,4 @@
-// lib/ui/components/conflict_resolution_dialog.dart
+// lib/ui/widgets/conflict_resolution_dialog.dart
 import 'package:flutter/material.dart';
 import '../theme.dart';
 

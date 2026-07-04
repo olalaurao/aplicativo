@@ -485,6 +485,31 @@ class NotificationService with WidgetsBindingObserver {
         .toList();
   }
 
+  /// F2.16: Clean up old notification actions (14-day rolling window)
+  Future<void> cleanOldNotificationActions() async {
+    final prefs = await SharedPreferences.getInstance();
+    try {
+      await prefs.reload();
+    } catch (_) {}
+    final pending = prefs.getStringList('notification_actions') ?? [];
+    if (pending.isEmpty) return;
+
+    final cutoff = DateTime.now().subtract(const Duration(days: 14));
+    final filtered = pending.where((item) {
+      try {
+        final decoded = jsonDecode(item) as Map<String, dynamic>;
+        final createdAt = decoded['created_at'] as String?;
+        if (createdAt == null) return false;
+        final date = DateTime.tryParse(createdAt);
+        return date != null && date.isAfter(cutoff);
+      } catch (_) {
+        return false;
+      }
+    }).toList();
+
+    await prefs.setStringList('notification_actions', filtered);
+  }
+
   Future<void> scheduleReminder({
     required int id,
     required String title,

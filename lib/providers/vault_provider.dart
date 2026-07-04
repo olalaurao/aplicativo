@@ -8,7 +8,6 @@ import '../services/markdown_parser.dart';
 import '../models/shared_types.dart';
 import '../models/content_object.dart';
 import '../models/task_model.dart';
-import '../models/shopping_item.dart';
 import '../models/shopping_list_model.dart' as shopping_list_model;
 import '../models/journal_entry.dart';
 import '../models/habit_model.dart';
@@ -18,6 +17,7 @@ import '../models/note_model.dart';
 import '../models/tracker_model.dart';
 import '../models/mood_model.dart';
 import '../models/analysis_model.dart';
+import '../models/wellbeing_indicator_model.dart';
 import '../models/resource_model.dart';
 import '../models/social_post.dart';
 import '../models/people_model.dart';
@@ -28,7 +28,6 @@ import '../models/day_theme_model.dart';
 import '../models/template_model.dart';
 import '../models/idea_model.dart';
 import '../models/inbox_model.dart';
-import '../models/calendar_session.dart';
 import '../models/pomodoro_session.dart';
 
 import '../models/sync_action.dart';
@@ -77,10 +76,7 @@ String getDailyNoteTemplate(
   buf.write('tags: [daily]\n');
   if (themeSlug.isNotEmpty) buf.write('day_theme: $themeSlug\n');
   if (habitKeys.isNotEmpty) buf.write('$habitKeys\n');
-  buf.write('mood_pleasantness:\n');
-  buf.write('mood_energy:\n');
-  buf.write('mood_label:\n');
-  buf.write('mood_emoji:\n');
+  buf.write('mood_entries: []\n');
   buf.write('---\n\n');
   buf.write('# $dateStr\n\n');
   buf.write('## Journal Entries\n\n');
@@ -206,19 +202,19 @@ Future<void> _cancelHabitSlotReminderNotification(
   Habit habit,
   int slotIndex,
 ) async {
-  final enabledSlotIndexes = habit.slots
+  final baseId = _stableNotificationBaseId(habit.id);
+  final reminderIndexes = habit.reminders
       .asMap()
       .entries
-      .where(
-        (entry) =>
-            entry.value.reminderEnabled && entry.value.reminderTime != null,
-      )
+      .where((entry) {
+        final match = RegExp(r'_slot_(\d+)(?:_|$)').firstMatch(entry.value.id);
+        return int.tryParse(match?.group(1) ?? '') == slotIndex;
+      })
       .map((entry) => entry.key)
       .toList();
-  final reminderIndex = enabledSlotIndexes.indexOf(slotIndex);
-  if (reminderIndex == -1) return;
-  final baseId = _stableNotificationBaseId(habit.id);
-  await NotificationService().cancelNotification(baseId + reminderIndex);
+  for (final reminderIndex in reminderIndexes) {
+    await NotificationService().cancelNotification(baseId + reminderIndex);
+  }
 }
 
 int _stableNotificationBaseId(String value) {
@@ -351,38 +347,6 @@ class TasksNotifier extends Notifier<List<Task>> {
 final tasksProvider = NotifierProvider<TasksNotifier, List<Task>>(() {
   return TasksNotifier();
 });
-
-class ShoppingItemsNotifier extends Notifier<List<ShoppingItem>> {
-  @override
-  List<ShoppingItem> build() {
-    return ref
-        .watch(objectsByTypeProvider('shopping_item'))
-        .cast<ShoppingItem>();
-  }
-
-  Future<void> addShoppingItem(ShoppingItem item) async {
-    state = [...state, item];
-    await ref.read(vaultProvider.notifier).createObject(item);
-  }
-
-  Future<void> updateShoppingItem(ShoppingItem item) async {
-    state = [
-      for (final t in state)
-        if (t.id == item.id) item else t,
-    ];
-    await ref.read(vaultProvider.notifier).updateObject(item);
-  }
-
-  Future<void> deleteShoppingItem(ShoppingItem item) async {
-    state = state.where((t) => t.id != item.id).toList();
-    await ref.read(vaultProvider.notifier).deleteObject(item);
-  }
-}
-
-final shoppingItemsProvider =
-    NotifierProvider<ShoppingItemsNotifier, List<ShoppingItem>>(() {
-      return ShoppingItemsNotifier();
-    });
 
 class ShoppingListsNotifier
     extends Notifier<List<shopping_list_model.ShoppingList>> {
@@ -575,6 +539,100 @@ class HabitsNotifier extends Notifier<List<Habit>> {
       }
     } catch (e, st) {
       debugPrint('Error toggling habit ${habit.id} on $dateStr: $e\n$st');
+      rethrow;
+    }
+  }
+
+  Future<void> toggleChecklistItem(
+    Habit habit,
+    DateTime date,
+    String itemId,
+  ) async {
+    if (!habit.isChecklistHabit) return;
+    final dateStr = date.toIso8601String().split('T').first;
+    final obsidianService = ref.read(obsidianServiceProvider);
+    final syncQueue = ref.read(syncQueueServiceProvider);
+
+    try {
+      final path = 'daily/$dateStr.md';
+      final dayThemes = ref.read(dayThemesProvider);
+      final content =
+          await obsidianService.readFile(path) ??
+          getDailyNoteTemplate(
+            dateStr,
+            dayThemes,
+            activeHabits: state
+                .where((h) => h.status == HabitStatus.active)
+                .toList(),
+          );
+
+      final frontmatter = MarkdownParser.parseFrontmatter(content);
+      final body = MarkdownParser.extractBody(content);
+      final habitsMap = MarkdownParser.parseHabitCompletions(frontmatter);
+      final currentVal = habitsMap[habit.slug];
+
+      final checklistMap = currentVal is Map
+          ? Map<String, dynamic>.from(currentVal)
+          : <String, dynamic>{};
+      checklistMap[itemId] = !(checklistMap[itemId] == true);
+      habitsMap[habit.slug] = checklistMap;
+
+      final updatedHabit = _updateHabitCompletionState(
+        habit,
+        date,
+        checklistMap,
+      );
+      state = [
+        for (final h in state)
+          if (h.id == updatedHabit.id) updatedHabit else h,
+      ];
+      ref.read(allObjectsProvider.notifier).replaceObjectInMemory(updatedHabit);
+
+      frontmatter.remove('habits');
+      habitsMap.forEach((slug, value) {
+        frontmatter[slug] = value;
+      });
+
+      final entries = MarkdownParser.parseJournalEntries(body, dateStr);
+      final tasks = MarkdownParser.parseTasksFromDailyNote(body);
+      final trackers = MarkdownParser.parseTrackerRecords(frontmatter);
+      final pomodoros = MarkdownParser.parsePomodoros(body);
+
+      final newBody = MarkdownParser.generateDailyNoteBody(
+        entries: entries,
+        tasks: tasks,
+        habits: habitsMap,
+        habitLabels: _habitLabelsFromRef(ref),
+        pactHabitSlugs: _pactHabitSlugsFromRef(ref),
+        trackers: trackers,
+        pomodoros: pomodoros,
+      );
+
+      final newContent = generateMarkdown(frontmatter, newBody);
+      await obsidianService.writeFile(path, newContent);
+
+      _updateDailyNoteCache(
+        dateStr: dateStr,
+        habitsMap: habitsMap,
+        frontmatter: frontmatter,
+        trackers: trackers,
+      );
+      ref.invalidate(objectsByTypeProvider('habit'));
+      ref.invalidate(dailyNoteDataProvider(dateStr));
+
+      await syncQueue.enqueueAction(
+        SyncAction(
+          objectType: 'daily_note',
+          objectId: dateStr,
+          operation: SyncOperation.update,
+          payload: frontmatter,
+        ),
+      );
+      WidgetService.updateHabits(state);
+    } catch (e, st) {
+      debugPrint(
+        'Error toggling checklist item $itemId for ${habit.id} on $dateStr: $e\n$st',
+      );
       rethrow;
     }
   }
@@ -774,21 +832,11 @@ class OrganizersNotifier extends Notifier<List<organizer_model.Organizer>> {
     final people = ref
         .watch(objectsByTypeProvider('person'))
         .cast<organizer_model.Organizer>();
-    final places = ref
-        .watch(objectsByTypeProvider('place'))
-        .cast<organizer_model.Organizer>();
     final labels = ref
         .watch(objectsByTypeProvider('label'))
         .cast<organizer_model.Organizer>();
 
-    return [
-      ...areas,
-      ...projects,
-      ...activities,
-      ...people,
-      ...places,
-      ...labels,
-    ];
+    return [...areas, ...projects, ...activities, ...people, ...labels];
   }
 
   Future<void> addOrganizer(organizer_model.Organizer organizer) async {
@@ -917,10 +965,6 @@ class PeopleNotifier extends Notifier<List<Person>> {
   }
 
   Future<void> addPerson(Person person) async {
-    // Spec PARTE 8: Person auto-inclui a categoria [[people]]
-    if (!person.categories.contains('[[people]]')) {
-      person.categories.add('[[people]]');
-    }
     state = [...state, person];
     await ref.read(vaultProvider.notifier).createObject(person);
   }
@@ -1494,12 +1538,6 @@ final templatesProvider =
       return TemplatesNotifier();
     });
 
-final calendarSessionsProvider = Provider<List<CalendarSession>>((ref) {
-  final asyncAll = ref.watch(allObjectsProvider);
-  final all = asyncAll.valueOrNull ?? [];
-  return all.whereType<CalendarSession>().toList();
-});
-
 final allEntriesProvider = Provider<List<JournalEntry>>((ref) {
   final asyncValue = ref.watch(allObjectsProvider);
   final data = asyncValue.valueOrNull;
@@ -1603,10 +1641,7 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
       );
       Future.microtask(() async {
         try {
-          await service.writeFile(
-            relativePath,
-            obj.toMarkdown(),
-          );
+          await service.writeFile(relativePath, obj.toMarkdown());
           debugPrint('[Vault] Rewrote repaired YAML: $relativePath');
         } catch (e) {
           debugPrint('[Vault] Failed to rewrite repaired YAML: $e');
@@ -1885,10 +1920,10 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
 
     // Add new entry
     entries.add(_dailyMapForEntry(entry, dateStr));
-    await _applyMoodToDailyFrontmatter(frontmatter, entry);
 
     // Sort by time
     entries.sort((a, b) => a['time'].compareTo(b['time']));
+    await _syncMoodEntriesFrontmatter(frontmatter, entries);
 
     final newBody = MarkdownParser.generateDailyNoteBody(
       entries: entries,
@@ -1927,39 +1962,71 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     ref.invalidate(allObjectsProvider);
   }
 
-  Future<void> _applyMoodToDailyFrontmatter(
+  Future<void> _syncMoodEntriesFrontmatter(
     Map<String, dynamic> frontmatter,
-    JournalEntry entry,
+    List<Map<String, dynamic>> entries,
   ) async {
-    final moodId = entry.moodSlug?.trim();
-    if (moodId == null || moodId.isEmpty) return;
-    final cleanMoodId = moodId
-        .replaceAll('[[', '')
-        .replaceAll(']]', '')
-        .split(',')
-        .first
-        .trim();
-    if (cleanMoodId.isEmpty) return;
+    frontmatter.remove('mood_entries');
+    frontmatter.remove('mood_pleasantness');
+    frontmatter.remove('mood_energy');
+    frontmatter.remove('mood_label');
+    frontmatter.remove('mood_emoji');
 
-    await ref.read(moodsProvider.notifier).ensureMoodFileExists(cleanMoodId);
+    final moodEntries = <Map<String, dynamic>>[];
+    final resolvedMoods = <String, MoodDefinition>{};
+
+    for (final entry in entries) {
+      final rawMood = entry['mood']?.toString().trim();
+      final time = entry['time']?.toString().trim();
+      if (rawMood == null || rawMood.isEmpty || time == null || time.isEmpty) {
+        continue;
+      }
+
+      final moodIds = rawMood
+          .split(RegExp(r'[,;|]'))
+          .map((mood) => mood.replaceAll('[[', '').replaceAll(']]', '').trim())
+          .where((mood) => mood.isNotEmpty)
+          .toList();
+
+      for (final moodId in moodIds) {
+        final mood =
+            resolvedMoods[moodId] ?? await _resolveMoodDefinition(moodId);
+        resolvedMoods[moodId] = mood;
+        moodEntries.add({
+          'time': time,
+          'pleasantness': mood.pleasantness,
+          'energy': mood.energy,
+          'label': mood.label,
+          'emoji': mood.emoji,
+        });
+      }
+    }
+
+    frontmatter['mood_entries'] = moodEntries;
+    if (moodEntries.isNotEmpty) {
+      final latest = moodEntries.last;
+      frontmatter['mood_pleasantness'] = latest['pleasantness'];
+      frontmatter['mood_energy'] = latest['energy'];
+      frontmatter['mood_label'] = latest['label'];
+      frontmatter['mood_emoji'] = latest['emoji'];
+    }
+  }
+
+  Future<MoodDefinition> _resolveMoodDefinition(String moodId) async {
+    await ref.read(moodsProvider.notifier).ensureMoodFileExists(moodId);
     final availableMoods = [
       ...ref.read(moodsProvider),
       ...MoodDefinition.systemMoods,
     ];
-    final mood = availableMoods.firstWhere(
-      (mood) => mood.id == cleanMoodId || mood.slug == cleanMoodId,
+    return availableMoods.firstWhere(
+      (mood) => mood.id == moodId || mood.slug == moodId,
       orElse: () => MoodDefinition(
-        id: cleanMoodId,
-        label: cleanMoodId,
+        id: moodId,
+        label: moodId,
         emoji: '😐',
         color: '#9E9E9E',
       ),
     );
-
-    frontmatter['mood_pleasantness'] = mood.pleasantness;
-    frontmatter['mood_energy'] = mood.energy;
-    frontmatter['mood_label'] = mood.label;
-    frontmatter['mood_emoji'] = mood.emoji;
   }
 
   Future<void> updateEntry(
@@ -2019,7 +2086,6 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
 
     entry.obsidianPath = relativePath;
     final replacement = _dailyMapForEntry(entry, dateStr);
-    await _applyMoodToDailyFrontmatter(frontmatter, entry);
 
     final index = _findEntryIndex(entries, sourceEntry);
     if (index >= 0) {
@@ -2032,6 +2098,7 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     }
 
     entries.sort((a, b) => a['time'].compareTo(b['time']));
+    await _syncMoodEntriesFrontmatter(frontmatter, entries);
 
     final newBody = MarkdownParser.generateDailyNoteBody(
       entries: entries,
@@ -2100,6 +2167,8 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
       debugPrint('Journal delete could not match entry in $relativePath.');
     }
 
+    await _syncMoodEntriesFrontmatter(frontmatter, entries);
+
     final newBody = MarkdownParser.generateDailyNoteBody(
       entries: entries,
       tasks: tasks,
@@ -2153,6 +2222,7 @@ class VaultNotifier extends Notifier<void> {
     if (object is TrackingRecord) return 'tracker_record';
     if (object is MoodDefinition) return 'mood_definition';
     if (object is CombinedAnalysis) return 'combined_analysis';
+    if (object is WellbeingIndicator) return 'wellbeing_indicator';
     if (object is TimeBlock) return 'time_block';
     if (object is DayTheme) return 'day_theme';
     if (object is TemplateDefinition) return 'template';
@@ -2238,7 +2308,7 @@ class VaultNotifier extends Notifier<void> {
   }
 
   int? _slotIndexFromReminderConfig(ReminderConfig config) {
-    final match = RegExp(r'_slot_(\d+)$').firstMatch(config.id);
+    final match = RegExp(r'_slot_(\d+)(?:_|$)').firstMatch(config.id);
     if (match == null) return null;
     return int.tryParse(match.group(1)!);
   }
@@ -2920,7 +2990,7 @@ class VaultNotifier extends Notifier<void> {
         newObject = Resource(
           id: baseId,
           title: baseTitle,
-          resourceType: 'General',
+          mediaType: 'General',
           synopsis: bodyContent,
           createdAt: baseCreatedAt,
           updatedAt: baseUpdatedAt,
@@ -3248,16 +3318,19 @@ class VaultNotifier extends Notifier<void> {
   }
 
   Future<void> archiveObject(ContentObject object) async {
+    // F2.17: Archive sets archived flag in place, never moves file
     object.archived = true;
     await updateObject(object);
   }
 
   Future<void> unarchiveObject(ContentObject object) async {
+    // F2.17: Unarchive reverts archived flag in place
     object.archived = false;
     await updateObject(object);
   }
 
   Future<void> deleteObject(ContentObject object) async {
+    // F2.17: Delete moves file to _deleted/ (permanent erase after 30 days)
     final obsidianService = ref.read(obsidianServiceProvider);
     final syncQueue = ref.read(syncQueueServiceProvider);
 
@@ -3339,6 +3412,7 @@ class VaultNotifier extends Notifier<void> {
       'organizer' => 'organizers',
       'mood_definition' => 'moods',
       'combined_analysis' => 'analyses',
+      'wellbeing_indicator' => 'app',
       'snapshot' => 'snapshots',
       _ => 'app',
     };
@@ -3836,7 +3910,7 @@ class InboxNotifier extends AsyncNotifier<List<InboxItem>> {
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}'
         '-${now.hour.toString().padLeft(2, '0')}-${now.minute.toString().padLeft(2, '0')}';
     final item = InboxItem(title: text.trim(), content: '', createdAt: now);
-    item.obsidianPath = 'inbox/$slug.md';
+    item.obsidianPath = 'app/$slug.md';
     await ref.read(vaultProvider.notifier).createObject(item);
     ref.invalidateSelf();
   }

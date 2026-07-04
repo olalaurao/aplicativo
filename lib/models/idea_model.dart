@@ -24,7 +24,8 @@ class IdeaDefinition extends ContentObject {
   /// [[wiki-links]] to related objects
   List<String> linkedSlugs;
 
-  // Kept for backward-compat
+  // F3.17: Migrated to universal links field - kept for backward-compat only
+  @Deprecated('Use links from ContentObject instead')
   List<String> linkedTaskIds;
 
   String? color;
@@ -57,6 +58,9 @@ class IdeaDefinition extends ContentObject {
 
   @override
   String get type => 'idea';
+
+  @override
+  bool get isIncomplete => title.trim().isEmpty;
 
   @override
   String toMarkdown() {
@@ -114,10 +118,13 @@ class IdeaDefinition extends ContentObject {
           .map((e) => e.toString())
           .toList();
     }
+    // F3.17: Migrate legacy linked_tasks to universal links field
     if (frontmatter['linked_tasks'] is List) {
       idea.linkedTaskIds = (frontmatter['linked_tasks'] as List)
           .map((e) => e.toString())
           .toList();
+      // Also migrate to the universal links field
+      idea.links = {...idea.links, ...idea.linkedTaskIds}.toList();
     }
     idea.convertedToType = frontmatter['converted_to_type']?.toString();
     idea.convertedToId = frontmatter['converted_to_id']?.toString();

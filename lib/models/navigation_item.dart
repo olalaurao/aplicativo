@@ -14,7 +14,6 @@ enum NavSection {
   goals,
   notes,
   archive,
-  map,
   reminders,
   deletedFiles,
   more,
@@ -116,8 +115,6 @@ class NavigationItem {
         return active ? Icons.note_alt_rounded : Icons.note_alt_outlined;
       case NavSection.archive:
         return active ? Icons.inventory_2_rounded : Icons.inventory_2_outlined;
-      case NavSection.map:
-        return active ? Icons.map_rounded : Icons.map_outlined;
       case NavSection.reminders:
         return active
             ? Icons.notifications_active_rounded

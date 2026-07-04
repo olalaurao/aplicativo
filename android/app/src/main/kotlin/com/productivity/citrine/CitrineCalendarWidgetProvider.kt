@@ -143,6 +143,18 @@ open class CitrineCalendarWidgetProvider : AppWidgetProvider() {
         views.setTextViewText(R.id.hoje_tarefas_text, data.optString("subtitle", ""))
         views.setTextColor(R.id.hoje_tarefas_text, mutedColor)
 
+        val overdueCount = data.optInt("overdueCount", 0)
+        if (overdueCount > 0) {
+            views.setViewVisibility(R.id.overdue_header, View.VISIBLE)
+            views.setTextViewText(
+                R.id.overdue_header,
+                "Atrasados ($overdueCount)",
+            )
+            views.setTextColor(R.id.overdue_header, 0xFFEF4444.toInt())
+        } else {
+            views.setViewVisibility(R.id.overdue_header, View.GONE)
+        }
+
         val adapterIntent = Intent(context, CitrineCalendarItemsService::class.java)
         adapterIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
         val adapterMode = data.optString("mode", mode)

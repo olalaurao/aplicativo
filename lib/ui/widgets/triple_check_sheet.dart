@@ -7,6 +7,7 @@ import '../../models/task_model.dart';
 import '../../providers/vault_provider.dart';
 import '../forms/create_task_form.dart';
 import '../theme.dart';
+import 'universal_search_picker.dart';
 
 /// Shows the Triple Check bottom sheet for a Task.
 /// Can be opened from the ⋯ menu, or from the ⚠️ badge on a stuck task.
@@ -147,6 +148,13 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
 
   // ── Save ─────────────────────────────────────────────────────────────────
 
+  Future<void> _autoSavePartialState() async {
+    // Auto-save partial state before navigation (F2.4)
+    if (_head != null && _heart != null && _hand != null && !_saved) {
+      await _save();
+    }
+  }
+
   Future<void> _save() async {
     if (_head == null || _heart == null || _hand == null) return;
     if (widget.readOnly && !_editingExistingCheck) return;
@@ -185,7 +193,25 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
     final handBlocked = _hand != TripleCheckAnswer.yes;
     final allGood = !headBlocked && !heartBlocked && !handBlocked;
 
-    if (allGood) return [];
+    if (allGood) {
+      return [
+        _ActionButton(
+          label: 'Ver dependências',
+          icon: Icons.link_off_rounded,
+          onTap: () {
+            _openViewDependencies();
+          },
+        ),
+        _ActionButton(
+          label: 'Ver agenda',
+          icon: Icons.calendar_today_rounded,
+          color: AppColors.textSecondary,
+          onTap: () {
+            _openCheckSchedule();
+          },
+        ),
+      ];
+    }
 
     if (headBlocked) {
       return [
@@ -219,7 +245,7 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
           label: 'Criar subtarefas',
           icon: Icons.account_tree_outlined,
           onTap: () {
-            _openEditTask();
+            _openCreateSubtask();
           },
         ),
         _ActionButton(
@@ -227,15 +253,7 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
           icon: Icons.schedule_rounded,
           color: AppColors.textSecondary,
           onTap: () async {
-            // Push start date by 1 day
-            Navigator.pop(context);
-            final messenger = ScaffoldMessenger.of(context);
-            final tomorrow = DateTime.now().add(const Duration(days: 1));
-            final snoozed = widget.task.copyWith(startDate: tomorrow);
-            await ref.read(tasksProvider.notifier).updateTask(snoozed);
-            messenger.showSnackBar(
-              const SnackBar(content: Text('Tarefa adiada para amanhã.')),
-            );
+            _showPostponeOptions();
           },
         ),
       ];
@@ -247,7 +265,7 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
         label: 'Adicionar dependência',
         icon: Icons.link_rounded,
         onTap: () {
-          _openEditTask();
+          _openDependencyPicker();
         },
       ),
       _ActionButton(
@@ -255,24 +273,154 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
         icon: Icons.person_add_alt_1_outlined,
         color: AppColors.textSecondary,
         onTap: () async {
-          final messenger = ScaffoldMessenger.of(context);
-          final notes = [...widget.task.notes];
-          if (!notes.any((note) => note.contains('Pedir ajuda'))) {
-            notes.add('Pedir ajuda: identificar pessoa ou recurso necessário.');
-          }
-          final updated = widget.task.copyWith(notes: notes);
-          await ref.read(tasksProvider.notifier).updateTask(updated);
-          if (!mounted) return;
-          Navigator.pop(context);
-          messenger.showSnackBar(
-            const SnackBar(content: Text('Tarefa marcada para pedir ajuda.')),
-          );
+          _openWhatsAppHelp();
         },
       ),
     ];
   }
 
-  void _openEditTask() {
+  void _openCreateSubtask() async {
+    // Auto-save partial state before navigation (F2.4)
+    await _autoSavePartialState();
+    // TODO: Implement create subtask form pre-focused and parented to this Task
+    // For now, open edit task as placeholder
+    _openEditTask();
+  }
+
+  void _showPostponeOptions() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Adiar tarefa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              children: [
+                _PostponeChip(
+                  label: '+1 dia',
+                  onTap: () => _postponeTask(1),
+                ),
+                _PostponeChip(
+                  label: '+1 semana',
+                  onTap: () => _postponeTask(7),
+                ),
+                _PostponeChip(
+                  label: '+1 mês',
+                  onTap: () => _postponeTask(30),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _openDatePicker();
+              },
+              child: const Text('Escolher data...'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _postponeTask(int days) async {
+    Navigator.pop(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final newDate = DateTime.now().add(Duration(days: days));
+    final snoozed = widget.task.copyWith(startDate: newDate);
+    await ref.read(tasksProvider.notifier).updateTask(snoozed);
+    messenger.showSnackBar(
+      SnackBar(content: Text('Tarefa adiada por $days dias.')),
+    );
+  }
+
+  void _openDatePicker() {
+    // TODO: Implement date picker for custom postpone date
+    // For now, use +1 day as placeholder
+    _postponeTask(1);
+  }
+
+  void _openDependencyPicker() async {
+    // Auto-save partial state before navigation (F2.4)
+    await _autoSavePartialState();
+    
+    // F3.5: Use Universal Search Picker with "Create new task" pinned option
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (!mounted) return;
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) => UniversalSearchPickerSheet(
+          title: 'Adicionar dependência',
+          initialFilter: 'task',
+          onSelected: (selectedObject) async {
+            Navigator.pop(sheetContext);
+            if (selectedObject is Task) {
+              // Add as dependency
+              final currentDeps = widget.task.dependsOn ?? [];
+              if (!currentDeps.contains(selectedObject.id)) {
+                final updated = widget.task.copyWith(
+                  dependsOn: [...currentDeps, selectedObject.id],
+                );
+                await ref.read(tasksProvider.notifier).updateTask(updated);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Dependência "${selectedObject.title}" adicionada.')),
+                  );
+                }
+              }
+            }
+          },
+        ),
+      );
+    });
+  }
+
+  void _openWhatsAppHelp() async {
+    final message = Uri.encodeComponent('Hey, I could use some help with: ${widget.task.title}');
+    final url = 'https://wa.me/?text=$message';
+    // TODO: Launch URL using url_launcher
+    // For now, add note as placeholder
+    final messenger = ScaffoldMessenger.of(context);
+    final notes = [...widget.task.notes];
+    if (!notes.any((note) => note.contains('Pedir ajuda'))) {
+      notes.add('Pedir ajuda: identificar pessoa ou recurso necessário.');
+    }
+    final updated = widget.task.copyWith(notes: notes);
+    await ref.read(tasksProvider.notifier).updateTask(updated);
+    if (!mounted) return;
+    Navigator.pop(context);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Tarefa marcada para pedir ajuda.')),
+    );
+  }
+
+  void _openViewDependencies() {
+    // TODO: Navigate to depends_on list on this Task
+    // For now, open edit task as placeholder
+    _openEditTask();
+  }
+
+  void _openCheckSchedule() {
+    // TODO: Navigate to Planner on this Task's start_date/end_date
+    // For now, open edit task as placeholder
+    _openEditTask();
+  }
+
+  void _openEditTask() async {
+    // Auto-save partial state before navigation (F2.4)
+    await _autoSavePartialState();
     final navigator = Navigator.of(context);
     navigator.pop();
     Future.delayed(const Duration(milliseconds: 200), () {
@@ -783,6 +931,40 @@ class TripleCheckBadge extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PostponeChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _PostponeChip({
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCardFill : AppColors.surfaceVariant,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.divider),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: AppTheme.textPrimaryColor(context),
+          ),
         ),
       ),
     );

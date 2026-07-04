@@ -267,7 +267,6 @@ void _showChangeTypeSheet(
     {'type': 'activity', 'label': 'Atividade', 'icon': Icons.sports_outlined},
     {'type': 'label', 'label': 'Etiqueta', 'icon': Icons.label_outline_rounded},
     {'type': 'person', 'label': 'Pessoa', 'icon': Icons.person_outline_rounded},
-    {'type': 'place', 'label': 'Lugar', 'icon': Icons.place_outlined},
     {'type': 'resource', 'label': 'Recurso', 'icon': Icons.menu_book_outlined},
     {
       'type': 'tracker_definition',
@@ -375,7 +374,7 @@ Future<void> _confirmAndChangeType(
     String newType = targetType;
     Map<String, dynamic> extraFields = {};
 
-    if (const ['area', 'activity', 'label', 'place'].contains(targetType)) {
+    if (const ['area', 'activity', 'label'].contains(targetType)) {
       newType = 'organizer';
       extraFields['organizerType'] = targetType;
     }
@@ -547,8 +546,6 @@ String _typeLabel(ContentObject object) {
         return 'Etiqueta';
       case OrganizerType.person:
         return 'Pessoa';
-      case OrganizerType.place:
-        return 'Lugar';
       case OrganizerType.task:
         return 'Tarefa';
       case OrganizerType.goal:

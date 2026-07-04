@@ -478,8 +478,6 @@ class _UniversalSearchPickerSheetState
           return 'Etiqueta';
         case OrganizerType.person:
           return 'Pessoa';
-        case OrganizerType.place:
-          return 'Lugar';
         case OrganizerType.task:
           return 'Tarefa';
         case OrganizerType.goal:
@@ -650,7 +648,7 @@ class _UniversalSearchPickerSheetState
       newObj = Resource(
         id: id,
         title: title,
-        resourceType: 'Book',
+        mediaType: 'Book',
         status: ResourceStatus.toConsume,
         createdAt: DateTime.now(),
       );
@@ -676,3 +674,5 @@ class _UniversalSearchPickerSheetState
     }
   }
 }
+
+

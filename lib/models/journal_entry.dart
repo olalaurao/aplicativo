@@ -7,11 +7,45 @@ import 'package:intl/intl.dart';
 
 enum JournalEntryType { standard, fieldNote, pmn }
 
+/// F2.14: Mood entry for multiple moods per day
+class MoodEntry {
+  final String moodSlug; // Reference to MoodDefinition.id
+  final DateTime timestamp; // When this mood was recorded
+  final int? pleasantness; // Optional pleasantness value (0-10)
+  final int? energy; // Optional energy value (0-10)
+
+  MoodEntry({
+    required this.moodSlug,
+    required this.timestamp,
+    this.pleasantness,
+    this.energy,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'mood_slug': moodSlug,
+      'timestamp': timestamp.toIso8601String(),
+      if (pleasantness != null) 'pleasantness': pleasantness,
+      if (energy != null) 'energy': energy,
+    };
+  }
+
+  factory MoodEntry.fromMap(Map<String, dynamic> map) {
+    return MoodEntry(
+      moodSlug: map['mood_slug'] as String,
+      timestamp: DateTime.parse(map['timestamp'] as String),
+      pleasantness: map['pleasantness'] as int?,
+      energy: map['energy'] as int?,
+    );
+  }
+}
+
 class JournalEntry extends ContentObject {
   String body;
   DateTime date;
   String? timeOfDay;
-  String? moodSlug; // Reference to MoodDefinition.id
+  String? moodSlug; // Reference to MoodDefinition.id (legacy, kept for compatibility)
+  List<MoodEntry> moodEntries; // F2.14: Array of mood entries for multiple moods per day
   List<String> photos;
   String? location;
   String? templateId;
@@ -43,6 +77,7 @@ class JournalEntry extends ContentObject {
     required this.date,
     this.timeOfDay,
     this.moodSlug,
+    this.moodEntries = const [],
     this.photos = const [],
     this.location,
     this.templateId,
@@ -91,6 +126,17 @@ class JournalEntry extends ContentObject {
 
   @override
   String get type => 'entry';
+
+  @override
+  bool get isIncomplete {
+    if (entryType == JournalEntryType.fieldNote) {
+      return category == null || category!.trim().isEmpty || text == null || text!.trim().isEmpty;
+    }
+    if (entryType == JournalEntryType.pmn) {
+      return week == null || week!.trim().isEmpty || dateRangeStart == null || dateRangeEnd == null;
+    }
+    return false;
+  }
 
   @override
   DateTime? get baseTime => date;
@@ -186,6 +232,11 @@ class JournalEntry extends ContentObject {
       finalBody = '${finalBody.trimRight()}\n\nmood:: [[$moodSlug]]';
     }
 
+    // F2.14: Serialize mood_entries array
+    if (moodEntries.isNotEmpty) {
+      frontmatter['mood_entries'] = moodEntries.map((e) => e.toMap()).toList();
+    }
+
     return generateMarkdown(
       frontmatter,
       normalizeRichTextBodyForMarkdown(finalBody),
@@ -271,6 +322,14 @@ class JournalEntry extends ContentObject {
       entry.moodSlug = frontmatter['mood']?.toString();
     }
 
+    // F2.14: Parse mood_entries array
+    final moodEntriesData = frontmatter['mood_entries'];
+    if (moodEntriesData is List) {
+      entry.moodEntries = moodEntriesData
+          .map((e) => MoodEntry.fromMap(e as Map<String, dynamic>))
+          .toList();
+    }
+
     entry.feelings = frontmatter['feelings'] as String?;
     entry.location = frontmatter['location'] as String?;
     entry.templateId = frontmatter['template_id'] as String?;
@@ -285,7 +344,9 @@ class JournalEntry extends ContentObject {
       entry.category = frontmatter['category']?.toString();
       final ev = frontmatter['energy_value'];
       if (ev != null) {
-        entry.energyValue = ev is int ? ev : int.tryParse(ev.toString());
+        final parsed = ev is int ? ev : int.tryParse(ev.toString());
+        // F3.15: Clamp energy value to 0-10 range
+        entry.energyValue = parsed != null ? parsed.clamp(0, 10) : null;
       }
       entry.text = frontmatter['text']?.toString();
     } else if (type == JournalEntryType.pmn) {
@@ -341,6 +402,7 @@ class JournalEntry extends ContentObject {
     DateTime? date,
     String? timeOfDay,
     String? moodSlug,
+    List<MoodEntry>? moodEntries,
     List<String>? photos,
     String? location,
     String? templateId,
@@ -374,6 +436,7 @@ class JournalEntry extends ContentObject {
       date: date ?? this.date,
       timeOfDay: timeOfDay ?? this.timeOfDay,
       moodSlug: moodSlug ?? this.moodSlug,
+      moodEntries: moodEntries ?? this.moodEntries,
       photos: photos ?? this.photos,
       location: location ?? this.location,
       templateId: templateId ?? this.templateId,

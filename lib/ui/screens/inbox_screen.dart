@@ -5,10 +5,12 @@ import 'package:flutter/services.dart';
 
 import '../../providers/vault_provider.dart';
 import '../../models/inbox_model.dart';
+import '../../models/idea_model.dart';
 import '../theme.dart';
 import '../forms/create_task_form.dart';
 import '../forms/create_note_form.dart';
 import '../forms/create_entry_form.dart';
+import '../forms/create_idea_form.dart';
 
 class InboxScreen extends ConsumerStatefulWidget {
   const InboxScreen({super.key});
@@ -288,6 +290,7 @@ class _InboxItemCard extends ConsumerWidget {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         item.title,
@@ -357,6 +360,7 @@ class _TriageSheet extends ConsumerWidget {
       final saved = await navigator.push<bool>(
         MaterialPageRoute(builder: (_) => form),
       );
+      // F2.9: Delete original Inbox Item only after successful conversion
       if (saved == true) {
         await inboxNotifier.triageItem(item);
       }
@@ -401,6 +405,7 @@ class _TriageSheet extends ConsumerWidget {
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 12),
               Container(
@@ -449,6 +454,20 @@ class _TriageSheet extends ConsumerWidget {
                     context,
                     ref,
                     CreateNoteForm(initialTitle: item.title),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              _TriageOption(
+                icon: Icons.lightbulb_outline_rounded,
+                color: AppColors.warning,
+                label: 'É uma ideia',
+                subtitle: 'Salvar no backlog de ideias',
+                onTap: () async {
+                  await _openFormAndTriage(
+                    context,
+                    ref,
+                    CreateIdeaForm(initialTitle: item.title),
                   );
                 },
               ),

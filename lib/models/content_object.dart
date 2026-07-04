@@ -57,6 +57,9 @@ abstract class ContentObject {
   String get type; // e.g., 'task', 'habit', 'entry'
   String toMarkdown();
 
+  /// V5: derived property indicating whether required fields are missing.
+  bool get isIncomplete => false;
+
   Map<String, dynamic> toBaseMap() {
     return {
       'id': id,
@@ -73,6 +76,7 @@ abstract class ContentObject {
       'organizers': organizers.map((o) => o.toWikiLink()).toList(),
       'reminders': reminders.map((r) => r.toMap()).toList(),
       if (links.isNotEmpty) 'links': links,
+      if (isIncomplete) 'is_incomplete': true,
     };
   }
 

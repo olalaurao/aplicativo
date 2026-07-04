@@ -11,6 +11,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/habit_detail_sheet.dart';
 import '../forms/create_habit_form.dart';
 import '../widgets/health_alerts_strip.dart';
+import '../widgets/habit_check_handler.dart';
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
@@ -631,8 +632,8 @@ class _TodayHabitCard extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final slots = _slotStates;
     final reminderTimes = habit.slots
-        .where((s) => s.reminderEnabled && s.reminderTime != null)
-        .map((s) => s.reminderTime!.format(context))
+        .where((s) => s.hasReminders && s.primaryReminderTime != null)
+        .map((s) => s.primaryReminderTime!.format(context))
         .toList();
 
     return GestureDetector(
@@ -824,7 +825,13 @@ class _TodayHabitCard extends ConsumerWidget {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        ref.read(habitsProvider.notifier).toggleHabit(habit, date);
+        handleHabitCheckTap(
+          context,
+          ref,
+          habit,
+          date,
+          wasAlreadyDone: () => goalReached,
+        );
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -862,7 +869,13 @@ class _TodayHabitCard extends ConsumerWidget {
       return GestureDetector(
         onTap: () {
           HapticFeedback.lightImpact();
-          ref.read(habitsProvider.notifier).toggleHabit(habit, date);
+          handleHabitCheckTap(
+            context,
+            ref,
+            habit,
+            date,
+            wasAlreadyDone: () => _isFullyCompleted,
+          );
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -887,7 +900,13 @@ class _TodayHabitCard extends ConsumerWidget {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        ref.read(habitsProvider.notifier).toggleHabit(habit, date);
+        handleHabitCheckTap(
+          context,
+          ref,
+          habit,
+          date,
+          wasAlreadyDone: () => completed,
+        );
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),

@@ -15,6 +15,7 @@ import '../screens/universal_detail_view.dart';
 import '../screens/home_screen.dart';
 import '../widgets/command_center_overlay.dart';
 import '../../providers/widget_sync_provider.dart';
+import '../../providers/overdue_provider.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -280,12 +281,17 @@ class _AppShellState extends ConsumerState<AppShell> {
                                         item.section == NavSection.more &&
                                         !isInboxInBottomBar &&
                                         ref.watch(inboxCountProvider) > 0;
+                                    final isPlannerWithOverdueBadge =
+                                        item.section == NavSection.planner &&
+                                        ref.watch(overdueCountProvider) > 0;
                                     final count =
                                         item.section == NavSection.inbox
                                         ? ref.watch(inboxCountProvider)
                                         : (isMoreWithInboxBadge
                                               ? ref.watch(inboxCountProvider)
-                                              : 0);
+                                              : (isPlannerWithOverdueBadge
+                                                    ? ref.watch(overdueCountProvider)
+                                                    : 0));
 
                                     return BottomNavigationBarItem(
                                       icon: Padding(
@@ -503,6 +509,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                 final isSelected = index == currentIndex;
                 final isInbox = item.section == NavSection.inbox;
                 final isMore = item.section == NavSection.more;
+                final isPlanner = item.section == NavSection.planner;
                 final isInboxInItems = items.any(
                   (it) => it.section == NavSection.inbox,
                 );
@@ -510,12 +517,17 @@ class _AppShellState extends ConsumerState<AppShell> {
                     isMore &&
                     !isInboxInItems &&
                     ref.watch(inboxCountProvider) > 0;
+                final isPlannerWithOverdueBadge =
+                    isPlanner &&
+                    ref.watch(overdueCountProvider) > 0;
 
                 final count = isInbox
                     ? ref.watch(inboxCountProvider)
                     : (isMoreWithInboxBadge
                           ? ref.watch(inboxCountProvider)
-                          : 0);
+                          : (isPlannerWithOverdueBadge
+                                ? ref.watch(overdueCountProvider)
+                                : 0));
 
                 final iconWidget = Icon(
                   isSelected ? item.activeIcon : item.icon,

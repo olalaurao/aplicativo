@@ -61,6 +61,7 @@ class AppSettings {
   final String themeMode;
   final String activeThemeId;
   final bool nlpTaskParsingEnabled;
+  final bool showOverdueSection;
   final String dailyNoteIdentifier;
   final String dailyNoteDateFormat;
   final String dailyNoteFolder;
@@ -121,6 +122,7 @@ class AppSettings {
     this.themeMode = 'system',
     this.activeThemeId = 'citrine',
     this.nlpTaskParsingEnabled = true,
+    this.showOverdueSection = true,
     this.dailyNoteIdentifier = 'filename_format',
     this.dailyNoteDateFormat = 'yyyy-MM-dd',
     this.dailyNoteFolder = 'daily',
@@ -158,6 +160,9 @@ class AppSettings {
   List<SavedFilter> filtersFor(String targetType) => savedFilters
       .where((f) => f.targetType == targetType || f.targetType == '*')
       .toList();
+
+  /// V5: mediaTypeFilters alias for resourceTypeFilters
+  List<String> get mediaTypeFilters => resourceTypeFilters;
 
   final String universalWidgetType;
   final String universalWidgetOrganizer;
@@ -207,6 +212,7 @@ class AppSettings {
     String? themeMode,
     String? activeThemeId,
     bool? nlpTaskParsingEnabled,
+    bool? showOverdueSection,
     String? dailyNoteIdentifier,
     String? dailyNoteDateFormat,
     String? dailyNoteFolder,
@@ -270,6 +276,7 @@ class AppSettings {
       activeThemeId: activeThemeId ?? this.activeThemeId,
       nlpTaskParsingEnabled:
           nlpTaskParsingEnabled ?? this.nlpTaskParsingEnabled,
+      showOverdueSection: showOverdueSection ?? this.showOverdueSection,
       dailyNoteIdentifier: dailyNoteIdentifier ?? this.dailyNoteIdentifier,
       dailyNoteDateFormat: dailyNoteDateFormat ?? this.dailyNoteDateFormat,
       dailyNoteFolder: dailyNoteFolder ?? this.dailyNoteFolder,
@@ -387,6 +394,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       themeMode: prefs.getString('themeMode') ?? 'system',
       activeThemeId: prefs.getString('activeThemeId') ?? 'citrine',
       nlpTaskParsingEnabled: prefs.getBool('nlpTaskParsingEnabled') ?? true,
+      showOverdueSection: prefs.getBool('showOverdueSection') ?? true,
       dailyNoteIdentifier:
           prefs.getString('dailyNoteIdentifier') ?? 'filename_format',
       dailyNoteDateFormat:
@@ -447,10 +455,10 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
 
   static Map<String, TypeSignature> _defaultSignatures() {
     return {
-      'shopping_item': TypeSignature(
-        objectType: 'shopping_item',
-        markerType: MarkerType.folder,
-        markerValue: 'shopping',
+      'shopping_list': TypeSignature(
+        objectType: 'shopping_list',
+        markerType: MarkerType.property,
+        markerValue: 'type: shopping_list',
       ),
       'task': TypeSignature(
         objectType: 'task',
@@ -506,11 +514,6 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
         objectType: 'activity',
         markerType: MarkerType.folder,
         markerValue: 'organizers/activities/',
-      ),
-      'place': TypeSignature(
-        objectType: 'place',
-        markerType: MarkerType.folder,
-        markerValue: 'organizers/places/',
       ),
       'label': TypeSignature(
         objectType: 'label',
@@ -789,6 +792,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> updateNlpTaskParsingEnabled(bool value) async {
     await _prefs.setBool('nlpTaskParsingEnabled', value);
     state = state.copyWith(nlpTaskParsingEnabled: value);
+  }
+
+  Future<void> updateShowOverdueSection(bool value) async {
+    await _prefs.setBool('showOverdueSection', value);
+    state = state.copyWith(showOverdueSection: value);
   }
 
   Future<void> updateDailyNoteSettings({

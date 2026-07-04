@@ -1,4 +1,7 @@
 // lib/models/goal_model.dart
+// V5: Goal simplified — identity/aspiration object only.
+// objective, strategy, phases moved to Project (see project_model.dart).
+// goal_mode removed per V5 Rule 5.
 import 'content_object.dart';
 import 'kpi_model.dart';
 import 'scheduler.dart';
@@ -8,8 +11,6 @@ enum GoalType { oneTime, repeating }
 
 enum GoalStatus { active, completed, cancelled, onHold }
 
-enum GoalMode { standard, plan }
-
 class Goal extends ContentObject {
   String? description;
   GoalType goalType;
@@ -18,20 +19,11 @@ class Goal extends ContentObject {
   DateTime? startDate;
   DateTime? deadline;
   List<KPI> kpis;
-  List<Subtask> subtasks;
+  /// V5: links replaces old `subtasks` (WikiLinks) — Goal never embeds Task files.
+  /// Use the universal `links` field (ContentObject.links) to reference Tasks/Projects.
   List<Scheduler> schedulers;
   String? color;
   String? icon;
-  String? linkedGoogleEventId;
-  String? linkedGoogleEventTitle;
-  String? linkedGoogleEventDate;
-  String? linkedGoogleEventUrl;
-  List<String> socialRefs;
-
-  GoalMode goalMode; // default: GoalMode.standard (Regra 5)
-  String? objective; // plan mode only
-  String? strategy; // plan mode only
-  List<String> phases; // plan mode only, default []
 
   Goal({
     super.id,
@@ -43,69 +35,39 @@ class Goal extends ContentObject {
     this.startDate,
     this.deadline,
     this.kpis = const [],
-    this.subtasks = const [],
     this.schedulers = const [],
     this.color,
     this.icon,
-    this.linkedGoogleEventId,
-    this.linkedGoogleEventTitle,
-    this.linkedGoogleEventDate,
-    this.linkedGoogleEventUrl,
-    List<String>? socialRefs,
-    this.goalMode = GoalMode.standard,
-    this.objective,
-    this.strategy,
-    List<String>? phases,
     super.organizers,
     super.categories,
+    super.tags,
+    super.links,
     super.createdAt,
     super.updatedAt,
     super.obsidianPath,
-  })  : socialRefs = socialRefs ?? [],
-        phases = phases ?? [],
-        super();
+  }) : super();
 
   @override
   String get type => 'goal';
 
   @override
+  bool get isIncomplete => title.trim().isEmpty;
+
+  @override
   String toMarkdown() {
     final frontmatter = toBaseMap();
-    frontmatter['description'] = description;
+    if (description != null) frontmatter['description'] = description;
     frontmatter['goal_type'] = goalType.name;
     frontmatter['state'] = state.name;
-    frontmatter['repeat_interval'] = repeatInterval;
-    frontmatter['start_date'] = startDate?.toIso8601String();
-    frontmatter['deadline'] = deadline?.toIso8601String();
-    frontmatter['kpis'] = kpis.map((e) => e.toMap()).toList();
-    frontmatter['subtasks'] = subtasks
-        .map((e) => {'title': e.title, 'completed': e.completed})
-        .toList();
-    frontmatter['color'] = color;
-    frontmatter['icon'] = icon;
-    if (linkedGoogleEventId != null) {
-      frontmatter['linked_google_event_id'] = linkedGoogleEventId;
-    }
-    if (linkedGoogleEventTitle != null) {
-      frontmatter['linked_google_event_title'] = linkedGoogleEventTitle;
-    }
-    if (linkedGoogleEventDate != null) {
-      frontmatter['linked_google_event_date'] = linkedGoogleEventDate;
-    }
-    if (linkedGoogleEventUrl != null) {
-      frontmatter['linked_google_event_url'] = linkedGoogleEventUrl;
-    }
-    if (socialRefs.isNotEmpty) {
-      frontmatter['social_refs'] = socialRefs;
-    }
-
-    frontmatter['goal_mode'] = goalMode.name;
-    if (goalMode == GoalMode.plan) {
-      if (objective != null) frontmatter['objective'] = objective;
-      if (strategy != null) frontmatter['strategy'] = strategy;
-      if (phases.isNotEmpty) frontmatter['phases'] = phases;
-    }
-
+    if (repeatInterval != null) frontmatter['repeat_interval'] = repeatInterval;
+    if (startDate != null) frontmatter['start_date'] = startDate!.toIso8601String();
+    if (deadline != null) frontmatter['deadline'] = deadline!.toIso8601String();
+    if (kpis.isNotEmpty) frontmatter['kpis'] = kpis.map((e) => e.toMap()).toList();
+    if (color != null) frontmatter['color'] = color;
+    if (icon != null) frontmatter['icon'] = icon;
+    // V5: goal_mode, objective, strategy, phases removed — moved to Project.
+    // V5: social_refs removed — folded into universal `links` field (ContentObject).
+    // V5: subtasks removed — use links field to reference Tasks.
     return generateMarkdown(frontmatter, description ?? '');
   }
 
@@ -123,46 +85,25 @@ class Goal extends ContentObject {
     );
     goal.repeatInterval = frontmatter['repeat_interval'] as String?;
     goal.startDate = frontmatter['start_date'] != null
-        ? DateTime.tryParse(frontmatter['start_date'])
+        ? DateTime.tryParse(frontmatter['start_date'].toString())
         : null;
     goal.deadline = frontmatter['deadline'] != null
-        ? DateTime.tryParse(frontmatter['deadline'])
+        ? DateTime.tryParse(frontmatter['deadline'].toString())
         : null;
 
     goal.kpis = (frontmatter['kpis'] as List? ?? [])
+        .whereType<Map>()
         .map((e) => KPI.fromMap(Map<String, dynamic>.from(e)))
-        .toList();
-
-    goal.subtasks = (frontmatter['subtasks'] as List? ?? [])
-        .map(
-          (e) => Subtask(title: e['title'], completed: e['completed'] ?? false),
-        )
         .toList();
 
     goal.color = frontmatter['color'] as String?;
     goal.icon = frontmatter['icon'] as String?;
-    goal.linkedGoogleEventId = frontmatter['linked_google_event_id']
-        ?.toString();
-    goal.linkedGoogleEventTitle = frontmatter['linked_google_event_title']
-        ?.toString();
-    goal.linkedGoogleEventDate = frontmatter['linked_google_event_date']
-        ?.toString();
-    goal.linkedGoogleEventUrl = frontmatter['linked_google_event_url']
-        ?.toString();
-    if (frontmatter['social_refs'] is List) {
-      goal.socialRefs = (frontmatter['social_refs'] as List)
-          .map((e) => e.toString())
-          .toList();
-    }
 
-    final rawMode = frontmatter['goal_mode']?.toString() ?? 'standard';
-    goal.goalMode = GoalMode.values.firstWhere(
-      (m) => m.name == rawMode,
-      orElse: () => GoalMode.standard,
-    );
-    goal.objective = frontmatter['objective'] as String?;
-    goal.strategy = frontmatter['strategy'] as String?;
-    goal.phases = List<String>.from(frontmatter['phases'] as List? ?? []);
+    // V5: goal_mode / objective / strategy / phases — parse silently, don't error.
+    // These fields are now on Project. If found on a legacy Goal file, they are
+    // preserved in `links` body note or silently dropped on next save.
+    // V5: social_refs — stripped on next save; any [[links]] already in
+    // ContentObject.links (loaded via loadBaseMap) take precedence.
 
     return goal;
   }
@@ -176,21 +117,13 @@ class Goal extends ContentObject {
     DateTime? startDate,
     DateTime? deadline,
     List<KPI>? kpis,
-    List<Subtask>? subtasks,
     List<Scheduler>? schedulers,
     String? color,
     String? icon,
-    String? linkedGoogleEventId,
-    String? linkedGoogleEventTitle,
-    String? linkedGoogleEventDate,
-    String? linkedGoogleEventUrl,
-    List<String>? socialRefs,
-    GoalMode? goalMode,
-    String? objective,
-    String? strategy,
-    List<String>? phases,
     List<OrganizerReference>? organizers,
     List<String>? categories,
+    List<String>? tags,
+    List<String>? links,
     DateTime? createdAt,
     DateTime? updatedAt,
     String? obsidianPath,
@@ -205,37 +138,30 @@ class Goal extends ContentObject {
       startDate: startDate ?? this.startDate,
       deadline: deadline ?? this.deadline,
       kpis: kpis ?? this.kpis,
-      subtasks: subtasks ?? this.subtasks,
       schedulers: schedulers ?? this.schedulers,
       color: color ?? this.color,
       icon: icon ?? this.icon,
-      linkedGoogleEventId: linkedGoogleEventId ?? this.linkedGoogleEventId,
-      linkedGoogleEventTitle:
-          linkedGoogleEventTitle ?? this.linkedGoogleEventTitle,
-      linkedGoogleEventDate:
-          linkedGoogleEventDate ?? this.linkedGoogleEventDate,
-      linkedGoogleEventUrl: linkedGoogleEventUrl ?? this.linkedGoogleEventUrl,
-      socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
-      goalMode: goalMode ?? this.goalMode,
-      objective: objective ?? this.objective,
-      strategy: strategy ?? this.strategy,
-      phases: phases ?? this.phases,
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
+      tags: tags ?? this.tags,
+      links: links ?? this.links,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
       obsidianPath: obsidianPath ?? this.obsidianPath,
     )
       ..archived = archived
       ..pinned = pinned
-      ..tags = List<String>.from(tags)
       ..reminders = List.from(reminders)
       ..order = order;
   }
 
+  /// Progress is derived from KPIs; Goals no longer embed subtasks directly.
+  /// Use links to Tasks/Projects and check their completion instead.
   double get progress {
-    if (subtasks.isEmpty) return 0.0;
-    final completedCount = subtasks.where((s) => s.completed).length;
-    return completedCount / subtasks.length;
+    if (kpis.isEmpty) return 0.0;
+    final total = kpis.fold<double>(0, (sum, k) => sum + k.targetValue);
+    if (total == 0) return 0.0;
+    final current = kpis.fold<double>(0, (sum, k) => sum + k.currentValue.clamp(0, k.targetValue));
+    return (current / total).clamp(0.0, 1.0);
   }
 }

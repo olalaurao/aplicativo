@@ -30,6 +30,8 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
   int _startingDayOffset = 0;
   int _intervalBetweenDays = 1;
   String? _linkedItemId;
+  String? _targetType;
+  String? _fieldName;
 
   // Scheduler Data
   List<SchedulerRule> _exclusions = [];
@@ -62,6 +64,8 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
         _startingDayOffset = firstRule.startingDayOffset ?? 0;
         _intervalBetweenDays = firstRule.intervalBetweenDays ?? 1;
         _linkedItemId = firstRule.linkedItemId;
+        _targetType = firstRule.targetType;
+        _fieldName = firstRule.fieldName;
       }
     }
   }
@@ -207,6 +211,11 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
           Icons.business_center_rounded,
         ),
         _typeOption(
+          RepeatType.daysAfterReferenceField,
+          'Days After Reference Field',
+          Icons.calendar_view_day_rounded,
+        ),
+        _typeOption(
           RepeatType.daysOfTheme,
           'Day Theme',
           Icons.dashboard_customize_rounded,
@@ -319,6 +328,39 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
         return const Text(
           'Scheduled for the first business day of each month.',
           style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+        );
+      case RepeatType.daysAfterReferenceField:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _intervalInput('Repeat every', 'days after date'),
+            const SizedBox(height: 20),
+            const Text('Target Object Type', style: TextStyle(fontSize: 16)),
+            const SizedBox(height: 8),
+            TextField(
+              decoration: InputDecoration(
+                hintText: 'e.g. person, project',
+                filled: true,
+                fillColor: AppColors.surfaceVariant,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+              controller: TextEditingController(text: _targetType),
+              onChanged: (v) => _targetType = v,
+            ),
+            const SizedBox(height: 20),
+            const Text('Date Field Name', style: TextStyle(fontSize: 16)),
+            const SizedBox(height: 8),
+            TextField(
+              decoration: InputDecoration(
+                hintText: 'e.g. last_contact_date',
+                filled: true,
+                fillColor: AppColors.surfaceVariant,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+              controller: TextEditingController(text: _fieldName),
+              onChanged: (v) => _fieldName = v,
+            ),
+          ],
         );
     }
   }
@@ -891,6 +933,8 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
             startingDayOffset: _startingDayOffset,
             intervalBetweenDays: _intervalBetweenDays,
             linkedItemId: _linkedItemId,
+            targetType: _targetType,
+            fieldName: _fieldName,
           ),
         ],
         exclusions: _exclusions,
@@ -931,6 +975,8 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
         return 'N days post-linked';
       case RepeatType.firstBusinessDayOfMonth:
         return '1st business day';
+      case RepeatType.daysAfterReferenceField:
+        return 'Days after reference field';
     }
   }
 }

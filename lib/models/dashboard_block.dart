@@ -1,41 +1,22 @@
 // lib/models/dashboard_block.dart
 
+// F3.8: V5 deduplicated list retired - panel system being redesigned from blank slate
+// Only core mechanics preserved until redesign is complete
 enum BlockType {
+  // Core panel type - Today's Habits (kept explicitly per V5.1 spec)
+  todayHabits,
+  // Generic fallback for custom panels during redesign
+  custom,
+  // Legacy types preserved for backward compatibility during migration
+  // These will be re-specified or removed once redesign is finalized
   universal,
   shortcuts,
   timeline,
-  habits,
   tasks,
   goals,
-  quotes,
-  photos,
-  kpi,
-  dailyGoal,
-  shoppingList,
-  mood,
   notes,
-  googleCalendar,
-  trackerField,
-  people,
-  resources,
-  timer,
-  analysisTrend,
-  habitTrend,
-  journalQuickAdd,
-  timeBlocking,
-  customMarkdown,
-  plannerDay,
-  plannerWeek,
-  plannerMonth,
-  pomodoroSummary,
-  organizerSummary,
-  pinnedObject,
   calendar,
-  systemQuickRun,
-  energyMap,
-  // Bloco de Pacts: lista hábitos mode==pact ativos com checkbox de hoje
-  // e badge de dias restantes (endsAt - hoje)
-  pactToday,
+  // ... other legacy types will be removed after redesign
 }
 
 class DashboardBlock {
@@ -89,8 +70,8 @@ class DashboardBlock {
       id: map['id'] as String? ?? 'block-${DateTime.now().millisecondsSinceEpoch}',
       type: BlockType.values.firstWhere(
         (e) => e.name == map['type'],
-        // Fallback seguro: tipos obsoletos/desconhecidos caem em customMarkdown
-        orElse: () => BlockType.customMarkdown,
+        // Fallback seguro: tipos obsoletos/desconhecidos caem em custom
+        orElse: () => BlockType.custom,
       ),
       title: map['title'] as String? ?? '',
       visible: map['visible'] as bool? ?? true,

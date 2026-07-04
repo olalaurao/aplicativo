@@ -792,6 +792,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           activeThumbColor: AppColors.primary,
                         ),
                       ),
+                      const Divider(height: 1, indent: 16),
+                      SwitchListTile(
+                        title: const Text('Mostrar seção Atrasados'),
+                        subtitle: const Text(
+                          'Exibe tarefas, metas e projetos com prazo vencido',
+                        ),
+                        value: settings.showOverdueSection,
+                        onChanged: (val) =>
+                            notifier.updateShowOverdueSection(val),
+                        activeThumbColor: AppColors.primary,
+                      ),
                     ],
                   ),
                 ),
@@ -1156,8 +1167,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _regenerateDataview(BuildContext context) async {
     final obsidian = ref.read(obsidianServiceProvider);
     final gen = DataviewGenerator(obsidian);
+    final projects = ref.read(projectsProvider);
+    final tasks = ref.read(tasksProvider);
     try {
-      await gen.regenerateAll();
+      await gen.regenerateAll(projects: projects, tasks: tasks);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

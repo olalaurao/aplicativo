@@ -207,7 +207,40 @@ class SchedulerService {
       case RepeatType.daysWithBlock:
         if (rule.blockId == null || isBlockActive == null) return false;
         return isBlockActive(rule.blockId!, date);
+
+      case RepeatType.daysAfterReferenceField:
+        // F2.13: This type requires a specific date field value from the target object
+        // (e.g. last_contact_date on Person). Resolution happens at the call site
+        // via the referenceDateValue callback.
+        if (rule.targetType == null || rule.fieldName == null || rule.interval == null) {
+          return false;
+        }
+        // The actual check is done by the caller providing referenceDateValue
+        // For now, return false - the caller must implement the specific logic
+        return false;
     }
+  }
+
+  /// F2.13: Check if a daysAfterReferenceField rule should fire for a specific object
+  /// This is called by the consumer (e.g., Person) to evaluate the rule against
+  /// the object's actual date field value.
+  static bool shouldFireReferenceFieldRule(
+    SchedulerRule rule,
+    DateTime date,
+    DateTime? referenceDateValue,
+  ) {
+    if (rule.repeatType != RepeatType.daysAfterReferenceField) return false;
+    if (referenceDateValue == null || rule.interval == null) return false;
+
+    final normalizedRefDate = DateTime(
+      referenceDateValue.year,
+      referenceDateValue.month,
+      referenceDateValue.day,
+    );
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+
+    final targetDate = normalizedRefDate.add(Duration(days: rule.interval!));
+    return normalizedDate.isAtSameMomentAs(targetDate) || normalizedDate.isAfter(targetDate);
   }
 
   static DateTime? nextOccurrence(Scheduler scheduler, {DateTime? after}) {

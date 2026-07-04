@@ -6,6 +6,90 @@ import 'task_model.dart';
 
 enum ProjectState { active, paused, completed, archived }
 
+class RotationGroup {
+  final String id;
+  final String name;
+  final String? emoji;
+  final String? colorHex;
+  final int periodDays;
+  final int order;
+
+  const RotationGroup({
+    required this.id,
+    required this.name,
+    this.emoji,
+    this.colorHex,
+    required this.periodDays,
+    required this.order,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'name': name,
+    if (emoji != null) 'emoji': emoji,
+    if (colorHex != null) 'color': colorHex,
+    'period_days': periodDays,
+    'order': order,
+  };
+
+  factory RotationGroup.fromMap(Map<String, dynamic> map) => RotationGroup(
+    id: map['id']?.toString() ?? '',
+    name: map['name']?.toString() ?? '',
+    emoji: map['emoji']?.toString(),
+    colorHex: map['color']?.toString(),
+    periodDays: map['period_days'] as int? ?? 7,
+    order: map['order'] as int? ?? 0,
+  );
+}
+
+/// A phase groups Tasks by stage within a Project.
+/// Each phase has a name and a list of WikiLinks to child Tasks.
+class ProjectPhase {
+  final String id;
+  final String name;
+  final String? description;
+  final int order;
+  final List<String> taskLinks; // WikiLinks to tasks in this phase
+
+  const ProjectPhase({
+    required this.id,
+    required this.name,
+    this.description,
+    this.order = 0,
+    this.taskLinks = const [],
+  });
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'name': name,
+    if (description != null) 'description': description,
+    'order': order,
+    'tasks': taskLinks,
+  };
+
+  factory ProjectPhase.fromMap(Map<String, dynamic> map) => ProjectPhase(
+    id: map['id']?.toString() ?? '',
+    name: map['name']?.toString() ?? '',
+    description: map['description']?.toString(),
+    order: map['order'] as int? ?? 0,
+    taskLinks: List<String>.from(map['tasks'] as List? ?? []),
+  );
+
+  ProjectPhase copyWith({
+    String? id,
+    String? name,
+    String? description,
+    int? order,
+    List<String>? taskLinks,
+  }) => ProjectPhase(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    description: description ?? this.description,
+    order: order ?? this.order,
+    taskLinks: taskLinks ?? this.taskLinks,
+  );
+}
+
 class Project extends Organizer {
   String? description;
   String? primaryKpiId;
@@ -18,6 +102,20 @@ class Project extends Organizer {
   String? linkedGoogleEventDate;
   String? linkedGoogleEventUrl;
   Scheduler? scheduler;
+  List<RotationGroup> rotationGroups = [];
+  DateTime? rotationStartDate;
+  /// V5: absorbed from Goal's plan_mode
+  String? objective;       // the why
+  String? strategy;        // the how
+  List<ProjectPhase> phases; // array grouping Tasks by stage
+  /// V5: set on old file when a scheduled restart creates a new Project
+  String? supersededBy;   // WikiLink e.g. "[[new-project-slug]]"
+  String? methodLabel;
+
+  bool get hasRotation =>
+      rotationGroups.isNotEmpty && rotationStartDate != null;
+  int get rotationCycleLengthDays =>
+      rotationGroups.fold(0, (sum, g) => sum + g.periodDays);
 
   ProjectState get projectState => ProjectState.values.firstWhere(
     (e) => e.name == super.state,
@@ -47,6 +145,13 @@ class Project extends Organizer {
     this.linkedGoogleEventDate,
     this.linkedGoogleEventUrl,
     this.scheduler,
+    List<RotationGroup>? rotationGroups,
+    this.rotationStartDate,
+    this.methodLabel,
+    this.objective,
+    this.strategy,
+    List<ProjectPhase>? phases,
+    this.supersededBy,
     super.parentId,
     super.startDate,
     super.endDate,
@@ -60,6 +165,8 @@ class Project extends Organizer {
   }) : secondaryKpiIds = secondaryKpiIds ?? [],
        taskLinks = taskLinks ?? [],
        quickAccessLinks = quickAccessLinks ?? [],
+       rotationGroups = rotationGroups ?? [],
+       phases = phases ?? [],
        super(
          organizerType: OrganizerType.project,
          state: state.name,
@@ -68,6 +175,9 @@ class Project extends Organizer {
 
   @override
   String get type => 'project';
+
+  @override
+  bool get isIncomplete => title.trim().isEmpty;
 
   @override
   String toMarkdown() {
@@ -96,6 +206,23 @@ class Project extends Organizer {
     if (scheduler != null) {
       frontmatter['scheduler'] = scheduler!.toMap();
     }
+    if (rotationGroups.isNotEmpty) {
+      frontmatter['rotation_groups'] =
+          rotationGroups.map((g) => g.toMap()).toList();
+    }
+    if (rotationStartDate != null) {
+      frontmatter['rotation_start_date'] =
+          rotationStartDate!.toIso8601String().split('T').first;
+    }
+    if (methodLabel != null) frontmatter['method_label'] = methodLabel;
+
+    // V5: Plan-mode fields absorbed from Goal
+    if (objective != null) frontmatter['objective'] = objective;
+    if (strategy != null) frontmatter['strategy'] = strategy;
+    if (phases.isNotEmpty) {
+      frontmatter['phases'] = phases.map((p) => p.toMap()).toList();
+    }
+    if (supersededBy != null) frontmatter['superseded_by'] = supersededBy;
 
     // Add organizer-specific fields
     if (startDate != null) {
@@ -170,6 +297,32 @@ class Project extends Organizer {
         Map<String, dynamic>.from(frontmatter['scheduler'] as Map),
       );
     }
+    if (frontmatter['rotation_groups'] is List) {
+      project.rotationGroups = (frontmatter['rotation_groups'] as List)
+          .whereType<Map>()
+          .map((m) => RotationGroup.fromMap(Map<String, dynamic>.from(m)))
+          .toList();
+    }
+    if (frontmatter['rotation_start_date'] != null) {
+      project.rotationStartDate =
+          DateTime.tryParse(frontmatter['rotation_start_date'].toString());
+    }
+    project.methodLabel = frontmatter['method_label']?.toString();
+
+    // V5: Plan-mode fields
+    project.objective = frontmatter['objective'] is List
+        ? (frontmatter['objective'] as List).join('\n')
+        : frontmatter['objective']?.toString();
+    project.strategy = frontmatter['strategy'] is List
+        ? (frontmatter['strategy'] as List).join('\n')
+        : frontmatter['strategy']?.toString();
+    if (frontmatter['phases'] is List) {
+      project.phases = (frontmatter['phases'] as List)
+          .whereType<Map>()
+          .map((m) => ProjectPhase.fromMap(Map<String, dynamic>.from(m)))
+          .toList();
+    }
+    project.supersededBy = frontmatter['superseded_by']?.toString();
 
     return project;
   }
@@ -213,6 +366,13 @@ class Project extends Organizer {
       linkedGoogleEventDate: linkedGoogleEventDate,
       linkedGoogleEventUrl: linkedGoogleEventUrl,
       scheduler: scheduler,
+      rotationGroups: rotationGroups,
+      rotationStartDate: rotationStartDate,
+      methodLabel: methodLabel,
+      objective: objective,
+      strategy: strategy,
+      phases: phases,
+      supersededBy: supersededBy,
       parentId: parentId ?? this.parentId,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
@@ -241,6 +401,13 @@ class Project extends Organizer {
     String? linkedGoogleEventDate,
     String? linkedGoogleEventUrl,
     Scheduler? scheduler,
+    List<RotationGroup>? rotationGroups,
+    DateTime? rotationStartDate,
+    String? methodLabel,
+    String? objective,
+    String? strategy,
+    List<ProjectPhase>? phases,
+    String? supersededBy,
     String? parentId,
     DateTime? startDate,
     DateTime? endDate,
@@ -270,6 +437,13 @@ class Project extends Organizer {
           linkedGoogleEventDate ?? this.linkedGoogleEventDate,
       linkedGoogleEventUrl: linkedGoogleEventUrl ?? this.linkedGoogleEventUrl,
       scheduler: scheduler ?? this.scheduler,
+      rotationGroups: rotationGroups ?? this.rotationGroups,
+      rotationStartDate: rotationStartDate ?? this.rotationStartDate,
+      methodLabel: methodLabel ?? this.methodLabel,
+      objective: objective ?? this.objective,
+      strategy: strategy ?? this.strategy,
+      phases: phases ?? this.phases,
+      supersededBy: supersededBy ?? this.supersededBy,
       parentId: parentId ?? this.parentId,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,

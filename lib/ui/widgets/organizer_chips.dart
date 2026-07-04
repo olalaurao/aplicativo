@@ -44,8 +44,6 @@ class OrganizerChips extends StatelessWidget {
         return AppColors.habitGreen;
       case 'person':
         return AppColors.habitPink;
-      case 'place':
-        return AppColors.habitOrange;
       case 'label':
         return AppColors.textSecondary;
       default:

@@ -146,6 +146,8 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
       updatedHabit = widget.habit.copyWith(
         status: HabitStatus.paused,
         pactOutcome: PactOutcome.pause,
+        startedAt: null,
+        endsAt: null,
         previousCycles: updatedCycles,
         description: _learningController.text.trim().isNotEmpty
             ? _learningController.text.trim()
@@ -154,6 +156,8 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
     } else {
       updatedHabit = widget.habit.copyWith(
         pactOutcome: PactOutcome.pivot,
+        startedAt: null,
+        endsAt: null,
         previousCycles: updatedCycles,
         description: _learningController.text.trim().isNotEmpty
             ? _learningController.text.trim()

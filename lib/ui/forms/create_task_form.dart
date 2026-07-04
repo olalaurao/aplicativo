@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../models/social_post.dart';
 import '../../models/task_model.dart';
+import '../../models/project_model.dart';
 import '../../models/reminder_config.dart';
 import '../../models/shared_types.dart';
 import '../../providers/vault_provider.dart';
@@ -49,6 +50,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
   int? _durationMinutes;
   String? _reflection;
   bool _untilDone = false;
+  String? _dateRange;
   List<OrganizerReference> _organizers = [];
   final List<Subtask> _subtasks = [];
   List<ReminderConfig> _customReminders = [];
@@ -59,6 +61,10 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
   Scheduler? _scheduler;
   int? _estimatedMinutes;
   String? _linkedSystem;
+  String? _rotationGroupId;
+  RotationFrequencyType _rotationFrequencyType = RotationFrequencyType.none;
+  int? _rotationEveryN;
+  final _rotationEveryNController = TextEditingController();
 
   @override
   void initState() {
@@ -89,6 +95,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         }
       }
       _untilDone = task.untilDone;
+      _dateRange = task.dateRange;
       _reflection = task.reflection;
       _organizers = List.from(task.organizers);
       _subtasks.addAll(
@@ -106,9 +113,14 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       _pomodoroCount = task.pomodoroCount;
       _timeBlock = task.timeBlock;
       _dependsOn = List.from(task.dependsOn);
-      _socialRefs = List.from(task.socialRefs);
+      _socialRefs = List.from(task.links);
       _estimatedMinutes = task.estimatedMinutes;
       _linkedSystem = task.linkedSystem;
+      _rotationGroupId = task.rotationGroupId;
+      _rotationFrequencyType = task.rotationFrequencyType;
+      _rotationEveryN = task.rotationEveryN;
+      _rotationEveryNController.text =
+          task.rotationEveryN?.toString() ?? '';
     } else {
       _timeBlock = widget.initialTimeBlock;
       if (widget.initialStage != null) {
@@ -123,7 +135,19 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
   @override
   void dispose() {
     _titleController.dispose();
+    _rotationEveryNController.dispose();
     super.dispose();
+  }
+
+  Project? _findRotationProject() {
+    final projects = ref.read(projectsProvider);
+    for (final org in _organizers) {
+      if (org.type != 'project') continue;
+      for (final project in projects) {
+        if (project.slug == org.slug && project.hasRotation) return project;
+      }
+    }
+    return null;
   }
 
   @override
@@ -131,6 +155,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     final hasTitle = _titleController.text.trim().isNotEmpty;
     final settings = ref.watch(settingsProvider);
     final isDirty = hasTitle || _notesContent.trim().isNotEmpty;
+    final hasDateRange = _dateRange != null && _dateRange!.trim().isNotEmpty;
 
     return PopScope(
       canPop: !isDirty,
@@ -418,6 +443,46 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                             ),
                           ),
                           const Divider(height: 24),
+                          if (hasDateRange) ...[
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Expanded(
+                                  child: Text(
+                                    'Date Range',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Flexible(
+                                  child: Text(
+                                    _dateRange!,
+                                    textAlign: TextAlign.right,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Until Done fica desativado enquanto esta tarefa usa date_range.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                            ),
+                            const Divider(height: 24),
+                          ],
                           // Until Done
                           Row(
                             children: [
@@ -431,8 +496,9 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                               const Spacer(),
                               Switch.adaptive(
                                 value: _untilDone,
-                                onChanged: (v) =>
-                                    setState(() => _untilDone = v),
+                                onChanged: hasDateRange
+                                    ? null
+                                    : (v) => setState(() => _untilDone = v),
                                 activeThumbColor: AppColors.primary,
                               ),
                             ],
@@ -513,7 +579,18 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                           const Divider(height: 24),
                           // Repeat / Scheduler
                           GestureDetector(
-                            onTap: _pickScheduler,
+                            onTap: _rotationFrequencyType !=
+                                    RotationFrequencyType.none
+                                ? () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Remova a rotação para usar Repeat.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                : _pickScheduler,
                             child: Row(
                               children: [
                                 const Text(
@@ -561,9 +638,23 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: OrganizerSelectorField(
                         selectedOrganizers: _organizers,
-                        onChanged: (val) => setState(() => _organizers = val),
+                        onChanged: (val) => setState(() {
+                          _organizers = val;
+                          if (_findRotationProject() == null) {
+                            _rotationGroupId = null;
+                            _rotationFrequencyType =
+                                RotationFrequencyType.none;
+                            _rotationEveryN = null;
+                            _rotationEveryNController.clear();
+                          }
+                        }),
                       ),
                     ),
+
+                    if (_findRotationProject() != null) ...[
+                      const SizedBox(height: 12),
+                      _buildRotationCard(_findRotationProject()!),
+                    ],
 
                     const SizedBox(height: 12),
 
@@ -1586,6 +1677,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
   }
 
   void _saveTask() async {
+    final hasDateRange = _dateRange != null && _dateRange!.trim().isNotEmpty;
     if (_endDate == null && _stage != TaskStage.idea) {
       final result = await showDialog<String>(
         context: context,
@@ -1641,16 +1733,30 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       scheduledTime: _scheduledTime != null
           ? '${_scheduledTime!.hour.toString().padLeft(2, '0')}:${_scheduledTime!.minute.toString().padLeft(2, '0')}'
           : null,
-      untilDone: _untilDone,
+      untilDone: hasDateRange ? false : _untilDone,
+      dateRange: _dateRange,
       duration: _durationMinutes ?? 15,
       reminders: _customReminders,
       scheduler: _scheduler,
       pomodoroCount: _pomodoroCount,
       timeBlock: _timeBlock,
       dependsOn: _dependsOn,
-      socialRefs: _socialRefs,
+      links: _socialRefs,
       estimatedMinutes: _estimatedMinutes,
       linkedSystem: _linkedSystem,
+      rotationGroupId: _rotationFrequencyType != RotationFrequencyType.none
+          ? _rotationGroupId
+          : null,
+      rotationFrequencyType: _rotationFrequencyType,
+      rotationEveryN: _rotationFrequencyType ==
+              RotationFrequencyType.everyNRotations
+          ? int.tryParse(_rotationEveryNController.text.trim()) ??
+              _rotationEveryN
+          : null,
+      rotationLastCompletedAtOccurrence:
+          widget.existingTask?.rotationLastCompletedAtOccurrence,
+      rotationDailyCompletions:
+          widget.existingTask?.rotationDailyCompletions ?? {},
     );
 
     task.organizers.clear();
@@ -1804,7 +1910,138 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         child: SchedulerPicker(initialScheduler: _scheduler),
       ),
     );
-    if (result != null) setState(() => _scheduler = result);
+    if (result != null) {
+      setState(() {
+        _scheduler = result;
+        _rotationGroupId = null;
+        _rotationFrequencyType = RotationFrequencyType.none;
+        _rotationEveryN = null;
+        _rotationEveryNController.clear();
+      });
+    }
+  }
+
+  Widget _buildRotationCard(Project project) {
+    final groups = [...project.rotationGroups]
+      ..sort((a, b) => a.order.compareTo(b.order));
+
+    return Container(
+      decoration: AppTheme.cardDecoration(context),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.sync_rounded, size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Rotação — ${project.title}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Mutuamente exclusivo com Repeat.',
+            style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            value: groups.any((g) => g.id == _rotationGroupId)
+                ? _rotationGroupId
+                : null,
+            decoration: const InputDecoration(
+              labelText: 'Zona',
+              border: OutlineInputBorder(),
+            ),
+            items: groups
+                .map(
+                  (g) => DropdownMenuItem(
+                    value: g.id,
+                    child: Text(
+                      '${g.emoji != null ? '${g.emoji} ' : ''}${g.name}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) => setState(() => _rotationGroupId = v),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<RotationFrequencyType>(
+            value: _rotationFrequencyType == RotationFrequencyType.none
+                ? null
+                : _rotationFrequencyType,
+            decoration: const InputDecoration(
+              labelText: 'Tipo de frequência',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(
+                value: RotationFrequencyType.daily,
+                child: Text('Diária'),
+              ),
+              DropdownMenuItem(
+                value: RotationFrequencyType.oncePerPeriod,
+                child: Text('Uma vez no período'),
+              ),
+              DropdownMenuItem(
+                value: RotationFrequencyType.everyNRotations,
+                child: Text('Por frequência'),
+              ),
+            ],
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() {
+                _rotationFrequencyType = v;
+                _scheduler = null;
+                if (v != RotationFrequencyType.everyNRotations) {
+                  _rotationEveryN = null;
+                  _rotationEveryNController.clear();
+                }
+              });
+            },
+          ),
+          if (_rotationFrequencyType ==
+              RotationFrequencyType.everyNRotations) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _rotationEveryNController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'A cada N rotações',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (v) => _rotationEveryN = int.tryParse(v),
+            ),
+          ],
+          if (_rotationFrequencyType != RotationFrequencyType.none) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => setState(() {
+                  _rotationGroupId = null;
+                  _rotationFrequencyType = RotationFrequencyType.none;
+                  _rotationEveryN = null;
+                  _rotationEveryNController.clear();
+                }),
+                child: const Text('Remover rotação'),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Color _priorityColor(TaskPriority p) {

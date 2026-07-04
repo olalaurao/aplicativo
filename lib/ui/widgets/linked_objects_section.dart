@@ -8,7 +8,7 @@ import '../screens/universal_detail_view.dart';
 
 class LinkedObjectsSection extends ConsumerWidget {
   final ContentObject owner;
-  final List<String> socialRefs;
+  final List<String> links;
   final Future<void> Function(ContentObject selected) onAdd;
   final Future<void> Function(String slug) onRemove;
   final String? addButtonLabel;
@@ -16,7 +16,7 @@ class LinkedObjectsSection extends ConsumerWidget {
   const LinkedObjectsSection({
     super.key,
     required this.owner,
-    required this.socialRefs,
+    required this.links,
     required this.onAdd,
     required this.onRemove,
     this.addButtonLabel,
@@ -25,10 +25,10 @@ class LinkedObjectsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
-    final linked = _resolve(allObjects, socialRefs);
+    final linked = _resolve(allObjects, links);
     final grouped = <String, List<ContentObject>>{};
     for (final obj in linked) {
-      grouped.putIfAbsent(obj.type, () => []).add(obj); // Assuming we use type since displayType might not exist on ContentObject
+      grouped.putIfAbsent(obj.type, () => []).add(obj);
     }
 
     return Column(

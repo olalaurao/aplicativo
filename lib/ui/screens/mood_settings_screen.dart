@@ -10,7 +10,7 @@ import '../widgets/app_color_picker.dart';
 class MoodSettingsScreen extends ConsumerWidget {
   const MoodSettingsScreen({super.key});
 
-  static const int _maxUserMoods = 15;
+  static const int _maxUserMoods = 20;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -124,6 +124,12 @@ class MoodSettingsScreen extends ConsumerWidget {
                 _openMoodForm(context, ref, mood);
               }
             : null,
+        onEditCoordinates: mood.source == MoodSource.system
+            ? () {
+                Navigator.pop(sheetContext);
+                _openMoodForm(context, ref, mood);
+              }
+            : null,
         onDelete: mood.source == MoodSource.user
             ? () async {
                 final confirmed = await _confirmDeleteMood(sheetContext, mood);
@@ -161,7 +167,7 @@ class MoodSettingsScreen extends ConsumerWidget {
 
   void _showMaxMoodsMessage(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('You already have 15 custom moods.')),
+      const SnackBar(content: Text('You already have 20 custom moods.')),
     );
   }
 }
@@ -293,7 +299,7 @@ class _MoodRow extends StatelessWidget {
       subtitle: Text(
         mood.description?.trim().isNotEmpty == true
             ? mood.description!.trim()
-            : 'Pleasantness ${mood.pleasantness}/5 · Energy ${mood.energy}/5',
+            : 'Pleasantness ${mood.pleasantness}/10 · Energy ${mood.energy}/10',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
@@ -301,6 +307,22 @@ class _MoodRow extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (mood.source == MoodSource.system)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.textMuted.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                'System',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ),
           if (mood.source == MoodSource.user)
             const Icon(Icons.drag_handle_rounded, color: AppColors.textMuted),
           Switch.adaptive(
@@ -319,12 +341,14 @@ class _MoodDetailSheet extends StatefulWidget {
   final ValueChanged<MoodDefinition> onUpdate;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onEditCoordinates;
 
   const _MoodDetailSheet({
     required this.mood,
     required this.onUpdate,
     this.onEdit,
     this.onDelete,
+    this.onEditCoordinates,
   });
 
   @override
@@ -404,7 +428,7 @@ class _MoodDetailSheetState extends State<_MoodDetailSheet> {
             _InfoRow(
               title: 'Values',
               child: Text(
-                'Pleasantness: ${_mood.pleasantness}/5 · Energy: ${_mood.energy}/5',
+                'Pleasantness: ${_mood.pleasantness}/10 · Energy: ${_mood.energy}/10',
               ),
             ),
             const SizedBox(height: 12),
@@ -448,6 +472,17 @@ class _MoodDetailSheetState extends State<_MoodDetailSheet> {
                   onPressed: widget.onEdit,
                   icon: const Icon(Icons.edit_outlined),
                   label: const Text('Edit mood'),
+                ),
+              ),
+            ],
+            if (widget.onEditCoordinates != null) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _confirmEditCoordinates,
+                  icon: const Icon(Icons.tune_outlined),
+                  label: const Text('Edit coordinates'),
                 ),
               ),
             ],
@@ -521,6 +556,31 @@ class _MoodDetailSheetState extends State<_MoodDetailSheet> {
   void _update(MoodDefinition mood) {
     setState(() => _mood = mood);
     widget.onUpdate(mood);
+  }
+
+  Future<void> _confirmEditCoordinates() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit coordinates?'),
+        content: const Text(
+          'This changes how this mood appears from now on. Past check-ins and charts won\'t change retroactively.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && widget.onEditCoordinates != null) {
+      widget.onEditCoordinates!();
+    }
   }
 }
 
@@ -821,18 +881,18 @@ class _MoodFormScreenState extends ConsumerState<_MoodFormScreen> {
 
   ({int start, int end}) _pleasantRange(MoodQuadrant quadrant) =>
       switch (quadrant) {
-        MoodQuadrant.red => (start: 1, end: 2),
-        MoodQuadrant.blue => (start: 1, end: 2),
-        MoodQuadrant.green => (start: 4, end: 5),
-        MoodQuadrant.yellow => (start: 4, end: 5),
+        MoodQuadrant.red => (start: 0, end: 4),
+        MoodQuadrant.blue => (start: 0, end: 4),
+        MoodQuadrant.green => (start: 5, end: 10),
+        MoodQuadrant.yellow => (start: 5, end: 10),
       };
 
   ({int start, int end}) _energyRange(MoodQuadrant quadrant) =>
       switch (quadrant) {
-        MoodQuadrant.red => (start: 3, end: 5),
-        MoodQuadrant.yellow => (start: 3, end: 5),
-        MoodQuadrant.green => (start: 1, end: 3),
-        MoodQuadrant.blue => (start: 1, end: 3),
+        MoodQuadrant.red => (start: 5, end: 10),
+        MoodQuadrant.yellow => (start: 5, end: 10),
+        MoodQuadrant.green => (start: 0, end: 4),
+        MoodQuadrant.blue => (start: 0, end: 4),
       };
 
   String _hexForColor(Color color) {
@@ -867,7 +927,7 @@ class _MoodSlider extends StatelessWidget {
           children: [
             Expanded(child: Text(label)),
             Text(
-              '$value/5',
+              '$value/10',
               style: const TextStyle(fontWeight: FontWeight.w800),
             ),
           ],

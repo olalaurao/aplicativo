@@ -12,8 +12,7 @@ enum OrganizerType {
   habit,
   tracker,
   label,
-  person,
-  place
+  person
 }
 
 class Organizer extends ContentObject {
@@ -46,6 +45,9 @@ class Organizer extends ContentObject {
 
   @override
   String get type => organizerType.name;
+
+  @override
+  bool get isIncomplete => title.trim().isEmpty;
 
   @override
   String get displayType => organizerType.name.toUpperCase();

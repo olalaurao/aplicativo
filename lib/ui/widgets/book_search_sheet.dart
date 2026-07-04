@@ -262,7 +262,7 @@ class _BookSearchSheetState extends ConsumerState<BookSearchSheet> {
     ];
     final resource = Resource(
       title: title,
-      resourceType: 'Livro',
+      mediaType: 'Livro',
       coverImage: result.coverUrlLarge ?? result.coverUrl,
       sourceUrl: 'https://books.google.com/books?id=${result.googleBooksId}',
       author: result.author,
@@ -275,7 +275,7 @@ class _BookSearchSheetState extends ConsumerState<BookSearchSheet> {
       publisher: result.publisher,
       language: result.language,
       googleBooksId: result.googleBooksId,
-      socialRefs: [
+      links: [
         if (widget.linkedPostId?.trim().isNotEmpty == true)
           widget.linkedPostId!,
       ],
@@ -300,3 +300,5 @@ class _BookSearchSheetState extends ConsumerState<BookSearchSheet> {
     widget.onSaved?.call();
   }
 }
+
+

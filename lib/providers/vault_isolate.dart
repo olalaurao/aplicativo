@@ -6,7 +6,6 @@ import '../services/markdown_parser.dart';
 import '../models/shared_types.dart';
 import '../models/content_object.dart';
 import '../models/task_model.dart';
-import '../models/shopping_item.dart';
 import '../models/shopping_list_model.dart' as shopping_list_model;
 import '../models/journal_entry.dart';
 import '../models/habit_model.dart';
@@ -16,18 +15,17 @@ import '../models/note_model.dart';
 import '../models/tracker_model.dart';
 import '../models/mood_model.dart';
 import '../models/analysis_model.dart';
+import '../models/wellbeing_indicator_model.dart';
 import '../models/resource_model.dart';
 import '../models/social_post.dart';
 import '../models/people_model.dart';
 import '../models/project_model.dart';
 import '../models/snapshot_model.dart';
 import '../models/system_model.dart';
-import '../models/scheduler.dart';
 import '../models/day_theme_model.dart';
 import '../models/template_model.dart';
 import '../models/idea_model.dart';
 import '../models/event_model.dart';
-import '../models/calendar_session.dart';
 import '../models/pomodoro_session.dart';
 import '../models/reminder_model.dart';
 
@@ -225,9 +223,13 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                     obsidianPath: relativePath,
                     entryType: resolvedEntryType,
                     category: data['category']?.toString(),
-                    energyValue: data['energy_value'] is int
-                        ? data['energy_value'] as int
-                        : int.tryParse(data['energy_value']?.toString() ?? ''),
+                    energyValue: (() {
+                      final ev = data['energy_value'] is int
+                          ? data['energy_value'] as int
+                          : int.tryParse(data['energy_value']?.toString() ?? '');
+                      // F3.15: Clamp energy value to 0-10 range
+                      return ev != null ? ev.clamp(0, 10) : null;
+                    })(),
                   );
                   if (data['organizers'] != null) {
                     entry.organizers = (data['organizers'] as List)
@@ -319,9 +321,6 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
               if (type == 'task' && !relativePath.startsWith('organizers/')) {
                 obj = Task.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
-              } else if (type == 'shopping_item') {
-                obj = ShoppingItem.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
               } else if (type == 'shopping_list') {
                 obj = shopping_list_model.ShoppingList.fromMarkdown(
                   frontmatter,
@@ -397,6 +396,9 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
               } else if (type == 'combined_analysis') {
                 obj = CombinedAnalysis.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
+              } else if (type == 'wellbeing_indicator') {
+                obj = WellbeingIndicator.fromMarkdown(frontmatter, body)
+                  ..obsidianPath = relativePath;
               } else if (type == 'snapshot') {
                 obj = Snapshot.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
@@ -406,9 +408,6 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                   body,
                   relativePath,
                 );
-              } else if (type == 'calendar_session') {
-                obj = CalendarSession.fromMarkdown(frontmatter, body)
-                  ..obsidianPath = relativePath;
               } else if (type == 'time_block') {
                 obj = TimeBlock.fromMap(frontmatter, body: body)
                   ..obsidianPath = relativePath;

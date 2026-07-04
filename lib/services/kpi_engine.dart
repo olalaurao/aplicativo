@@ -156,12 +156,29 @@ class KPIEngine {
         if (kpi.calculationMode == 'mood_average') {
           // Sistema de 2 eixos: pleasantness (padrão) ou energy
           final useEnergy = kpi.fieldId == 'energy';
-          final dayMoods = entries.where((e) => e.moodSlug != null).map((e) {
-            final m = moods.where((m) => m.id == e.moodSlug).firstOrNull;
-            if (useEnergy) {
-              return (m?.energy ?? 0).toDouble();
+          
+          // F2.14: Collect all mood entries from moodEntries array
+          final allMoodEntries = <MoodEntry>[];
+          for (final entry in entries) {
+            if (entry.moodEntries.isNotEmpty) {
+              allMoodEntries.addAll(entry.moodEntries);
+            } else if (entry.moodSlug != null) {
+              // Legacy fallback
+              allMoodEntries.add(MoodEntry(
+                moodSlug: entry.moodSlug!,
+                timestamp: entry.date,
+              ));
             }
-            return (m?.pleasantness ?? m?.numericValue ?? 0).toDouble();
+          }
+          
+          final dayMoods = allMoodEntries.map((moodEntry) {
+            final m = moods.where((m) => m.id == moodEntry.moodSlug).firstOrNull;
+            if (useEnergy) {
+              // Use energy from MoodEntry if available, else from MoodDefinition
+              return (moodEntry.energy ?? m?.energy ?? 0).toDouble();
+            }
+            // Use pleasantness from MoodEntry if available, else from MoodDefinition
+            return (moodEntry.pleasantness ?? m?.pleasantness ?? m?.numericValue ?? 0).toDouble();
           }).where((val) => val > 0).toList();
           return average(dayMoods);
         } else if (kpi.calculationMode == 'mood_trend') {
@@ -169,17 +186,33 @@ class KPIEngine {
           final now = DateTime.now();
           final cutoff = now.subtract(const Duration(days: 7));
           final prevCutoff = now.subtract(const Duration(days: 14));
-          double moodVal(JournalEntry e) {
-            final m = moods.where((m) => m.id == e.moodSlug).firstOrNull;
-            return (m?.pleasantness ?? m?.numericValue ?? 0).toDouble();
+          
+          // F2.14: Collect all mood entries from moodEntries array
+          final allMoodEntries = <MoodEntry>[];
+          for (final entry in entries) {
+            if (entry.moodEntries.isNotEmpty) {
+              allMoodEntries.addAll(entry.moodEntries);
+            } else if (entry.moodSlug != null) {
+              // Legacy fallback
+              allMoodEntries.add(MoodEntry(
+                moodSlug: entry.moodSlug!,
+                timestamp: entry.date,
+              ));
+            }
           }
-          final recentMoods = entries
-              .where((e) => e.moodSlug != null && e.date.isAfter(cutoff))
+          
+          double moodVal(MoodEntry moodEntry) {
+            final m = moods.where((m) => m.id == moodEntry.moodSlug).firstOrNull;
+            return (moodEntry.pleasantness ?? m?.pleasantness ?? m?.numericValue ?? 0).toDouble();
+          }
+          
+          final recentMoods = allMoodEntries
+              .where((e) => e.timestamp.isAfter(cutoff))
               .map(moodVal)
               .where((v) => v > 0)
               .toList();
-          final prevMoods = entries
-              .where((e) => e.moodSlug != null && e.date.isAfter(prevCutoff) && !e.date.isAfter(cutoff))
+          final prevMoods = allMoodEntries
+              .where((e) => e.timestamp.isAfter(prevCutoff) && !e.timestamp.isAfter(cutoff))
               .map(moodVal)
               .where((v) => v > 0)
               .toList();

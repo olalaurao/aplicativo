@@ -267,9 +267,10 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     } else {
       ratio = 1.2;
     }
-    if (ratio > 1.0) return daysSince != null ? 'Atrasado ($daysSince dias)' : 'Nunca contatado';
-    if (ratio > 0.7) return daysSince != null ? 'Próximo ($daysSince dias)' : 'Próximo';
-    return daysSince != null ? 'OK ($daysSince dias)' : 'OK';
+    // F3.10: Add short word labels for Person urgency badge instead of color alone
+    if (ratio > 1.0) return 'Overdue';
+    if (ratio > 0.7) return 'Due soon';
+    return 'On track';
   }
 
   Widget _contactActionWidget(

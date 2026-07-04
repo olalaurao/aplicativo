@@ -82,8 +82,8 @@ class TypeSignaturesScreen extends ConsumerWidget {
         return 'Projeto';
       case 'goal':
         return 'Meta';
-      case 'calendar_session':
-        return 'Sessão de Calendário';
+      case 'event':
+        return 'Event';
       case 'note':
         return 'Nota';
       case 'resource':
@@ -106,8 +106,6 @@ class TypeSignaturesScreen extends ConsumerWidget {
         return 'Área';
       case 'activity':
         return 'Atividade';
-      case 'place':
-        return 'Lugar';
       case 'label':
         return 'Marcador';
       case 'organizer':

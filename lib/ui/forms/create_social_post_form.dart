@@ -43,7 +43,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
 
   SocialPost? _draft;
   List<OrganizerReference> _organizers = [];
-  final List<String> _socialRefs = [];
+  final List<String> _links = [];
   final List<String> _tags = [];
   bool _isFetching = false;
   bool _urlLocked = false;
@@ -65,7 +65,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
     _draft = existing;
     _urlLocked = existing != null;
     _organizers = List.of(existing?.organizers ?? []);
-    _socialRefs.addAll(existing?.socialRefs ?? []);
+    _links.addAll(existing?.links ?? []);
     _tags.addAll(existing?.tags ?? []);
 
     final initial = widget.initialUrl?.trim();
@@ -367,7 +367,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
 
   Widget _buildLinkedObjectsSection() {
     final objects = ref.watch(allObjectsProvider).valueOrNull ?? [];
-    final linked = _resolveRefs(objects, _socialRefs);
+    final linked = _resolveRefs(objects, _links);
     final grouped = <String, List<ContentObject>>{};
     for (final object in linked) {
       grouped.putIfAbsent(object.displayType, () => []).add(object);
@@ -438,7 +438,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           onDeleted: () => setState(
-                            () => _socialRefs.removeWhere(
+                            () => _links.removeWhere(
                               (ref) => _sameRef(ref, refLink, object),
                             ),
                           ),
@@ -696,12 +696,12 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
           ? null
           : _noteController.text.trim(),
       organizers: _organizers,
-      socialRefs: _socialRefs,
+      links: _links,
       tags: _tags,
       obsidianPath: existingPath,
     );
     if (existingPath != null && existingPath.isNotEmpty) return post;
-    return post.copyWith(obsidianPath: 'social/${post.socialSlug}.md');
+    return post.copyWith(obsidianPath: 'app/${post.socialSlug}.md');
   }
 
   SocialPost _fallbackDraft() {
@@ -732,8 +732,8 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
           Navigator.pop(sheetContext);
           final refLink = _objectWikiLink(object);
           setState(() {
-            if (!_socialRefs.any((ref) => _sameRef(ref, refLink, object))) {
-              _socialRefs.add(refLink);
+            if (!_links.any((ref) => _sameRef(ref, refLink, object))) {
+              _links.add(refLink);
             }
           });
         },
@@ -826,12 +826,12 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
         if (post.caption?.trim().isNotEmpty == true) post.caption!.trim(),
         post.url,
       ],
-      socialRefs: [postRef],
+      links: [postRef],
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
     await ref.read(tasksProvider.notifier).addTask(task);
-    await _appendSocialRef(post, _objectWikiLink(task));
+    await _appendLink(post, _objectWikiLink(task));
   }
 
   Future<void> _createAndLinkProject(SocialPost post) async {
@@ -845,7 +845,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
       updatedAt: DateTime.now(),
     );
     await ref.read(projectsProvider.notifier).addProject(project);
-    await _appendSocialRef(post, _objectWikiLink(project));
+    await _appendLink(post, _objectWikiLink(project));
   }
 
   Future<void> _linkExistingObject(SocialPost post) async {
@@ -866,14 +866,14 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
     final object = selected;
     if (object == null) return;
 
-    await _appendSocialRef(post, _objectWikiLink(object));
+    await _appendLink(post, _objectWikiLink(object));
 
     final postRef = _objectWikiLink(post);
-    if (object is Task && !object.socialRefs.contains(postRef)) {
+    if (object is Task && !object.links.contains(postRef)) {
       await ref
           .read(tasksProvider.notifier)
           .updateTask(
-            object.copyWith(socialRefs: [...object.socialRefs, postRef]),
+            object.copyWith(links: [...object.links, postRef]),
           );
     } else if (object is Project &&
         !object.quickAccessLinks.contains(postRef)) {
@@ -883,10 +883,10 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
     }
   }
 
-  Future<void> _appendSocialRef(SocialPost post, String refLink) async {
-    if (post.socialRefs.any((ref) => _sameRef(ref, refLink, post))) return;
+  Future<void> _appendLink(SocialPost post, String refLink) async {
+    if (post.links.any((ref) => _sameRef(ref, refLink, post))) return;
     final updatedPost = post.copyWith(
-      socialRefs: [...post.socialRefs, refLink],
+      links: [...post.links, refLink],
       updatedAt: DateTime.now(),
     );
     await ref.read(socialPostsProvider.notifier).updatePost(updatedPost);

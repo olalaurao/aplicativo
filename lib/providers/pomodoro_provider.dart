@@ -492,18 +492,54 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
             ]
           : [],
     );
-
+    
     await ref.read(tasksProvider.notifier).addTask(pomodoroBlock);
-
-    // Schedule notification for the start of the block
-    await NotificationService().scheduleNotification(
-      id: startTime.millisecondsSinceEpoch ~/ 1000,
-      title: 'Pomodoro Block',
-      body: 'Time to start focusing: ${taskTitle ?? "Focus"}',
-      scheduledDate: startTime,
-      payload: 'pomodoro_start',
-    );
   }
+
+  /// F2.18: Log retroactive pomodoro session
+  /// Allows user to log past work sessions ("I did 4 pomodoros starting at 11am")
+  /// Auto-creates Calendar Session/Event for the logged session
+  Future<void> logRetroactiveSession({
+    required DateTime occurredAt,
+    required int blocksCompleted,
+    required int minutesWorked,
+    String? taskTitle,
+    String? linkedItemId,
+  }) async {
+    final session = PomodoroSession(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      taskTitle: taskTitle ?? 'Retroactive Focus',
+      date: DateTime.now(), // When logged
+      occurredAt: occurredAt, // When actually occurred
+      linkedItemSlug: linkedItemId,
+      blocksCompleted: blocksCompleted,
+      minutesWorked: minutesWorked,
+      minutesBreak: 0,
+      state: PomodoroSessionState.completed,
+    );
+    
+    state = state.copyWith(history: [session, ...state.history]);
+    await _persistHistory();
+    await _saveToDailyNote(session);
+    await _updateLinkedObjectMetrics(session);
+    
+    // F2.18: Auto-create Calendar Session/Event
+    await _createEventForRetroactiveSession(session);
+  }
+
+  Future<void> _createEventForRetroactiveSession(PomodoroSession session) async {
+    final event = Task(
+      id: 'event_${DateTime.now().millisecondsSinceEpoch}',
+      title: session.title,
+      startDate: session.occurredAt ?? session.date,
+      duration: session.minutesWorked,
+      stage: TaskStage.finalized,
+      pomodoroCount: session.blocksCompleted,
+    );
+    
+    await ref.read(tasksProvider.notifier).addTask(event);
+  }
+
 
   void _updateWeeklyWidget() {
     final now = DateTime.now();

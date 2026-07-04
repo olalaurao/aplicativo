@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../models/reminder_model.dart';
 import '../../models/reminder_config.dart';
 import '../../models/scheduler.dart';
 import '../../models/shared_types.dart';
+import '../../models/template_model.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import 'scheduler_picker.dart';
@@ -93,6 +95,14 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
                   IconButton(
                     icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(context),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.copy_all_rounded,
+                      color: AppColors.primary,
+                    ),
+                    tooltip: 'Usar Template',
+                    onPressed: _showTemplatePicker,
                   ),
                   const Spacer(),
                   const Text(
@@ -436,13 +446,89 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
         ),
       ],
     );
-
+    
     ref.read(remindersProvider.notifier).addReminder(reminder);
 
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Reminder "${reminder.title}" set!')),
     );
+  }
+
+  void _showTemplatePicker() async {
+    final templates = ref
+        .read(templatesProvider)
+        .where((t) => t.templateType == 'reminder')
+        .toList();
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  'Templates',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    context.push(
+                      '/create/template',
+                      extra: {'initialType': 'reminder'},
+                    );
+                  },
+                  child: const Text('Criar novo'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (templates.isEmpty)
+              const Text(
+                'Nenhum template encontrado.',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
+            ...templates.map(
+              (t) => ListTile(
+                title: Text(t.title),
+                onTap: () {
+                  Navigator.pop(context);
+                  _applyTemplate(t);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _applyTemplate(TemplateDefinition template) {
+    setState(() {
+      if (template.frontmatterDefaults.containsKey('title')) {
+        _titleController.text = template.frontmatterDefaults['title'] as String;
+      }
+      if (template.frontmatterDefaults.containsKey('completable')) {
+        _completable = template.frontmatterDefaults['completable'] as bool? ?? true;
+      }
+      if (template.body.isNotEmpty) {
+        final lines = template.body.split('\n');
+        _checkboxes.clear();
+        _checkboxControllers.clear();
+        for (final line in lines) {
+          if (line.trim().isNotEmpty) {
+            _checkboxes.add(line.trim());
+            _checkboxControllers.add(TextEditingController(text: line.trim()));
+          }
+        }
+      }
+    });
   }
 
   Widget _metadataChip({

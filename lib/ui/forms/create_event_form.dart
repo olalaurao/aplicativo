@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../models/people_model.dart';
 import '../../models/event_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/task_model.dart';
+import '../../models/template_model.dart';
 import '../../providers/google_calendar_provider.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/google_auth_service.dart' as auth;
@@ -87,6 +89,15 @@ class _CreateEventFormState extends ConsumerState<CreateEventForm> {
           widget.existingEvent == null ? 'Criar Evento' : 'Editar Evento',
         ),
         actions: [
+          if (widget.existingEvent == null)
+            IconButton(
+              icon: const Icon(
+                Icons.copy_all_rounded,
+                color: AppColors.primary,
+              ),
+              tooltip: 'Usar Template',
+              onPressed: _showTemplatePicker,
+            ),
           TextButton(
             onPressed: canSave ? _save : null,
             child: _saving
@@ -228,6 +239,77 @@ class _CreateEventFormState extends ConsumerState<CreateEventForm> {
       initialTime: _endTime,
     );
     if (picked != null) setState(() => _endTime = picked);
+  }
+
+  void _showTemplatePicker() async {
+    final templates = ref
+        .read(templatesProvider)
+        .where((t) => t.templateType == 'event')
+        .toList();
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  'Templates',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    context.push(
+                      '/create/template',
+                      extra: {'initialType': 'event'},
+                    );
+                  },
+                  child: const Text('Criar novo'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (templates.isEmpty)
+              const Text(
+                'Nenhum template encontrado.',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
+            ...templates.map(
+              (t) => ListTile(
+                title: Text(t.title),
+                onTap: () {
+                  Navigator.pop(context);
+                  _applyTemplate(t);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _applyTemplate(TemplateDefinition template) {
+    setState(() {
+      if (template.frontmatterDefaults.containsKey('title')) {
+        _titleController.text = template.frontmatterDefaults['title'] as String;
+      }
+      if (template.frontmatterDefaults.containsKey('location')) {
+        _locationController.text = template.frontmatterDefaults['location'] as String;
+      }
+      if (template.frontmatterDefaults.containsKey('description')) {
+        _descriptionController.text = template.frontmatterDefaults['description'] as String;
+      }
+      if (template.body.isNotEmpty) {
+        _descriptionController.text = template.body;
+      }
+    });
   }
 
   Future<void> _save() async {

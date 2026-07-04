@@ -6,6 +6,10 @@ enum PomodoroType { work, shortBreak, longBreak, custom }
 class PomodoroSession extends ContentObject {
   String? linkedItemSlug;
   DateTime date;
+  /// V5: Actual timestamp when the session occurred.
+  /// Used for retroactive logging (F2.18) where the session is entered after the fact.
+  /// Defaults to [date] when not set.
+  DateTime? occurredAt;
   int workDuration;
   int shortBreakDuration;
   int longBreakDuration;
@@ -19,6 +23,7 @@ class PomodoroSession extends ContentObject {
     super.id,
     required String taskTitle,
     required this.date,
+    this.occurredAt,
     this.linkedItemSlug,
     this.workDuration = 25,
     this.shortBreakDuration = 5,
@@ -39,12 +44,16 @@ class PomodoroSession extends ContentObject {
   String toMarkdown() => ''; // Not standalone, embedded in daily note
 
   String toDailyNoteBlock() {
-    final hh = date.hour.toString().padLeft(2, '0');
-    final mm = date.minute.toString().padLeft(2, '0');
+    final effectiveDate = occurredAt ?? date;
+    final hh = effectiveDate.hour.toString().padLeft(2, '0');
+    final mm = effectiveDate.minute.toString().padLeft(2, '0');
     final buf = StringBuffer()
       ..writeln('### $hh:$mm — $title');
     if (linkedItemSlug != null) {
       buf.writeln('- Linked: [[$linkedItemSlug]]');
+    }
+    if (occurredAt != null && occurredAt != date) {
+      buf.writeln('- Occurred at: ${occurredAt!.toIso8601String()}');
     }
     buf
       ..writeln('- Blocos: $blocksCompleted')

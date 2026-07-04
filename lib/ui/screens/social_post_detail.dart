@@ -9,7 +9,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/content_object.dart';
 import '../../models/social_post.dart';
-import '../../models/place_ref.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/vault_provider.dart';
 import '../forms/create_social_post_form.dart';
@@ -130,9 +129,6 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
                   const SizedBox(height: 12),
                   const SizedBox(height: 12),
                   _buildLinkedObjectsSection(post),
-                  const SizedBox(height: 12),
-                  _buildPlacesSection(post),
-                  const SizedBox(height: 12),
                   _buildTagsSection(post),
                   backlinks.when(
                     data: (items) => items.isEmpty
@@ -285,7 +281,7 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
         children: [
           LinkedObjectsSection(
             owner: post,
-            socialRefs: getSocialRefs(post),
+            links: getSocialRefs(post),
             onAdd: (selected) => addSocialRef(post, selected, ref),
             onRemove: (slug) => removeSocialRef(post, slug, ref),
             addButtonLabel: 'Vincular',
@@ -313,120 +309,6 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
       await addSocialRef(post, newResource, ref);
     }
   }
-
-  Widget _buildPlacesSection(SocialPost post) {
-    return _section(
-      title: 'Lugares',
-      trailing: IconButton(
-        icon: const Icon(Icons.add_rounded),
-        onPressed: () => _addPlace(post),
-      ),
-      child: post.places.isEmpty
-          ? const Text(
-              'Nenhum lugar adicionado',
-              style: TextStyle(color: AppColors.textMuted),
-            )
-          : Column(
-              children: post.places
-                  .map(
-                    (place) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(
-                        Icons.place_rounded,
-                        color: AppColors.primary,
-                      ),
-                      title: Text(
-                        place.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: place.address != null
-                          ? Text(
-                              place.address!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            )
-                          : null,
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline_rounded,
-                              color: AppColors.error,
-                            ),
-                            onPressed: () => _removePlace(post, place.id),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-    );
-  }
-
-  Future<void> _addPlace(SocialPost post) async {
-    final nameController = TextEditingController();
-    final addressController = TextEditingController();
-
-    final added = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Adicionar Lugar'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Nome'),
-            ),
-            TextField(
-              controller: addressController,
-              decoration: const InputDecoration(
-                labelText: 'Endereço (opcional)',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Adicionar'),
-          ),
-        ],
-      ),
-    );
-
-    if (added == true && nameController.text.trim().isNotEmpty) {
-      final newPlace = PlaceRef(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: nameController.text.trim(),
-        address: addressController.text.trim().isEmpty
-            ? null
-            : addressController.text.trim(),
-      );
-      ref
-          .read(socialPostsProvider.notifier)
-          .updatePost(post.copyWith(places: [...post.places, newPlace]));
-    }
-  }
-
-  void _removePlace(SocialPost post, String placeId) {
-    ref
-        .read(socialPostsProvider.notifier)
-        .updatePost(
-          post.copyWith(
-            places: post.places.where((p) => p.id != placeId).toList(),
-          ),
-        );
-  }
-
-  void _openInMaps(PlaceRef place) {}
 
   Widget _buildTagsSection(SocialPost post) {
     return _section(

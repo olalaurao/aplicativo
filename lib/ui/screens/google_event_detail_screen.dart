@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/people_model.dart';
 import '../../models/content_object.dart';
-import '../../models/goal_model.dart';
 import '../../models/project_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/task_model.dart';
@@ -178,10 +177,10 @@ class _GoogleEventDetailScreenState
   }
 
   Future<void> _linkEventToObject(ContentObject object) async {
-    if (object is! Task && object is! Goal && object is! Project) {
+    if (object is! Task && object is! Project) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Selecione uma tarefa, objetivo ou projeto.'),
+          content: Text('Selecione uma tarefa ou projeto.'),
         ),
       );
       return;
@@ -202,13 +201,6 @@ class _GoogleEventDetailScreenState
               linkedGoogleEventUrl: _event.htmlLink,
             ),
           );
-    } else if (object is Goal) {
-      object
-        ..linkedGoogleEventId = _event.id
-        ..linkedGoogleEventTitle = title
-        ..linkedGoogleEventDate = eventDate
-        ..linkedGoogleEventUrl = _event.htmlLink;
-      await ref.read(vaultProvider.notifier).updateObject(object);
     } else if (object is Project) {
       object
         ..linkedGoogleEventId = _event.id

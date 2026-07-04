@@ -179,6 +179,9 @@ class TrackerDefinition extends ContentObject {
   String get type => 'tracker_definition';
 
   @override
+  bool get isIncomplete => title.trim().isEmpty || sections.isEmpty;
+
+  @override
   String toMarkdown() {
     final frontmatter = toBaseMap();
     frontmatter['color'] = color;

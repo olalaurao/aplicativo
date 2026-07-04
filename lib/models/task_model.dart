@@ -10,6 +10,8 @@ enum TaskStage { idea, backlog, todo, inProgress, pending, finalized }
 
 enum TaskPriority { none, low, medium, high }
 
+enum RotationFrequencyType { none, daily, oncePerPeriod, everyNRotations }
+
 /// Triple Check answer for a single dimension (head/heart/hand)
 enum TripleCheckAnswer {
   yes,     // Sim
@@ -33,18 +35,24 @@ class TripleCheck {
     required this.checkedAt,
   });
 
-  String? get primaryBlocker {
-    if (head != TripleCheckAnswer.yes) return 'head';
-    if (heart != TripleCheckAnswer.yes) return 'heart';
-    if (hand != TripleCheckAnswer.yes) return 'hand';
-    return null;
+  /// V5: blocker is now an array (multiple dimensions can fail simultaneously).
+  /// e.g. ['heart', 'hand']
+  List<String> get blockers {
+    final result = <String>[];
+    if (head != TripleCheckAnswer.yes) result.add('head');
+    if (heart != TripleCheckAnswer.yes) result.add('heart');
+    if (hand != TripleCheckAnswer.yes) result.add('hand');
+    return result;
   }
+
+  /// Legacy single-blocker accessor (first blocker or null)
+  String? get primaryBlocker => blockers.isEmpty ? null : blockers.first;
 
   Map<String, dynamic> toMap() => {
     'head': head.name,
     'heart': heart.name,
     'hand': hand.name,
-    'blocker': primaryBlocker,
+    'blocker': blockers, // V5: array, not scalar
     'diagnosis': diagnosis,
     'checked_at': checkedAt.toIso8601String(),
   };
@@ -92,11 +100,13 @@ class Task extends ContentObject {
   Scheduler? scheduler;
   String? color;
   List<OrganizerReference> participants;
-  List<OrganizerReference> places;
   int timerSessions;
   List<Comment> comments;
   String? reflection;
   bool untilDone;
+  /// V5: date_range and until_done are mutually exclusive; date_range takes precedence.
+  /// When dateRange is set, untilDone is ignored on read and cleared on save.
+  String? dateRange; // e.g. '2026-01-01/2026-01-31'
   bool allDay;
   int duration; // minutes
   String? scheduledTime; // HH:MM
@@ -108,10 +118,31 @@ class Task extends ContentObject {
   int? pomodoroCount;
   String? timeBlock;
   List<String> dependsOn;
-  List<String> socialRefs;
   int? estimatedMinutes;
   TripleCheck? tripleCheck;
   String? linkedSystem;
+  String? rotationGroupId;
+  RotationFrequencyType rotationFrequencyType = RotationFrequencyType.none;
+  int? rotationEveryN;
+  int? rotationLastCompletedAtOccurrence;
+  Map<String, bool> rotationDailyCompletions = {};
+
+  bool get isRotationTask => rotationFrequencyType != RotationFrequencyType.none;
+  bool get hasDateRange => dateRange != null && dateRange!.trim().isNotEmpty;
+
+  void normalizeDateRangeAndUntilDone({bool logWarning = false}) {
+    if (hasDateRange && untilDone) {
+      if (logWarning) {
+        debugPrint(
+          'Task data-cleanliness warning: both date_range and until_done were set for "$title"; date_range takes precedence.',
+        );
+      }
+      untilDone = false;
+    }
+  }
+
+  @override
+  bool get isIncomplete => title.trim().isEmpty || stage == TaskStage.idea;
 
   Task({
     super.id,
@@ -126,11 +157,11 @@ class Task extends ContentObject {
     this.scheduler,
     this.color,
     this.participants = const [],
-    this.places = const [],
     this.timerSessions = 0,
     this.comments = const [],
     this.reflection,
     this.untilDone = false,
+    this.dateRange,
     this.allDay = false,
     this.duration = 15,
     this.scheduledTime,
@@ -139,6 +170,7 @@ class Task extends ContentObject {
     super.organizers,
     super.categories,
     super.tags,
+    super.links,
     super.createdAt,
     super.updatedAt,
     super.obsidianPath,
@@ -151,15 +183,21 @@ class Task extends ContentObject {
     this.pomodoroCount,
     this.timeBlock,
     this.dependsOn = const [],
-    this.socialRefs = const [],
     this.estimatedMinutes,
     this.tripleCheck,
     this.linkedSystem,
+    this.rotationGroupId,
+    this.rotationFrequencyType = RotationFrequencyType.none,
+    this.rotationEveryN,
+    this.rotationLastCompletedAtOccurrence,
+    Map<String, bool>? rotationDailyCompletions,
     DateTime? reminderDate,
-  }) {
+  }) : rotationDailyCompletions = rotationDailyCompletions ?? {} {
     if (reminderDate != null) {
       this.reminderDate = reminderDate;
     }
+    // V5: date_range wins over until_done if both somehow set
+    normalizeDateRangeAndUntilDone();
   }
 
   DateTime? get reminderDate {
@@ -256,6 +294,7 @@ class Task extends ContentObject {
 
   @override
   String toMarkdown() {
+    normalizeDateRangeAndUntilDone(logWarning: true);
     final frontmatter = toBaseMap();
     frontmatter['stage'] = stage.name;
     frontmatter['priority'] = priority.name;
@@ -297,8 +336,10 @@ class Task extends ContentObject {
     if (dependsOn.isNotEmpty) {
       frontmatter['depends_on'] = dependsOn;
     }
-    if (socialRefs.isNotEmpty) {
-      frontmatter['social_refs'] = socialRefs;
+    if (hasDateRange) {
+      frontmatter['date_range'] = dateRange;
+      // V5: date_range wins — never write until_done when date_range is set
+      frontmatter.remove('until_done');
     }
     if (estimatedMinutes != null) {
       frontmatter['estimated_minutes'] = estimatedMinutes;
@@ -310,6 +351,25 @@ class Task extends ContentObject {
     frontmatter['triple_check'] = tripleCheck?.toMap();
     if (linkedSystem != null) {
       frontmatter['linked_system'] = linkedSystem;
+    }
+    if (rotationGroupId != null) {
+      frontmatter['rotation_group'] = '[[$rotationGroupId]]';
+    }
+    if (rotationFrequencyType != RotationFrequencyType.none) {
+      frontmatter['rotation_frequency_type'] = switch (rotationFrequencyType) {
+        RotationFrequencyType.daily => 'daily',
+        RotationFrequencyType.oncePerPeriod => 'once_per_period',
+        RotationFrequencyType.everyNRotations => 'every_n_rotations',
+        RotationFrequencyType.none => 'none',
+      };
+    }
+    if (rotationEveryN != null) frontmatter['rotation_every_n'] = rotationEveryN;
+    if (rotationLastCompletedAtOccurrence != null) {
+      frontmatter['rotation_last_completed_at_occurrence'] =
+          rotationLastCompletedAtOccurrence;
+    }
+    if (rotationDailyCompletions.isNotEmpty) {
+      frontmatter['rotation_daily_completions'] = rotationDailyCompletions;
     }
 
     if (scheduler != null) frontmatter['scheduler'] = scheduler!.toMap();
@@ -473,12 +533,9 @@ class Task extends ContentObject {
           .map((e) => e.toString())
           .toList();
     }
-    if (frontmatter['social_refs'] != null &&
-        frontmatter['social_refs'] is List) {
-      task.socialRefs = (frontmatter['social_refs'] as List)
-          .map((e) => e.toString())
-          .toList();
-    }
+    task.dateRange = frontmatter['date_range']?.toString();
+    // V5: if date_range is present, until_done is ignored
+    task.normalizeDateRangeAndUntilDone(logWarning: true);
     final em = frontmatter['estimated_minutes'];
     task.estimatedMinutes = em is num
         ? em.toInt()
@@ -503,6 +560,36 @@ class Task extends ContentObject {
       task.priority = TaskPriority.values.firstWhere(
         (e) => e.name == frontmatter['priority'],
         orElse: () => TaskPriority.none,
+      );
+    }
+    final rotGroup = frontmatter['rotation_group'];
+    if (rotGroup != null) {
+      final raw = rotGroup.toString().replaceAll('[', '').replaceAll(']', '');
+      task.rotationGroupId = raw.trim();
+    }
+    final rotType = frontmatter['rotation_frequency_type']?.toString();
+    if (rotType != null) {
+      task.rotationFrequencyType = RotationFrequencyType.values.firstWhere(
+        (e) =>
+            e.name == rotType ||
+            e.name == rotType.replaceAll('_', '') ||
+            (rotType == 'once_per_period' && e == RotationFrequencyType.oncePerPeriod) ||
+            (rotType == 'every_n_rotations' && e == RotationFrequencyType.everyNRotations),
+        orElse: () => RotationFrequencyType.none,
+      );
+    }
+    final rotN = frontmatter['rotation_every_n'];
+    task.rotationEveryN =
+        rotN is num ? rotN.toInt() : int.tryParse(rotN?.toString() ?? '');
+    final rotLast = frontmatter['rotation_last_completed_at_occurrence'];
+    task.rotationLastCompletedAtOccurrence = rotLast is num
+        ? rotLast.toInt()
+        : int.tryParse(rotLast?.toString() ?? '');
+    if (frontmatter['rotation_daily_completions'] is Map) {
+      task.rotationDailyCompletions = Map<String, bool>.from(
+        (frontmatter['rotation_daily_completions'] as Map).map(
+          (k, v) => MapEntry(k.toString(), v == true),
+        ),
       );
     }
 
@@ -610,11 +697,11 @@ class Task extends ContentObject {
     Scheduler? scheduler,
     String? color,
     List<OrganizerReference>? participants,
-    List<OrganizerReference>? places,
     int? timerSessions,
     List<Comment>? comments,
     String? reflection,
     bool? untilDone,
+    String? dateRange,
     bool? allDay,
     int? duration,
     String? scheduledTime,
@@ -629,14 +716,19 @@ class Task extends ContentObject {
     int? pomodoroCount,
     String? timeBlock,
     List<String>? dependsOn,
-    List<String>? socialRefs,
     int? estimatedMinutes,
     TripleCheck? tripleCheck,
     bool clearTripleCheck = false,
     String? linkedSystem,
+    String? rotationGroupId,
+    RotationFrequencyType? rotationFrequencyType,
+    int? rotationEveryN,
+    int? rotationLastCompletedAtOccurrence,
+    Map<String, bool>? rotationDailyCompletions,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     List<String>? tags,
+    List<String>? links,
     int? order,
   }) {
     return Task(
@@ -652,11 +744,11 @@ class Task extends ContentObject {
       scheduler: scheduler ?? this.scheduler,
       color: color ?? this.color,
       participants: participants ?? this.participants,
-      places: places ?? this.places,
       timerSessions: timerSessions ?? this.timerSessions,
       comments: comments ?? this.comments,
       reflection: reflection ?? this.reflection,
       untilDone: untilDone ?? this.untilDone,
+      dateRange: dateRange ?? this.dateRange,
       allDay: allDay ?? this.allDay,
       duration: duration ?? this.duration,
       scheduledTime: scheduledTime ?? this.scheduledTime,
@@ -673,13 +765,21 @@ class Task extends ContentObject {
       pomodoroCount: pomodoroCount ?? this.pomodoroCount,
       timeBlock: timeBlock ?? this.timeBlock,
       dependsOn: dependsOn ?? this.dependsOn,
-      socialRefs: socialRefs ?? this.socialRefs,
       estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
       tripleCheck: clearTripleCheck ? null : (tripleCheck ?? this.tripleCheck),
       linkedSystem: linkedSystem ?? this.linkedSystem,
+      rotationGroupId: rotationGroupId ?? this.rotationGroupId,
+      rotationFrequencyType:
+          rotationFrequencyType ?? this.rotationFrequencyType,
+      rotationEveryN: rotationEveryN ?? this.rotationEveryN,
+      rotationLastCompletedAtOccurrence: rotationLastCompletedAtOccurrence ??
+          this.rotationLastCompletedAtOccurrence,
+      rotationDailyCompletions: rotationDailyCompletions ??
+          Map<String, bool>.from(this.rotationDailyCompletions),
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       tags: tags ?? this.tags,
+      links: links ?? this.links,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
       obsidianPath: obsidianPath,

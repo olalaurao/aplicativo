@@ -12,6 +12,7 @@ import '../../models/tracker_model.dart';
 import '../../models/mood_model.dart';
 import '../../models/analysis_model.dart';
 import '../../models/pomodoro_session.dart';
+import '../../models/journal_entry.dart';
 import '../theme.dart';
 import '../widgets/citrine_chart.dart';
 import '../widgets/analysis_calendar.dart';
@@ -711,29 +712,33 @@ class _CombinedAnalysisScreenState
     final entries = ref.read(allEntriesProvider);
     final moods = ref.read(moodsProvider);
 
-    final dayEntries = entries
-        .where(
-          (e) =>
-              e.date.year == date.year &&
-              e.date.month == date.month &&
-              e.date.day == date.day &&
-              e.moodSlug != null,
-        )
-        .toList();
-
-    if (dayEntries.isEmpty) return null;
-
-    // Pegar o mood mais frequente no dia
-    final moodCounts = <String, int>{};
-    for (final entry in dayEntries) {
-      final slug = entry.moodSlug!;
-      moodCounts[slug] = (moodCounts[slug] ?? 0) + 1;
+    // F2.14: Collect all mood entries for the day from moodEntries array
+    final allMoodEntries = <MoodEntry>[];
+    for (final entry in entries) {
+      if (entry.date.year == date.year &&
+          entry.date.month == date.month &&
+          entry.date.day == date.day) {
+        // Prefer moodEntries array over legacy moodSlug
+        if (entry.moodEntries.isNotEmpty) {
+          allMoodEntries.addAll(entry.moodEntries);
+        } else if (entry.moodSlug != null) {
+          // Legacy fallback: convert moodSlug to MoodEntry
+          allMoodEntries.add(MoodEntry(
+            moodSlug: entry.moodSlug!,
+            timestamp: entry.date,
+          ));
+        }
+      }
     }
-    final dominantSlug = moodCounts.entries
-        .reduce((a, b) => a.value >= b.value ? a : b)
-        .key;
+
+    if (allMoodEntries.isEmpty) return null;
+
+    // Get the most recent mood entry for the day
+    allMoodEntries.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final recentEntry = allMoodEntries.first;
+    
     return moods
-        .where((m) => m.id == dominantSlug || m.slug == dominantSlug)
+        .where((m) => m.id == recentEntry.moodSlug || m.slug == recentEntry.moodSlug)
         .firstOrNull;
   }
 
@@ -775,31 +780,40 @@ class _CombinedAnalysisScreenState
     final entries = ref.read(allEntriesProvider);
     final moods = ref.read(moodsProvider);
 
-    final dayEntries = entries
-        .where(
-          (e) =>
-              e.date.year == date.year &&
-              e.date.month == date.month &&
-              e.date.day == date.day,
-        )
-        .where((e) => e.moodSlug != null)
+    // F2.14: Collect all mood entries for the day from moodEntries array
+    final allMoodEntries = <MoodEntry>[];
+    for (final entry in entries) {
+      if (entry.date.year == date.year &&
+          entry.date.month == date.month &&
+          entry.date.day == date.day) {
+        // Prefer moodEntries array over legacy moodSlug
+        if (entry.moodEntries.isNotEmpty) {
+          allMoodEntries.addAll(entry.moodEntries);
+        } else if (entry.moodSlug != null) {
+          // Legacy fallback: convert moodSlug to MoodEntry
+          allMoodEntries.add(MoodEntry(
+            moodSlug: entry.moodSlug!,
+            timestamp: entry.date,
+          ));
+        }
+      }
+    }
+
+    if (allMoodEntries.isEmpty) return null;
+
+    // Average all mood values for the day
+    final values = allMoodEntries
+        .map((moodEntry) {
+          final mood = moods
+              .where((m) => m.id == moodEntry.moodSlug || m.slug == moodEntry.moodSlug)
+              .firstOrNull;
+          return mood?.numericValue.toDouble();
+        })
+        .whereType<double>()
         .toList();
 
-    if (dayEntries.isNotEmpty) {
-      final values = dayEntries
-          .map(
-            (entry) => moods
-                .where(
-                  (m) => m.id == entry.moodSlug || m.slug == entry.moodSlug,
-                )
-                .firstOrNull,
-          )
-          .whereType<MoodDefinition>()
-          .map((mood) => mood.numericValue.toDouble())
-          .toList();
-      if (values.isNotEmpty) {
-        return values.reduce((a, b) => a + b) / values.length;
-      }
+    if (values.isNotEmpty) {
+      return values.reduce((a, b) => a + b) / values.length;
     }
     return null;
   }

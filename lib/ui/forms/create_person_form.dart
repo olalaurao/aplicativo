@@ -302,7 +302,6 @@ class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
       phone: widget.existingPerson?.phone,
       email: widget.existingPerson?.email,
       organizers: widget.existingPerson?.organizers,
-      categories: widget.existingPerson?.categories,
       obsidianPath: widget.existingPerson?.obsidianPath ?? '',
     );
 

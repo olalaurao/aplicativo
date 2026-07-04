@@ -1,13 +1,16 @@
 // lib/ui/forms/create_project_form.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../models/project_model.dart';
 import '../../models/task_model.dart';
 import '../../models/shared_types.dart';
+import '../../models/template_model.dart';
 import '../../providers/vault_provider.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/organizer_selector_field.dart';
+import '../../services/collection_row_service.dart';
 import '../theme.dart';
 
 class CreateProjectForm extends ConsumerStatefulWidget {
@@ -29,6 +32,11 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
   DateTime? _endDate;
   String _selectedColor = '#3B82F6';
   List<OrganizerReference> _organizers = [];
+  bool _useRotation = false;
+  DateTime? _rotationStartDate;
+  String? _methodLabel;
+  List<RotationGroup> _rotationGroups = [];
+  final _methodLabelController = TextEditingController();
 
   static const _colorSwatches = [
     '#3B82F6',
@@ -63,6 +71,11 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
       _endDate = project.endDate;
       _selectedColor = project.color ?? '#3B82F6';
       _organizers = List.from(project.organizers);
+      _useRotation = project.hasRotation;
+      _rotationStartDate = project.rotationStartDate;
+      _methodLabel = project.methodLabel;
+      _methodLabelController.text = project.methodLabel ?? '';
+      _rotationGroups = List.from(project.rotationGroups);
     } else {
       if (widget.initialOrganizers != null) {
         _organizers = List.from(widget.initialOrganizers!);
@@ -74,6 +87,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
   void dispose() {
     _titleController.dispose();
     _descController.dispose();
+    _methodLabelController.dispose();
     super.dispose();
   }
 
@@ -124,6 +138,17 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
             ),
             centerTitle: true,
+            actions: [
+              if (widget.existingProject == null)
+                IconButton(
+                  icon: const Icon(
+                    Icons.copy_all_rounded,
+                    color: AppColors.primary,
+                  ),
+                  tooltip: 'Usar Template',
+                  onPressed: _showTemplatePicker,
+                ),
+            ],
           ),
 
           SliverToBoxAdapter(
@@ -295,6 +320,74 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
                     ),
                   ),
 
+                  const SizedBox(height: 12),
+
+                  Container(
+                    decoration: AppTheme.cardDecoration(context),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Este projeto usa rotação de zonas'),
+                          value: _useRotation,
+                          onChanged: (v) => setState(() => _useRotation = v),
+                        ),
+                        if (_useRotation) ...[
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Início da rotação'),
+                            subtitle: Text(
+                              _rotationStartDate != null
+                                  ? DateFormat('d MMM yyyy')
+                                      .format(_rotationStartDate!)
+                                  : 'Selecionar data',
+                            ),
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _rotationStartDate ?? DateTime.now(),
+                                firstDate: DateTime(2000),
+                                lastDate: DateTime(2100),
+                              );
+                              if (picked != null) {
+                                setState(() => _rotationStartDate = picked);
+                              }
+                            },
+                          ),
+                          TextField(
+                            controller: _methodLabelController,
+                            decoration: const InputDecoration(
+                              labelText: 'Rótulo do método (opcional)',
+                              hintText: 'Método FlyLady',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ..._rotationGroups.asMap().entries.map((e) {
+                            final g = e.value;
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text('${g.emoji ?? ''} ${g.name}'.trim()),
+                              subtitle: Text('${g.periodDays} dias'),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () => setState(
+                                  () => _rotationGroups.removeAt(e.key),
+                                ),
+                              ),
+                            );
+                          }),
+                          TextButton.icon(
+                            onPressed: _addRotationGroup,
+                            icon: const Icon(Icons.add_rounded),
+                            label: const Text('Adicionar zona'),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
                   const SizedBox(height: 100),
                 ],
               ),
@@ -403,8 +496,141 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
     );
   }
 
+  void _addRotationGroup() {
+    final nameController = TextEditingController();
+    final daysController = TextEditingController(text: '7');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nova zona'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Nome'),
+            ),
+            TextField(
+              controller: daysController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Duração (dias)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              final name = nameController.text.trim();
+              if (name.isEmpty) return;
+              setState(() {
+                _rotationGroups.add(RotationGroup(
+                  id: slugify(name),
+                  name: name,
+                  periodDays: int.tryParse(daysController.text) ?? 7,
+                  order: _rotationGroups.length,
+                ));
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('Adicionar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTemplatePicker() async {
+    final templates = ref
+        .read(templatesProvider)
+        .where((t) => t.templateType == 'project')
+        .toList();
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  'Templates',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    context.push(
+                      '/create/template',
+                      extra: {'initialType': 'project'},
+                    );
+                  },
+                  child: const Text('Criar novo'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (templates.isEmpty)
+              const Text(
+                'Nenhum template encontrado.',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
+            ...templates.map(
+              (t) => ListTile(
+                title: Text(t.title),
+                onTap: () {
+                  Navigator.pop(context);
+                  _applyTemplate(t);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _applyTemplate(TemplateDefinition template) {
+    setState(() {
+      if (template.frontmatterDefaults.containsKey('title')) {
+        _titleController.text = template.frontmatterDefaults['title'] as String;
+      }
+      if (template.frontmatterDefaults.containsKey('description')) {
+        _descController.text = template.frontmatterDefaults['description'] as String;
+      }
+      if (template.frontmatterDefaults.containsKey('color')) {
+        _selectedColor = template.frontmatterDefaults['color'] as String;
+      }
+      if (template.frontmatterDefaults.containsKey('priority')) {
+        final priorityStr = template.frontmatterDefaults['priority'] as String;
+        _priority = TaskPriority.values.firstWhere(
+          (e) => e.name == priorityStr,
+          orElse: () => TaskPriority.none,
+        );
+      }
+      if (template.body.isNotEmpty) {
+        _descController.text = template.body;
+      }
+    });
+  }
+
+  Color _parseColor(String hex) {
+    try {
+      return Color(int.parse(hex.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return AppColors.primary;
+    }
+  }
+
   void _saveProject() {
-    final project = Project(
+    var project = Project(
       id:
           widget.existingProject?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
@@ -420,10 +646,18 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
       organizers: _organizers,
     );
 
+    project = project.copyProjectWith(
+      rotationGroups: _useRotation ? _rotationGroups : [],
+      rotationStartDate: _useRotation ? _rotationStartDate : null,
+      methodLabel: _useRotation && _methodLabelController.text.trim().isNotEmpty
+          ? _methodLabelController.text.trim()
+          : null,
+    );
+
     if (widget.existingProject != null) {
       ref.read(vaultProvider.notifier).updateObject(project);
     } else {
-      ref.read(projectsProvider.notifier).addProject(project);
+      ref.read(vaultProvider.notifier).createObject(project);
     }
 
     Navigator.pop(context);
@@ -435,13 +669,5 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
         backgroundColor: _parseColor(_selectedColor),
       ),
     );
-  }
-
-  Color _parseColor(String hex) {
-    try {
-      return Color(int.parse(hex.replaceAll('#', '0xFF')));
-    } catch (_) {
-      return AppColors.primary;
-    }
   }
 }

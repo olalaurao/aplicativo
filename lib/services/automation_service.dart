@@ -7,10 +7,12 @@ import '../models/journal_entry.dart';
 import '../models/task_model.dart';
 import '../models/note_model.dart';
 import '../models/people_model.dart';
+import '../models/content_object.dart';
 import '../providers/vault_provider.dart';
 import '../services/kpi_engine.dart';
 import '../models/goal_model.dart';
 import '../models/tracker_model.dart';
+import '../models/sync_action.dart';
 import 'notification_service.dart';
 import 'markdown_parser.dart';
 
@@ -68,8 +70,9 @@ class AutomationService {
     dynamic ref,
     ActionDef action,
     String sourceTitle,
-    DateTime date,
-  ) async {
+    DateTime date, [
+    List<VaultLinkRef>? selectedRefs,
+  ]) async {
     switch (action.type) {
       case 'add_entry':
         final journalNotifier = ref.read(todayJournalProvider.notifier);
@@ -189,6 +192,92 @@ class AutomationService {
           }
         }
         break;
+
+      case 'link_item':
+        if (selectedRefs != null && selectedRefs.isNotEmpty && sourceTitle.isNotEmpty) {
+          final habits = ref.read(habitsProvider);
+          final habit = habits
+              .where((h) => h.displayTitle == sourceTitle || h.title == sourceTitle)
+              .firstOrNull;
+          if (habit != null) {
+            await _persistLinkedRefs(ref, habit, date, selectedRefs);
+          }
+        }
+        break;
+    }
+  }
+
+  static Future<void> persistLinkedRefsPublic(
+    dynamic ref,
+    Habit habit,
+    DateTime date,
+    List<VaultLinkRef> refs,
+  ) =>
+      _persistLinkedRefs(ref, habit, date, refs);
+
+  static Future<void> _persistLinkedRefs(
+    dynamic ref,
+    Habit habit,
+    DateTime date,
+    List<VaultLinkRef> refs,
+  ) async {
+    final dateStr = date.toIso8601String().split('T').first;
+    final obsidianService = ref.read(obsidianServiceProvider);
+    final syncQueue = ref.read(syncQueueServiceProvider);
+    final dayThemes = ref.read(dayThemesProvider);
+
+    try {
+      final path = 'daily/$dateStr.md';
+      final content =
+          await obsidianService.readFile(path) ??
+          getDailyNoteTemplate(
+            dateStr,
+            dayThemes,
+            activeHabits: ref
+                .read(habitsProvider)
+                .where((h) => h.status == HabitStatus.active)
+                .toList(),
+          );
+
+      final frontmatter = MarkdownParser.parseFrontmatter(content);
+      final body = MarkdownParser.extractBody(content);
+      frontmatter['${habit.slug}__links'] =
+          refs.map((r) => r.toWikiLink()).toList();
+
+      final entries = MarkdownParser.parseJournalEntries(body, dateStr);
+      final tasks = MarkdownParser.parseTasksFromDailyNote(body);
+      final trackers = MarkdownParser.parseTrackerRecords(frontmatter);
+      final pomodoros = MarkdownParser.parsePomodoros(body);
+      final habitsMap = MarkdownParser.parseHabitCompletions(frontmatter);
+
+      frontmatter.remove('habits');
+      habitsMap.forEach((slug, value) {
+        frontmatter[slug] = value;
+      });
+
+      final newBody = MarkdownParser.generateDailyNoteBody(
+        entries: entries,
+        tasks: tasks,
+        habits: habitsMap,
+        trackers: trackers,
+        pomodoros: pomodoros,
+      );
+
+      await obsidianService.writeFile(
+        path,
+        generateMarkdown(frontmatter, newBody),
+      );
+
+      await syncQueue.enqueueAction(
+        SyncAction(
+          objectType: 'daily_note',
+          objectId: dateStr,
+          operation: SyncOperation.update,
+          payload: frontmatter,
+        ),
+      );
+    } catch (e, st) {
+      debugPrint('[AutomationService] _persistLinkedRefs failed: $e\n$st');
     }
   }
 

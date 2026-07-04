@@ -6,7 +6,9 @@ import '../../providers/vault_provider.dart';
 import '../../services/kpi_engine.dart';
 import '../theme.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/overdue_section.dart';
 import '../widgets/object_action_wrapper.dart';
+import '../widgets/incomplete_badge.dart';
 import '../forms/create_goal_form.dart';
 import 'universal_detail_view.dart';
 
@@ -36,16 +38,28 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: CustomScrollView(
-        slivers: [
-          const SliverAppBar(
-            title: Text('Goals'),
-            centerTitle: true,
-            floating: true,
-            pinned: true,
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 12, 0),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Goals',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,46 +110,45 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
                 ],
               ),
             ),
-          ),
-          if (goals.isEmpty)
-            SliverFillRemaining(child: _buildEmptyState(context))
-          else
-            SliverPadding(
-              padding: const EdgeInsets.all(20),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  if (activeGoals.isNotEmpty) ...[
-                    _buildSectionHeader('IN PROGRESS'),
-                    const SizedBox(height: 12),
-                    ...activeGoals.map((g) => _GoalCard(goal: g)),
-                  ],
-                  if (onHoldGoals.isNotEmpty) ...[
-                    const SizedBox(height: 32),
-                    _buildSectionHeader('ON HOLD'),
-                    const SizedBox(height: 12),
-                    ...onHoldGoals.map((g) => _GoalCard(goal: g)),
-                  ],
-                  if (completedGoals.isNotEmpty) ...[
-                    const SizedBox(height: 32),
-                    _buildSectionHeader('COMPLETED'),
-                    const SizedBox(height: 12),
-                    ...completedGoals.map(
-                      (g) => _GoalCard(goal: g, isCompleted: true),
+            Expanded(
+              child: goals.isEmpty
+                  ? _buildEmptyState(context)
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+                      children: [
+                        const OverdueSection(filterTypes: ['goal']),
+                        if (activeGoals.isNotEmpty) ...[
+                          _buildSectionHeader('IN PROGRESS'),
+                          const SizedBox(height: 12),
+                          ...activeGoals.map((g) => _GoalCard(goal: g)),
+                        ],
+                        if (onHoldGoals.isNotEmpty) ...[
+                          const SizedBox(height: 32),
+                          _buildSectionHeader('ON HOLD'),
+                          const SizedBox(height: 12),
+                          ...onHoldGoals.map((g) => _GoalCard(goal: g)),
+                        ],
+                        if (completedGoals.isNotEmpty) ...[
+                          const SizedBox(height: 32),
+                          _buildSectionHeader('COMPLETED'),
+                          const SizedBox(height: 12),
+                          ...completedGoals.map(
+                            (g) => _GoalCard(goal: g, isCompleted: true),
+                          ),
+                        ],
+                        if (cancelledGoals.isNotEmpty) ...[
+                          const SizedBox(height: 32),
+                          _buildSectionHeader('CANCELLED'),
+                          const SizedBox(height: 12),
+                          ...cancelledGoals.map(
+                            (g) => _GoalCard(goal: g, isCompleted: true),
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
-                  if (cancelledGoals.isNotEmpty) ...[
-                    const SizedBox(height: 32),
-                    _buildSectionHeader('CANCELLED'),
-                    const SizedBox(height: 12),
-                    ...cancelledGoals.map(
-                      (g) => _GoalCard(goal: g, isCompleted: true),
-                    ),
-                  ],
-                ]),
-              ),
             ),
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
-        ],
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Navigator.push(
@@ -197,9 +210,7 @@ class _GoalCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final color = _goalColor(goal.color);
-    final accentColor = goal.goalMode == GoalMode.plan
-        ? AppColors.primary
-        : color;
+    final accentColor = color;
 
     return ObjectActionWrapper(
       object: goal,
@@ -260,32 +271,9 @@ class _GoalCard extends ConsumerWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              // F3.11: Add Incomplete badge
+                              IncompleteBadge(visible: goal.isIncomplete),
                               const SizedBox(width: 8),
-                              if (goal.goalMode == GoalMode.plan) ...[
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withValues(
-                                      alpha: 0.12,
-                                    ),
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: const Text(
-                                    'PLAN',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: AppColors.primary,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                              ],
                               const Icon(
                                 Icons.chevron_right_rounded,
                                 color: AppColors.textMuted,
@@ -436,22 +424,7 @@ class _GoalCard extends ConsumerWidget {
                   color: AppColors.textMuted,
                 ),
               ),
-              if (goal.subtasks.isNotEmpty) ...[
-                const SizedBox(width: 12),
-                const Icon(
-                  Icons.checklist_rounded,
-                  size: 12,
-                  color: AppColors.textMuted,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '${goal.subtasks.where((s) => s.completed).length}/${goal.subtasks.length}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ],
+              // subtasks removed from Goal in V5.
             ],
           ),
         ],
@@ -461,7 +434,7 @@ class _GoalCard extends ConsumerWidget {
 
   /// Calculate live progress using KPIEngine for real-time values.
   double _calculateLiveProgress(WidgetRef ref) {
-    if (goal.kpis.isEmpty && goal.subtasks.isEmpty) return goal.progress;
+    if (goal.kpis.isEmpty) return goal.progress;
 
     final habits = ref.watch(habitsProvider);
     final trackerRecords = ref.watch(trackingRecordsProvider);
@@ -485,11 +458,6 @@ class _GoalCard extends ConsumerWidget {
         tasks: tasks,
       );
       completed += (currentValue / kpi.targetValue).clamp(0.0, 1.0);
-    }
-
-    for (final st in goal.subtasks) {
-      total += 1;
-      if (st.completed) completed += 1;
     }
 
     return total > 0 ? (completed / total) : 0;

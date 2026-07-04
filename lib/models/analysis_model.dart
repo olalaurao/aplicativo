@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'content_object.dart';
+import 'shared_types.dart';
 import '../ui/widgets/citrine_chart.dart'; // for ChartType
 
 enum MetricType {
@@ -22,6 +23,15 @@ class MetricSource {
   final bool showEmojiMarkers;
   final Map<String, num>? valueMapping;
 
+  DataSourceReference? get unifiedDataSource =>
+      _toUnifiedDataSource(
+        type: type,
+        id: id,
+        fieldId: fieldId,
+        dimension: dimension,
+        valueMapping: valueMapping,
+      );
+
   MetricSource({
     required this.type,
     required this.id,
@@ -35,9 +45,7 @@ class MetricSource {
   });
 
   Map<String, dynamic> toMap() {
-    return {
-      'type': type.name,
-      'id': id,
+    final map = <String, dynamic>{
       'label': label,
       if (fieldId != null) 'field_id': fieldId,
       if (color != null)
@@ -47,9 +55,42 @@ class MetricSource {
       if (dimension != null) 'dimension': dimension,
       if (valueMapping != null) 'value_mapping': valueMapping,
     };
+
+    final unified = unifiedDataSource;
+    if (unified != null) {
+      map['data_source'] = unified.toMap();
+      map.remove('field_id');
+      map.remove('dimension');
+      map.remove('value_mapping');
+    } else {
+      map['type'] = type.name;
+      map['id'] = id;
+    }
+
+    return map;
   }
 
   factory MetricSource.fromMap(Map<String, dynamic> map) {
+    if (map['data_source'] is Map) {
+      final unified = DataSourceReference.fromMap(
+        Map<String, dynamic>.from(map['data_source'] as Map),
+      );
+      final resolvedType = _metricTypeFromUnified(unified);
+      return MetricSource(
+        type: resolvedType,
+        id: unified.sourceId ?? '',
+        label: map['label']?.toString() ?? '',
+        fieldId: unified.fieldId,
+        color: _parseColor(map['color']),
+        axis: map['axis']?.toString() ?? 'left',
+        showEmojiMarkers: map['show_emoji_markers'] == true,
+        dimension: unified.dimension,
+        valueMapping: unified.valueMapping?.map(
+          (key, value) => MapEntry(key, value is num ? value : num.tryParse(value.toString()) ?? 0),
+        ),
+      );
+    }
+
     return MetricSource(
       type: MetricType.values.firstWhere(
         (e) => e.name == map['type']?.toString(),
@@ -208,5 +249,61 @@ class CombinedAnalysis extends ContentObject {
       analysis.dataSources = analysis.charts.expand((c) => c.sources).toList();
     }
     return analysis;
+  }
+}
+
+DataSourceReference? _toUnifiedDataSource({
+  required MetricType type,
+  required String id,
+  required String? fieldId,
+  required String? dimension,
+  required Map<String, num>? valueMapping,
+}) {
+  switch (type) {
+    case MetricType.mood:
+      return DataSourceReference(
+        sourceType: DataSourceType.journalMood,
+        dimension: dimension ?? 'pleasantness',
+      );
+    case MetricType.habit:
+      return DataSourceReference(
+        sourceType: DataSourceType.habit,
+        sourceId: id.isEmpty ? null : id,
+      );
+    case MetricType.trackerField:
+    case MetricType.trackerScore:
+      return DataSourceReference(
+        sourceType: DataSourceType.trackerField,
+        sourceId: id.isEmpty ? null : id,
+        fieldId: fieldId,
+        valueMapping: valueMapping == null
+            ? null
+            : Map<String, dynamic>.from(valueMapping),
+      );
+    case MetricType.pomodoro:
+      return DataSourceReference(
+        sourceType: DataSourceType.timeSpent,
+        sourceId: id.isEmpty ? null : id,
+      );
+    case MetricType.googleCalendar:
+      return null;
+  }
+}
+
+MetricType _metricTypeFromUnified(DataSourceReference source) {
+  switch (source.sourceType) {
+    case DataSourceType.journalMood:
+      return MetricType.mood;
+    case DataSourceType.habit:
+      return MetricType.habit;
+    case DataSourceType.trackerField:
+      return MetricType.trackerField;
+    case DataSourceType.timeSpent:
+      return MetricType.pomodoro;
+    case DataSourceType.subtasks:
+    case DataSourceType.collection:
+    case DataSourceType.entry:
+    case DataSourceType.manualQuantity:
+      return MetricType.trackerScore;
   }
 }

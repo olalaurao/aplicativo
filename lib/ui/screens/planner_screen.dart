@@ -9,13 +9,13 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/task_model.dart';
 import '../../models/note_model.dart';
 import '../../models/saved_filter.dart';
-import 'matrix_screen.dart';
 import '../../models/habit_model.dart';
 import '../../services/undo_service.dart';
 import '../theme.dart';
 import '../../models/journal_entry.dart';
 import '../../models/tracker_model.dart';
 import '../../models/reminder_model.dart';
+import '../../models/reminder_config.dart';
 import '../widgets/timeline_day_view.dart';
 import '../../services/scheduler_service.dart';
 import '../../providers/google_calendar_provider.dart';
@@ -23,14 +23,66 @@ import 'package:googleapis/calendar/v3.dart' as google_calendar;
 import '../../providers/pomodoro_provider.dart';
 import '../../models/people_model.dart';
 import '../../models/day_theme_model.dart';
+import '../../models/project_model.dart';
+import '../../services/rotation_service.dart';
 import '../widgets/object_action_wrapper.dart';
 import 'pomodoro_screen.dart';
 import 'google_event_detail_screen.dart';
 import '../forms/create_task_form.dart';
 import '../forms/create_habit_form.dart';
+import '../widgets/overdue_section.dart';
 import '../../models/content_object.dart';
 import 'universal_detail_view.dart';
 import '../widgets/triple_check_sheet.dart';
+import '../../providers/overdue_provider.dart';
+
+List<Task> rotationTasksForDay(
+  DateTime date,
+  List<Task> tasks,
+  List<Project> projects,
+) {
+  final result = <Task>[];
+  final dateOnly = DateTime(date.year, date.month, date.day);
+
+  for (final project in projects) {
+    if (!project.hasRotation) continue;
+    final status = RotationService.computeActiveStatus(project, now: dateOnly);
+    if (status == null) continue;
+
+    for (final task in tasks) {
+      if (task.stage == TaskStage.finalized || task.archived) continue;
+      if (!task.isRotationTask) continue;
+      if (task.rotationGroupId != status.group.id) continue;
+      final linkedToProject = task.organizers.any(
+        (o) => o.type == 'project' && o.slug == project.slug,
+      );
+      if (!linkedToProject) continue;
+
+      final include = switch (task.rotationFrequencyType) {
+        RotationFrequencyType.daily => true,
+        RotationFrequencyType.oncePerPeriod =>
+          !RotationService.isDoneThisOccurrence(task, status),
+        RotationFrequencyType.everyNRotations =>
+          RotationService.isDueNow(task, status) &&
+              !RotationService.isDoneThisOccurrence(task, status),
+        RotationFrequencyType.none => false,
+      };
+      if (include) result.add(task);
+    }
+  }
+  return result;
+}
+
+List<Task> mergeDayTasksWithRotation(
+  List<Task> base,
+  DateTime date,
+  List<Task> allTasks,
+  List<Project> projects,
+) {
+  final rotation = rotationTasksForDay(date, allTasks, projects);
+  final ids = base.map((t) => t.id).toSet();
+  return [...base, ...rotation.where((t) => !ids.contains(t.id))];
+}
 
 class PlannerScreen extends ConsumerStatefulWidget {
   final DateTime? initialDate;
@@ -47,6 +99,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   bool _isTimeline = true;
   late DateTime _selectedDate;
   final ScrollController _scrollController = ScrollController();
+  bool _showOverdue = true;
 
   @override
   void initState() {
@@ -76,9 +129,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   @override
   Widget build(BuildContext context) {
     final tasks = ref.watch(tasksProvider);
+    final projects = ref.watch(projectsProvider);
     final habits = ref
         .watch(habitsProvider)
-        .where((h) => !h.isQuitting)
+        .where((h) => !h.isQuitting && !h.isNegative)
         .toList();
     final people = ref.watch(peopleProvider);
     final dayThemes = ref.watch(dayThemesProvider);
@@ -183,7 +237,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       return hasLinkedReminder;
     }
 
-    final dayTasks = tasks.where((t) {
+    final baseDayTasks = tasks.where((t) {
       if (t.deadline != null && _isSameDay(t.deadline!, _selectedDate)) {
         return true;
       }
@@ -200,6 +254,13 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       }
       return false;
     }).toList();
+
+    final dayTasks = mergeDayTasksWithRotation(
+      baseDayTasks,
+      _selectedDate,
+      tasks,
+      projects,
+    );
 
     final dayHabits = habits.where((h) {
       for (final s in h.schedulers) {
@@ -237,9 +298,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         controller: _scrollController,
         slivers: [
           SliverAppBar(
-            toolbarHeight: activeTheme != null ? 56.0 : 44.0,
+            toolbarHeight: activeTheme != null ? 60.0 : 48.0,
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
                   'Planning',
@@ -262,26 +324,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             ),
             pinned: true,
             actions: [
-              IconButton(
-                icon: const Icon(
-                  Icons.grid_4x4_rounded,
-                  color: AppColors.primary,
-                ),
-                tooltip: 'Eisenhower Matrix',
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const MatrixScreen(
-                      filter: SavedFilter(
-                        id: 'eisenhower',
-                        name: 'Eisenhower',
-                        targetType: 'task',
-                        matrixConfig: MatrixConfig.eisenhower,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
               IconButton(
                 icon: const Icon(Icons.inbox_rounded, color: AppColors.primary),
                 tooltip: 'Backlog / Sem data',
@@ -313,7 +355,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
               ),
             ],
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(_viewMode == 0 ? 120 : 60),
+              preferredSize: Size.fromHeight(_viewMode == 0 ? 180 : 60),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
@@ -326,6 +368,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                     if (_viewMode == 0) ...[
                       const SizedBox(height: 12),
                       _buildDateStrip(),
+                      const SizedBox(height: 8),
+                      _buildOverdueToggle(),
                     ],
                   ],
                 ),
@@ -333,7 +377,14 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             ),
           ),
 
-          if (_viewMode == 0)
+          if (_viewMode == 0) ...[
+            if (_isSameDay(_selectedDate, DateTime.now()) && _showOverdue)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  child: OverdueSection(),
+                ),
+              ),
             _isTimeline
                 ? SliverToBoxAdapter(
                     child: Padding(
@@ -383,26 +434,41 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                           if (updatedSlots.isEmpty) {
                             updatedSlots.add(
                               HabitSlot(
-                                reminderEnabled: true,
-                                reminderTime: TimeOfDay(
-                                  hour: time.hour,
-                                  minute: time.minute,
-                                ),
+                                reminders: [
+                                  ReminderConfig(
+                                    id: 'primary',
+                                    timeOfDay:
+                                        '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+                                  ),
+                                ],
                               ),
                             );
                           } else {
-                            updatedSlots[0] = HabitSlot(
+                            final updatedSlot = HabitSlot(
                               time: updatedSlots[0].time,
                               completed: updatedSlots[0].completed,
                               label: updatedSlots[0].label,
-                              reminderEnabled: true,
-                              reminderTime: TimeOfDay(
+                              reminders: List<ReminderConfig>.from(
+                                updatedSlots[0].reminders,
+                              ),
+                              actions: updatedSlots[0].actions,
+                            );
+                            updatedSlot.enableDefaultReminder();
+                            updatedSlot.setPrimaryReminderTime(
+                              TimeOfDay(
                                 hour: time.hour,
                                 minute: time.minute,
                               ),
-                              notificationType:
-                                  updatedSlots[0].notificationType,
-                              actions: updatedSlots[0].actions,
+                            );
+                            updatedSlot.setPrimaryReminderType(
+                              updatedSlots[0].primaryReminderType,
+                            );
+                            updatedSlots[0] = HabitSlot(
+                              time: updatedSlot.time,
+                              completed: updatedSlot.completed,
+                              label: updatedSlot.label,
+                              reminders: updatedSlot.reminders,
+                              actions: updatedSlot.actions,
                             );
                           }
                           final updatedHabit = habit.copyWith(
@@ -451,8 +517,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                     dayEntries,
                     dayRecords,
                     googleEvents,
-                  )
-          else if (_viewMode == 1)
+                  ),
+          ] else if (_viewMode == 1)
             _buildWeekView(tasks, habits)
           else
             _buildMonthView(tasks, habits),
@@ -606,6 +672,54 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     );
   }
 
+  Widget _buildOverdueToggle() {
+    final overdueCount = ref.watch(overdueCountProvider);
+    if (overdueCount == 0) return const SizedBox.shrink();
+    
+    return GestureDetector(
+      onTap: () => setState(() => _showOverdue = !_showOverdue),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: _showOverdue 
+              ? AppColors.error.withValues(alpha: 0.1)
+              : AppColors.surfaceVariant,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: _showOverdue 
+                ? AppColors.error.withValues(alpha: 0.3)
+                : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: AppColors.error,
+              size: 16,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Atrasados ($overdueCount)',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _showOverdue ? AppColors.error : AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              _showOverdue ? Icons.expand_less : Icons.expand_more,
+              size: 16,
+              color: _showOverdue ? AppColors.error : AppColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDayAgendaView(
     List<Task> tasks,
     List<Habit> habits,
@@ -654,6 +768,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       sliver: SliverList(
         delegate: SliverChildListDelegate([
+          if (_isSameDay(_selectedDate, DateTime.now()))
+            const OverdueSection(),
           const Text(
             'Day Blocks',
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
@@ -1085,7 +1201,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     final energyColor = energyLevel == null
         ? null
         : _energyTintColor(energyLevel);
-    final isHighEnergyBlock = energyLevel == EnergyLevel.high;
+    final isHighEnergyBlock = energyLevel != null && energyLevel >= 7;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1286,12 +1402,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     );
   }
 
-  Color _energyTintColor(EnergyLevel level) {
-    return switch (level) {
-      EnergyLevel.high => AppColors.success,
-      EnergyLevel.medium => AppColors.warning,
-      EnergyLevel.low => AppColors.habitOrange,
-    };
+  Color _energyTintColor(int level) {
+    // Convert 0-10 scale to color
+    // 0-3: low (orange), 4-6: medium (yellow), 7-10: high (green)
+    if (level <= 3) return AppColors.habitOrange;
+    if (level <= 6) return AppColors.warning;
+    return AppColors.success;
   }
 
   Widget _buildTaskItem(Task task, {bool isHighEnergyBlock = false}) {
@@ -1609,7 +1725,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     int slotIndex,
     bool isDone,
   ) {
-    final time = slot.reminderTime;
+    final time = slot.primaryReminderTime;
     final label = slot.label?.trim();
     final slotTitle = label == null || label.isEmpty
         ? (habit.slots.length > 1 ? 'Slot ${slotIndex + 1}' : 'Concluir')
@@ -1833,6 +1949,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   Widget _buildWeekView(List<Task> tasks, List<Habit> habits) {
+    final projects = ref.watch(projectsProvider);
     final reminders = ref.watch(remindersProvider);
     final startOfWeek = DateTime.now().subtract(
       Duration(days: DateTime.now().weekday - 1),
@@ -1844,9 +1961,15 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         delegate: SliverChildBuilderDelegate((context, index) {
           final date = startOfWeek.add(Duration(days: index));
 
-          final dayTasks = tasks
+          final baseDayTasks = tasks
               .where((t) => t.deadline != null && _isSameDay(t.deadline!, date))
               .toList();
+          final dayTasks = mergeDayTasksWithRotation(
+            baseDayTasks,
+            date,
+            tasks,
+            projects,
+          );
           final dayHabits = habits.where((h) {
             for (final s in h.schedulers) {
               if (SchedulerService.shouldFire(
@@ -2237,9 +2360,16 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     List<Task> tasks,
     List<Habit> habits,
   ) {
-    final dayTasks = tasks
+    final projects = ref.read(projectsProvider);
+    final baseDayTasks = tasks
         .where((t) => t.deadline != null && _isSameDay(t.deadline!, date))
         .toList();
+    final dayTasks = mergeDayTasksWithRotation(
+      baseDayTasks,
+      date,
+      tasks,
+      projects,
+    );
     final dayThemes = ref.read(dayThemesProvider);
     final timeBlocks = ref.read(timeBlocksProvider);
 

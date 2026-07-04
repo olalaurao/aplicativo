@@ -1,5 +1,6 @@
 // lib/ui/widgets/habit_row.dart
 import 'package:flutter/material.dart';
+export 'habit_check_handler.dart' show handleHabitCheckTap;
 import '../../models/habit_model.dart';
 import '../theme.dart';
 import 'habit_detail_sheet.dart';
@@ -134,19 +135,31 @@ class HabitRow extends StatelessWidget {
 
   Widget _buildDaysSinceBadge(BuildContext context, int days) {
     if (days == 0) {
+      // F3.10: Add checkmark icon for "Done today" state
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
           color: AppColors.habitGreen.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Text(
-          'Done today',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            color: AppColors.habitGreen,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.check_rounded,
+              size: 10,
+              color: AppColors.habitGreen,
+            ),
+            const SizedBox(width: 4),
+            const Text(
+              'Done today',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: AppColors.habitGreen,
+              ),
+            ),
+          ],
         ),
       );
     }

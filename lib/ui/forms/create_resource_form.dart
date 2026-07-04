@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/resource_model.dart';
 import '../../models/shared_types.dart';
-import '../../models/task_model.dart'; // TaskPriority
 import '../../services/resource_metadata_service.dart';
 import '../theme.dart';
 import '../widgets/wiki_link_controller.dart';
@@ -43,7 +42,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
   DateTime? _readDate;
   String _resourceType = 'Book';
   ResourceStatus _status = ResourceStatus.toConsume;
-  TaskPriority _priority = TaskPriority.none;
+  ResourcePriority _priority = ResourcePriority.none;
   int _rating = 0;
   List<OrganizerReference> _organizers = [];
   bool _isFetchingUrl = false;
@@ -84,7 +83,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
 
     if (widget.existingResource != null) {
       final resource = widget.existingResource!;
-      _resourceType = resource.resourceType;
+      _resourceType = resource.mediaType;
       _status = resource.status;
       _priority = resource.priority;
       _rating = resource.rating;
@@ -95,7 +94,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
     } else {
       final defaultType = ref
           .read(settingsProvider)
-          .resourceTypeFilters
+          .mediaTypeFilters
           .where((type) => type.trim().isNotEmpty)
           .firstOrNull;
       if (widget.initialResourceType?.trim().isNotEmpty == true) {
@@ -405,7 +404,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
   }
 
   Widget _buildTypeRow() {
-    final configuredTypes = ref.watch(settingsProvider).resourceTypeFilters;
+    final configuredTypes = ref.watch(settingsProvider).mediaTypeFilters;
     final types = {
       if (_resourceType.trim().isNotEmpty) _resourceType.trim(),
       ...configuredTypes.where((type) => type.trim().isNotEmpty),
@@ -429,7 +428,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
           onChanged: (val) => setState(() => _resourceType = val!),
           items: types
               .map(
-                (t) => DropdownMenuItem(
+                (t) => DropdownMenuItem<String>(
                   value: t,
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 180),
@@ -455,7 +454,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
         ),
         const Spacer(),
-        DropdownButton<TaskPriority>(
+        DropdownButton<ResourcePriority>(
           value: _priority,
           underline: const SizedBox(),
           style: const TextStyle(
@@ -464,9 +463,9 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
             color: AppColors.primary,
           ),
           onChanged: (val) => setState(() => _priority = val!),
-          items: TaskPriority.values
+          items: ResourcePriority.values
               .map(
-                (p) => DropdownMenuItem(
+                (p) => DropdownMenuItem<ResourcePriority>(
                   value: p,
                   child: Text(p.name.toUpperCase()),
                 ),
@@ -687,7 +686,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
       createdAt: widget.existingResource?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
       title: _titleController.text.trim(),
-      resourceType: _resourceType,
+      mediaType: _resourceType,
       status: _status,
       rating: _rating,
       synopsis: _synopsisController.text.trim(),
@@ -781,8 +780,8 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
         if ((draft.category ?? '').trim().isNotEmpty) {
           _categoryController.text = draft.category!.trim();
         }
-        if ((draft.resourceType ?? '').trim().isNotEmpty) {
-          _resourceType = _normalizeResourceType(draft.resourceType!);
+        if ((draft.mediaType ?? '').trim().isNotEmpty) {
+          _resourceType = _normalizeResourceType(draft.mediaType!);
         }
         // Persist IMDb id when sourced from IMDB
         if (_sourceName == 'IMDB' && (draft.sourceId ?? '').isNotEmpty) {
@@ -800,7 +799,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
 
   String _normalizeResourceType(String value) {
     final trimmed = value.trim();
-    final configured = ref.read(settingsProvider).resourceTypeFilters;
+    final configured = ref.read(settingsProvider).mediaTypeFilters;
     // First check for exact case-insensitive match in configured list
     final match = configured.firstWhere(
       (type) => type.toLowerCase() == trimmed.toLowerCase(),
@@ -825,3 +824,4 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
     });
   }
 }
+

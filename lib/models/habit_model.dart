@@ -16,6 +16,62 @@ enum HabitMode { habit, pact }
 
 enum PactOutcome { persist, pause, pivot }
 
+class ChecklistItem {
+  final String id;
+  final String title;
+  final int? estimatedMinutes;
+
+  const ChecklistItem({
+    required this.id,
+    required this.title,
+    this.estimatedMinutes,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'title': title,
+    if (estimatedMinutes != null) 'estimated_minutes': estimatedMinutes,
+  };
+
+  factory ChecklistItem.fromMap(Map<String, dynamic> map) => ChecklistItem(
+    id: map['id']?.toString() ?? '',
+    title: map['title']?.toString() ?? '',
+    estimatedMinutes: map['estimated_minutes'] as int?,
+  );
+}
+
+class ChecklistSection {
+  final String id;
+  final String label;
+  final String? emoji;
+  final List<ChecklistItem> items;
+
+  const ChecklistSection({
+    required this.id,
+    required this.label,
+    this.emoji,
+    this.items = const [],
+  });
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'label': label,
+    if (emoji != null) 'emoji': emoji,
+    'items': items.map((i) => i.toMap()).toList(),
+  };
+
+  factory ChecklistSection.fromMap(Map<String, dynamic> map) =>
+      ChecklistSection(
+        id: map['id']?.toString() ?? '',
+        label: map['label']?.toString() ?? '',
+        emoji: map['emoji']?.toString(),
+        items: (map['items'] as List? ?? [])
+            .whereType<Map>()
+            .map((m) => ChecklistItem.fromMap(Map<String, dynamic>.from(m)))
+            .toList(),
+      );
+}
+
 class PactCycle {
   final DateTime startedAt;
   final DateTime endsAt;
@@ -46,17 +102,19 @@ class PactCycle {
 
   factory PactCycle.fromMap(Map<dynamic, dynamic> map) {
     final now = DateTime.now();
-    final startedAt = DateTime.tryParse(map['started_at']?.toString() ?? '') ??
+    final startedAt =
+        DateTime.tryParse(map['started_at']?.toString() ?? '') ??
         DateTime(now.year, now.month, now.day);
-    final endsAt = DateTime.tryParse(map['ends_at']?.toString() ?? '') ??
-        startedAt;
+    final endsAt =
+        DateTime.tryParse(map['ends_at']?.toString() ?? '') ?? startedAt;
     bool? hypCorrect;
     if (map['hypothesis_correct'] != null) {
       if (map['hypothesis_correct'] is bool) {
         hypCorrect = map['hypothesis_correct'] as bool;
       } else if (map['hypothesis_correct'].toString().toLowerCase() == 'true') {
         hypCorrect = true;
-      } else if (map['hypothesis_correct'].toString().toLowerCase() == 'false') {
+      } else if (map['hypothesis_correct'].toString().toLowerCase() ==
+          'false') {
         hypCorrect = false;
       }
     }
@@ -78,20 +136,99 @@ class HabitSlot {
   DateTime? time;
   bool completed;
   String? label;
-  bool reminderEnabled;
-  TimeOfDay? reminderTime;
-  NotificationType notificationType;
+  List<ReminderConfig> reminders;
   List<ActionDef> actions;
 
   HabitSlot({
     this.time,
     this.completed = false,
     this.label,
-    this.reminderEnabled = false,
-    this.reminderTime,
-    this.notificationType = NotificationType.push,
+    List<ReminderConfig>? reminders,
     List<ActionDef>? actions,
-  }) : actions = actions ?? [];
+  }) : reminders = reminders != null
+           ? List<ReminderConfig>.from(reminders)
+           : [],
+       actions = actions ?? [];
+
+  static List<ReminderConfig> _buildLegacyReminders({
+    required bool reminderEnabled,
+    required TimeOfDay? reminderTime,
+    required NotificationType notificationType,
+  }) {
+    if (!reminderEnabled || reminderTime == null) return [];
+    return [
+      ReminderConfig(
+        id: 'primary',
+        timeOfDay:
+            '${reminderTime.hour.toString().padLeft(2, '0')}:${reminderTime.minute.toString().padLeft(2, '0')}',
+        type: notificationType,
+      ),
+    ];
+  }
+
+  ReminderConfig _defaultReminder() => ReminderConfig(
+    id: 'primary',
+    timeOfDay: '08:00',
+    type: NotificationType.push,
+  );
+
+  ReminderConfig? get primaryReminder =>
+      reminders.isEmpty ? null : reminders.first;
+
+  bool get hasReminders => reminders.isNotEmpty;
+
+  TimeOfDay? get primaryReminderTime {
+    final timeOfDay = primaryReminder?.timeOfDay;
+    if (timeOfDay == null || timeOfDay.trim().isEmpty) return null;
+    final parts = timeOfDay.split(':');
+    if (parts.length != 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  void enableDefaultReminder() {
+    if (reminders.isEmpty) {
+      reminders = [_defaultReminder()];
+    }
+  }
+
+  void clearReminders() {
+    reminders = [];
+  }
+
+  void setPrimaryReminderTime(TimeOfDay? value) {
+    if (value == null) return;
+    final formatted =
+        '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+    final current = primaryReminder ?? _defaultReminder();
+    final updated = current.copyWith(
+      timeOfDay: formatted,
+      clearTriggerTime: true,
+      clearMinutesBefore: true,
+      clearDaysBefore: true,
+    );
+    if (reminders.isEmpty) {
+      reminders = [updated];
+    } else {
+      reminders[0] = updated;
+    }
+  }
+
+  NotificationType get primaryReminderType =>
+      primaryReminder?.type ?? NotificationType.push;
+
+  void setPrimaryReminderType(NotificationType value) {
+    final current = primaryReminder ?? _defaultReminder();
+    final updated = current.copyWith(type: value);
+    if (reminders.isEmpty) {
+      reminders = [updated];
+    } else {
+      reminders[0] = updated;
+    }
+  }
 }
 
 class CompletionRecord {
@@ -148,7 +285,11 @@ class Habit extends ContentObject {
   int? frequencyDays;
   bool isFlexibleFrequency;
   bool isQuitting; // A6.1: if true, goal is NOT to do this habit
-  List<String> socialRefs;
+  List<ChecklistSection> checklistSections = [];
+
+  bool get isChecklistHabit => checklistSections.isNotEmpty;
+  int get totalChecklistItems =>
+      checklistSections.fold(0, (sum, s) => sum + s.items.length);
 
   Scheduler? get scheduler => schedulers.isNotEmpty ? schedulers.first : null;
   set scheduler(Scheduler? s) {
@@ -191,7 +332,7 @@ class Habit extends ContentObject {
     this.frequencyDays,
     this.isFlexibleFrequency = false,
     this.isQuitting = false,
-    List<String>? socialRefs,
+    List<ChecklistSection>? checklistSections,
     super.organizers,
     super.categories,
     super.tags,
@@ -203,41 +344,43 @@ class Habit extends ContentObject {
        completionHistory = completionHistory ?? [],
        actions = actions ?? [],
        previousCycles = previousCycles ?? [],
-       socialRefs = socialRefs ?? [];
+       checklistSections = checklistSections ?? [];
+
+  static int countChecklistDone(dynamic rawValue) {
+    if (rawValue is! Map) return 0;
+    return rawValue.values.where((v) => v == true).length;
+  }
+
+  Map<String, bool> resolveChecklistState(dynamic rawValue) {
+    final raw = rawValue is Map ? rawValue : <String, dynamic>{};
+    return {
+      for (final section in checklistSections)
+        for (final item in section.items) item.id: raw[item.id] == true,
+    };
+  }
 
   @override
   String get type => 'habit';
 
   @override
+  bool get isIncomplete => title.trim().isEmpty;
+
+  @override
   List<ReminderConfig> get reminders {
-    final now = DateTime.now();
-    return slots
-        .asMap()
-        .entries
-        .where((e) => e.value.reminderEnabled && e.value.reminderTime != null)
-        .map((e) {
-          final slot = e.value;
-          final idx = e.key;
-          DateTime trigger = DateTime(
-            now.year,
-            now.month,
-            now.day,
-            slot.reminderTime!.hour,
-            slot.reminderTime!.minute,
-          );
-          if (trigger.isBefore(now)) {
-            trigger = trigger.add(
-              const Duration(days: 1),
-            ); // Schedule for next day if already passed today
-          }
-          return ReminderConfig(
-            id: '${id}_slot_$idx',
-            triggerTime: trigger,
-            type: slot.notificationType,
-            notificationBody: 'Hora de: $title',
-          );
-        })
-        .toList();
+    return slots.asMap().entries.expand((entry) {
+      final idx = entry.key;
+      final slot = entry.value;
+      return slot.reminders.asMap().entries.map((reminderEntry) {
+        final reminderIndex = reminderEntry.key;
+        final reminder = reminderEntry.value;
+        return reminder.copyWith(
+          id: '${id}_slot_${idx}_reminder_$reminderIndex',
+          notificationBody: reminder.notificationBody?.trim().isNotEmpty == true
+              ? reminder.notificationBody
+              : 'Hora de: $title',
+        );
+      });
+    }).toList();
   }
 
   @override
@@ -277,7 +420,7 @@ class Habit extends ContentObject {
     int? frequencyDays,
     bool? isFlexibleFrequency,
     bool? isQuitting,
-    List<String>? socialRefs,
+    List<ChecklistSection>? checklistSections,
   }) {
     final newHabit = Habit(
       id: id,
@@ -311,7 +454,9 @@ class Habit extends ContentObject {
       frequencyDays: frequencyDays ?? this.frequencyDays,
       isFlexibleFrequency: isFlexibleFrequency ?? this.isFlexibleFrequency,
       isQuitting: isQuitting ?? this.isQuitting,
-      socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
+      checklistSections:
+          checklistSections ??
+          List<ChecklistSection>.from(this.checklistSections),
       organizers: organizers,
       categories: categories,
       tags: tags,
@@ -411,11 +556,7 @@ class Habit extends ContentObject {
               if (s.time != null) 'time': s.time!.toIso8601String(),
               'completed': s.completed,
               if (s.label != null) 'label': s.label,
-              'reminder_enabled': s.reminderEnabled,
-              if (s.reminderTime != null)
-                'reminder_time':
-                    '${s.reminderTime!.hour}:${s.reminderTime!.minute}',
-              'notification_type': s.notificationType.name,
+              'reminders': s.reminders.map((r) => r.toMap()).toList(),
             },
           )
           .toList();
@@ -439,23 +580,37 @@ class Habit extends ContentObject {
 
     // Pact fields
     frontmatter['habit_mode'] = habitMode.name;
-    if (statement != null) frontmatter['statement'] = statement;
-    if (curiosityQuestion != null) frontmatter['curiosity_question'] = curiosityQuestion;
-    if (hypothesis != null) frontmatter['hypothesis'] = hypothesis;
-    if (startedAt != null) frontmatter['started_at'] = startedAt!.toIso8601String().split('T').first;
-    if (endsAt != null) frontmatter['ends_at'] = endsAt!.toIso8601String().split('T').first;
+    if (statement != null) {
+      frontmatter['statement'] = statement;
+    }
+    if (curiosityQuestion != null) {
+      frontmatter['curiosity_question'] = curiosityQuestion;
+    }
+    if (hypothesis != null) {
+      frontmatter['hypothesis'] = hypothesis;
+    }
+    if (startedAt != null) {
+      frontmatter['started_at'] = startedAt!.toIso8601String().split('T').first;
+    }
+    if (endsAt != null) {
+      frontmatter['ends_at'] = endsAt!.toIso8601String().split('T').first;
+    }
     if (pactOutcome != null) {
       frontmatter['pact_outcome'] = pactOutcome!.name;
     } else {
       frontmatter['pact_outcome'] = null;
     }
-    frontmatter['previous_cycles'] = previousCycles.map((c) => c.toMap()).toList();
+    frontmatter['previous_cycles'] = previousCycles
+        .map((c) => c.toMap())
+        .toList();
 
     if (frequencyDays != null) frontmatter['frequency_days'] = frequencyDays;
     if (isFlexibleFrequency) frontmatter['flexible_frequency'] = true;
     if (isQuitting) frontmatter['is_quitting'] = true;
-    if (socialRefs.isNotEmpty) {
-      frontmatter['social_refs'] = socialRefs;
+    if (checklistSections.isNotEmpty) {
+      frontmatter['checklist_sections'] = checklistSections
+          .map((s) => s.toMap())
+          .toList();
     }
 
     // Yesplification for the body: a log of completions
@@ -494,29 +649,59 @@ class Habit extends ContentObject {
     habit.completionUnit = frontmatter['completion_unit'] as String? ?? 'times';
     habit.linkedTrackerSlug = frontmatter['linked_tracker_slug'] as String?;
     final dg = frontmatter['daily_goal'];
-    habit.dailyGoal = dg is int ? dg : int.tryParse(dg?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '') ?? 1;
+    habit.dailyGoal = dg is int
+        ? dg
+        : int.tryParse(
+                dg?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '',
+              ) ??
+              1;
 
     final st = frontmatter['streak'];
-    habit.streak = st is int ? st : int.tryParse(st?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '') ?? 0;
+    habit.streak = st is int
+        ? st
+        : int.tryParse(
+                st?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '',
+              ) ??
+              0;
 
     if (frontmatter['slots'] != null && frontmatter['slots'] is Iterable) {
       habit.slots = (frontmatter['slots'] as Iterable).map((s) {
         if (s is Map) {
-          TimeOfDay? rTime;
-          if (s['reminder_time'] != null) {
-            final parts = s['reminder_time'].toString().split(':');
-            if (parts.length == 2) {
-              final hour = int.tryParse(parts[0]);
-              final minute = int.tryParse(parts[1]);
-              if (hour != null &&
-                  minute != null &&
-                  hour >= 0 &&
-                  hour <= 23 &&
-                  minute >= 0 &&
-                  minute <= 59) {
-                rTime = TimeOfDay(hour: hour, minute: minute);
+          List<ReminderConfig> slotReminders = [];
+          if (s['reminders'] is Iterable) {
+            slotReminders = (s['reminders'] as Iterable)
+                .whereType<Map>()
+                .map(
+                  (reminder) => ReminderConfig.fromMap(
+                    Map<String, dynamic>.from(reminder),
+                  ),
+                )
+                .toList();
+          } else {
+            TimeOfDay? rTime;
+            if (s['reminder_time'] != null) {
+              final parts = s['reminder_time'].toString().split(':');
+              if (parts.length == 2) {
+                final hour = int.tryParse(parts[0]);
+                final minute = int.tryParse(parts[1]);
+                if (hour != null &&
+                    minute != null &&
+                    hour >= 0 &&
+                    hour <= 23 &&
+                    minute >= 0 &&
+                    minute <= 59) {
+                  rTime = TimeOfDay(hour: hour, minute: minute);
+                }
               }
             }
+            slotReminders = HabitSlot._buildLegacyReminders(
+              reminderEnabled: s['reminder_enabled'] == true,
+              reminderTime: rTime,
+              notificationType: NotificationType.values.firstWhere(
+                (e) => e.name == s['notification_type'],
+                orElse: () => NotificationType.push,
+              ),
+            );
           }
           return HabitSlot(
             time: s['time'] != null
@@ -524,12 +709,7 @@ class Habit extends ContentObject {
                 : null,
             completed: s['completed'] == true,
             label: s['label']?.toString(),
-            reminderEnabled: s['reminder_enabled'] == true,
-            reminderTime: rTime,
-            notificationType: NotificationType.values.firstWhere(
-              (e) => e.name == s['notification_type'],
-              orElse: () => NotificationType.push,
-            ),
+            reminders: slotReminders,
           );
         }
         return HabitSlot();
@@ -596,23 +776,30 @@ class Habit extends ContentObject {
       final match = PactOutcome.values.where((e) => e.name == outcomeStr);
       habit.pactOutcome = match.isNotEmpty ? match.first : null;
     }
-    if (frontmatter['previous_cycles'] != null && frontmatter['previous_cycles'] is Iterable) {
-      habit.previousCycles = (frontmatter['previous_cycles'] as Iterable).map((item) {
-        if (item is Map) {
-          return PactCycle.fromMap(item);
-        }
-        return null;
-      }).whereType<PactCycle>().toList();
+    if (frontmatter['previous_cycles'] != null &&
+        frontmatter['previous_cycles'] is Iterable) {
+      habit.previousCycles = (frontmatter['previous_cycles'] as Iterable)
+          .map((item) {
+            if (item is Map) {
+              return PactCycle.fromMap(item);
+            }
+            return null;
+          })
+          .whereType<PactCycle>()
+          .toList();
     }
 
     if (frontmatter['frequency_days'] != null) {
-      habit.frequencyDays = int.tryParse(frontmatter['frequency_days'].toString());
+      habit.frequencyDays = int.tryParse(
+        frontmatter['frequency_days'].toString(),
+      );
     }
     habit.isFlexibleFrequency = frontmatter['flexible_frequency'] == true;
     habit.isQuitting = frontmatter['is_quitting'] as bool? ?? false;
-    if (frontmatter['social_refs'] != null) {
-      habit.socialRefs = (frontmatter['social_refs'] as Iterable)
-          .map((e) => e.toString())
+    if (frontmatter['checklist_sections'] is List) {
+      habit.checklistSections = (frontmatter['checklist_sections'] as List)
+          .whereType<Map>()
+          .map((m) => ChecklistSection.fromMap(Map<String, dynamic>.from(m)))
           .toList();
     }
 
@@ -662,5 +849,6 @@ String _resolveHabitTitle(Map<String, dynamic> frontmatter, String body) {
     r'^\s{0,3}#{1,6}\s+(.+?)\s*$',
     multiLine: true,
   ).firstMatch(body)?.group(1);
-  return displayTitleFromValue(heading, id: frontmatter['id']?.toString()) ?? '';
+  return displayTitleFromValue(heading, id: frontmatter['id']?.toString()) ??
+      '';
 }

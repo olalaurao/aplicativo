@@ -6,6 +6,7 @@ import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import es.antonborri.home_widget.HomeWidgetPlugin
 import org.json.JSONArray
+import org.json.JSONObject
 
 class CitrineCalendarItemsService : RemoteViewsService() {
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory {
@@ -23,7 +24,23 @@ private class CitrineCalendarItemsFactory(
     override fun onDataSetChanged() {
         val widgetData = HomeWidgetPlugin.getData(context)
         val data = CitrineWidgetUtils.json(widgetData.getString("citrine_calendar", null))
-        items = CitrineWidgetUtils.array(data, "items")
+        val regularItems = CitrineWidgetUtils.array(data, "items")
+        val overdueItems = CitrineWidgetUtils.array(data, "overdue")
+        items = JSONArray()
+        for (i in 0 until overdueItems.length()) {
+            val overdue = overdueItems.optJSONObject(i) ?: continue
+            val enriched = JSONObject(overdue.toString())
+            enriched.put("isOverdue", true)
+            enriched.put("time", "⚠")
+            enriched.put(
+                "subtitle",
+                "${overdue.optInt("daysLate", 0)} dia(s) atrasado",
+            )
+            items.put(enriched)
+        }
+        for (i in 0 until regularItems.length()) {
+            items.put(regularItems.optJSONObject(i))
+        }
     }
 
     override fun onDestroy() {

@@ -18,6 +18,8 @@ class JournalEntryCard extends StatelessWidget {
   final List<Widget> chips;
   final List<String> photoUrls;
   final VoidCallback? onTap;
+  final DateTime? createdAt;
+  final DateTime? occurredAt;
 
   const JournalEntryCard({
     super.key,
@@ -31,6 +33,8 @@ class JournalEntryCard extends StatelessWidget {
     this.chips = const [],
     this.photoUrls = const [],
     this.onTap,
+    this.createdAt,
+    this.occurredAt,
   });
 
   @override
@@ -47,10 +51,19 @@ class JournalEntryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title row + mood emoji
+                // Title row + mood emoji + created/happened glyph
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // F3.6: Created vs happened glyph
+                    if (createdAt != null || occurredAt != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: _CreatedHappenedGlyph(
+                          createdAt: createdAt,
+                          occurredAt: occurredAt,
+                        ),
+                      ),
                     Expanded(
                       child: Text(
                         title ??
@@ -554,6 +567,31 @@ class _StatCol extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+// F3.6: Created vs happened glyph for Journal Timeline
+class _CreatedHappenedGlyph extends StatelessWidget {
+  final DateTime? createdAt;
+  final DateTime? occurredAt;
+
+  const _CreatedHappenedGlyph({
+    required this.createdAt,
+    required this.occurredAt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Show ⚡ if occurredAt exists and differs from createdAt
+    // Show 🕐 if timestamp is based on createdAt (no occurredAt or they match)
+    final showHappened = occurredAt != null && 
+                          createdAt != null && 
+                          occurredAt!.isAtSameMomentAs(createdAt!) == false;
+    
+    return Text(
+      showHappened ? '⚡' : '🕐',
+      style: const TextStyle(fontSize: 14),
     );
   }
 }

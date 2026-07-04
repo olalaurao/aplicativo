@@ -808,7 +808,7 @@ class _SocialTimelineCardState extends ConsumerState<_SocialTimelineCard> {
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),
-                  if (post.socialRefs.isNotEmpty) ...[
+                  if (post.links.isNotEmpty) ...[
                     const SizedBox(width: 6),
                     const Icon(Icons.link_rounded, size: 14, color: AppColors.textMuted),
                   ],
@@ -972,10 +972,10 @@ class _SocialTimelineCardState extends ConsumerState<_SocialTimelineCard> {
         onSelected: (object) async {
           Navigator.pop(sheetContext);
           final refLink = _objectWikiLink(object);
-          final refs = <String>{...widget.post.socialRefs, refLink}.toList();
+          final refs = <String>{...widget.post.links, refLink}.toList();
           await ref
               .read(socialPostsProvider.notifier)
-              .updatePost(widget.post.copyWith(socialRefs: refs));
+              .updatePost(widget.post.copyWith(links: refs));
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Associado a ${object.title}')),

@@ -67,7 +67,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
       final res = item as Resource;
       // Type filter
       if (typeFilter.values.isNotEmpty) {
-        final rt = res.resourceType.toLowerCase();
+        final rt = res.mediaType.toLowerCase();
         if (!typeFilter.values.any((v) => rt.contains(v) || v.contains(rt))) {
           return false;
         }
@@ -78,7 +78,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
         res.title,
         res.author,
         res.category,
-        res.resourceType,
+        res.mediaType,
         res.synopsis,
         ...res.tags,
         ...res.aliases,
@@ -108,8 +108,8 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
         SortField.status => ((a as dynamic).status?.name ?? '').compareTo(
           (b as dynamic).status?.name ?? '',
         ),
-        SortField.type => ((a as dynamic).resourceType ?? '').compareTo(
-          (b as dynamic).resourceType ?? '',
+        SortField.type => ((a as dynamic).mediaType ?? '').compareTo(
+          (b as dynamic).mediaType ?? '',
         ),
         _ => 0,
       };
@@ -424,7 +424,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   );
 
   Widget _fallbackIcon(Resource r) {
-    final emoji = switch (r.resourceType.toLowerCase()) {
+    final emoji = switch (r.mediaType.toLowerCase()) {
       'book' || 'livro' => '📗',
       'podcast' => '🎙️',
       'movie' || 'filme' => '🎬',
@@ -519,13 +519,13 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     );
   }
 
-  Color _resourceColor(Resource r) => switch (r.resourceType.toLowerCase()) {
+  Color _resourceColor(Resource r) => switch (r.mediaType.toLowerCase()) {
     'podcast' => AppColors.info,
     'book' || 'livro' => AppColors.primary,
     _ => AppColors.habitPurple,
   };
 
-  String _resourceEmoji(Resource r) => switch (r.resourceType.toLowerCase()) {
+  String _resourceEmoji(Resource r) => switch (r.mediaType.toLowerCase()) {
     'book' || 'livro' => '📗',
     'podcast' => '🎙️',
     'movie' || 'filme' => '🎬',
@@ -780,3 +780,4 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     );
   }
 }
+

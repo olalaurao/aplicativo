@@ -88,7 +88,7 @@ class PropertyGrid extends StatelessWidget {
             crossAxisCount: crossAxisCount,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            mainAxisExtent: 96,
+            mainAxisExtent: 102,
           ),
           itemBuilder: (context, index) {
             return _PropertyCardWidget(card: resolvedCards[index]);
@@ -128,10 +128,9 @@ class _PropertyCardWidget extends StatelessWidget {
                     ),
                   ),
           ),
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
@@ -148,6 +147,7 @@ class _PropertyCardWidget extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
+                        height: 1.1,
                         fontWeight: FontWeight.w700,
                         color: contentColor.withValues(alpha: 0.7),
                       ),
@@ -161,6 +161,7 @@ class _PropertyCardWidget extends StatelessWidget {
                     ),
                 ],
               ),
+              const Spacer(),
               if (card.customChild != null)
                 card.customChild!
               else
@@ -170,6 +171,7 @@ class _PropertyCardWidget extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 14,
+                    height: 1.1,
                     fontWeight: card.state == PropertyCardState.empty
                         ? FontWeight.w400
                         : FontWeight.w600,

@@ -17,13 +17,9 @@ class BackupService {
       await backupDir.create(recursive: true);
     }
 
-    final timestamp = DateTime.now()
-        .toIso8601String()
-        .replaceAll(':', '-')
-        .split('.')
-        .first;
+    // F2.15: Use single fixed filename that gets overwritten
     final backupFile = File(
-      p.join(backupDir.path, 'citrine_backup_$timestamp.zip'),
+      p.join(backupDir.path, 'vault-backup.zip'),
     );
 
     final encoder = ZipFileEncoder();
@@ -43,25 +39,6 @@ class BackupService {
     }
 
     encoder.close();
-    await cleanOldBackups();
     return backupFile;
-  }
-
-  Future<void> cleanOldBackups({int keepCount = 1}) async {
-    final vaultDir = obsidianService.vaultDir;
-    if (vaultDir == null) return;
-    final backupDir = Directory(p.join(vaultDir.path, '_backups'));
-    if (!await backupDir.exists()) return;
-
-    final backups = backupDir.listSync().whereType<File>().toList();
-    if (backups.length <= keepCount) return;
-
-    backups.sort(
-      (a, b) => a.statSync().modified.compareTo(b.statSync().modified),
-    );
-    final toDelete = backups.take(backups.length - keepCount);
-    for (final file in toDelete) {
-      await file.delete();
-    }
   }
 }

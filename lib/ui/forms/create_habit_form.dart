@@ -1,9 +1,12 @@
 // lib/ui/forms/create_habit_form.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/habit_model.dart';
 import '../../models/scheduler.dart';
+import '../../models/template_model.dart';
 import '../../providers/vault_provider.dart';
+import '../../services/collection_row_service.dart';
 import '../theme.dart';
 import '../../models/shared_types.dart';
 import '../../models/reminder_config.dart';
@@ -56,6 +59,9 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
   DateTime? _startedAt;
   PactOutcome? _pactOutcome;
   List<PactCycle> _previousCycles = [];
+
+  bool _useChecklist = false;
+  List<ChecklistSection> _checklistSections = [];
 
   static const _colorSwatches = [
     '#DC2626',
@@ -118,6 +124,25 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
       for (int i = 0; i < habit.slots.length && i < _slotConfigs.length; i++) {
         _slotConfigs[i] = habit.slots[i];
       }
+      _useChecklist = habit.isChecklistHabit;
+      _checklistSections = habit.checklistSections
+          .map(
+            (s) => ChecklistSection(
+              id: s.id,
+              label: s.label,
+              emoji: s.emoji,
+              items: s.items
+                  .map(
+                    (i) => ChecklistItem(
+                      id: i.id,
+                      title: i.title,
+                      estimatedMinutes: i.estimatedMinutes,
+                    ),
+                  )
+                  .toList(),
+            ),
+          )
+          .toList();
     } else {
       _timeBlock = widget.initialTimeBlock;
       if (widget.initialOrganizers != null) {
@@ -193,6 +218,15 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
             ),
             centerTitle: true,
             actions: [
+              if (widget.existingHabit == null)
+                IconButton(
+                  icon: const Icon(
+                    Icons.copy_all_rounded,
+                    color: AppColors.primary,
+                  ),
+                  tooltip: 'Usar Template',
+                  onPressed: _showTemplatePicker,
+                ),
               if (widget.existingHabit != null)
                 IconButton(
                   icon: const Icon(
@@ -505,7 +539,41 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
 
                   const SizedBox(height: 12),
 
+                  // ─── Checklist Mode Toggle ───
+                  Container(
+                    decoration: AppTheme.cardDecoration(context),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text(
+                            'Usar checklist por etapas',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          subtitle: const Text(
+                            'Rotina multi-etapa com seções que resetam todo dia',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          value: _useChecklist,
+                          onChanged: (v) => setState(() => _useChecklist = v),
+                        ),
+                        if (_useChecklist) ...[
+                          const SizedBox(height: 8),
+                          _buildChecklistEditor(),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
                   // ─── Completion Unit Card ───
+                  if (!_useChecklist)
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.all(16),
@@ -560,6 +628,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                   const SizedBox(height: 12),
 
                   // ─── Slots & Goal Card ───
+                  if (!_useChecklist)
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.all(16),
@@ -941,22 +1010,28 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
               ),
               const SizedBox(width: 12),
               Switch.adaptive(
-                value: slot.reminderEnabled,
-                onChanged: (v) => setState(() => slot.reminderEnabled = v),
+                value: slot.hasReminders,
+                onChanged: (v) => setState(() {
+                  if (v) {
+                    slot.enableDefaultReminder();
+                  } else {
+                    slot.clearReminders();
+                  }
+                }),
                 activeThumbColor: AppColors.primary,
               ),
             ],
           ),
-          if (slot.reminderEnabled) ...[
+          if (slot.hasReminders) ...[
             const SizedBox(height: 8),
             InkWell(
               onTap: () => _pickReminderDetails(index),
               child: Row(
                 children: [
                   Icon(
-                    slot.notificationType == NotificationType.alarm
+                    slot.primaryReminderType == NotificationType.alarm
                         ? Icons.alarm_rounded
-                        : (slot.notificationType == NotificationType.popup
+                        : (slot.primaryReminderType == NotificationType.popup
                               ? Icons.picture_in_picture_rounded
                               : Icons.notifications_active_outlined),
                     size: 14,
@@ -964,8 +1039,8 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    slot.reminderTime != null
-                        ? '${slot.reminderTime!.format(context)} • ${slot.notificationType.name.toUpperCase()}'
+                    slot.primaryReminderTime != null
+                        ? '${slot.primaryReminderTime!.format(context)} • ${slot.primaryReminderType.name.toUpperCase()}'
                         : 'Tap to set time \u0026 alert type',
                     style: const TextStyle(
                       fontSize: 12,
@@ -1013,8 +1088,8 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
   void _pickReminderDetails(int index) {
     final slot = _slotConfigs[index];
     TimeOfDay? tempTime =
-        slot.reminderTime ?? const TimeOfDay(hour: 8, minute: 0);
-    NotificationType tempType = slot.notificationType;
+        slot.primaryReminderTime ?? const TimeOfDay(hour: 8, minute: 0);
+    NotificationType tempType = slot.primaryReminderType;
 
     showModalBottomSheet(
       context: context,
@@ -1081,8 +1156,10 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                     child: ElevatedButton(
                       onPressed: () {
                         setState(() {
-                          slot.reminderTime = tempTime;
-                          slot.notificationType = tempType;
+                          if (tempTime != null) {
+                            slot.setPrimaryReminderTime(tempTime);
+                            slot.setPrimaryReminderType(tempType);
+                          }
                         });
                         Navigator.pop(ctx);
                       },
@@ -1214,8 +1291,8 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
     );
     if (time != null) {
       setState(() {
-        _slotConfigs[index].reminderTime = time;
-        _slotConfigs[index].reminderEnabled = true;
+        _slotConfigs[index].enableDefaultReminder();
+        _slotConfigs[index].setPrimaryReminderTime(time);
       });
     }
   }
@@ -1350,6 +1427,20 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
   }
 
   Future<void> _saveHabit() async {
+    if (_useChecklist) {
+      final hasItems = _checklistSections.any((s) => s.items.isNotEmpty);
+      if (!hasItems) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Adicione pelo menos 1 seção com 1 item no checklist.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
     final habit = Habit(
       id:
           widget.existingHabit?.id ??
@@ -1392,6 +1483,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
               ? 7 
               : (_schedulers.first.rules.first.period == 'month' ? 30 : 365))
           : null,
+      checklistSections: _useChecklist ? _checklistSections : [],
     );
     try {
       if (widget.existingHabit != null) {
@@ -1401,13 +1493,88 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
       }
     } catch (e) {
       debugPrint('Failed to save habit: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erro ao salvar hábito: $e')));
-      return;
     }
-    if (mounted) Navigator.pop(context);
+  }
+
+  void _showTemplatePicker() async {
+    final templates = ref
+        .read(templatesProvider)
+        .where((t) => t.templateType == 'habit')
+        .toList();
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  'Templates',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    context.push(
+                      '/create/template',
+                      extra: {'initialType': 'habit'},
+                    );
+                  },
+                  child: const Text('Criar novo'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (templates.isEmpty)
+              const Text(
+                'Nenhum template encontrado.',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
+            ...templates.map(
+              (t) => ListTile(
+                title: Text(t.title),
+                onTap: () {
+                  Navigator.pop(context);
+                  _applyTemplate(t);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _applyTemplate(TemplateDefinition template) {
+    setState(() {
+      if (template.frontmatterDefaults.containsKey('title')) {
+        _titleController.text = template.frontmatterDefaults['title'] as String;
+      }
+      if (template.frontmatterDefaults.containsKey('description')) {
+        _descController.text = template.frontmatterDefaults['description'] as String;
+      }
+      if (template.frontmatterDefaults.containsKey('color')) {
+        _selectedColor = template.frontmatterDefaults['color'] as String;
+      }
+      if (template.frontmatterDefaults.containsKey('is_negative')) {
+        _isNegative = template.frontmatterDefaults['is_negative'] as bool? ?? false;
+      }
+      if (template.frontmatterDefaults.containsKey('habit_mode')) {
+        final modeStr = template.frontmatterDefaults['habit_mode'] as String;
+        _habitMode = HabitMode.values.firstWhere(
+          (e) => e.name == modeStr,
+          orElse: () => HabitMode.habit,
+        );
+      }
+      if (template.body.isNotEmpty) {
+        _descController.text = template.body;
+      }
+    });
   }
 
   void _deleteHabit() {
@@ -1453,6 +1620,91 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
     _buildActionPickerSheet((action) {
       setState(() => _actions.add(action));
     });
+  }
+
+  void _showLinkItemActionConfig(Function(ActionDef) onSelect) {
+    var trigger = 'day_complete';
+    var allowMultiple = true;
+    final promptController = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            left: 20,
+            right: 20,
+            top: 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Vincular item',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: trigger,
+                decoration: const InputDecoration(labelText: 'Quando disparar?'),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'slot_complete',
+                    child: Text('slot_complete'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'day_complete',
+                    child: Text('day_complete'),
+                  ),
+                ],
+                onChanged: (v) => setModalState(() => trigger = v ?? trigger),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Permitir vincular mais de um item'),
+                value: allowMultiple,
+                onChanged: (v) =>
+                    setModalState(() => allowMultiple = v ?? allowMultiple),
+              ),
+              TextField(
+                controller: promptController,
+                decoration: const InputDecoration(
+                  labelText: 'Texto da pergunta (opcional)',
+                  hintText: 'O que você quer vincular a esse check?',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Ao marcar este hábito, vai aparecer um popup perguntando o que vincular.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textMutedColor(context),
+                ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () {
+                  onSelect(ActionDef(
+                    type: 'link_item',
+                    trigger: trigger,
+                    params: {
+                      'allow_multiple': allowMultiple,
+                      if (promptController.text.trim().isNotEmpty)
+                        'prompt_title': promptController.text.trim(),
+                    },
+                  ));
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Adicionar ação'),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _buildActionPickerSheet(Function(ActionDef) onSelect) {
@@ -1547,6 +1799,17 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
               ListTile(
                 leading: const Icon(
                   Icons.link_rounded,
+                  color: AppColors.accent,
+                ),
+                title: const Text('Vincular item (link_item)'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showLinkItemActionConfig(onSelect);
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.open_in_new_rounded,
                   color: AppColors.textSecondary,
                 ),
                 title: const Text('Launch URL'),
@@ -1629,6 +1892,256 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
       case HabitInputType.duration:
         return 'Duration';
     }
+  }
+
+  Widget _buildChecklistEditor() {
+    if (_checklistSections.isEmpty) {
+      return TextButton.icon(
+        onPressed: _addChecklistSection,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Adicionar seção'),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ReorderableListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _checklistSections.length,
+          onReorder: (oldIndex, newIndex) {
+            setState(() {
+              if (newIndex > oldIndex) newIndex--;
+              final item = _checklistSections.removeAt(oldIndex);
+              _checklistSections.insert(newIndex, item);
+            });
+          },
+          itemBuilder: (context, sectionIndex) {
+            final section = _checklistSections[sectionIndex];
+            return Card(
+              key: ValueKey('section-${section.id}-$sectionIndex'),
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.drag_handle_rounded,
+                            color: AppColors.textMuted, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            decoration: InputDecoration(
+                              labelText: 'Seção',
+                              hintText: 'Manhã',
+                              prefixText: section.emoji != null
+                                  ? '${section.emoji} '
+                                  : null,
+                            ),
+                            controller: TextEditingController(text: section.label)
+                              ..selection = TextSelection.collapsed(
+                                offset: section.label.length,
+                              ),
+                            onChanged: (v) {
+                              _checklistSections[sectionIndex] =
+                                  ChecklistSection(
+                                id: slugify(v.isEmpty ? 'secao' : v),
+                                label: v,
+                                emoji: section.emoji,
+                                items: section.items,
+                              );
+                            },
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.emoji_emotions_outlined),
+                          onPressed: () => _pickSectionEmoji(sectionIndex),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline,
+                              color: AppColors.error),
+                          onPressed: () => setState(
+                            () => _checklistSections.removeAt(sectionIndex),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ReorderableListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: section.items.length,
+                      onReorder: (oldIndex, newIndex) {
+                        setState(() {
+                          if (newIndex > oldIndex) newIndex--;
+                          final items = List<ChecklistItem>.from(section.items);
+                          final moved = items.removeAt(oldIndex);
+                          items.insert(newIndex, moved);
+                          _checklistSections[sectionIndex] = ChecklistSection(
+                            id: section.id,
+                            label: section.label,
+                            emoji: section.emoji,
+                            items: items,
+                          );
+                        });
+                      },
+                      itemBuilder: (context, itemIndex) {
+                        final item = section.items[itemIndex];
+                        return ListTile(
+                          key: ValueKey('item-${item.id}-$itemIndex'),
+                          leading:
+                              const Icon(Icons.drag_handle_rounded, size: 18),
+                          title: TextField(
+                            decoration: const InputDecoration(
+                              hintText: 'Título do item',
+                              isDense: true,
+                            ),
+                            controller: TextEditingController(text: item.title)
+                              ..selection = TextSelection.collapsed(
+                                offset: item.title.length,
+                              ),
+                            onChanged: (v) {
+                              final items =
+                                  List<ChecklistItem>.from(section.items);
+                              items[itemIndex] = ChecklistItem(
+                                id: slugify(v.isEmpty ? 'item' : v),
+                                title: v,
+                                estimatedMinutes: item.estimatedMinutes,
+                              );
+                              _checklistSections[sectionIndex] =
+                                  ChecklistSection(
+                                id: section.id,
+                                label: section.label,
+                                emoji: section.emoji,
+                                items: items,
+                              );
+                            },
+                          ),
+                          subtitle: TextField(
+                            decoration: const InputDecoration(
+                              hintText: 'Min (opcional)',
+                              isDense: true,
+                            ),
+                            keyboardType: TextInputType.number,
+                            controller: TextEditingController(
+                              text: item.estimatedMinutes?.toString() ?? '',
+                            ),
+                            onChanged: (v) {
+                              final items =
+                                  List<ChecklistItem>.from(section.items);
+                              items[itemIndex] = ChecklistItem(
+                                id: item.id,
+                                title: item.title,
+                                estimatedMinutes: int.tryParse(v),
+                              );
+                              _checklistSections[sectionIndex] =
+                                  ChecklistSection(
+                                id: section.id,
+                                label: section.label,
+                                emoji: section.emoji,
+                                items: items,
+                              );
+                            },
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            onPressed: () {
+                              setState(() {
+                                final items =
+                                    List<ChecklistItem>.from(section.items)
+                                      ..removeAt(itemIndex);
+                                _checklistSections[sectionIndex] =
+                                    ChecklistSection(
+                                  id: section.id,
+                                  label: section.label,
+                                  emoji: section.emoji,
+                                  items: items,
+                                );
+                              });
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                    TextButton(
+                      onPressed: () => _addChecklistItem(sectionIndex),
+                      child: const Text('+ Adicionar item'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+        TextButton.icon(
+          onPressed: _addChecklistSection,
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('+ Adicionar seção'),
+        ),
+      ],
+    );
+  }
+
+  void _addChecklistSection() {
+    setState(() {
+      _checklistSections.add(
+        const ChecklistSection(
+          id: 'nova-secao',
+          label: 'Nova seção',
+          emoji: '📋',
+          items: [],
+        ),
+      );
+    });
+  }
+
+  void _addChecklistItem(int sectionIndex) {
+    setState(() {
+      final section = _checklistSections[sectionIndex];
+      final items = List<ChecklistItem>.from(section.items)
+        ..add(const ChecklistItem(id: 'novo-item', title: ''));
+      _checklistSections[sectionIndex] = ChecklistSection(
+        id: section.id,
+        label: section.label,
+        emoji: section.emoji,
+        items: items,
+      );
+    });
+  }
+
+  Future<void> _pickSectionEmoji(int sectionIndex) async {
+    const emojis = ['🌅', '☀️', '🌙', '📋', '💪', '🧘', '🏠', '💼'];
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          alignment: WrapAlignment.center,
+          children: emojis
+              .map(
+                (e) => GestureDetector(
+                  onTap: () => Navigator.pop(ctx, e),
+                  child: Text(e, style: const TextStyle(fontSize: 28)),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+    if (picked == null) return;
+    setState(() {
+      final s = _checklistSections[sectionIndex];
+      _checklistSections[sectionIndex] = ChecklistSection(
+        id: s.id,
+        label: s.label,
+        emoji: picked,
+        items: s.items,
+      );
+    });
   }
 
   Color _parseColor(String hex) {

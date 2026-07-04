@@ -12,6 +12,10 @@ enum RepeatType {
   linkedItemAppears,
   nDaysAfterLinkedItem,
   firstBusinessDayOfMonth,
+  /// V5 (type 12): fires N days after any date-type field on any object.
+  /// Used for People's contact-frequency and any future "N days after date field" need.
+  /// Config: { targetType, fieldName, days }.
+  daysAfterReferenceField,
   // Extensões não documentadas na spec — documentadas aqui como extensão
   daysOfTheme,
   daysWithBlock,
@@ -32,6 +36,7 @@ extension RepeatTypeX on RepeatType {
     RepeatType.linkedItemAppears      => 'linked_item_appears',
     RepeatType.nDaysAfterLinkedItem   => 'n_days_after_linked_item',
     RepeatType.firstBusinessDayOfMonth => 'first_business_day_of_month',
+    RepeatType.daysAfterReferenceField => 'days_after_reference_field',
     RepeatType.daysOfTheme            => 'days_of_theme',
     RepeatType.daysWithBlock          => 'days_with_block',
   };
@@ -58,6 +63,10 @@ class SchedulerRule {
   int? intervalBetweenDays;
   String? themeId;
   String? blockId;
+  /// V5 type 12 (daysAfterReferenceField): the object type to watch.
+  String? targetType;
+  /// V5 type 12: the date field name on the target object (e.g. 'last_contact_date').
+  String? fieldName;
 
   SchedulerRule({
     required this.repeatType,
@@ -71,21 +80,25 @@ class SchedulerRule {
     this.intervalBetweenDays,
     this.themeId,
     this.blockId,
+    this.targetType,
+    this.fieldName,
   });
 
   Map<String, dynamic> toMap() {
     return {
       'repeat_type': repeatType.specName,
-      'interval': interval,
-      'days_of_week': daysOfWeek,
-      'days_of_month': daysOfMonth,
-      'linked_item_id': linkedItemId,
-      'count_per_period': countPerPeriod,
-      'period': period,
-      'starting_day_offset': startingDayOffset,
-      'interval_between_days': intervalBetweenDays,
-      'theme_id': themeId,
-      'block_id': blockId,
+      if (interval != null) 'interval': interval,
+      if (daysOfWeek != null) 'days_of_week': daysOfWeek,
+      if (daysOfMonth != null) 'days_of_month': daysOfMonth,
+      if (linkedItemId != null) 'linked_item_id': linkedItemId,
+      if (countPerPeriod != null) 'count_per_period': countPerPeriod,
+      if (period != null) 'period': period,
+      if (startingDayOffset != null) 'starting_day_offset': startingDayOffset,
+      if (intervalBetweenDays != null) 'interval_between_days': intervalBetweenDays,
+      if (themeId != null) 'theme_id': themeId,
+      if (blockId != null) 'block_id': blockId,
+      if (targetType != null) 'target_type': targetType,
+      if (fieldName != null) 'field_name': fieldName,
     };
   }
 
@@ -108,6 +121,8 @@ class SchedulerRule {
       intervalBetweenDays: map['interval_between_days'] as int?,
       themeId: map['theme_id'] as String?,
       blockId: map['block_id'] as String?,
+      targetType: map['target_type'] as String?,
+      fieldName: map['field_name'] as String?,
     );
   }
 }

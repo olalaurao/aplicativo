@@ -4,8 +4,11 @@
 
 import 'package:flutter/foundation.dart';
 import '../models/analysis_model.dart';
+import '../models/project_model.dart';
+import '../models/task_model.dart';
 import '../models/tracker_model.dart';
 import 'obsidian_service.dart';
+import 'rotation_service.dart';
 
 class DataviewGenerator {
   final ObsidianService _obsidian;
@@ -15,7 +18,10 @@ class DataviewGenerator {
   // ─── Public API ──────────────────────────────────────────────────────────────
 
   /// Regenerates all index files with Dataview queries.
-  Future<void> regenerateAll() async {
+  Future<void> regenerateAll({
+    List<Project> projects = const [],
+    List<Task> tasks = const [],
+  }) async {
     await Future.wait([
       _writeTasksIndex(),
       _writeHabitsIndex(),
@@ -25,6 +31,7 @@ class DataviewGenerator {
       _writeSocialIndex(),
       _writeSystemsIndex(),
       _writePactsIndex(),
+      _writeRotationIndex(projects, tasks),
     ]);
   }
 
@@ -402,6 +409,95 @@ SORT ends_at ASC
 ''';
     await _safeWrite('app/pacts-index.md', content);
   }
+
+  Future<void> _writeRotationIndex(
+    List<Project> projects,
+    List<Task> tasks,
+  ) async {
+    final buffer = StringBuffer()
+      ..writeln('---')
+      ..writeln('type: index')
+      ..writeln('title: Rotation Index')
+      ..writeln('---')
+      ..writeln('')
+      ..writeln('# Rotation')
+      ..writeln('');
+
+    final rotationProjects = projects.where((p) => p.hasRotation).toList();
+    if (rotationProjects.isEmpty) {
+      buffer.writeln('_Nenhum projeto com rotação configurada._');
+      await _safeWrite('app/rotation-index.md', buffer.toString());
+      return;
+    }
+
+    for (final project in rotationProjects) {
+      final status = RotationService.computeActiveStatus(project);
+      buffer.writeln('## ${project.title}');
+      if (status != null) {
+        final emoji = status.group.emoji != null ? '${status.group.emoji} ' : '';
+        buffer.writeln(
+          '- **Zona ativa:** $emoji${status.group.name} '
+          '(dia ${status.dayOfPeriod}/${status.group.periodDays})',
+        );
+        buffer.writeln(
+          '- **Período:** '
+          '${_fmtDate(status.periodStart)} — ${_fmtDate(status.periodEnd)}',
+        );
+      } else {
+        buffer.writeln('- _Rotação ainda não iniciada._');
+      }
+      buffer.writeln('');
+      buffer.writeln('### Tarefas pendentes');
+
+      if (status == null) {
+        buffer.writeln('- _—_');
+        buffer.writeln('');
+        continue;
+      }
+
+      final pending = tasks.where((t) {
+        if (!t.isRotationTask || t.stage == TaskStage.finalized) return false;
+        if (!t.organizers.any(
+          (o) => o.type == 'project' && o.slug == project.slug,
+        )) {
+          return false;
+        }
+        if (t.rotationGroupId != status.group.id) return false;
+        return switch (t.rotationFrequencyType) {
+          RotationFrequencyType.daily => true,
+          RotationFrequencyType.oncePerPeriod =>
+            !RotationService.isDoneThisOccurrence(t, status),
+          RotationFrequencyType.everyNRotations =>
+            RotationService.isDueNow(t, status) &&
+                !RotationService.isDoneThisOccurrence(t, status),
+          RotationFrequencyType.none => false,
+        };
+      }).toList();
+
+      if (pending.isEmpty) {
+        buffer.writeln('- _Nenhuma tarefa pendente na zona ativa._');
+      } else {
+        for (final t in pending) {
+          final freq = switch (t.rotationFrequencyType) {
+            RotationFrequencyType.daily => 'diária',
+            RotationFrequencyType.oncePerPeriod => '1× no período',
+            RotationFrequencyType.everyNRotations =>
+              'a cada ${t.rotationEveryN ?? 1} rotações',
+            RotationFrequencyType.none => '',
+          };
+          buffer.writeln('- [[${t.slug}|${t.title}]] ($freq)');
+        }
+      }
+      buffer.writeln('');
+    }
+
+    await _safeWrite('app/rotation-index.md', buffer.toString());
+  }
+
+  String _fmtDate(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
 
   Future<void> _safeWrite(String path, String content) async {
     try {

@@ -7,7 +7,10 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../models/note_model.dart';
 import '../../providers/vault_provider.dart';
+import '../../services/markdown_parser.dart';
+import '../../services/ocr_service.dart';
 import '../theme.dart';
+import '../widgets/ocr_text_section.dart';
 
 class CreateScanDocumentForm extends ConsumerStatefulWidget {
   final String? initialTitle;
@@ -147,31 +150,53 @@ class _CreateScanDocumentFormState
   }
 
   Widget _attachmentTile(_DocumentAttachment attachment) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: AppTheme.cardDecoration(context),
-      child: ListTile(
-        leading: Icon(
-          attachment.isImage
-              ? Icons.image_outlined
-              : Icons.insert_drive_file_outlined,
-          color: AppColors.primary,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: AppTheme.cardDecoration(context),
+          child: ListTile(
+            leading: Icon(
+              attachment.isImage
+                  ? Icons.image_outlined
+                  : Icons.insert_drive_file_outlined,
+              color: AppColors.primary,
+            ),
+            title: Text(
+              attachment.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              attachment.relativePath,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.close_rounded),
+              onPressed: () => setState(() => _attachments.remove(attachment)),
+            ),
+          ),
         ),
-        title: Text(
-          attachment.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          attachment.relativePath,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.close_rounded),
-          onPressed: () => setState(() => _attachments.remove(attachment)),
-        ),
-      ),
+        if (attachment.isImage)
+          OcrTextSection(
+            state: attachment.ocrState,
+            text: attachment.ocrText,
+            sourceImageLabel: attachment.name,
+            initiallyExpanded: attachment.ocrState == OcrSectionState.loaded &&
+                attachment.ocrText.isNotEmpty,
+            onTextChanged: (text) {
+              final idx = _attachments.indexOf(attachment);
+              if (idx >= 0) {
+                setState(() {
+                  _attachments[idx] = attachment.copyWith(ocrText: text);
+                });
+              }
+            },
+            onRetry: () => _retryOcr(attachment),
+          ),
+      ],
     );
   }
 
@@ -218,15 +243,81 @@ class _CreateScanDocumentFormState
     final obsidian = ref.read(obsidianServiceProvider);
     final relativePath = await obsidian.saveAttachment(file);
     if (!mounted || relativePath == null) return;
+
+    OcrSectionState ocrState = OcrSectionState.empty;
+    String ocrText = '';
+    Future<OcrResult>? ocrFuture;
+    if (isImage) {
+      ocrState = OcrSectionState.loading;
+      ocrFuture = OcrService.extractText(file);
+    }
+
     setState(() {
       _attachments.add(
         _DocumentAttachment(
           name: name,
           relativePath: relativePath,
           isImage: isImage,
+          ocrState: ocrState,
+          ocrText: ocrText,
         ),
       );
     });
+
+    if (ocrFuture != null) {
+      try {
+        final result = await ocrFuture;
+        if (!mounted) return;
+        setState(() {
+          final idx = _attachments.indexWhere((a) => a.relativePath == relativePath);
+          if (idx < 0) return;
+          final att = _attachments[idx];
+          _attachments[idx] = att.copyWith(
+            ocrText: result.text,
+            ocrState: result.hasText
+                ? OcrSectionState.loaded
+                : OcrSectionState.empty,
+          );
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          final idx = _attachments.indexWhere((a) => a.relativePath == relativePath);
+          if (idx >= 0) {
+            _attachments[idx] =
+                _attachments[idx].copyWith(ocrState: OcrSectionState.error);
+          }
+        });
+      }
+    }
+  }
+
+  Future<void> _retryOcr(_DocumentAttachment attachment) async {
+    final idx = _attachments.indexOf(attachment);
+    if (idx < 0) return;
+    setState(() => _attachments[idx] = attachment.copyWith(
+          ocrState: OcrSectionState.loading,
+        ));
+    try {
+      final vaultPath = ref.read(obsidianServiceProvider).vaultPath;
+      final file = File('$vaultPath/_attachments/${attachment.relativePath}');
+      final result = await OcrService.extractText(file);
+      if (!mounted) return;
+      setState(() {
+        _attachments[idx] = attachment.copyWith(
+          ocrText: result.text,
+          ocrState: result.hasText
+              ? OcrSectionState.loaded
+              : OcrSectionState.empty,
+        );
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _attachments[idx] =
+            attachment.copyWith(ocrState: OcrSectionState.error);
+      });
+    }
   }
 
   Future<void> _saveDocumentNote() async {
@@ -241,10 +332,21 @@ class _CreateScanDocumentFormState
       body.writeln('- ![[${attachment.relativePath}]]');
     }
 
+    var finalBody = body.toString().trim();
+    for (final attachment in _attachments) {
+      if (attachment.isImage && attachment.ocrText.trim().isNotEmpty) {
+        finalBody = MarkdownParser.upsertOcrSection(
+          finalBody,
+          attachment.relativePath,
+          attachment.ocrText.trim(),
+        );
+      }
+    }
+
     final note = Note(
       title: _titleController.text.trim(),
       subtype: NoteSubtype.text,
-      body: body.toString().trim(),
+      body: finalBody,
       categories: const ['[[notes]]', '[[documents]]'],
     );
     await ref.read(notesProvider.notifier).addNote(note);
@@ -257,10 +359,27 @@ class _DocumentAttachment {
   final String name;
   final String relativePath;
   final bool isImage;
+  final OcrSectionState ocrState;
+  final String ocrText;
 
   const _DocumentAttachment({
     required this.name,
     required this.relativePath,
     required this.isImage,
+    this.ocrState = OcrSectionState.empty,
+    this.ocrText = '',
   });
+
+  _DocumentAttachment copyWith({
+    OcrSectionState? ocrState,
+    String? ocrText,
+  }) {
+    return _DocumentAttachment(
+      name: name,
+      relativePath: relativePath,
+      isImage: isImage,
+      ocrState: ocrState ?? this.ocrState,
+      ocrText: ocrText ?? this.ocrText,
+    );
+  }
 }

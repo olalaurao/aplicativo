@@ -26,6 +26,7 @@ import '../../models/kpi_model.dart';
 import '../../providers/pomodoro_provider.dart';
 import '../../services/kpi_engine.dart';
 import '../../services/markdown_parser.dart';
+import '../../services/scheduler_service.dart';
 import '../../providers/vault_provider.dart';
 import 'pomodoro_screen.dart';
 import '../theme.dart';
@@ -38,6 +39,7 @@ import '../widgets/property_grid.dart';
 import '../widgets/collection_view.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../../models/note_model.dart';
+import '../../models/idea_model.dart';
 import '../widgets/checklist_view.dart';
 import '../../models/template_model.dart';
 import '../widgets/wiki_text_view.dart';
@@ -64,6 +66,26 @@ import 'system_detail_screen.dart';
 import '../../providers/systems_provider.dart';
 import '../widgets/linked_objects_section.dart';
 import '../utils/social_ref_utils.dart';
+import '../navigation/object_navigation.dart';
+import '../../services/rotation_service.dart';
+
+class _PropRow {
+  final String label;
+  final String value;
+  final bool isEmpty;
+  final bool isOverdue;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+
+  const _PropRow({
+    required this.label,
+    required this.value,
+    this.isEmpty = false,
+    this.isOverdue = false,
+    this.onTap,
+    this.trailing,
+  });
+}
 
 class UniversalDetailView extends ConsumerStatefulWidget {
   final ContentObject object;
@@ -85,6 +107,8 @@ class UniversalDetailView extends ConsumerStatefulWidget {
 class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   bool _isEditing = false;
   late ContentObject object;
+  String? _rotationTaskFilter;
+  int _linkChartDays = 7;
 
   @override
   void initState() {
@@ -160,122 +184,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             ],
           ),
 
-          // ─── Title Area ───
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          object is MoodDefinition
-                              ? '${(object as MoodDefinition).emoji} ${object.title}'
-                              : (object.obsidianFileName.isNotEmpty
-                                    ? object.obsidianFileName
-                                    : 'Untitled'),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                      ),
-                      ConflictBadge(
-                        visible: currentObject.hasTypeConflict,
-                        tooltip: currentObject.conflictReason,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _typeLabel(object),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textMuted,
-                    ),
-                  ),
-                  if (object is Project) _buildProjectProgress(context, ref),
-                  if (conflictGroup.length > 1)
-                    _buildObjectConflictBanner(context, ref, conflictGroup),
-                  if (widget.searchSnippet != null &&
-                      widget.searchSnippet!.trim().isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.18),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Search Match',
-                              style: TextStyle(
-                                color: AppColors.primary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            _highlightSearchSnippet(
-                              widget.searchSnippet!,
-                              widget.searchQuery ?? '',
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-
-          // ─── Properties Grid ───
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-              child: PropertyGrid(
-                items: [
-                  if (object is! Resource)
-                    PropertyGridItem(
-                      label: 'Status',
-                      value: _getStatus(object),
-                      onTap: () => _onPropertyTap(
-                        context,
-                        ref,
-                        'Status',
-                        _getStatus(object),
-                      ),
-                    ),
-                  PropertyGridItem(
-                    label: 'Created',
-                    value: DateFormat(
-                      'EEE, d MMM, yyyy',
-                    ).format(object.createdAt),
-                  ),
-                  PropertyGridItem(
-                    label: 'Modified',
-                    value: DateFormat(
-                      'EEE, d MMM, yyyy',
-                    ).format(object.updatedAt),
-                  ),
-                  ..._buildTypeSpecificProperties(context, ref),
-                ],
-              ),
-            ),
-          ),
+          // ─── Hero Header + Property Cards ───
+          if (object is! Resource)
+            _buildHeroHeader(context, ref, currentObject, conflictGroup),
+          ..._buildTypeSpecificPropertyCards(context, ref),
 
           // ─── Linked Organizers (Connections) ───
           if (object.organizers.isNotEmpty)
@@ -394,7 +306,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
               child: LinkedObjectsSection(
                 owner: object,
-                socialRefs: getSocialRefs(object),
+                links: getSocialRefs(object),
                 onAdd: (selected) => addSocialRef(object, selected, ref),
                 onRemove: (slug) => removeSocialRef(object, slug, ref),
               ),
@@ -753,6 +665,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         'edit',
         'change_type',
         'merge_note',
+        'save_as_system',
         'save_template',
         'archive',
         'delete',
@@ -815,6 +728,17 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                         ? 'Reverter para Nota'
                         : 'Converter para Checklist',
                   ),
+                ],
+              ),
+            );
+          case 'save_as_system':
+            return const PopupMenuItem(
+              value: 'save_as_system',
+              child: Row(
+                children: [
+                  Icon(Icons.account_tree_rounded, size: 18),
+                  SizedBox(width: 12),
+                  Text('Save as System'),
                 ],
               ),
             );
@@ -909,188 +833,412 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
-  List<PropertyGridItem> _buildTypeSpecificProperties(
+  List<Widget> _buildTypeSpecificPropertyCards(
     BuildContext context,
     WidgetRef ref,
   ) {
+    if (object is Resource) return [];
+
+    final cards = <Widget>[];
+
     if (object is Task) {
       final task = object as Task;
-      return [
-        ..._buildLinkedGoogleEventRows(context, task),
-        PropertyGridItem(
-          label: 'Priority',
-          value: task.priority.name.toUpperCase(),
-          onTap: () => _showTaskPriorityPicker(context, ref, task),
+      cards.add(
+        _buildPropertiesCard(
+          context: context,
+          title: 'Datas',
+          icon: Icons.calendar_today_outlined,
+          rows: [
+            _PropRow(
+              label: 'Criado',
+              value: DateFormat('d MMM yyyy').format(task.createdAt),
+            ),
+            _PropRow(
+              label: 'Prazo',
+              value: task.endDate != null
+                  ? DateFormat('d MMM yyyy').format(task.endDate!)
+                  : 'Não definida',
+              isEmpty: task.endDate == null,
+              isOverdue: _isOverdue(task),
+              onTap: () => _showTaskDueDatePicker(context, ref, task),
+            ),
+            _PropRow(
+              label: 'Início',
+              value: task.startDate != null
+                  ? DateFormat('d MMM yyyy').format(task.startDate!)
+                  : 'Não definida',
+              isEmpty: task.startDate == null,
+            ),
+          ],
         ),
-        if (task.endDate != null) ...[
-          PropertyGridItem(
-            label: 'Due Date',
-            value: DateFormat('MMM d, yyyy').format(task.endDate!),
-            onTap: () => _showTaskDueDatePicker(context, ref, task),
-          ),
-        ],
-      ];
-    }
-    if (object is Habit) {
+      );
+      cards.add(
+        _buildPropertiesCard(
+          context: context,
+          title: 'Configuração',
+          icon: Icons.tune_rounded,
+          rows: [
+            _PropRow(
+              label: 'Prioridade',
+              value: '',
+              trailing: _buildPriorityBadge(task),
+            ),
+            _PropRow(
+              label: 'Stage',
+              value: _getStatusLabel(task),
+              onTap: () => _onPropertyTap(context, ref, 'Status', _getStatus(task)),
+            ),
+            _PropRow(
+              label: 'Tempo estimado',
+              value: task.estimatedMinutes != null
+                  ? '${task.estimatedMinutes} min'
+                  : 'Não definido',
+              isEmpty: task.estimatedMinutes == null,
+            ),
+            _PropRow(
+              label: 'Tempo real',
+              value: task.actualMinutes > 0
+                  ? '${task.actualMinutes} min'
+                  : 'Não definido',
+              isEmpty: task.actualMinutes == 0,
+            ),
+            _PropRow(
+              label: 'Pomodoros',
+              value: task.pomodoroCount != null && task.pomodoroCount! > 0
+                  ? '${task.pomodoroCount}'
+                  : 'Não definido',
+              isEmpty: task.pomodoroCount == null || task.pomodoroCount == 0,
+            ),
+            ..._buildLinkedGoogleEventPropRows(context, task),
+          ],
+        ),
+      );
+    } else if (object is Habit) {
       final habit = object as Habit;
-      return [
-        PropertyGridItem(label: 'Streak', value: '${habit.streak} days'),
-        PropertyGridItem(
-          label: 'Days Since',
-          value: habit.daysSinceLastCompletion == 0
-              ? 'Today'
-              : '${habit.daysSinceLastCompletion} days ago',
-        ),
-      ];
-    }
-    if (object is Project) {
-      final project = object as Project;
-      return [
-        ..._buildLinkedGoogleEventRows(context, project),
-        PropertyGridItem(
-          label: 'State',
-          value: project.projectState.name.toUpperCase(),
-          onTap: () => _showProjectStatePicker(context, ref, project),
-        ),
-        PropertyGridItem(
-          label: 'Priority',
-          value: project.projectPriority.name.toUpperCase(),
-          onTap: () => _showProjectPriorityPicker(context, ref, project),
-        ),
-      ];
-    }
-    if (object is Person) {
-      final person = object as Person;
-      return [
-        PropertyGridItem(
-          label: 'Priority',
-          value: person.contactPriority.name.toUpperCase(),
-          onTap: () => _showPersonPriorityPicker(context, ref, person),
-        ),
-        if (person.contactFrequency != null) ...[
-          PropertyGridItem(
-            label: 'Frequency',
-            value: 'Every ${person.contactFrequency!.inDays} days',
-            onTap: () => _showFrequencyPicker(context, ref, person),
+      if (!habit.isChecklistHabit) {
+        cards.add(
+          _buildPropertiesCard(
+            context: context,
+            title: 'Config',
+            icon: Icons.tune_rounded,
+            rows: [
+              _PropRow(
+                label: 'Frequência',
+                value: habit.scheduler?.rules.isNotEmpty == true
+                    ? habit.scheduler!.rules.first.repeatType.name
+                    : 'Não definida',
+                isEmpty: habit.scheduler == null || habit.scheduler!.rules.isEmpty,
+              ),
+              _PropRow(label: 'Streak', value: '${habit.streak} 🔥'),
+              _PropRow(
+                label: 'Último registro',
+                value: habit.daysSinceLastCompletion == 0
+                    ? 'Hoje'
+                    : '${habit.daysSinceLastCompletion} dias atrás',
+                isEmpty: habit.completionHistory.isEmpty,
+              ),
+              _PropRow(
+                label: 'Categoria',
+                value: habit.categories.isNotEmpty
+                    ? habit.categories.first
+                    : 'Não definida',
+                isEmpty: habit.categories.isEmpty,
+              ),
+            ],
           ),
-        ],
-      ];
-    }
-    if (object is JournalEntry) {
+        );
+      }
+    } else if (object is Project) {
+      final project = object as Project;
+      final tasks = ref.watch(tasksProvider);
+      final progress = KPIEngine.calculateProjectProgress(project, tasks);
+      final linkedTasks = tasks
+          .where((t) => project.taskLinks.contains(t.slug) || project.taskLinks.contains(t.id))
+          .toList();
+      final doneCount = linkedTasks.where((t) => t.isCompleted).length;
+
+      if (project.hasRotation) {
+        cards.add(
+          _buildPropertiesCard(
+            context: context,
+            title: 'Progresso',
+            icon: Icons.trending_up_rounded,
+            rows: [
+              _PropRow(
+                label: 'Concluído',
+                value: '${(progress * 100).toInt()}%',
+              ),
+              _PropRow(
+                label: 'Tarefas',
+                value: '$doneCount de ${linkedTasks.length}',
+              ),
+            ],
+          ),
+        );
+      }
+      cards.add(
+        _buildPropertiesCard(
+          context: context,
+          title: 'Datas',
+          icon: Icons.calendar_today_outlined,
+          rows: [
+            _PropRow(
+              label: 'Início',
+              value: project.startDate != null
+                  ? DateFormat('d MMM yyyy').format(project.startDate!)
+                  : 'Não definida',
+              isEmpty: project.startDate == null,
+            ),
+            _PropRow(
+              label: 'Término',
+              value: project.endDate != null
+                  ? DateFormat('d MMM yyyy').format(project.endDate!)
+                  : 'Não definida',
+              isEmpty: project.endDate == null,
+              isOverdue: _isOverdue(project),
+            ),
+          ],
+        ),
+      );
+      cards.add(
+        _buildPropertiesCard(
+          context: context,
+          title: 'Config',
+          icon: Icons.tune_rounded,
+          rows: [
+            if (_hasPriority(project))
+              _PropRow(
+                label: 'Prioridade',
+                value: '',
+                trailing: _buildPriorityBadge(project),
+              ),
+            _PropRow(
+              label: 'Estado',
+              value: _getStatusLabel(project),
+              onTap: () =>
+                  _onPropertyTap(context, ref, 'Status', _getStatus(project)),
+            ),
+            ..._buildLinkedGoogleEventPropRows(context, project),
+          ],
+        ),
+      );
+    } else if (object is Goal) {
+      final goal = object as Goal;
+      cards.add(
+        _buildPropertiesCard(
+          context: context,
+          title: 'Datas',
+          icon: Icons.calendar_today_outlined,
+          rows: [
+            _PropRow(
+              label: 'Início',
+              value: goal.startDate != null
+                  ? DateFormat('d MMM yyyy').format(goal.startDate!)
+                  : 'Não definida',
+              isEmpty: goal.startDate == null,
+            ),
+            _PropRow(
+              label: 'Prazo',
+              value: goal.deadline != null
+                  ? DateFormat('d MMM yyyy').format(goal.deadline!)
+                  : 'Não definida',
+              isEmpty: goal.deadline == null,
+              isOverdue: _isOverdue(goal),
+            ),
+            _PropRow(
+              label: 'Tipo',
+              value: goal.goalType == GoalType.repeating ? 'Recorrente' : 'Pontual',
+            ),
+            _PropRow(
+              label: 'Intervalo',
+              value: goal.repeatInterval ?? 'Não definido',
+              isEmpty: goal.repeatInterval == null,
+            ),
+          ],
+        ),
+      );
+    } else if (object is IdeaDefinition) {
+      final idea = object as IdeaDefinition;
+      cards.add(
+        _buildPropertiesCard(
+          context: context,
+          title: 'Config',
+          icon: Icons.tune_rounded,
+          rows: [
+            _PropRow(
+              label: 'Horizonte',
+              value: '',
+              trailing: _buildHorizonBadge(idea),
+            ),
+            _PropRow(
+              label: 'Prioridade',
+              value: '',
+              trailing: idea.priority != null && idea.priority != TaskPriority.none
+                  ? _buildPriorityBadge(idea)
+                  : Text(
+                      'Não definida',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontStyle: FontStyle.italic,
+                        color: AppColors.textMuted.withValues(alpha: 0.4),
+                      ),
+                    ),
+            ),
+            _PropRow(
+              label: 'Convertida em',
+              value: idea.convertedToType ?? 'Não convertida',
+              isEmpty: idea.convertedToType == null,
+            ),
+          ],
+        ),
+      );
+      cards.add(
+        _buildPropertiesCard(
+          context: context,
+          title: 'Datas',
+          icon: Icons.calendar_today_outlined,
+          rows: [
+            _PropRow(
+              label: 'Data alvo',
+              value: idea.targetDate != null
+                  ? DateFormat('d MMM yyyy').format(idea.targetDate!)
+                  : 'Não definida',
+              isEmpty: idea.targetDate == null,
+              isOverdue: _isOverdue(idea),
+            ),
+            _PropRow(
+              label: 'Criado',
+              value: DateFormat('d MMM yyyy').format(idea.createdAt),
+            ),
+          ],
+        ),
+      );
+    } else if (object is Note) {
+      final note = object as Note;
+      cards.add(
+        _buildPropertiesCard(
+          context: context,
+          title: 'Config',
+          icon: Icons.tune_rounded,
+          rows: [
+            _PropRow(label: 'Subtipo', value: note.subtype.name),
+            _PropRow(
+              label: 'Categoria',
+              value: note.categories.isNotEmpty
+                  ? note.categories.first
+                  : 'Não definida',
+              isEmpty: note.categories.isEmpty,
+            ),
+            _PropRow(label: 'Fixado', value: note.pinned ? 'Sim 📌' : 'Não'),
+          ],
+        ),
+      );
+      cards.add(_buildDefaultDatesCard(context));
+    } else if (object is Person) {
+      final person = object as Person;
+      cards.add(
+        _buildPropertiesCard(
+          context: context,
+          title: 'Dados',
+          icon: Icons.person_outline_rounded,
+          rows: [
+            _PropRow(
+              label: 'Prioridade',
+              value: '',
+              trailing: _buildContactPriorityBadge(person),
+            ),
+            _PropRow(
+              label: 'Frequência',
+              value: person.contactFrequency != null
+                  ? 'A cada ${person.contactFrequency!.inDays} dias'
+                  : 'Não definida',
+              isEmpty: person.contactFrequency == null,
+              onTap: person.contactFrequency != null
+                  ? () => _showFrequencyPicker(context, ref, person)
+                  : null,
+            ),
+            _PropRow(
+              label: 'Próximo contato',
+              value: () {
+                if (person.lastContactDate == null ||
+                    person.contactFrequency == null) {
+                  return 'Não definido';
+                }
+                final next = person.lastContactDate!.add(person.contactFrequency!);
+                return DateFormat('d MMM yyyy').format(next);
+              }(),
+              isEmpty:
+                  person.lastContactDate == null || person.contactFrequency == null,
+            ),
+          ],
+        ),
+      );
+      cards.add(_buildDefaultDatesCard(context));
+    } else if (object is JournalEntry) {
       final entry = object as JournalEntry;
       final mood = _moodForEntry(entry);
-      return [
-        PropertyGridItem(
-          label: 'Date',
-          value: DateFormat('EEE, d MMM, yyyy').format(entry.date),
+      cards.add(
+        _buildPropertiesCard(
+          context: context,
+          title: 'Contexto',
+          icon: Icons.auto_stories_outlined,
+          rows: [
+            _PropRow(
+              label: 'Mood',
+              value: mood != null
+                  ? '${mood.emoji} ${mood.title}'
+                  : (entry.moodSlug ?? 'Não definido'),
+              isEmpty: mood == null && (entry.moodSlug == null || entry.moodSlug!.isEmpty),
+            ),
+            _PropRow(
+              label: 'Data/hora',
+              value: DateFormat('d MMM yyyy • HH:mm').format(entry.date),
+            ),
+            if (entry.categories.isNotEmpty)
+              _PropRow(label: 'Categoria', value: entry.categories.first),
+          ],
         ),
-        PropertyGridItem(
-          label: 'Time',
-          value: DateFormat('HH:mm').format(entry.date),
-        ),
-        if (mood != null) ...[
-          PropertyGridItem(label: 'Mood', value: '${mood.emoji} ${mood.title}'),
-        ] else if (entry.moodSlug != null && entry.moodSlug!.isNotEmpty) ...[
-          PropertyGridItem(
-            label: 'Mood',
-            value: '${_fallbackMoodEmoji(entry.moodSlug!)} ${entry.moodSlug}',
-          ),
-        ],
-      ];
-    }
-    if (object is Resource) {
-      final resource = object as Resource;
-      return [
-        PropertyGridItem(
-          label: 'Status',
-          value: resource.status.name.toUpperCase(),
-          onTap: () => _showResourceStatusPicker(context, ref, resource),
-        ),
-        PropertyGridItem(
-          label: 'Priority',
-          value: resource.priority.name.toUpperCase(),
-          onTap: () => _showResourcePriorityPicker(context, ref, resource),
-        ),
-        PropertyGridItem(label: 'Author', value: resource.author ?? 'Unknown'),
-        PropertyGridItem(
-          label: 'Year',
-          value: resource.year?.toString() ?? 'N/A',
-        ),
-        PropertyGridItem(
-          label: 'Pages',
-          value: resource.pages?.toString() ?? 'N/A',
-        ),
-        PropertyGridItem(
-          label: 'Read Date',
-          value: resource.readDate != null
-              ? DateFormat('MMM d, yyyy').format(resource.readDate!)
-              : 'Not set',
-        ),
-        PropertyGridItem(label: 'Rating', value: '${resource.rating}/5'),
-      ];
-    }
-    if (object is Goal) {
-      final goal = object as Goal;
-      final habits = ref.watch(habitsProvider);
-      final trackerRecords = ref.watch(trackingRecordsProvider);
-      final entries = ref.watch(allEntriesProvider);
-      final moods = ref.watch(moodsProvider);
-      final notes = ref.watch(notesProvider);
-      final tasks = ref.watch(tasksProvider);
-
-      // Calculate live progress
-      double total = 0;
-      double completed = 0;
-      for (final kpi in goal.kpis) {
-        total += 1;
-        final val = KPIEngine.calculateKPIValue(
-          kpi: kpi,
-          habits: habits,
-          trackerRecords: trackerRecords,
-          entries: entries,
-          moods: moods,
-          notes: notes,
-          tasks: tasks,
-        );
-        completed += (val / kpi.targetValue).clamp(0.0, 1.0);
-      }
-      for (final st in goal.subtasks) {
-        total += 1;
-        if (st.completed) completed += 1;
-      }
-      final progress = total > 0 ? (completed / total) : 0.0;
-
-      return [
-        ..._buildLinkedGoogleEventRows(context, goal),
-        PropertyGridItem(
-          label: 'Estado',
-          value: goal.state.name.toUpperCase(),
-          onTap: () => _showGoalStatePicker(context, ref, goal),
-        ),
-        PropertyGridItem(
-          label: 'Tipo',
-          value: goal.goalType == GoalType.repeating ? 'Recorrente' : 'Pontual',
-        ),
-        PropertyGridItem(
-          label: 'Progresso',
-          value: '${(progress * 100).toInt()}%',
-        ),
-        if (goal.deadline != null) ...[
-          PropertyGridItem(
-            label: 'Prazo',
-            value: DateFormat('d MMM yyyy').format(goal.deadline!),
-          ),
-        ],
-        if (goal.startDate != null) ...[
-          PropertyGridItem(
-            label: 'Home',
-            value: DateFormat('d MMM yyyy').format(goal.startDate!),
-          ),
-        ],
-      ];
+      );
+    } else {
+      cards.add(_buildDefaultDatesCard(context));
     }
 
-    return [];
+    return cards.map((c) => SliverToBoxAdapter(child: c)).toList();
+  }
+
+  Widget _buildDefaultDatesCard(BuildContext context) {
+    return _buildPropertiesCard(
+      context: context,
+      title: 'Datas',
+      icon: Icons.calendar_today_outlined,
+      rows: [
+        _PropRow(
+          label: 'Criado',
+          value: DateFormat('d MMM yyyy').format(object.createdAt),
+        ),
+        _PropRow(
+          label: 'Modificado',
+          value: DateFormat('d MMM yyyy').format(object.updatedAt),
+        ),
+      ],
+    );
+  }
+
+  List<_PropRow> _buildLinkedGoogleEventPropRows(
+    BuildContext context,
+    Object source,
+  ) {
+    final rows = _buildLinkedGoogleEventRows(context, source);
+    return rows
+        .map(
+          (item) => _PropRow(
+            label: item.label,
+            value: item.value,
+            onTap: item.onTap,
+          ),
+        )
+        .toList();
   }
 
   List<PropertyGridItem> _buildLinkedGoogleEventRows(
@@ -1103,11 +1251,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     String? url;
 
     if (source is Task) {
-      id = source.linkedGoogleEventId;
-      title = source.linkedGoogleEventTitle;
-      date = source.linkedGoogleEventDate;
-      url = source.linkedGoogleEventUrl;
-    } else if (source is Goal) {
       id = source.linkedGoogleEventId;
       title = source.linkedGoogleEventTitle;
       date = source.linkedGoogleEventDate;
@@ -1352,6 +1495,48 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       final project = object as Project;
       final tasks = ref.watch(tasksProvider);
       final progress = KPIEngine.calculateProjectProgress(project, tasks);
+      final linkedTasks = tasks
+          .where((t) =>
+              project.taskLinks.contains(t.slug) ||
+              project.taskLinks.contains(t.id))
+          .toList();
+      final doneCount = linkedTasks.where((t) => t.isCompleted).length;
+
+      if (project.hasRotation) {
+        return [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (project.description != null &&
+                      project.description!.isNotEmpty) ...[
+                    const Text(
+                      'Descrição',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: AppTheme.cardDecoration(context),
+                      child: WikiTextView(
+                        text: project.description!,
+                        style: const TextStyle(fontSize: 15, height: 1.5),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                  _buildRotationTasksSection(context, ref, project, tasks),
+                  const SizedBox(height: 24),
+                  _buildSnapshotsSection(context, ref, project.id),
+                ],
+              ),
+            ),
+          ),
+        ];
+      }
 
       return [
         SliverToBoxAdapter(
@@ -1360,33 +1545,26 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Project Progress',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: AppTheme.cardDecoration(context),
                   child: Column(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${(progress * 100).toInt()}% Completed',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          const Icon(
-                            Icons.rocket_launch_rounded,
-                            color: AppColors.primary,
-                            size: 32,
-                          ),
-                        ],
+                      Text(
+                        '${(progress * 100).toInt()}% Concluído',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '$doneCount de ${linkedTasks.length} tarefas',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textMuted,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       ClipRRect(
@@ -1407,7 +1585,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     project.description!.isNotEmpty) ...[
                   const SizedBox(height: 24),
                   const Text(
-                    'Description',
+                    'Descrição',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 12),
@@ -1431,6 +1609,31 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
     if (object is Goal) {
       final goal = object as Goal;
+      final habits = ref.watch(habitsProvider);
+      final trackerRecords = ref.watch(trackingRecordsProvider);
+      final entries = ref.watch(allEntriesProvider);
+      final moods = ref.watch(moodsProvider);
+      final notes = ref.watch(notesProvider);
+      final tasks = ref.watch(tasksProvider);
+
+      double total = 0;
+      double completed = 0;
+      for (final kpi in goal.kpis) {
+        total += 1;
+        final val = KPIEngine.calculateKPIValue(
+          kpi: kpi,
+          habits: habits,
+          trackerRecords: trackerRecords,
+          entries: entries,
+          moods: moods,
+          notes: notes,
+          tasks: tasks,
+        );
+        completed += (val / kpi.targetValue).clamp(0.0, 1.0);
+      }
+      final progress = total > 0 ? (completed / total) : 0.0;
+      final kpisDone = goal.kpis.where((k) => k.completed).length;
+
       return [
         SliverToBoxAdapter(
           child: Padding(
@@ -1438,10 +1641,44 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (goal.goalMode == GoalMode.plan) ...[
-                  _buildGoalPlanSections(context, goal),
-                  const SizedBox(height: 24),
-                ],
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: AppTheme.cardDecoration(context),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${(progress * 100).toInt()}%',
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 10,
+                          backgroundColor: AppColors.surfaceVariant,
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            AppColors.primary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        '$kpisDone de ${goal.kpis.length} KPIs atingidos',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
                 const Text(
                   'Indicadores de Sucesso (KPIs)',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
@@ -1450,13 +1687,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 ...goal.kpis.map(
                   (kpi) => _buildKPICard(context, ref, goal, kpi),
                 ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Sub-metas / Checklist',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 16),
-                _buildSubtaskList(context, ref, goal.subtasks),
                 const SizedBox(height: 24),
                 _buildSnapshotsSection(context, ref, goal.id),
               ],
@@ -1467,62 +1697,197 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
     if (object is Resource) {
       final resource = object as Resource;
+      final readDateStr = resource.readDate != null
+          ? DateFormat('d MMM yyyy').format(resource.readDate!)
+          : 'N/A';
+      final statusColor = _resourceStatusColor(resource.status);
+
       return [
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: Column(
               children: [
                 if (resource.coverImage != null)
                   Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 220),
-                      child: AspectRatio(
-                        aspectRatio: 1 / 1.414,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Image.network(
-                            resource.coverImage!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    child: Container(
+                      height: 220,
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 16,
+                            offset: const Offset(0, 8),
                           ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          resource.coverImage!,
+                          height: 220,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
                         ),
                       ),
                     ),
                   ),
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: AppTheme.cardDecoration(context),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _badge(
-                            resource.resourceType.toUpperCase(),
-                            color: AppColors.info,
+                const SizedBox(height: 20),
+                Text(
+                  resource.title,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Recurso · ${resource.mediaType}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                GestureDetector(
+                  onTap: () =>
+                      _showResourceStatusPicker(context, ref, resource),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Text(
+                          'Status',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
                           ),
-                          _badge(
-                            resource.status.name.toUpperCase(),
-                            color: _statusColor(resource.status),
+                        ),
+                        const Spacer(),
+                        Text(
+                          _resourceStatusLabel(resource.status).toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'SYNOPSIS & HIGHLIGHTS',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textMuted,
-                          letterSpacing: 1.0,
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  childAspectRatio: 2.2,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  children: [
+                    _miniPropCard(
+                      context,
+                      icon: Icons.calendar_today_outlined,
+                      label: 'Criado',
+                      value: DateFormat('d MMM').format(resource.createdAt),
+                    ),
+                    _miniPropCard(
+                      context,
+                      icon: Icons.update_rounded,
+                      label: 'Modificado',
+                      value: DateFormat('d MMM').format(resource.updatedAt),
+                    ),
+                    _miniPropCard(
+                      context,
+                      icon: Icons.person_outline_rounded,
+                      label: 'Autor',
+                      value: resource.author ?? 'N/A',
+                      isEmpty: resource.author == null,
+                    ),
+                    _miniPropCard(
+                      context,
+                      icon: Icons.date_range_outlined,
+                      label: 'Ano',
+                      value: resource.year?.toString() ?? 'N/A',
+                      isEmpty: resource.year == null,
+                    ),
+                    _miniPropCard(
+                      context,
+                      icon: Icons.category_outlined,
+                      label: 'Categoria',
+                      value: resource.category ?? 'Sem categoria',
+                      isEmpty: resource.category == null,
+                    ),
+                    _miniPropCard(
+                      context,
+                      icon: Icons.menu_book_outlined,
+                      label: 'Data de leitura',
+                      value: readDateStr,
+                      isEmpty: resource.readDate == null,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    5,
+                    (i) => GestureDetector(
+                      onTap: () => _updateResourceRating(ref, resource, i + 1),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Icon(
+                          Icons.star_rounded,
+                          size: 32,
+                          color: i < resource.rating
+                              ? AppColors.warning
+                              : AppColors.textMuted.withValues(alpha: 0.25),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      if (_isEditing)
-                        RichTextEditor(
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Sinopse & Destaques',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => setState(() => _isEditing = !_isEditing),
+                      child: Text(_isEditing ? 'Concluir' : 'Editar'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: AppTheme.cardDecoration(context),
+                  child: _isEditing
+                      ? RichTextEditor(
                           content: resource.synopsis ?? '',
                           onChanged: (newVal) {
                             final updated = resource.copyWith(synopsis: newVal);
@@ -1532,37 +1897,11 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                             setState(() => object = updated);
                           },
                         )
-                      else
-                        MarkdownBodyView(
+                      : MarkdownBodyView(
                           content: resource.synopsis?.isNotEmpty == true
                               ? resource.synopsis!
-                              : 'No synopsis or highlights provided.',
+                              : 'Sem sinopse ou destaques.',
                         ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'RATING',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textMuted,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: List.generate(
-                          5,
-                          (i) => Icon(
-                            Icons.star_rounded,
-                            size: 32,
-                            color: i < resource.rating
-                                ? AppColors.warning
-                                : AppColors.textMuted.withValues(alpha: 0.2),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ],
             ),
@@ -1577,7 +1916,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.error,
                 side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 minimumSize: const Size(double.infinity, 48),
               ),
               onPressed: () => _startFocusSession(context, ref),
@@ -1587,12 +1928,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         SliverToBoxAdapter(
           child: LinkedObjectsSection(
             owner: resource,
-            socialRefs: resource.socialRefs,
+            links: resource.links,
             onAdd: (selected) async {
-              final ref = '[[${selected.slug}]]';
-              if (resource.socialRefs.contains(ref)) return;
+              final linkRef = '[[${selected.slug}]]';
+              if (resource.links.contains(linkRef)) return;
               final updated = resource.copyWith(
-                socialRefs: [...resource.socialRefs, ref],
+                links: [...resource.links, linkRef],
                 updatedAt: DateTime.now(),
               );
               await this.ref
@@ -1602,7 +1943,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             },
             onRemove: (slug) async {
               final updated = resource.copyWith(
-                socialRefs: resource.socialRefs
+                links: resource.links
                     .where((r) => r != slug)
                     .toList(),
                 updatedAt: DateTime.now(),
@@ -1873,6 +2214,21 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
     if (object is Habit) {
       final habit = object as Habit;
+      final linkedSliver = _buildHabitLinkedItemsSliver(context, ref, habit);
+      if (habit.isChecklistHabit) {
+        return [
+          _buildHabitChecklistSliver(context, ref, habit),
+          linkedSliver,
+        ];
+      }
+      return [
+        _buildHabitNormalSliver(context, ref, habit),
+        linkedSliver,
+      ];
+    }
+    if (object is IdeaDefinition) {
+      final idea = object as IdeaDefinition;
+      final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
       return [
         SliverToBoxAdapter(
           child: Padding(
@@ -1881,18 +2237,78 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Activity (Last 30 Days)',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  'Conteúdo',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 12),
                 Container(
-                  height: 180,
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
                   decoration: AppTheme.cardDecoration(context),
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-                  child: habit.inputType == HabitInputType.boolean
-                      ? _buildHabitFrequencyChart(habit)
-                      : _buildHabitNumericTrendChart(habit),
+                  child: idea.body.trim().isEmpty
+                      ? Text(
+                          'Sem conteúdo',
+                          style: TextStyle(
+                            fontStyle: FontStyle.italic,
+                            color: AppColors.textMuted.withValues(alpha: 0.4),
+                          ),
+                        )
+                      : WikiTextView(
+                          text: idea.body,
+                          style: const TextStyle(fontSize: 15, height: 1.5),
+                        ),
                 ),
+                if (idea.linkedSlugs.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Vínculos',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
+                  ...idea.linkedSlugs.map((slug) {
+                    final linked = allObjects.cast<ContentObject?>().firstWhere(
+                      (o) =>
+                          o != null &&
+                          (o.slug == slug ||
+                              o.id == slug ||
+                              o.title == slug),
+                      orElse: () => null,
+                    );
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        tileColor: AppTheme.surfaceColor(context),
+                        leading: Icon(
+                          linked != null
+                              ? _typeIcon(linked.type)
+                              : Icons.link_rounded,
+                          color: AppColors.primary,
+                        ),
+                        title: Text(
+                          linked?.title ?? slug,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          linked?.type.toUpperCase() ?? 'LINK',
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                        onTap: linked != null
+                            ? () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      UniversalDetailView(object: linked),
+                                ),
+                              )
+                            : null,
+                      ),
+                    );
+                  }),
+                ],
               ],
             ),
           ),
@@ -2217,58 +2633,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         ),
       ];
     }
-    if (object is Habit) {
-      final habit = object as Habit;
-      return [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Monthly Frequency',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  height: 120,
-                  width: double.infinity,
-                  decoration: AppTheme.cardDecoration(context),
-                  padding: const EdgeInsets.all(16),
-                  child: CitrineChart(
-                    type: ChartType.heatmap,
-                    color: Color(
-                      int.parse(habit.color.replaceAll('#', '0xFF')),
-                    ),
-                    data: List.generate(30, (i) {
-                      final date = DateTime.now().subtract(
-                        Duration(days: 29 - i),
-                      );
-                      final record = habit.completionHistory
-                          .where(
-                            (r) =>
-                                r.date.year == date.year &&
-                                r.date.month == date.month &&
-                                r.date.day == date.day,
-                          )
-                          .firstOrNull;
-                      return ChartDataPoint(
-                        label: '',
-                        value: (record != null && record.successful)
-                            ? 1.0
-                            : 0.0,
-                      );
-                    }),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-        ),
-      ];
-    }
     if (object is Note) {
       final note = object as Note;
       final allNotes = ref.watch(notesProvider);
@@ -2587,11 +2951,708 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
+  Widget _buildHeroHeader(
+    BuildContext context,
+    WidgetRef ref,
+    ContentObject currentObject,
+    List<ContentObject> conflictGroup,
+  ) {
+    return SliverToBoxAdapter(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+        padding: const EdgeInsets.all(20),
+        decoration: AppTheme.cardDecoration(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _buildHeroLeading(context, currentObject),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              currentObject is MoodDefinition
+                                  ? '${(currentObject as MoodDefinition).emoji} ${currentObject.title}'
+                                  : currentObject.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          ConflictBadge(
+                            visible: currentObject.hasTypeConflict,
+                            tooltip: currentObject.conflictReason,
+                          ),
+                        ],
+                      ),
+                      Text(
+                        _typeSubtitle(currentObject),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (conflictGroup.length > 1) ...[
+              const SizedBox(height: 12),
+              _buildObjectConflictBanner(context, ref, conflictGroup),
+            ],
+            if (widget.searchSnippet != null &&
+                widget.searchSnippet!.trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Search Match',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    _highlightSearchSnippet(
+                      widget.searchSnippet!,
+                      widget.searchQuery ?? '',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (object is! Note) ...[
+              const SizedBox(height: 16),
+              _buildStatusHero(context, ref, currentObject),
+            ] else ...[
+              const SizedBox(height: 12),
+              _buildNoteSubtypeBadge(object as Note),
+            ],
+            if (_isOverdue(currentObject)) ...[
+              const SizedBox(height: 10),
+              _buildOverdueBanner(currentObject),
+            ],
+            if (_hasPriority(currentObject)) ...[
+              const SizedBox(height: 8),
+              _buildPriorityBadge(currentObject),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroLeading(BuildContext context, ContentObject obj) {
+    if (obj is Person) {
+      final person = obj;
+      return CircleAvatar(
+        radius: 22,
+        backgroundColor: AppColors.surfaceVariant,
+        backgroundImage:
+            person.photo != null ? NetworkImage(person.photo!) : null,
+        child: person.photo == null
+            ? Text(
+                person.title.isNotEmpty
+                    ? person.title.substring(0, 1).toUpperCase()
+                    : '?',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primary,
+                ),
+              )
+            : null,
+      );
+    }
+    if (obj is JournalEntry) {
+      final entry = obj;
+      final mood = _moodForEntry(entry);
+      return Container(
+        width: 44,
+        height: 44,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          mood?.emoji ??
+              (entry.moodSlug != null
+                  ? _fallbackMoodEmoji(entry.moodSlug!)
+                  : '📝'),
+          style: const TextStyle(fontSize: 24),
+        ),
+      );
+    }
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: _typeColor(obj.type).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(_typeIcon(obj.type), color: _typeColor(obj.type), size: 24),
+    );
+  }
+
+  Widget _buildNoteSubtypeBadge(Note note) {
+    final label = switch (note.subtype) {
+      NoteSubtype.text => 'Texto',
+      NoteSubtype.outline => 'Outline',
+      NoteSubtype.collection => 'Coleção',
+    };
+    return Row(
+      children: [
+        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        if (note.pinned) ...[
+          const SizedBox(width: 8),
+          const Text('📌', style: TextStyle(fontSize: 14)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPropertiesCard({
+    required BuildContext context,
+    required String title,
+    required IconData icon,
+    required List<_PropRow> rows,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10, left: 2),
+            child: Row(
+              children: [
+                Icon(icon, size: 15, color: AppColors.textMuted),
+                const SizedBox(width: 6),
+                Text(
+                  title.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textMuted,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            decoration: AppTheme.cardDecoration(context),
+            child: Column(
+              children: rows.asMap().entries.map((e) {
+                return Column(
+                  children: [
+                    _buildPropRow(context, e.value),
+                    if (e.key != rows.length - 1)
+                      const Divider(
+                        height: 1,
+                        indent: 16,
+                        endIndent: 16,
+                        color: AppColors.divider,
+                      ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPropRow(BuildContext context, _PropRow row) {
+    final valueColor = row.isOverdue
+        ? AppColors.error
+        : row.isEmpty
+        ? AppColors.textMuted.withValues(alpha: 0.4)
+        : null;
+    return InkWell(
+      onTap: row.onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        child: Row(
+          children: [
+            Text(
+              row.label,
+              style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+            ),
+            const Spacer(),
+            if (row.trailing != null)
+              row.trailing!
+            else
+              Text(
+                row.value,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: valueColor,
+                  fontStyle: row.isEmpty ? FontStyle.italic : FontStyle.normal,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            if (row.onTap != null) ...[
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 16,
+                color: row.isOverdue ? AppColors.error : AppColors.primary,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _miniPropCard(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+    bool isEmpty = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: AppTheme.cardDecoration(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 12, color: AppColors.textMuted),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: isEmpty ? AppColors.textMuted.withValues(alpha: 0.5) : null,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  DateTime _todayDateOnly() {
+    final n = DateTime.now();
+    return DateTime(n.year, n.month, n.day);
+  }
+
+  bool _isOverdue(ContentObject obj) {
+    final today = _todayDateOnly();
+    DateTime? dl;
+    if (obj is Task) {
+      if (obj.stage == TaskStage.finalized) return false;
+      dl = obj.endDate;
+    } else if (obj is Goal) {
+      if (obj.state != GoalStatus.active) return false;
+      dl = obj.deadline;
+    } else if (obj is Project) {
+      if (obj.projectState == ProjectState.completed ||
+          obj.projectState == ProjectState.archived) {
+        return false;
+      }
+      dl = obj.endDate;
+    } else if (obj is IdeaDefinition) {
+      if (obj.status == IdeaStatus.converted ||
+          obj.status == IdeaStatus.dropped) {
+        return false;
+      }
+      dl = obj.targetDate;
+    }
+    if (dl == null) return false;
+    return DateTime(dl.year, dl.month, dl.day).isBefore(today);
+  }
+
+  int _daysLate(ContentObject obj) {
+    DateTime? dl;
+    if (obj is Task) {
+      dl = obj.endDate;
+    } else if (obj is Goal) {
+      dl = obj.deadline;
+    } else if (obj is Project) {
+      dl = obj.endDate;
+    } else if (obj is IdeaDefinition) {
+      dl = obj.targetDate;
+    }
+    if (dl == null) return 0;
+    final today = _todayDateOnly();
+    return today.difference(DateTime(dl.year, dl.month, dl.day)).inDays;
+  }
+
+  String _deadlineLabel(ContentObject obj) {
+    DateTime? dl;
+    if (obj is Task) {
+      dl = obj.endDate;
+    } else if (obj is Goal) {
+      dl = obj.deadline;
+    } else if (obj is Project) {
+      dl = obj.endDate;
+    } else if (obj is IdeaDefinition) {
+      dl = obj.targetDate;
+    }
+    if (dl == null) return '';
+    return DateFormat('d MMM').format(dl);
+  }
+
+  bool _hasPriority(ContentObject obj) {
+    if (obj is Task) return obj.priority != TaskPriority.none;
+    if (obj is Project) return obj.projectPriority != TaskPriority.none;
+    if (obj is IdeaDefinition) {
+      return obj.priority != null && obj.priority != TaskPriority.none;
+    }
+    return false;
+  }
+
+  String _typeSubtitle(ContentObject obj) {
+    if (obj is Resource) return 'Recurso · ${obj.mediaType}';
+    if (obj is Project && obj.methodLabel != null) {
+      return 'Projeto · ${obj.methodLabel}';
+    }
+    if (obj is Task && obj.endDate != null) {
+      return 'Tarefa · ${DateFormat('d MMM').format(obj.endDate!)}';
+    }
+    return _typeLabel(obj);
+  }
+
+  Widget _buildStatusHero(
+    BuildContext context,
+    WidgetRef ref,
+    ContentObject obj,
+  ) {
+    if (obj is Person) {
+      final person = obj;
+      final overdue = person.isDueForContact;
+      final color = overdue ? AppColors.error : AppColors.success;
+      final label = overdue ? '⚠️ Contato Atrasado' : '✅ Em dia';
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+      );
+    }
+    if (obj is Note || obj is TrackerDefinition || obj is MoodDefinition) {
+      return const SizedBox.shrink();
+    }
+    return GestureDetector(
+      onTap: () =>
+          _onPropertyTap(context, ref, 'Status', _getStatus(obj)),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: _statusColor(obj).withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _statusColor(obj).withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(_statusIcon(obj), color: _statusColor(obj), size: 18),
+            const SizedBox(width: 8),
+            Text(
+              _getStatusLabel(obj),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: _statusColor(obj),
+              ),
+            ),
+            const Spacer(),
+            Icon(Icons.chevron_right_rounded, color: _statusColor(obj), size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverdueBanner(ContentObject obj) {
+    final days = _daysLate(obj);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          const Text('⚠️', style: TextStyle(fontSize: 16)),
+          const SizedBox(width: 8),
+          Text(
+            'Atrasado há $days ${days == 1 ? 'dia' : 'dias'}',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.error,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            'Prazo: ${_deadlineLabel(obj)}',
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.error.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriorityBadge(ContentObject obj) {
+    TaskPriority priority = TaskPriority.none;
+    if (obj is Task) {
+      priority = obj.priority;
+    } else if (obj is Project) {
+      priority = obj.projectPriority;
+    } else if (obj is IdeaDefinition) {
+      priority = obj.priority ?? TaskPriority.none;
+    }
+
+    final (emoji, label, color) = switch (priority) {
+      TaskPriority.high => ('🟠', 'Alta', AppColors.priorityHigh),
+      TaskPriority.medium => ('🟡', 'Média', AppColors.warning),
+      TaskPriority.low => ('🟢', 'Baixa', AppColors.success),
+      TaskPriority.none => ('⚪', 'Sem prioridade', AppColors.textMuted),
+    };
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 14)),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContactPriorityBadge(Person person) {
+    return _buildPriorityBadge(
+      Task(
+        title: person.title,
+        priority: person.contactPriority,
+      ),
+    );
+  }
+
+  Widget _buildHorizonBadge(IdeaDefinition idea) {
+    final (emoji, label, color) = switch (idea.horizon) {
+      IdeaHorizon.now => ('🔴', 'Agora', AppColors.error),
+      IdeaHorizon.soon => ('🟡', 'Em breve', AppColors.warning),
+      IdeaHorizon.someday => ('🔵', 'Algum dia', AppColors.info),
+      IdeaHorizon.noDeadline => ('⚪', 'Sem prazo', AppColors.textMuted),
+    };
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 14)),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _statusColorForTask(TaskStage stage) => switch (stage) {
+    TaskStage.idea => AppColors.textMuted,
+    TaskStage.todo => AppColors.info,
+    TaskStage.inProgress => AppColors.habitOrange,
+    TaskStage.pending => AppColors.warning,
+    TaskStage.finalized => AppColors.success,
+    TaskStage.backlog => AppColors.textMuted,
+  };
+
+  Color _resourceStatusColor(ResourceStatus status) => switch (status) {
+    ResourceStatus.inProgress => AppColors.habitOrange,
+    ResourceStatus.completed => AppColors.success,
+    ResourceStatus.toConsume => AppColors.info,
+    ResourceStatus.dropped => AppColors.error,
+  };
+
+  Color _statusColor(ContentObject obj) {
+    if (obj is Task) return _statusColorForTask(obj.stage);
+    if (obj is Project) {
+      return switch (obj.projectState) {
+        ProjectState.active => AppColors.info,
+        ProjectState.paused => AppColors.warning,
+        ProjectState.completed => AppColors.success,
+        ProjectState.archived => AppColors.textMuted,
+      };
+    }
+    if (obj is Goal) {
+      return switch (obj.state) {
+        GoalStatus.active => AppColors.habitOrange,
+        GoalStatus.completed => AppColors.success,
+        GoalStatus.onHold => AppColors.textMuted,
+        GoalStatus.cancelled => AppColors.error,
+      };
+    }
+    if (obj is Habit) {
+      return switch (obj.status) {
+        HabitStatus.active => AppColors.success,
+        HabitStatus.paused => AppColors.textMuted,
+        HabitStatus.completed => AppColors.textMuted,
+      };
+    }
+    if (obj is IdeaDefinition) {
+      return switch (obj.status) {
+        IdeaStatus.raw => AppColors.textMuted,
+        IdeaStatus.developing => AppColors.info,
+        IdeaStatus.readyToAct => AppColors.habitOrange,
+        IdeaStatus.converted => AppColors.success,
+        IdeaStatus.dropped => AppColors.error,
+      };
+    }
+    if (obj is Resource) return _resourceStatusColor(obj.status);
+    return AppColors.primary;
+  }
+
+  IconData _statusIcon(ContentObject obj) {
+    if (obj is Task) {
+      return switch (obj.stage) {
+        TaskStage.idea => Icons.lightbulb_outline_rounded,
+        TaskStage.todo => Icons.check_box_outline_blank_rounded,
+        TaskStage.inProgress => Icons.bolt_rounded,
+        TaskStage.pending => Icons.pause_circle_outline_rounded,
+        TaskStage.finalized => Icons.check_circle_rounded,
+        TaskStage.backlog => Icons.inbox_outlined,
+      };
+    }
+    if (obj is Project) {
+      // F3.10: Add specific icons for Project state badges
+      return switch (obj.projectState) {
+        ProjectState.active => Icons.play_arrow_rounded,
+        ProjectState.paused => Icons.pause_rounded,
+        ProjectState.completed => Icons.check_rounded,
+        ProjectState.archived => Icons.inventory_2_rounded,
+      };
+    }
+    if (obj is Goal) return Icons.flag_outlined;
+    if (obj is Habit) return Icons.cached_rounded;
+    if (obj is IdeaDefinition) return Icons.lightbulb_outline_rounded;
+    if (obj is Resource) return Icons.menu_book_outlined;
+    return Icons.circle_outlined;
+  }
+
+  String _getStatusLabel(ContentObject obj) {
+    if (obj is Task) return _translateStage(obj.stage);
+    if (obj is Project) {
+      return switch (obj.projectState) {
+        ProjectState.active => 'Ativo',
+        ProjectState.paused => 'Pausado',
+        ProjectState.completed => 'Concluído',
+        ProjectState.archived => 'Arquivado',
+      };
+    }
+    if (obj is Goal) {
+      return switch (obj.state) {
+        GoalStatus.active => 'Ativo',
+        GoalStatus.completed => 'Concluído',
+        GoalStatus.onHold => 'Em espera',
+        GoalStatus.cancelled => 'Cancelado',
+      };
+    }
+    if (obj is Habit) {
+      return switch (obj.status) {
+        HabitStatus.active => 'Ativo',
+        HabitStatus.paused => 'Pausado',
+        HabitStatus.completed => 'Arquivado',
+      };
+    }
+    if (obj is IdeaDefinition) {
+      return switch (obj.status) {
+        IdeaStatus.raw => 'Bruta',
+        IdeaStatus.developing => 'Em desenvolvimento',
+        IdeaStatus.readyToAct => 'Pronta para agir',
+        IdeaStatus.converted => 'Convertida',
+        IdeaStatus.dropped => 'Descartada',
+      };
+    }
+    if (obj is Resource) return _resourceStatusLabel(obj.status);
+    return _getStatus(obj);
+  }
+
+  String _resourceStatusLabel(ResourceStatus status) => switch (status) {
+    ResourceStatus.toConsume => 'Quero consumir',
+    ResourceStatus.inProgress => 'Lendo',
+    ResourceStatus.completed => 'Concluído',
+    ResourceStatus.dropped => 'Abandonado',
+  };
+
   String _getStatus(ContentObject obj) {
-    if (obj is Task) return obj.stage.name.toUpperCase();
-    if (obj is Project) return obj.projectState.name.toUpperCase();
-    if (obj is Resource) return obj.status.name.toUpperCase();
-    if (obj is Goal) return obj.state.name.toUpperCase();
+    if (obj is Task) return _getStatusLabel(obj);
+    if (obj is Project) return _getStatusLabel(obj);
+    if (obj is Resource) return _resourceStatusLabel(obj.status);
+    if (obj is Goal) return _getStatusLabel(obj);
+    if (obj is Habit) return _getStatusLabel(obj);
+    if (obj is IdeaDefinition) return _getStatusLabel(obj);
     return 'ACTIVE';
   }
 
@@ -2759,6 +3820,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         break;
       case 'merge_note':
         _showMergeTargetPicker(context, ref);
+        break;
+      case 'save_as_system':
+        _saveAsSystem(context, ref);
         break;
       case 'save_template':
         _saveAsTemplate(context, ref);
@@ -2945,6 +4009,35 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     titleController.dispose();
   }
 
+  // F3.18: Save as System - opens same form as FAB, pre-filled with Task subtasks
+  void _saveAsSystem(BuildContext context, WidgetRef ref) {
+    if (object is! Task) return;
+    final task = object as Task;
+    
+    // Convert Task subtasks to SystemSteps
+    final steps = task.subtasks.map((st) => SystemStep(
+      title: st.title,
+      substeps: [],
+    )).toList();
+
+    // Create a new SystemDefinition with pre-filled data
+    final system = SystemDefinition(
+      title: task.title,
+      trigger: '',
+      estimatedMinutes: (task.estimatedMinutes ?? 0) > 0 ? task.estimatedMinutes! : 0,
+      steps: steps,
+      description: task.notes.join('\n'),
+    );
+
+    // Open CreateSystemForm with the pre-filled system
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateSystemForm(existingSystem: system),
+      ),
+    );
+  }
+
   void _showChangeTypeSheet(BuildContext context, WidgetRef ref) {
     final types = [
       {
@@ -2964,14 +4057,13 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         'label': 'Person',
         'icon': Icons.person_outline_rounded,
       },
-      {'type': 'place', 'label': 'Place', 'icon': Icons.place_outlined},
       {
         'type': 'resource',
         'label': 'Resource',
         'icon': Icons.menu_book_outlined,
       },
       {
-        'type': 'tracker_definition',
+        'type': 'tracker',
         'label': 'Tracker',
         'icon': Icons.analytics_outlined,
       },
@@ -3121,7 +4213,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       String newType = targetType;
       Map<String, dynamic> extraFields = {};
 
-      if (const ['area', 'activity', 'label', 'place'].contains(targetType)) {
+      if (const ['area', 'activity', 'label'].contains(targetType)) {
         newType = 'organizer';
         extraFields['organizerType'] = targetType;
       }
@@ -3151,7 +4243,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
   String _changeTypeKeyForObject(ContentObject object) {
     if (object is Organizer) return object.organizerType.name;
-    if (object is TrackerDefinition) return 'tracker_definition';
+    if (object is TrackerDefinition) return 'tracker';
     return object.type;
   }
 
@@ -3175,11 +4267,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         return 'Label';
       case 'person':
         return 'Person';
-      case 'place':
-        return 'Place';
       case 'resource':
         return 'Resource';
-      case 'tracker_definition':
       case 'tracker':
         return 'Tracker';
       default:
@@ -3207,11 +4296,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         return Icons.label_outline_rounded;
       case 'person':
         return Icons.person_outline_rounded;
-      case 'place':
-        return Icons.place_outlined;
       case 'resource':
         return Icons.menu_book_outlined;
-      case 'tracker_definition':
       case 'tracker':
         return Icons.analytics_outlined;
       default:
@@ -3556,11 +4642,72 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       title: 'Project State',
       values: ProjectState.values,
       label: (value) => value.name,
-      onSelected: (value) {
+      onSelected: (value) async {
+        final previousState = project.projectState;
         project.projectState = value;
-        ref.read(vaultProvider.notifier).updateObject(project);
+        
+        // F2.12: If project is being completed and has a scheduler, create new project
+        if (previousState != ProjectState.completed && value == ProjectState.completed && project.scheduler != null) {
+          await _handleScheduledProjectRestart(context, ref, project);
+        }
+        
+        await ref.read(vaultProvider.notifier).updateObject(project);
       },
     );
+  }
+
+  Future<void> _handleScheduledProjectRestart(
+    BuildContext context,
+    WidgetRef ref,
+    Project project,
+  ) async {
+    final scheduler = project.scheduler;
+    if (scheduler == null) return;
+
+    // Calculate next occurrence date from scheduler
+    final nextDate = SchedulerService.nextOccurrence(scheduler);
+    if (nextDate == null) return;
+
+    // Create new project with fresh data
+    final newProject = Project(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      title: project.title,
+      description: project.description,
+      state: ProjectState.active,
+      priority: project.projectPriority,
+      startDate: nextDate,
+      endDate: scheduler.endDate,
+      color: project.color,
+      organizers: project.organizers,
+      scheduler: scheduler,
+      objective: project.objective,
+      strategy: project.strategy,
+      phases: project.phases,
+      methodLabel: project.methodLabel,
+      rotationGroups: project.rotationGroups,
+      rotationStartDate: project.rotationStartDate,
+    );
+
+    // Add new project
+    await ref.read(vaultProvider.notifier).createObject(newProject);
+
+    // Archive old project with supersededBy link
+    final oldProject = project.copyProjectWith(
+      state: ProjectState.archived,
+      updatedAt: DateTime.now(),
+      supersededBy: '[[${newProject.slug}]]',
+    );
+    await ref.read(vaultProvider.notifier).updateObject(oldProject);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Projeto "${newProject.title}" criado para ${DateFormat('dd/MM/yyyy').format(nextDate)}'),
+        ),
+      );
+    }
   }
 
   void _showGoalStatePicker(BuildContext context, WidgetRef ref, Goal goal) {
@@ -3638,10 +4785,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     WidgetRef ref,
     Resource resource,
   ) {
-    _showOptionSheet<TaskPriority>(
+    _showOptionSheet<ResourcePriority>(
       context: context,
       title: 'Priority',
-      values: TaskPriority.values,
+      values: ResourcePriority.values,
       label: (value) => value.name,
       onSelected: (value) {
         final updated = resource.copyWith(priority: value);
@@ -3805,8 +4952,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           return 'Etiqueta';
         case OrganizerType.person:
           return 'Pessoa';
-        case OrganizerType.place:
-          return 'Lugar';
         case OrganizerType.task:
           return 'Tarefa';
         case OrganizerType.goal:
@@ -3826,7 +4971,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         return 'Objetivo';
       case 'entry':
         return 'Diário';
-      case 'calendar_session':
+      case 'event':
         return 'Evento';
       case 'project':
         return 'Projeto';
@@ -3855,7 +5000,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         return AppColors.habitOrange;
       case 'entry':
         return AppColors.habitPurple;
-      case 'calendar_session':
+      case 'event':
         return AppColors.primary;
       case 'project':
         return AppColors.priorityHigh;
@@ -3878,7 +5023,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         return Icons.flag_outlined;
       case 'entry':
         return Icons.auto_stories_rounded;
-      case 'calendar_session':
+      case 'event':
         return Icons.calendar_today_outlined;
       case 'project':
         return Icons.rocket_launch_rounded;
@@ -4019,126 +5164,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
-  Widget _buildGoalPlanSections(BuildContext context, Goal goal) {
-    final phases = goal.phases
-        .map((phase) => phase.trim())
-        .where((phase) => phase.isNotEmpty)
-        .toList();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildGoalPlanTextSection(
-          context: context,
-          label: 'OBJECTIVE',
-          text: goal.objective?.trim(),
-        ),
-        const SizedBox(height: 12),
-        _buildGoalPlanTextSection(
-          context: context,
-          label: 'STRATEGY',
-          text: goal.strategy?.trim(),
-        ),
-        if (phases.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            decoration: AppTheme.cardDecoration(context).copyWith(
-              border: const Border(
-                left: BorderSide(color: AppColors.primary, width: 3),
-              ),
-            ),
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'PHASES',
-                  style: TextStyle(
-                    color: AppTheme.textMutedColor(context),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...phases.asMap().entries.map((entry) {
-                  return Padding(
-                    padding: EdgeInsets.only(
-                      bottom: entry.key == phases.length - 1 ? 0 : 10,
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: 28,
-                          child: Text(
-                            '${entry.key + 1}.',
-                            style: TextStyle(
-                              color: AppTheme.textMutedColor(context),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: WikiTextView(
-                            text: entry.value,
-                            style: const TextStyle(fontSize: 15, height: 1.5),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildGoalPlanTextSection({
-    required BuildContext context,
-    required String label,
-    required String? text,
-  }) {
-    final value = text == null || text.isEmpty ? 'Not set' : text;
-
-    return Container(
-      width: double.infinity,
-      decoration: AppTheme.cardDecoration(context).copyWith(
-        border: const Border(
-          left: BorderSide(color: AppColors.primary, width: 3),
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: AppTheme.textMutedColor(context),
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 8),
-          WikiTextView(
-            text: value,
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.5,
-              color: text == null || text.isEmpty
-                  ? AppTheme.textMutedColor(context)
-                  : AppTheme.textPrimaryColor(context),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _showManualKpiIncrementDialog(
     BuildContext context,
@@ -4576,17 +5602,618 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  Color _statusColor(ResourceStatus status) {
-    switch (status) {
-      case ResourceStatus.toConsume:
-        return AppColors.textSecondary;
-      case ResourceStatus.inProgress:
-        return AppColors.info;
-      case ResourceStatus.completed:
-        return AppColors.habitGreen;
-      case ResourceStatus.dropped:
-        return AppColors.error;
+  Future<void> _updateResourceRating(
+    WidgetRef ref,
+    Resource resource,
+    int rating,
+  ) async {
+    final updated = resource.copyWith(
+      rating: rating,
+      updatedAt: DateTime.now(),
+    );
+    await ref.read(resourcesProvider.notifier).updateResource(updated);
+    if (mounted) setState(() => object = updated);
+  }
+
+  Widget _buildHabitChecklistSliver(
+    BuildContext context,
+    WidgetRef ref,
+    Habit habit,
+  ) {
+    final today = DateTime.now();
+    final dateStr = today.toIso8601String().split('T').first;
+    final dailyData = ref.watch(dailyNoteDataProvider(dateStr));
+    final habitsMap =
+        (dailyData['habits'] as Map<String, dynamic>?) ?? const {};
+    final rawVal = habitsMap[habit.slug];
+    final checklistState = habit.resolveChecklistState(rawVal);
+    final doneCount = checklistState.values.where((v) => v).length;
+    final total = habit.totalChecklistItems;
+    final progress = total > 0 ? doneCount / total : 0.0;
+    final habitColor = _parseColor(habit.color);
+
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        habit.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        DateFormat('EEEE, d MMM').format(today),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: progress),
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                    builder: (context, value, _) => Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          value: value,
+                          strokeWidth: 5,
+                          color: habitColor,
+                          backgroundColor: habitColor.withValues(alpha: 0.15),
+                        ),
+                        Text(
+                          '${(value * 100).round()}%',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: progress),
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              builder: (context, value, _) => LinearProgressIndicator(
+                value: value,
+                minHeight: 8,
+                borderRadius: BorderRadius.circular(4),
+                color: habitColor,
+                backgroundColor: habitColor.withValues(alpha: 0.15),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '$doneCount de $total tarefas',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const Text('hoje', style: TextStyle(color: AppColors.textMuted)),
+              ],
+            ),
+            const SizedBox(height: 20),
+            if (total == 0)
+              Center(
+                child: TextButton(
+                  onPressed: () => _handleAction(context, ref, 'edit'),
+                  child: const Text('Adicionar seções de checklist'),
+                ),
+              )
+            else
+              ...habit.checklistSections.map((section) {
+                final sectionDone = section.items
+                    .where((item) => checklistState[item.id] == true)
+                    .length;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Row(
+                        children: [
+                          if (section.emoji != null) ...[
+                            Text(section.emoji!, style: const TextStyle(fontSize: 16)),
+                            const SizedBox(width: 6),
+                          ],
+                          Text(
+                            section.label.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '$sectionDone/${section.items.length}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ...section.items.map((item) {
+                      final done = checklistState[item.id] == true;
+                      final title = item.estimatedMinutes != null
+                          ? '${item.title} (${item.estimatedMinutes} min)'
+                          : item.title;
+                      return Semantics(
+                        label: "Marcar '$title' como feito",
+                        button: true,
+                        child: GestureDetector(
+                          onTap: () async {
+                            await ref
+                                .read(habitsProvider.notifier)
+                                .toggleChecklistItem(habit, today, item.id);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              children: [
+                                AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 150),
+                                  transitionBuilder: (child, anim) =>
+                                      ScaleTransition(scale: anim, child: child),
+                                  child: Container(
+                                    key: ValueKey(done),
+                                    width: 44,
+                                    height: 44,
+                                    alignment: Alignment.center,
+                                    child: Container(
+                                      width: 24,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: done ? habitColor : Colors.transparent,
+                                        border: Border.all(
+                                          color: done
+                                              ? habitColor
+                                              : AppColors.textMuted,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: done
+                                          ? const Icon(
+                                              Icons.check,
+                                              size: 14,
+                                              color: Colors.white,
+                                            )
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: AnimatedDefaultTextStyle(
+                                    duration: const Duration(milliseconds: 150),
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      decoration: done
+                                          ? TextDecoration.lineThrough
+                                          : TextDecoration.none,
+                                      color: done
+                                          ? AppColors.textMuted
+                                          : AppTheme.textPrimaryColor(context),
+                                    ),
+                                    child: Text(
+                                      title,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 8),
+                  ],
+                );
+              }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHabitNormalSliver(
+    BuildContext context,
+    WidgetRef ref,
+    Habit habit,
+  ) {
+    final today = DateTime.now();
+    final dateStr = today.toIso8601String().split('T').first;
+    final dailyData = ref.watch(dailyNoteDataProvider(dateStr));
+    final habitsMap =
+        (dailyData['habits'] as Map<String, dynamic>?) ?? const {};
+    final todayVal = habitsMap[habit.slug];
+    final habitColor = _parseColor(habit.color);
+
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildPropertiesCard(
+              context: context,
+              title: 'Hoje',
+              icon: Icons.today_outlined,
+              rows: [
+                _PropRow(
+                  label: 'Progresso',
+                  value: '${(habit.dailyGoal > 0 ? (habit.isCompletedToday ? 1.0 : 0.0) * 100 : 0).round()}%',
+                  trailing: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: CircularProgressIndicator(
+                      value: habit.isCompletedToday ? 1.0 : 0.3,
+                      color: habitColor,
+                      backgroundColor: habitColor.withValues(alpha: 0.15),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (habit.slots.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildHabitPeriodSlots(context, ref, habit, todayVal),
+            ],
+            const SizedBox(height: 16),
+            const Text(
+              'Atividade (30d)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 180,
+              decoration: AppTheme.cardDecoration(context),
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+              child: habit.inputType == HabitInputType.boolean
+                  ? _buildHabitFrequencyChart(habit)
+                  : _buildHabitNumericTrendChart(habit),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHabitPeriodSlots(
+    BuildContext context,
+    WidgetRef ref,
+    Habit habit,
+    dynamic todayVal,
+  ) {
+    final groups = <String, List<(int index, HabitSlot slot)>>{
+      'manha': [],
+      'tarde': [],
+      'noite': [],
+      'indefinido': [],
+    };
+    for (var i = 0; i < habit.slots.length; i++) {
+      final slot = habit.slots[i];
+      final hour = slot.time?.hour;
+      final period = hour == null
+          ? 'indefinido'
+          : hour >= 5 && hour <= 11
+          ? 'manha'
+          : hour >= 12 && hour <= 17
+          ? 'tarde'
+          : 'noite';
+      groups[period]!.add((i, slot));
     }
+
+    final labels = {
+      'manha': '🌅 Manhã',
+      'tarde': '☀️ Tarde',
+      'noite': '🌙 Noite',
+      'indefinido': 'Indefinido',
+    };
+
+    List<bool> slotStates = [];
+    if (todayVal is List) {
+      slotStates = todayVal.map((v) => v == true).toList();
+    } else if (todayVal is bool) {
+      slotStates = List.filled(habit.slots.length, todayVal);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: groups.entries.where((e) => e.value.isNotEmpty).map((entry) {
+        final done = entry.value.where((e) {
+          final idx = e.$1;
+          return idx < slotStates.length && slotStates[idx];
+        }).length;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Container(
+            decoration: AppTheme.cardDecoration(context),
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      labels[entry.key] ?? entry.key,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '$done/${entry.value.length}',
+                      style: const TextStyle(color: AppColors.textMuted),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ...entry.value.map((item) {
+                  final idx = item.$1;
+                  final slot = item.$2;
+                  final done = idx < slotStates.length && slotStates[idx];
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      done
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      color: done ? AppColors.habitOrange : AppColors.textMuted,
+                    ),
+                    title: Text(
+                      slot.label ?? 'Slot ${idx + 1}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        decoration:
+                            done ? TextDecoration.lineThrough : TextDecoration.none,
+                        color: done ? AppColors.textMuted : null,
+                      ),
+                    ),
+                    onTap: () => ref
+                        .read(habitsProvider.notifier)
+                        .toggleHabit(habit, DateTime.now(), slotIndex: idx),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildRotationTasksSection(
+    BuildContext context,
+    WidgetRef ref,
+    Project project,
+    List<Task> allTasks,
+  ) {
+    final activeStatus = RotationService.computeActiveStatus(project);
+    final rotationTasks = allTasks.where((t) => t.isRotationTask).toList();
+    final filtered = _rotationTaskFilter == null
+        ? rotationTasks
+        : rotationTasks.where((t) {
+            return switch (_rotationTaskFilter) {
+              'daily' => t.rotationFrequencyType == RotationFrequencyType.daily,
+              'oncePerPeriod' =>
+                t.rotationFrequencyType == RotationFrequencyType.oncePerPeriod,
+              'everyNRotations' =>
+                t.rotationFrequencyType == RotationFrequencyType.everyNRotations,
+              _ => true,
+            };
+          }).toList();
+
+    final groups = [...project.rotationGroups]
+      ..sort((a, b) => a.order.compareTo(b.order));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                activeStatus != null
+                    ? 'Próxima rotação: ${activeStatus.group.name}'
+                    : 'Rotação de zonas',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textMuted,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            TextButton(
+              onPressed: () =>
+                  navigateToRotationOverview(context, project.id),
+              child: const Text('Ver rotação completa'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Tarefas por Grupo',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _rotationFilterChip('Todas', null),
+              _rotationFilterChip('Diária', 'daily'),
+              _rotationFilterChip('1x no período', 'oncePerPeriod'),
+              _rotationFilterChip('Por frequência', 'everyNRotations'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...groups.map((group) {
+          final groupTasks = filtered
+              .where((t) => t.rotationGroupId == group.id)
+              .toList();
+          if (groupTasks.isEmpty) return const SizedBox.shrink();
+          final isActive = activeStatus?.group.id == group.id;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    if (group.emoji != null) Text(group.emoji!),
+                    const SizedBox(width: 6),
+                    Text(
+                      group.name,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (isActive) ...[
+                      const SizedBox(width: 8),
+                      _badge('ativa agora', color: AppColors.success),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ...groupTasks.map(
+                  (task) => _buildRotationTaskRow(
+                    context,
+                    ref,
+                    project,
+                    task,
+                    activeStatus,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+        if (activeStatus != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _rotationFooterText(project, activeStatus),
+            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _rotationFilterChip(String label, String? value) {
+    final selected = _rotationTaskFilter == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => setState(() => _rotationTaskFilter = value),
+        selectedColor: AppColors.primary.withValues(alpha: 0.15),
+        checkmarkColor: AppColors.primary,
+      ),
+    );
+  }
+
+  Widget _buildRotationTaskRow(
+    BuildContext context,
+    WidgetRef ref,
+    Project project,
+    Task task,
+    RotationStatus? activeStatus,
+  ) {
+    final dotColor = rotationFrequencyColor(
+      task.rotationFrequencyType,
+      context,
+    );
+    String trailing = '';
+    if (activeStatus != null &&
+        task.rotationFrequencyType == RotationFrequencyType.daily) {
+      final todayKey =
+          '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}';
+      trailing = task.rotationDailyCompletions[todayKey] == true
+          ? 'feito'
+          : DateFormat('d MMM').format(DateTime.now());
+    } else if (activeStatus != null &&
+        task.rotationFrequencyType == RotationFrequencyType.oncePerPeriod) {
+      trailing = RotationService.isDoneThisOccurrence(task, activeStatus)
+          ? 'feito'
+          : DateFormat('d MMM').format(activeStatus.periodEnd);
+    } else if (task.rotationFrequencyType ==
+        RotationFrequencyType.everyNRotations) {
+      final next = RotationService.nextDueDateForEveryN(task, project);
+      trailing = next != null
+          ? '→ ${DateFormat('MMM').format(next)}'
+          : '→ —';
+    }
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+      leading: Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+      ),
+      title: Text(
+        task.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: Text(
+        trailing,
+        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+      ),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => UniversalDetailView(object: task),
+        ),
+      ),
+    );
+  }
+
+  String _rotationFooterText(Project project, RotationStatus activeStatus) {
+    final upcoming = RotationService.upcomingGroups(project, count: 1);
+    if (upcoming.isEmpty) return '';
+    final next = upcoming.first;
+    final taskCount = ref
+        .read(tasksProvider)
+        .where((t) => t.rotationGroupId == next.group.id)
+        .length;
+    return 'Próxima rotação: ${next.group.emoji ?? ''} ${next.group.name} · '
+        '${DateFormat('d MMM').format(next.startsAt)}–${DateFormat('d MMM').format(next.endsAt)} · '
+        '$taskCount tarefas';
   }
 
   Widget _personGoogleEventBanner(
@@ -5118,6 +6745,263 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       ),
     );
   }
+
+  Widget _buildHabitLinkedItemsSliver(
+    BuildContext context,
+    WidgetRef ref,
+    Habit habit,
+  ) {
+    if (!habit.actions.any((a) => a.type == 'link_item')) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
+
+    final linksKey = '${habit.slug}__links';
+    final today = DateTime.now();
+    final dayEntries = <({DateTime date, List<VaultLinkRef> refs})>[];
+
+    for (var i = 0; i < 7; i++) {
+      final date = DateTime(today.year, today.month, today.day - i);
+      final dateStr = DateFormat('yyyy-MM-dd').format(date);
+      final data = ref.watch(dailyNoteDataProvider(dateStr));
+      final raw = data[linksKey];
+      if (raw is! List || raw.isEmpty) continue;
+      final refs = raw
+          .map((item) {
+            final link = item.toString();
+            return VaultLinkRef.fromMap({
+              'link': link,
+              'display_title': link
+                  .replaceAll('[[', '')
+                  .replaceAll(']]', '')
+                  .split('^')
+                  .first,
+            });
+          })
+          .toList();
+      dayEntries.add((date: date, refs: refs));
+    }
+
+    final chartRefs = <VaultLinkRef>[];
+    for (var i = 0; i < _linkChartDays; i++) {
+      final date = DateTime(today.year, today.month, today.day - i);
+      final dateStr = DateFormat('yyyy-MM-dd').format(date);
+      final data = ref.watch(dailyNoteDataProvider(dateStr));
+      final raw = data[linksKey];
+      if (raw is! List || raw.isEmpty) continue;
+      for (final item in raw) {
+        final link = item.toString();
+        chartRefs.add(
+          VaultLinkRef.fromMap({
+            'link': link,
+            'display_title': link
+                .replaceAll('[[', '')
+                .replaceAll(']]', '')
+                .split('^')
+                .first,
+          }),
+        );
+      }
+    }
+
+    if (dayEntries.isEmpty && chartRefs.isEmpty) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
+
+    final counts = <String, int>{};
+    for (final refItem in chartRefs) {
+      counts[refItem.displayTitle] = (counts[refItem.displayTitle] ?? 0) + 1;
+    }
+
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Itens vinculados recentemente',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            if (chartRefs.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Text(
+                    'Itens mais vinculados',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  _linkChartDaysChip(7),
+                  const SizedBox(width: 6),
+                  _linkChartDaysChip(30),
+                  const SizedBox(width: 6),
+                  _linkChartDaysChip(90),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _buildLinkedItemsBarChart(context, counts),
+            ],
+            if (dayEntries.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              ...dayEntries.map((entry) {
+                return Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(14),
+                  decoration: AppTheme.cardDecoration(context),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        DateFormat('d MMM yyyy').format(entry.date),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: entry.refs.map((refItem) {
+                          return ActionChip(
+                            label: Text(
+                              refItem.displayTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onPressed: () => _openLinkedRef(context, ref, refItem),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _linkChartDaysChip(int days) {
+    final selected = _linkChartDays == days;
+    return FilterChip(
+      label: Text('${days}d'),
+      selected: selected,
+      onSelected: (_) => setState(() => _linkChartDays = days),
+      selectedColor: AppColors.accent.withValues(alpha: 0.2),
+      checkmarkColor: AppColors.accent,
+    );
+  }
+
+  Widget _buildLinkedItemsBarChart(
+    BuildContext context,
+    Map<String, int> counts,
+  ) {
+    if (counts.isEmpty) return const SizedBox.shrink();
+
+    final sorted = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final top = sorted.take(8).toList();
+    final maxCount = top.first.value.toDouble();
+    final barColor = Theme.of(context).colorScheme.primary;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: AppTheme.cardDecoration(context),
+      child: Column(
+        children: top.map((entry) {
+          final fraction = maxCount > 0 ? entry.value / maxCount : 0.0;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    entry.key,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 3,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: fraction,
+                      minHeight: 8,
+                      backgroundColor: AppColors.surfaceVariant,
+                      color: barColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${entry.value}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  void _openLinkedRef(
+    BuildContext context,
+    WidgetRef ref,
+    VaultLinkRef refItem,
+  ) {
+    if (refItem.isRow) {
+      Note? note;
+      for (final n in ref.read(notesProvider)) {
+        if (n.slug == refItem.noteSlug) {
+          note = n;
+          break;
+        }
+      }
+      if (note != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UniversalDetailView(object: note!),
+          ),
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Linha: ${refItem.displayTitle}')),
+        );
+      }
+    } else {
+      final target = ref
+          .read(allObjectsProvider)
+          .valueOrNull
+          ?.where((o) => o.slug == refItem.objectSlug)
+          .firstOrNull;
+      if (target != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UniversalDetailView(object: target),
+          ),
+        );
+      }
+    }
+  }
 }
 
 class _SubtaskListView extends StatefulWidget {
@@ -5258,3 +7142,4 @@ class _SubtaskListViewState extends State<_SubtaskListView> {
     );
   }
 }
+

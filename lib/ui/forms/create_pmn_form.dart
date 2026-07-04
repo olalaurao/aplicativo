@@ -48,12 +48,24 @@ class _CreatePmnFormState extends ConsumerState<CreatePmnForm> {
     return '${_startDate.year}-W${woy.toString().padLeft(2, '0')}';
   }
 
+  // F3.16: Generate all dates in the range inclusive
+  List<DateTime> _generateReferencedDates() {
+    final dates = <DateTime>[];
+    var current = _startDate;
+    while (current.isBefore(_endDate) || current.isAtSameMomentAs(_endDate)) {
+      dates.add(DateTime(current.year, current.month, current.day));
+      current = current.add(const Duration(days: 1));
+    }
+    return dates;
+  }
+
   Future<void> _savePmn() async {
     final plusList = _plusController.text.split('\n').where((s) => s.trim().isNotEmpty).map((e) => e.startsWith('- ') ? e.substring(2) : e).toList();
     final minusList = _minusController.text.split('\n').where((s) => s.trim().isNotEmpty).map((e) => e.startsWith('- ') ? e.substring(2) : e).toList();
     final nextList = _nextController.text.split('\n').where((s) => s.trim().isNotEmpty).map((e) => e.startsWith('- ') ? e.substring(2) : e).toList();
 
     final weekStr = _getWeekString();
+    final referencedDates = _generateReferencedDates();
     
     final pmn = widget.existingPmn?.copyWith(
       id: JournalEntry.pmnIdFromDate(_startDate),
@@ -63,7 +75,7 @@ class _CreatePmnFormState extends ConsumerState<CreatePmnForm> {
       week: weekStr,
       dateRangeStart: _startDate,
       dateRangeEnd: _endDate,
-      referencedDates: [_startDate, _endDate],
+      referencedDates: referencedDates,
     ) ?? JournalEntry(
       id: JournalEntry.pmnIdFromDate(_startDate),
       title: 'PMN $weekStr',
@@ -73,7 +85,7 @@ class _CreatePmnFormState extends ConsumerState<CreatePmnForm> {
       week: weekStr,
       dateRangeStart: _startDate,
       dateRangeEnd: _endDate,
-      referencedDates: [_startDate, _endDate],
+      referencedDates: referencedDates,
       plus: plusList,
       minus: minusList,
       next: nextList,

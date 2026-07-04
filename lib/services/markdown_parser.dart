@@ -17,6 +17,13 @@ class HighlightItem {
   const HighlightItem({required this.text, this.tag, this.date});
 }
 
+class OcrBlock {
+  final String? sourceImage;
+  final String text;
+
+  const OcrBlock({this.sourceImage, required this.text});
+}
+
 class MarkdownParser {
   static bool matchesSignature(
     Map<String, dynamic> frontmatter,
@@ -575,6 +582,10 @@ class MarkdownParser {
         final energyValue = energyMatch != null
             ? int.tryParse(energyMatch.group(1)!)
             : null;
+        // F3.15: Clamp energy value to 0-10 range
+        final clampedEnergyValue = energyValue != null
+            ? energyValue.clamp(0, 10)
+            : null;
 
         final hashtags = extractTags(entryBody);
 
@@ -599,7 +610,7 @@ class MarkdownParser {
         };
         if (entryTypeStr != null) entryData['entry_type'] = entryTypeStr;
         if (categoryStr != null) entryData['category'] = categoryStr;
-        if (energyValue != null) entryData['energy_value'] = energyValue;
+        if (clampedEnergyValue != null) entryData['energy_value'] = clampedEnergyValue;
         entries.add(entryData);
       }
     }
@@ -645,6 +656,7 @@ class MarkdownParser {
       'entry_type',
       'category',
       'energy_value',
+      'mood_entries',
       'mood_pleasantness',
       'mood_energy',
       'mood_label',
@@ -910,5 +922,45 @@ class MarkdownParser {
     }
 
     return buffer.toString().trim();
+  }
+
+  static List<OcrBlock> parseOcrSections(String body) {
+    final sectionRegex = RegExp(
+      r'^##\s*📝\s*Texto Extraído \(OCR\)\s*$',
+      multiLine: true,
+    );
+    final sourceRegex = RegExp(r'<!--\s*ocr-source:\s*(.+?)\s*-->');
+    final matches = sectionRegex.allMatches(body).toList();
+    final blocks = <OcrBlock>[];
+    for (var i = 0; i < matches.length; i++) {
+      final start = matches[i].end;
+      final end = i + 1 < matches.length ? matches[i + 1].start : body.length;
+      final sectionText = body.substring(start, end).trim();
+      final sourceMatch = sourceRegex.firstMatch(sectionText);
+      final text = sourceMatch != null
+          ? sectionText.substring(sourceMatch.end).trim()
+          : sectionText;
+      blocks.add(OcrBlock(sourceImage: sourceMatch?.group(1), text: text));
+    }
+    return blocks;
+  }
+
+  static String upsertOcrSection(
+    String body,
+    String sourceImage,
+    String newText,
+  ) {
+    final newBlock =
+        '## 📝 Texto Extraído (OCR)\n<!-- ocr-source: $sourceImage -->\n$newText';
+    final sectionRegex = RegExp(
+      r'^##\s*📝\s*Texto Extraído \(OCR\)\s*\n<!--\s*ocr-source:\s*' +
+          RegExp.escape(sourceImage) +
+          r'\s*-->\n(.*?)(?=\n##\s|\z)',
+      multiLine: true,
+      dotAll: true,
+    );
+    final match = sectionRegex.firstMatch(body);
+    if (match == null) return '${body.trimRight()}\n\n$newBlock\n';
+    return body.replaceRange(match.start, match.end, newBlock);
   }
 }

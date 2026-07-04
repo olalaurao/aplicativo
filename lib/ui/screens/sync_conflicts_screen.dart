@@ -287,7 +287,6 @@ class _ConflictCard extends ConsumerWidget {
       final zipFile = await backupService.createBackup();
       if (zipFile != null) {
         await driveSync.createBackupFromFile(zipFile);
-        await backupService.cleanOldBackups(keepCount: 2);
       }
 
       await obsidian.writeFile(conflict.relativePath, chosenContent);

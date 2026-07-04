@@ -15,7 +15,7 @@ import '../theme.dart';
 import '../widgets/organizer_picker_modal.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/mood_model.dart';
-import '../widgets/mood_picker.dart';
+import '../widgets/mood_picker_sheet.dart';
 
 class CreateEntryForm extends ConsumerStatefulWidget {
   final String? initialTitle;
@@ -437,102 +437,11 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  MoodPicker(
-                    initialMood: moods.cast<MoodDefinition>().firstWhere(
-                      (m) => m.id == _moodSlug || m.slug == _moodSlug,
-                      orElse: () => MoodDefinition.systemMoods.firstWhere(
-                        (m) => m.id == _moodSlug,
-                        orElse: () => MoodDefinition(
-                          id: _moodSlug ?? 'neutral',
-                          label: _moodSlug ?? 'Neutral',
-                          emoji: '😐',
-                          color: '#9E9E9E',
-                        ),
-                      ),
-                    ),
-                    onSelected: (mood) {
-                      setState(() {
-                        _moodSlug = mood.id;
-                      });
-                      setModalState(() {});
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Sentimentos (opcional)',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _feelingsController,
-                    decoration: const InputDecoration(
-                      hintText: 'Ex: leveza, tensão no peito',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  const Text(
-                    'Sentimentos extras',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _feelingChips.map((f) {
-                      final isSelected = _selectedFeelings.contains(f);
-                      return FilterChip(
-                        label: Text(f),
-                        selected: isSelected,
-                        onSelected: (val) {
-                          setState(() {
-                            if (val) {
-                              _selectedFeelings.add(f);
-                            } else {
-                              _selectedFeelings.remove(f);
-                            }
-                          });
-                          setModalState(() {});
-                        },
-                        selectedColor: AppColors.primary.withValues(alpha: 0.1),
-                        checkmarkColor: AppColors.primary,
-                        labelStyle: TextStyle(
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
-                          fontSize: 13,
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: AppTheme.primaryButtonStyle,
-                      child: const Text('Confirmar'),
-                    ),
-                  ),
-                ],
-              ),
-            );
+        return MoodPickerSheet(
+          onMoodSelected: (moodSlug) {
+            setState(() {
+              _moodSlug = moodSlug;
+            });
           },
         );
       },

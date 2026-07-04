@@ -1,8 +1,10 @@
 // lib/ui/forms/create_tracker_form.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/tracker_model.dart';
 import '../../models/shared_types.dart';
+import '../../models/template_model.dart';
 import '../../providers/vault_provider.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../theme.dart';
@@ -110,6 +112,17 @@ class _CreateTrackerFormState extends ConsumerState<CreateTrackerForm> {
                 ),
               ),
               centerTitle: true,
+              actions: [
+                if (widget.tracker == null)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.copy_all_rounded,
+                      color: AppColors.primary,
+                    ),
+                    tooltip: 'Usar Template',
+                    onPressed: _showTemplatePicker,
+                  ),
+              ],
             ),
 
             SliverToBoxAdapter(
@@ -611,6 +624,80 @@ class _CreateTrackerFormState extends ConsumerState<CreateTrackerForm> {
       ref.read(trackersProvider.notifier).addTracker(tracker);
     }
     Navigator.pop(context);
+  }
+
+  void _showTemplatePicker() async {
+    final templates = ref
+        .read(templatesProvider)
+        .where((t) => t.templateType == 'tracker')
+        .toList();
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  'Templates',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    context.push(
+                      '/create/template',
+                      extra: {'initialType': 'tracker'},
+                    );
+                  },
+                  child: const Text('Criar novo'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (templates.isEmpty)
+              const Text(
+                'Nenhum template encontrado.',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
+            ...templates.map(
+              (t) => ListTile(
+                title: Text(t.title),
+                onTap: () {
+                  Navigator.pop(context);
+                  _applyTemplate(t);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _applyTemplate(TemplateDefinition template) {
+    setState(() {
+      if (template.frontmatterDefaults.containsKey('title')) {
+        _titleController.text = template.frontmatterDefaults['title'] as String;
+      }
+      if (template.frontmatterDefaults.containsKey('description')) {
+        _descController.text = template.frontmatterDefaults['description'] as String;
+      }
+      if (template.frontmatterDefaults.containsKey('color')) {
+        _selectedColor = template.frontmatterDefaults['color'] as String;
+      }
+      if (template.frontmatterDefaults.containsKey('is_health_tracker')) {
+        _isHealthTracker = template.frontmatterDefaults['is_health_tracker'] as bool? ?? false;
+      }
+      if (template.body.isNotEmpty) {
+        _descController.text = template.body;
+      }
+    });
   }
 
   String _alertLevelLabel(FieldAlertLevel level) {

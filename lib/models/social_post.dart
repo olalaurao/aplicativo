@@ -2,7 +2,6 @@
 import 'content_object.dart';
 import 'reminder_config.dart';
 import 'shared_types.dart';
-import 'place_ref.dart';
 
 enum SocialPlatform {
   tiktok,
@@ -23,18 +22,18 @@ class SocialPost extends ContentObject {
   SocialPlatform platform;
   SocialMediaType mediaType;
   String? caption;
+  String? creator;
   String? authorHandle;
   String? authorName;
   String? thumbnailUrl;
   String? embedUrl;
   String? videoUrl;
+  String? transcription;
   List<String> mediaUrls;
   int primaryMediaIndex;
   DateTime? postedAt;
   String? personalNote;
   bool watched;
-  List<String> socialRefs;
-  List<PlaceRef> places;
 
   SocialPost({
     super.id,
@@ -43,20 +42,22 @@ class SocialPost extends ContentObject {
     required this.platform,
     this.mediaType = SocialMediaType.other,
     this.caption,
+    this.creator,
     this.authorHandle,
     this.authorName,
     this.thumbnailUrl,
     this.embedUrl,
     this.videoUrl,
+    this.transcription,
     List<String>? mediaUrls,
     this.primaryMediaIndex = 0,
     this.postedAt,
     this.personalNote,
     this.watched = false,
-    List<String>? socialRefs,
     super.organizers,
     super.categories,
     super.tags,
+    super.links,
     super.createdAt,
     super.updatedAt,
     super.obsidianPath,
@@ -64,13 +65,13 @@ class SocialPost extends ContentObject {
     super.pinned,
     super.order,
     super.reminders,
-    List<PlaceRef>? places,
-  }) : mediaUrls = mediaUrls ?? [],
-       socialRefs = socialRefs ?? [],
-       places = places ?? [];
+  }) : mediaUrls = mediaUrls ?? [];
 
   @override
   String get type => 'social_post';
+
+  @override
+  bool get isIncomplete => title.trim().isEmpty || url.trim().isEmpty;
 
   @override
   String get displayType => platform.name.toUpperCase();
@@ -127,21 +128,19 @@ class SocialPost extends ContentObject {
     frontmatter['platform'] = platform.name;
     frontmatter['media_type'] = mediaType.name;
     if (_hasText(caption)) frontmatter['caption'] = caption;
+    if (_hasText(creator)) frontmatter['creator'] = creator;
     if (_hasText(authorHandle)) frontmatter['author_handle'] = authorHandle;
     if (_hasText(authorName)) frontmatter['author_name'] = authorName;
     if (_hasText(thumbnailUrl)) frontmatter['thumbnail'] = thumbnailUrl;
     if (_hasText(embedUrl)) frontmatter['embed_url'] = embedUrl;
     if (_hasText(videoUrl)) frontmatter['video_url'] = videoUrl;
+    if (_hasText(transcription)) frontmatter['transcription'] = transcription;
     if (mediaUrls.isNotEmpty) frontmatter['media_urls'] = mediaUrls;
     frontmatter['primary_media_index'] = primaryMediaIndex;
     if (postedAt != null) {
       frontmatter['posted_at'] = postedAt!.toIso8601String();
     }
     frontmatter['watched'] = watched;
-    frontmatter['social_refs'] = socialRefs;
-    if (places.isNotEmpty) {
-      frontmatter['places'] = places.map((p) => p.toMap()).toList();
-    }
 
     final buffer = StringBuffer();
     if (_hasText(caption)) {
@@ -151,6 +150,11 @@ class SocialPost extends ContentObject {
       if (buffer.isNotEmpty) buffer.writeln('\n---\n');
       buffer.writeln('## Nota pessoal\n');
       buffer.writeln(personalNote!.trim());
+    }
+    if (_hasText(transcription)) {
+      if (buffer.isNotEmpty) buffer.writeln('\n---\n');
+      buffer.writeln('## Transcription\n');
+      buffer.writeln(transcription!.trim());
     }
 
     return generateMarkdown(frontmatter, buffer.toString().trimRight());
@@ -186,6 +190,10 @@ class SocialPost extends ContentObject {
     post.loadBaseMap(frontmatter);
     if (post.title.trim().isEmpty) post.title = title;
     post.caption = caption;
+    post.creator =
+        _stringValue(frontmatter['creator']) ??
+        _stringValue(frontmatter['author_handle']) ??
+        _stringValue(frontmatter['author_name']);
     post.authorHandle = _stringValue(frontmatter['author_handle']);
     post.authorName = _stringValue(frontmatter['author_name']);
     post.thumbnailUrl = _stringValue(
@@ -202,6 +210,7 @@ class SocialPost extends ContentObject {
     post.videoUrl = _stringValue(
       frontmatter['video_url'] ?? frontmatter['direct_video_url'],
     );
+    post.transcription = _stringValue(frontmatter['transcription']);
     post.mediaUrls = _stringList(
       frontmatter['media_urls'] ??
           frontmatter['media'] ??
@@ -214,15 +223,17 @@ class SocialPost extends ContentObject {
     post.postedAt = DateTime.tryParse(
       _stringValue(frontmatter['posted_at']) ?? '',
     );
-    post.socialRefs = _stringList(frontmatter['social_refs']);
-
-    if (frontmatter['places'] is List) {
-      post.places = (frontmatter['places'] as List)
-          .map((p) => PlaceRef.fromMap(p as Map<String, dynamic>))
-          .toList();
+    final legacyRefs = _stringList(
+      frontmatter['social_refs'] ??
+          frontmatter['linked_tasks'] ??
+          frontmatter['linked_content'],
+    );
+    if (legacyRefs.isNotEmpty) {
+      post.links = {...post.links, ...legacyRefs}.toList();
     }
 
     post.personalNote = _personalNoteFromBody(body, post.caption);
+    post.transcription ??= _transcriptionFromBody(body);
     return post;
   }
 
@@ -232,18 +243,19 @@ class SocialPost extends ContentObject {
     SocialPlatform? platform,
     SocialMediaType? mediaType,
     String? caption,
+    String? creator,
     String? authorHandle,
     String? authorName,
     String? thumbnailUrl,
     String? embedUrl,
     String? videoUrl,
+    String? transcription,
     List<String>? mediaUrls,
     int? primaryMediaIndex,
     DateTime? postedAt,
     String? personalNote,
     bool? watched,
-    List<String>? socialRefs,
-    List<PlaceRef>? places,
+    List<String>? links,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     List<String>? tags,
@@ -262,18 +274,19 @@ class SocialPost extends ContentObject {
       platform: platform ?? this.platform,
       mediaType: mediaType ?? this.mediaType,
       caption: caption ?? this.caption,
+      creator: creator ?? this.creator,
       authorHandle: authorHandle ?? this.authorHandle,
       authorName: authorName ?? this.authorName,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       embedUrl: embedUrl ?? this.embedUrl,
       videoUrl: videoUrl ?? this.videoUrl,
+      transcription: transcription ?? this.transcription,
       mediaUrls: mediaUrls ?? List<String>.from(this.mediaUrls),
       primaryMediaIndex: primaryMediaIndex ?? this.primaryMediaIndex,
       postedAt: postedAt ?? this.postedAt,
       personalNote: personalNote ?? this.personalNote,
       watched: watched ?? this.watched,
-      socialRefs: socialRefs ?? List<String>.from(this.socialRefs),
-      places: places ?? List<PlaceRef>.from(this.places),
+      links: links ?? List<String>.from(this.links),
       organizers: organizers ?? List<OrganizerReference>.from(this.organizers),
       categories: categories ?? List<String>.from(this.categories),
       tags: tags ?? List<String>.from(this.tags),
@@ -356,7 +369,7 @@ class SocialPost extends ContentObject {
     }
     const looseMarker = '## Nota pessoal';
     if (trimmed.contains(looseMarker)) {
-      return trimmed.split(looseMarker).last.trim();
+      return trimmed.split(looseMarker).last.split('## Transcription').first.trim();
     }
     final captionText = caption?.trim();
     if (captionText != null && captionText.isNotEmpty) {
@@ -364,5 +377,13 @@ class SocialPost extends ContentObject {
       return remainder.isEmpty || remainder == '---' ? null : remainder;
     }
     return trimmed;
+  }
+
+  static String? _transcriptionFromBody(String body) {
+    const marker = '## Transcription';
+    final index = body.indexOf(marker);
+    if (index == -1) return null;
+    final text = body.substring(index + marker.length).trim();
+    return text.isEmpty ? null : text;
   }
 }

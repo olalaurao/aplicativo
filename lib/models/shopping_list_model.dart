@@ -94,6 +94,9 @@ class ShoppingList extends ContentObject {
   String get type => 'shopping_list';
 
   @override
+  bool get isIncomplete => title.trim().isEmpty;
+
+  @override
   String get obsidianFileName => title;
 
   @override

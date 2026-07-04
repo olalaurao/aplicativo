@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../theme.dart';
-import '../forms/create_calendar_session_form.dart';
 import '../forms/create_entry_form.dart';
 import '../forms/create_event_form.dart';
 import '../forms/create_goal_form.dart';
@@ -40,7 +39,7 @@ class CreateMenuSheet extends ConsumerStatefulWidget {
 }
 
 class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
-  int _selectedTab = 0; // 0 = Journal, 1 = Plan, 2 = Record, 3 = Note
+  int _selectedTab = 0; // 0 = Journal, 1 = Plan, 2 = Record, 3 = Create
 
   // Journal Tab state
   bool _isEntryStandard = true; // true = Entrada completa, false = Observação rápida
@@ -89,7 +88,11 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
 
     int? energyValue;
     if (_selectedCategory == 'energia') {
-      energyValue = int.tryParse(text);
+      final parsed = int.tryParse(text);
+      // F3.15: Clamp energy value to 0-10 range
+      if (parsed != null) {
+        energyValue = parsed.clamp(0, 10);
+      }
     }
 
     final entry = JournalEntry(
@@ -122,9 +125,10 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
 
   Widget _buildTabHeaderButton(String label, int index) {
     final isSelected = _selectedTab == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedTab = index),
+    return GestureDetector(
+      onTap: () => setState(() => _selectedTab = index),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -434,21 +438,6 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         ),
         const Divider(),
         _buildOptionRow(
-          icon: Icons.event_outlined,
-          color: AppColors.secondary,
-          label: '📅 Nova sessão',
-          onTap: () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CreateCalendarSessionForm(initialTitle: widget.initialTitle),
-              ),
-            );
-          },
-        ),
-        const Divider(),
-        _buildOptionRow(
           icon: Icons.alarm,
           color: AppColors.warning,
           label: '🔔 Novo lembrete',
@@ -504,13 +493,13 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         .toList();
 
     if (trackers.isEmpty && activeHabits.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
         child: Column(
           children: [
-            const Icon(Icons.show_chart_rounded, size: 48, color: AppColors.textMuted),
-            const SizedBox(height: 12),
-            const Text(
+            Icon(Icons.show_chart_rounded, size: 48, color: AppColors.textMuted),
+            SizedBox(height: 12),
+            Text(
               'Você ainda não tem trackers ou hábitos ativos.',
               style: TextStyle(fontSize: 14, color: AppColors.textMuted),
             ),
@@ -613,9 +602,11 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
     );
   }
 
-  Widget _buildNoteTab() {
+  // F3.3: Merged Note and Organize tabs into single Create tab
+  Widget _buildCreateTab() {
     return Column(
       children: [
+        // Note types
         _buildOptionRow(
           icon: Icons.description_outlined,
           color: AppColors.primary,
@@ -697,13 +688,8 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
             );
           },
         ),
-      ],
-    );
-  }
-
-  Widget _buildOrganizeTab() {
-    return Column(
-      children: [
+        const Divider(),
+        // Organizer types (from former Organize tab)
         _buildOptionRow(
           icon: Icons.layers_outlined,
           color: AppColors.primary,
@@ -870,9 +856,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
                     const SizedBox(width: 8),
                     _buildTabHeaderButton('Record', 2),
                     const SizedBox(width: 8),
-                    _buildTabHeaderButton('Note', 3),
-                    const SizedBox(width: 8),
-                    _buildTabHeaderButton('Organize', 4),
+                    _buildTabHeaderButton('Create', 3),
                   ],
                 ),
               ),
@@ -880,7 +864,10 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
             const SizedBox(height: 20),
 
             // Tab Content
-            Flexible(
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.55,
+              ),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: AnimatedSwitcher(
@@ -891,8 +878,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
                       0 => _buildJournalTab(),
                       1 => _buildPlanTab(),
                       2 => _buildRecordTab(),
-                      3 => _buildNoteTab(),
-                      4 => _buildOrganizeTab(),
+                      3 => _buildCreateTab(),
                       _ => const SizedBox.shrink(),
                     },
                   ),

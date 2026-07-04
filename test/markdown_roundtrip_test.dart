@@ -374,7 +374,7 @@ Texto original.
 
         final resource = Resource(
           title: 'A Book',
-          resourceType: 'Book',
+          mediaType: 'Book',
           status: ResourceStatus.inProgress,
           rating: 4,
           synopsis: 'Useful notes.',
@@ -731,3 +731,5 @@ Texto original.
     });
   });
 }
+
+

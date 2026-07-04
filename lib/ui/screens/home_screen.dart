@@ -228,7 +228,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         .where((task) => task.stage != TaskStage.finalized && !task.archived)
         .length;
     final activeHabits = habits
-        .where((habit) => habit.status == HabitStatus.active && !habit.archived)
+        .where((habit) => habit.status == HabitStatus.active && !habit.archived && !habit.isNegative)
         .length;
 
     return Scaffold(

@@ -37,6 +37,9 @@ class ResourceDraft {
     this.sourceId,
     this.sourceName,
   });
+
+  /// V5: mediaType getter for compatibility
+  String? get mediaType => resourceType;
 }
 
 class ResourceMetadataService {

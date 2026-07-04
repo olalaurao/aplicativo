@@ -1,15 +1,15 @@
 // lib/ui/forms/create_goal_form.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../models/goal_model.dart';
 import '../../models/kpi_model.dart';
 import '../../models/shared_types.dart' hide KPI;
-import '../../models/social_post.dart';
+import '../../models/template_model.dart';
 import '../../providers/vault_provider.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/organizer_selector_field.dart';
-import '../widgets/universal_search_picker.dart';
 import '../theme.dart';
 
 class CreateGoalForm extends ConsumerStatefulWidget {
@@ -25,11 +25,7 @@ class CreateGoalForm extends ConsumerStatefulWidget {
 class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
   late final TextEditingController _titleController;
   late final TextEditingController _descController;
-  late final TextEditingController _objectiveController;
-  late final TextEditingController _strategyController;
-  final List<TextEditingController> _phaseControllers = [];
   GoalType _goalType = GoalType.oneTime;
-  GoalMode _goalMode = GoalMode.standard;
   DateTime? _deadline;
   String _selectedColor = '#10B981';
   bool _ignoreDirty = false;
@@ -50,7 +46,6 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
   GoalStatus _state = GoalStatus.active;
   List<KPI> _kpis = [];
   List<OrganizerReference> _organizers = [];
-  List<String> _socialRefs = [];
 
   @override
   void initState() {
@@ -63,36 +58,20 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
       context: context,
       text: widget.existingGoal?.description ?? '',
     );
-    _objectiveController = WikiLinkTextController(
-      context: context,
-      text: widget.existingGoal?.objective ?? '',
-    );
-    _strategyController = WikiLinkTextController(
-      context: context,
-      text: widget.existingGoal?.strategy ?? '',
-    );
 
     if (widget.existingGoal != null) {
       final goal = widget.existingGoal!;
       _titleController.text = goal.title;
       _selectedColor = goal.color ?? '#10B981';
       _goalType = goal.goalType;
-      _goalMode = goal.goalMode;
       _deadline = goal.deadline;
       _state = goal.state;
       _kpis = List.from(goal.kpis);
       _organizers = List.from(goal.organizers);
-      _socialRefs = List.from(goal.socialRefs);
-      for (final phase in goal.phases) {
-        _phaseControllers.add(TextEditingController(text: phase));
-      }
     } else {
       if (widget.initialOrganizers != null) {
         _organizers = List.from(widget.initialOrganizers!);
       }
-    }
-    if (_phaseControllers.isEmpty) {
-      _phaseControllers.add(TextEditingController());
     }
   }
 
@@ -100,12 +79,15 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
   void dispose() {
     _titleController.dispose();
     _descController.dispose();
-    _objectiveController.dispose();
-    _strategyController.dispose();
-    for (final controller in _phaseControllers) {
-      controller.dispose();
-    }
     super.dispose();
+  }
+
+  Color _parseColor(String hex) {
+    try {
+      return Color(int.parse(hex.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return AppColors.primary;
+    }
   }
 
   @override
@@ -158,6 +140,16 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
               ),
               centerTitle: true,
+              actions: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.copy_all_rounded,
+                    color: AppColors.primary,
+                  ),
+                  tooltip: 'Usar Template',
+                  onPressed: _showTemplatePicker,
+                ),
+              ],
             ),
 
             SliverToBoxAdapter(
@@ -357,10 +349,6 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                     const SizedBox(height: 12),
 
-                    _buildGoalModeSection(),
-
-                    const SizedBox(height: 12),
-
                     // âÂ”Â€âÂ”Â€âÂ”Â€ KPIs âÂ”Â€âÂ”Â€âÂ”Â€
                     Container(
                       decoration: AppTheme.cardDecoration(context),
@@ -457,10 +445,6 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
                         ],
                       ),
                     ),
-
-                    const SizedBox(height: 12),
-
-                    _buildSocialRefsSection(),
 
                     const SizedBox(height: 12),
 
@@ -588,173 +572,6 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
     );
   }
 
-  Widget _buildGoalModeSection() {
-    final isPlan = _goalMode == GoalMode.plan;
-
-    return Container(
-      decoration: AppTheme.cardDecoration(context),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Goal mode',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          SegmentedButton<GoalMode>(
-            segments: const [
-              ButtonSegment(
-                value: GoalMode.standard,
-                label: Text('Standard'),
-                icon: Icon(Icons.flag_rounded),
-              ),
-              ButtonSegment(
-                value: GoalMode.plan,
-                label: Text('Plan'),
-                icon: Icon(Icons.route_rounded),
-              ),
-            ],
-            selected: {_goalMode},
-            onSelectionChanged: (selection) {
-              setState(() => _goalMode = selection.first);
-            },
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-            child: isPlan
-                ? Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildPlanTextField(
-                          controller: _objectiveController,
-                          label: 'Objective',
-                          hintText: 'What specifically do you want to achieve?',
-                        ),
-                        const SizedBox(height: 12),
-                        _buildPlanTextField(
-                          controller: _strategyController,
-                          label: 'Strategy',
-                          hintText: 'How will you get there?',
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                'Phases',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                            TextButton.icon(
-                              onPressed: _addPhaseField,
-                              icon: const Icon(Icons.add_rounded, size: 16),
-                              label: const Text('Add phase'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        ..._phaseControllers.asMap().entries.map((entry) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 14),
-                                  child: Text(
-                                    '${entry.key + 1}.',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.textMuted,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: entry.value,
-                                    minLines: 1,
-                                    maxLines: 3,
-                                    decoration: const InputDecoration(
-                                      hintText: 'Describe this phase',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  tooltip: 'Remove phase',
-                                  onPressed: _phaseControllers.length == 1
-                                      ? null
-                                      : () => _removePhaseField(entry.key),
-                                  icon: const Icon(Icons.close_rounded),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                      ],
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPlanTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hintText,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          minLines: 2,
-          maxLines: 5,
-          decoration: InputDecoration(
-            hintText: hintText,
-            border: const OutlineInputBorder(),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _addPhaseField() {
-    setState(() => _phaseControllers.add(TextEditingController()));
-  }
-
-  void _removePhaseField(int index) {
-    final controller = _phaseControllers.removeAt(index);
-    controller.dispose();
-    setState(() {});
-  }
-
   void _pickDate() async {
     final date = await showDatePicker(
       context: context,
@@ -763,79 +580,6 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
       lastDate: DateTime(2030),
     );
     if (date != null) setState(() => _deadline = date);
-  }
-
-  Widget _buildSocialRefsSection() {
-    final posts = ref.watch(socialPostsProvider);
-    final selectedPosts = posts
-        .where((post) => _socialRefs.contains('[[social/${post.socialSlug}]]'))
-        .toList();
-
-    return Container(
-      decoration: AppTheme.cardDecoration(context),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Inspirado por',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (selectedPosts.isNotEmpty)
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final post in selectedPosts)
-                  InputChip(
-                    label: Text(
-                      post.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    onDeleted: () => setState(
-                      () => _socialRefs.remove('[[social/${post.socialSlug}]]'),
-                    ),
-                  ),
-              ],
-            ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.add_link_rounded),
-            label: const Text('Adicionar post de referência'),
-            onPressed: _pickSocialReference,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _pickSocialReference() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => UniversalSearchPickerSheet(
-        title: 'Escolher post social',
-        initialFilter: 'social_post',
-        onSelected: (object) {
-          if (object is SocialPost) {
-            final socialRef = '[[social/${object.socialSlug}]]';
-            setState(() {
-              if (!_socialRefs.contains(socialRef)) {
-                _socialRefs.add(socialRef);
-              }
-            });
-          }
-          Navigator.pop(context);
-        },
-      ),
-    );
   }
 
   void _saveGoal() {
@@ -853,20 +597,6 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
       color: _selectedColor,
       kpis: _kpis,
       organizers: _organizers,
-      socialRefs: _socialRefs,
-      goalMode: _goalMode,
-      objective: _goalMode == GoalMode.plan
-          ? _objectiveController.text.trim()
-          : null,
-      strategy: _goalMode == GoalMode.plan
-          ? _strategyController.text.trim()
-          : null,
-      phases: _goalMode == GoalMode.plan
-          ? _phaseControllers
-                .map((controller) => controller.text.trim())
-                .where((phase) => phase.isNotEmpty)
-                .toList()
-          : const [],
       obsidianPath: widget.existingGoal?.obsidianPath ?? '',
     );
 
@@ -875,23 +605,84 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
     } else {
       ref.read(goalsProvider.notifier).addGoal(goal);
     }
+  }
 
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Goal "${goal.title}" ${widget.existingGoal != null ? 'atualizado' : 'criado'} com sucesso!',
+  void _showTemplatePicker() async {
+    final templates = ref
+        .read(templatesProvider)
+        .where((t) => t.templateType == 'goal')
+        .toList();
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  'Templates',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    context.push(
+                      '/create/template',
+                      extra: {'initialType': 'goal'},
+                    );
+                  },
+                  child: const Text('Criar novo'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (templates.isEmpty)
+              const Text(
+                'Nenhum template encontrado.',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
+            ...templates.map(
+              (t) => ListTile(
+                title: Text(t.title),
+                onTap: () {
+                  Navigator.pop(context);
+                  _applyTemplate(t);
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Color _parseColor(String hex) {
-    try {
-      return Color(int.parse(hex.replaceAll('#', '0xFF')));
-    } catch (_) {
-      return AppColors.primary;
-    }
+  void _applyTemplate(TemplateDefinition template) {
+    setState(() {
+      if (template.frontmatterDefaults.containsKey('title')) {
+        _titleController.text = template.frontmatterDefaults['title'] as String;
+      }
+      if (template.frontmatterDefaults.containsKey('description')) {
+        _descController.text = template.frontmatterDefaults['description'] as String;
+      }
+      if (template.frontmatterDefaults.containsKey('color')) {
+        _selectedColor = template.frontmatterDefaults['color'] as String;
+      }
+      if (template.frontmatterDefaults.containsKey('goal_type')) {
+        final typeStr = template.frontmatterDefaults['goal_type'] as String;
+        _goalType = GoalType.values.firstWhere(
+          (e) => e.name == typeStr,
+          orElse: () => GoalType.oneTime,
+        );
+      }
+      if (template.body.isNotEmpty) {
+        _descController.text = template.body;
+      }
+    });
   }
 
   void _addKpi() {
@@ -921,6 +712,14 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
   KPISourceType _sourceType = KPISourceType.manualQuantity;
   String? _sourceId;
   String? _fieldId;
+
+  Color _parseColor(String hex) {
+    try {
+      return Color(int.parse(hex.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return AppColors.primary;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
