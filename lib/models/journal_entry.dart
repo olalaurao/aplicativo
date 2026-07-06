@@ -4,6 +4,7 @@ import 'shared_types.dart';
 import 'reminder_config.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
+import 'alignment_log_entry.dart';
 
 enum JournalEntryType { standard, fieldNote, pmn }
 
@@ -46,6 +47,7 @@ class JournalEntry extends ContentObject {
   String? timeOfDay;
   String? moodSlug; // Reference to MoodDefinition.id (legacy, kept for compatibility)
   List<MoodEntry> moodEntries; // F2.14: Array of mood entries for multiple moods per day
+  List<AlignmentLogEntry> alignmentLogEntries; // RA-P1-2: Alignment tracking logs
   List<String> photos;
   String? location;
   String? templateId;
@@ -78,6 +80,7 @@ class JournalEntry extends ContentObject {
     this.timeOfDay,
     this.moodSlug,
     this.moodEntries = const [],
+    this.alignmentLogEntries = const [],
     this.photos = const [],
     this.location,
     this.templateId,
@@ -237,6 +240,11 @@ class JournalEntry extends ContentObject {
       frontmatter['mood_entries'] = moodEntries.map((e) => e.toMap()).toList();
     }
 
+    // RA-P1-2: Serialize alignment_log_entries array
+    if (alignmentLogEntries.isNotEmpty) {
+      frontmatter['alignment_log_entries'] = alignmentLogEntries.map((e) => e.toMap()).toList();
+    }
+
     return generateMarkdown(
       frontmatter,
       normalizeRichTextBodyForMarkdown(finalBody),
@@ -330,6 +338,14 @@ class JournalEntry extends ContentObject {
           .toList();
     }
 
+    // RA-P1-2: Parse alignment_log_entries array
+    final alignmentLogData = frontmatter['alignment_log_entries'];
+    if (alignmentLogData is List) {
+      entry.alignmentLogEntries = alignmentLogData
+          .map((e) => AlignmentLogEntry.fromMap(e as Map<String, dynamic>))
+          .toList();
+    }
+
     entry.feelings = frontmatter['feelings'] as String?;
     entry.location = frontmatter['location'] as String?;
     entry.templateId = frontmatter['template_id'] as String?;
@@ -403,6 +419,7 @@ class JournalEntry extends ContentObject {
     String? timeOfDay,
     String? moodSlug,
     List<MoodEntry>? moodEntries,
+    List<AlignmentLogEntry>? alignmentLogEntries,
     List<String>? photos,
     String? location,
     String? templateId,
@@ -437,6 +454,7 @@ class JournalEntry extends ContentObject {
       timeOfDay: timeOfDay ?? this.timeOfDay,
       moodSlug: moodSlug ?? this.moodSlug,
       moodEntries: moodEntries ?? this.moodEntries,
+      alignmentLogEntries: alignmentLogEntries ?? this.alignmentLogEntries,
       photos: photos ?? this.photos,
       location: location ?? this.location,
       templateId: templateId ?? this.templateId,

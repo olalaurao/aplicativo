@@ -10,6 +10,7 @@ import '../models/goal_model.dart';
 import '../models/project_model.dart';
 import '../models/kpi_model.dart';
 import '../models/shared_types.dart';
+import '../models/relay_step.dart';
 import '../services/notification_service.dart';
 import 'vault_provider.dart';
 import '../services/pomodoro_bg_service.dart';
@@ -29,6 +30,11 @@ class PomodoroState {
   final String? currentItemTitle;
   final int completedSessions;
   final int sessionsToLongBreak;
+  
+  // Relay mode fields (RA-P1-4)
+  final List<RelayStep>? relaySteps;
+  final int currentRelayIndex;
+  final bool isRelayMode;
 
   PomodoroState({
     this.isRunning = false,
@@ -40,6 +46,9 @@ class PomodoroState {
     this.currentItemTitle,
     this.completedSessions = 0,
     this.sessionsToLongBreak = 4,
+    this.relaySteps,
+    this.currentRelayIndex = 0,
+    this.isRelayMode = false,
   });
 
   PomodoroState copyWith({
@@ -52,6 +61,9 @@ class PomodoroState {
     String? currentItemTitle,
     int? completedSessions,
     int? sessionsToLongBreak,
+    List<RelayStep>? relaySteps,
+    int? currentRelayIndex,
+    bool? isRelayMode,
   }) {
     return PomodoroState(
       isRunning: isRunning ?? this.isRunning,
@@ -63,6 +75,9 @@ class PomodoroState {
       currentItemTitle: currentItemTitle ?? this.currentItemTitle,
       completedSessions: completedSessions ?? this.completedSessions,
       sessionsToLongBreak: sessionsToLongBreak ?? this.sessionsToLongBreak,
+      relaySteps: relaySteps ?? this.relaySteps,
+      currentRelayIndex: currentRelayIndex ?? this.currentRelayIndex,
+      isRelayMode: isRelayMode ?? this.isRelayMode,
     );
   }
 }
@@ -256,6 +271,77 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     _persistState();
   }
 
+  // RA-P1-4: Relay mode methods
+  void startRelayMode(List<RelayStep> steps, String itemId, String itemTitle) {
+    if (steps.isEmpty) return;
+    
+    reset();
+    state = state.copyWith(
+      isRelayMode: true,
+      relaySteps: steps,
+      currentRelayIndex: 0,
+      currentItemId: itemId,
+      currentItemTitle: itemTitle,
+    );
+    
+    _loadRelayStep(0);
+  }
+
+  void _loadRelayStep(int index) {
+    if (state.relaySteps == null || index >= state.relaySteps!.length) {
+      // Relay complete
+      stop();
+      state = state.copyWith(
+        isRelayMode: false,
+        currentRelayIndex: 0,
+      );
+      _persistState();
+      return;
+    }
+
+    final step = state.relaySteps![index];
+    final seconds = step.durationMinutes * 60;
+    
+    state = state.copyWith(
+      remainingSeconds: seconds,
+      totalSeconds: seconds,
+      currentType: step.isBreak 
+          ? PomodoroType.shortBreak 
+          : PomodoroType.work,
+      currentRelayIndex: index,
+    );
+    
+    _persistState();
+  }
+
+  void _advanceRelayStep() {
+    if (!state.isRelayMode || state.relaySteps == null) return;
+    
+    final nextIndex = state.currentRelayIndex + 1;
+    if (nextIndex >= state.relaySteps!.length) {
+      // Relay complete
+      stop();
+      state = state.copyWith(
+        isRelayMode: false,
+        currentRelayIndex: 0,
+      );
+      _persistState();
+      return;
+    }
+    
+    _loadRelayStep(nextIndex);
+  }
+
+  void stopRelayMode() {
+    stop();
+    state = state.copyWith(
+      isRelayMode: false,
+      relaySteps: null,
+      currentRelayIndex: 0,
+    );
+    _persistState();
+  }
+
   void start() {
     if (state.isRunning) return;
     state = state.copyWith(isRunning: true);
@@ -285,6 +371,11 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
         stop();
         _completeSession();
         _notifyPhaseEnd();
+        
+        // RA-P1-4: Auto-advance relay step if in relay mode
+        if (state.isRelayMode) {
+          _advanceRelayStep();
+        }
       }
     });
     _persistState();

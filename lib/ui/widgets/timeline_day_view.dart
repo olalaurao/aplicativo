@@ -15,6 +15,8 @@ import '../screens/google_event_detail_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../screens/universal_detail_view.dart';
 import '../screens/pomodoro_screen.dart';
+import '../forms/create_task_form.dart';
+import '../../models/pomodoro_session.dart';
 
 class TimeLineDayView extends ConsumerStatefulWidget {
   final List<Task> tasks;
@@ -29,6 +31,8 @@ class TimeLineDayView extends ConsumerStatefulWidget {
   final Function(dynamic)? onPlay;
   final Function(Habit, int)? onHabitToggle;
   final String colorMode;
+  final int gridGranularity; // 15, 30, or 60 minutes
+  final List<PomodoroSession> pomodoroSessions;
 
   const TimeLineDayView({
     super.key,
@@ -44,6 +48,8 @@ class TimeLineDayView extends ConsumerStatefulWidget {
     this.onPlay,
     this.onHabitToggle,
     this.colorMode = 'category',
+    this.gridGranularity = 30,
+    this.pomodoroSessions = const [],
   });
 
   @override
@@ -53,6 +59,10 @@ class TimeLineDayView extends ConsumerStatefulWidget {
 class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
   // Store local durations during active dragging to avoid continuous DB writes
   final Map<String, int> _localDurations = {};
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
 
   @override
   void didUpdateWidget(covariant TimeLineDayView oldWidget) {
@@ -68,8 +78,11 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
 
   @override
   Widget build(BuildContext context) {
-    const double hourHeight = 80.0;
+    final double hourHeight = widget.gridGranularity == 15 ? 40.0 
+                          : widget.gridGranularity == 30 ? 80.0 
+                          : 160.0; // 60 min
     const double leftColumnWidth = 60.0;
+    final int slotsPerHour = 60 ~/ widget.gridGranularity;
 
     return Container(
       color: AppTheme.backgroundColor(context),
@@ -235,7 +248,11 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                                   right: 8,
                                 ),
                                 child: Text(
-                                  '${index.toString().padLeft(2, '0')}:00',
+                                  widget.gridGranularity == 60 
+                                      ? '${index.toString().padLeft(2, '0')}:00'
+                                      : widget.gridGranularity == 30
+                                          ? '${index.toString().padLeft(2, '0')}:00'
+                                          : '${index.toString().padLeft(2, '0')}:00',
                                   textAlign: TextAlign.right,
                                   style: TextStyle(
                                     fontSize: 11,
@@ -288,39 +305,91 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
 
                       if (item.originalItem is Task) {
                         final task = item.originalItem as Task;
+                        
+                        // Find completed Pomodoro session for this task on this day
+                        PomodoroSession? completedSession;
+                        try {
+                          completedSession = widget.pomodoroSessions.firstWhere(
+                            (session) => 
+                              session.linkedItemSlug == task.slug &&
+                              session.state == PomodoroSessionState.completed &&
+                              _isSameDay(session.date, widget.selectedDate),
+                          );
+                        } catch (e) {
+                          completedSession = null;
+                        }
+                        
                         return Positioned(
                           top: topOffset,
                           left: leftOffset,
                           width: colWidth - 4,
                           height: height,
-                          child: LongPressDraggable<Task>(
-                            data: task,
-                            feedback: Material(
-                              color: Colors.transparent,
-                              child: Container(
-                                width: colWidth - 4,
-                                height: height,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(
-                                    alpha: 0.8,
+                          child: Stack(
+                            children: [
+                              // Planned task block
+                              LongPressDraggable<Task>(
+                                data: task,
+                                feedback: Material(
+                                  color: Colors.transparent,
+                                  child: Container(
+                                    width: colWidth - 4,
+                                    height: height,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.8,
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    padding: const EdgeInsets.all(12),
+                                    child: Text(
+                                      task.title,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                  borderRadius: BorderRadius.circular(10),
                                 ),
-                                padding: const EdgeInsets.all(12),
-                                child: Text(
-                                  task.title,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                childWhenDragging: Opacity(
+                                  opacity: 0.3,
+                                  child: _buildTaskBlock(context, task, height),
                                 ),
+                                child: _buildTaskBlock(context, task, height),
                               ),
-                            ),
-                            childWhenDragging: Opacity(
-                              opacity: 0.3,
-                              child: _buildTaskBlock(context, task, height),
-                            ),
-                            child: _buildTaskBlock(context, task, height),
+                              // Plan-vs-actual overlay
+                              if (completedSession != null)
+                                Positioned(
+                                  bottom: 0,
+                                  left: 0,
+                                  right: 0,
+                                  child: Container(
+                                    height: (completedSession.minutesWorked / 60 * hourHeight).clamp(0, height),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.success.withValues(alpha: 0.4),
+                                      borderRadius: const BorderRadius.only(
+                                        bottomLeft: Radius.circular(10),
+                                        bottomRight: Radius.circular(10),
+                                      ),
+                                      border: Border.all(
+                                        color: AppColors.success,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '${completedSession.minutesWorked}m',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         );
                       } else if (item.originalItem is Habit) {
@@ -505,61 +574,101 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
   }
 
   List<Widget> _buildDropTargets(double hourHeight, double leftColumnWidth) {
-    return List.generate(48, (index) {
-      final hour = index ~/ 2;
-      final minute = (index % 2) * 30;
+    final int slotsPerHour = 60 ~/ widget.gridGranularity;
+    return List.generate(24 * slotsPerHour, (index) {
+      final slotIndex = index % slotsPerHour;
+      final hour = index ~/ slotsPerHour;
+      final minute = slotIndex * widget.gridGranularity;
       return Positioned(
-        top: index * (hourHeight / 2),
+        top: index * (hourHeight / slotsPerHour),
         left: leftColumnWidth,
         right: 0,
-        height: hourHeight / 2,
-        child: DragTarget<Object>(
-          onWillAcceptWithDetails: (details) =>
-              details.data is Task || details.data is Habit,
-          onAcceptWithDetails: (details) {
-            final dropTime = DateTime(
-              widget.selectedDate.year,
-              widget.selectedDate.month,
-              widget.selectedDate.day,
-              hour,
-              minute,
+        height: hourHeight / slotsPerHour,
+        child: GestureDetector(
+          onLongPress: () {
+            // Open CreateTaskForm with pre-filled date and time
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CreateTaskForm(
+                  initialDate: widget.selectedDate,
+                  initialTime: TimeOfDay(hour: hour, minute: minute),
+                  initialStage: TaskStage.todo,
+                ),
+              ),
             );
+          },
+          child: DragTarget<Object>(
+            onWillAcceptWithDetails: (details) =>
+                details.data is Task || details.data is Habit,
+            onAcceptWithDetails: (details) {
+              final dropTime = DateTime(
+                widget.selectedDate.year,
+                widget.selectedDate.month,
+                widget.selectedDate.day,
+                hour,
+                minute,
+              );
 
-            if (details.data is Task) {
-              widget.onTaskDrop?.call(details.data as Task, dropTime);
-            } else if (details.data is Habit) {
-              widget.onHabitDrop?.call(details.data as Habit, dropTime);
-            }
-          },
-          builder: (context, candidateData, rejectedData) {
-            return Container(
-              color: candidateData.isNotEmpty
-                  ? AppColors.primary.withValues(alpha: 0.1)
-                  : Colors.transparent,
-              child: candidateData.isNotEmpty
-                  ? Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+              if (details.data is Task) {
+                widget.onTaskDrop?.call(details.data as Task, dropTime);
+              } else if (details.data is Habit) {
+                widget.onHabitDrop?.call(details.data as Habit, dropTime);
+              }
+            },
+            builder: (context, candidateData, rejectedData) {
+              if (candidateData.isEmpty) {
+                return const SizedBox.shrink();
+              }
+
+              // Show ghost block with actual duration instead of time pill
+              final data = candidateData.first;
+              int duration = widget.gridGranularity; // Default to current granularity
+              String title = '';
+
+              if (data is Task) {
+                duration = data.estimatedMinutes ?? data.duration;
+                title = data.title;
+              } else if (data is Habit) {
+                duration = 30; // Habits default to 30 min
+                title = data.displayTitle;
+              }
+
+              final ghostHeight = (duration / 60 * hourHeight);
+
+              return Container(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                child: Center(
+                  child: Container(
+                    height: ghostHeight,
+                    width: double.infinity,
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: AppColors.primary,
+                        width: 2,
                       ),
-                    )
-                  : null,
-            );
-          },
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: title.isNotEmpty
+                        ? Text(
+                            title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        : null,
+                  ),
+                ),
+              );
+            },
+          ),
         ),
       );
     });
@@ -740,15 +849,25 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
     if (widget.colorMode == 'priority') {
       baseColor = _getPriorityColor(task.priority);
     } else {
-      // Category mode - use category colors from settings
-      final settings = ref.watch(settingsProvider);
-      final category = task.organizers.isNotEmpty 
-          ? task.organizers.first.title 
-          : 'default';
-      final colorHex = settings.categoryColors[category];
-      baseColor = colorHex != null 
-          ? _parseColor(colorHex) 
-          : AppColors.secondary;
+      // Category mode - derive color from linked Organizer/Area
+      if (task.organizers.isNotEmpty) {
+        final organizer = task.organizers.first;
+        // Try to use the organizer's own color field first
+        if (organizer.color != null && organizer.color!.isNotEmpty) {
+          baseColor = _parseColor(organizer.color!);
+        } else {
+          // Fall back to category colors from settings
+          final settings = ref.watch(settingsProvider);
+          final category = organizer.title;
+          final colorHex = settings.categoryColors[category];
+          baseColor = colorHex != null 
+              ? _parseColor(colorHex) 
+              : AppColors.textMuted; // Neutral gray for tasks with no color
+        }
+      } else {
+        // No linked organizer - use neutral gray
+        baseColor = AppColors.textMuted;
+      }
     }
 
     return ObjectActionWrapper(

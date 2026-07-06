@@ -5,6 +5,7 @@ import 'shared_types.dart';
 import 'scheduler.dart';
 import 'reminder_config.dart';
 import 'package:uuid/uuid.dart';
+import 'relay_step.dart';
 
 enum TaskStage { idea, backlog, todo, inProgress, pending, finalized }
 
@@ -126,9 +127,17 @@ class Task extends ContentObject {
   int? rotationEveryN;
   int? rotationLastCompletedAtOccurrence;
   Map<String, bool> rotationDailyCompletions = {};
+  
+  // Alignment tracking fields (RA-P1-1)
+  int? flexibilityWindowMinutes; // null = alignment tracking off for this task
+
+  // Focus Relay fields (RA-P1-3)
+  List<RelayStep>? relaySteps; // null = use flat Pomodoro, non-null = use Relay mode
 
   bool get isRotationTask => rotationFrequencyType != RotationFrequencyType.none;
   bool get hasDateRange => dateRange != null && dateRange!.trim().isNotEmpty;
+  bool get isAlignmentTrackable => flexibilityWindowMinutes != null && scheduledTime != null;
+  bool get hasRelaySteps => relaySteps != null && relaySteps!.isNotEmpty;
 
   void normalizeDateRangeAndUntilDone({bool logWarning = false}) {
     if (hasDateRange && untilDone) {
@@ -191,6 +200,8 @@ class Task extends ContentObject {
     this.rotationEveryN,
     this.rotationLastCompletedAtOccurrence,
     Map<String, bool>? rotationDailyCompletions,
+    this.flexibilityWindowMinutes,
+    this.relaySteps,
     DateTime? reminderDate,
   }) : rotationDailyCompletions = rotationDailyCompletions ?? {} {
     if (reminderDate != null) {
@@ -370,6 +381,12 @@ class Task extends ContentObject {
     }
     if (rotationDailyCompletions.isNotEmpty) {
       frontmatter['rotation_daily_completions'] = rotationDailyCompletions;
+    }
+    if (flexibilityWindowMinutes != null) {
+      frontmatter['flexibility_window_minutes'] = flexibilityWindowMinutes;
+    }
+    if (relaySteps != null && relaySteps!.isNotEmpty) {
+      frontmatter['relay_steps'] = relaySteps!.map((s) => s.toMap()).toList();
     }
 
     if (scheduler != null) frontmatter['scheduler'] = scheduler!.toMap();
@@ -592,6 +609,16 @@ class Task extends ContentObject {
         ),
       );
     }
+    final fwm = frontmatter['flexibility_window_minutes'];
+    task.flexibilityWindowMinutes = fwm is num
+        ? fwm.toInt()
+        : int.tryParse(fwm?.toString() ?? '');
+    if (frontmatter['relay_steps'] is List) {
+      task.relaySteps = (frontmatter['relay_steps'] as List)
+          .whereType<Map>()
+          .map((s) => RelayStep.fromMap(Map<String, dynamic>.from(s)))
+          .toList();
+    }
 
     final List<SubtaskSession> fmSessions = [];
     final rawSessions =
@@ -725,6 +752,8 @@ class Task extends ContentObject {
     int? rotationEveryN,
     int? rotationLastCompletedAtOccurrence,
     Map<String, bool>? rotationDailyCompletions,
+    int? flexibilityWindowMinutes,
+    List<RelayStep>? relaySteps,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     List<String>? tags,
@@ -776,6 +805,8 @@ class Task extends ContentObject {
           this.rotationLastCompletedAtOccurrence,
       rotationDailyCompletions: rotationDailyCompletions ??
           Map<String, bool>.from(this.rotationDailyCompletions),
+      flexibilityWindowMinutes: flexibilityWindowMinutes ?? this.flexibilityWindowMinutes,
+      relaySteps: relaySteps ?? this.relaySteps,
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       tags: tags ?? this.tags,

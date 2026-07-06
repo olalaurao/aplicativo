@@ -286,8 +286,12 @@ class Habit extends ContentObject {
   bool isFlexibleFrequency;
   bool isQuitting; // A6.1: if true, goal is NOT to do this habit
   List<ChecklistSection> checklistSections = [];
+  
+  // Alignment tracking fields (RA-P1-1)
+  int? flexibilityWindowMinutes; // null = alignment tracking off for this habit
 
   bool get isChecklistHabit => checklistSections.isNotEmpty;
+  bool get isAlignmentTrackable => flexibilityWindowMinutes != null && slots.isNotEmpty && slots.first.time != null;
   int get totalChecklistItems =>
       checklistSections.fold(0, (sum, s) => sum + s.items.length);
 
@@ -332,6 +336,7 @@ class Habit extends ContentObject {
     this.frequencyDays,
     this.isFlexibleFrequency = false,
     this.isQuitting = false,
+    this.flexibilityWindowMinutes,
     List<ChecklistSection>? checklistSections,
     super.organizers,
     super.categories,
@@ -420,6 +425,7 @@ class Habit extends ContentObject {
     int? frequencyDays,
     bool? isFlexibleFrequency,
     bool? isQuitting,
+    int? flexibilityWindowMinutes,
     List<ChecklistSection>? checklistSections,
   }) {
     final newHabit = Habit(
@@ -454,6 +460,7 @@ class Habit extends ContentObject {
       frequencyDays: frequencyDays ?? this.frequencyDays,
       isFlexibleFrequency: isFlexibleFrequency ?? this.isFlexibleFrequency,
       isQuitting: isQuitting ?? this.isQuitting,
+      flexibilityWindowMinutes: flexibilityWindowMinutes ?? this.flexibilityWindowMinutes,
       checklistSections:
           checklistSections ??
           List<ChecklistSection>.from(this.checklistSections),
@@ -607,6 +614,9 @@ class Habit extends ContentObject {
     if (frequencyDays != null) frontmatter['frequency_days'] = frequencyDays;
     if (isFlexibleFrequency) frontmatter['flexible_frequency'] = true;
     if (isQuitting) frontmatter['is_quitting'] = true;
+    if (flexibilityWindowMinutes != null) {
+      frontmatter['flexibility_window_minutes'] = flexibilityWindowMinutes;
+    }
     if (checklistSections.isNotEmpty) {
       frontmatter['checklist_sections'] = checklistSections
           .map((s) => s.toMap())
@@ -796,6 +806,10 @@ class Habit extends ContentObject {
     }
     habit.isFlexibleFrequency = frontmatter['flexible_frequency'] == true;
     habit.isQuitting = frontmatter['is_quitting'] as bool? ?? false;
+    final fwm = frontmatter['flexibility_window_minutes'];
+    habit.flexibilityWindowMinutes = fwm is num
+        ? fwm.toInt()
+        : int.tryParse(fwm?.toString() ?? '');
     if (frontmatter['checklist_sections'] is List) {
       habit.checklistSections = (frontmatter['checklist_sections'] as List)
           .whereType<Map>()

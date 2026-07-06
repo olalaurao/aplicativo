@@ -6,6 +6,7 @@ import '../../models/task_model.dart';
 import '../../models/project_model.dart';
 import '../../models/reminder_config.dart';
 import '../../models/shared_types.dart';
+import '../../models/relay_step.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import '../widgets/wiki_link_controller.dart';
@@ -25,6 +26,8 @@ class CreateTaskForm extends ConsumerStatefulWidget {
   final String? initialTimeBlock;
   final TaskStage? initialStage;
   final List<OrganizerReference>? initialOrganizers;
+  final DateTime? initialDate;
+  final TimeOfDay? initialTime;
   const CreateTaskForm({
     super.key,
     this.initialTitle,
@@ -32,6 +35,8 @@ class CreateTaskForm extends ConsumerStatefulWidget {
     this.initialTimeBlock,
     this.initialStage,
     this.initialOrganizers,
+    this.initialDate,
+    this.initialTime,
   });
 
   @override
@@ -65,6 +70,14 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
   RotationFrequencyType _rotationFrequencyType = RotationFrequencyType.none;
   int? _rotationEveryN;
   final _rotationEveryNController = TextEditingController();
+  
+  // Alignment tracking (RA-P1-1)
+  bool _trackAlignment = false;
+  int? _flexibilityWindowMinutes;
+  
+  // Focus Relay (RA-P1-3)
+  bool _useRelay = false;
+  List<RelayStep> _relaySteps = [];
 
   @override
   void initState() {
@@ -121,10 +134,24 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       _rotationEveryN = task.rotationEveryN;
       _rotationEveryNController.text =
           task.rotationEveryN?.toString() ?? '';
+      _trackAlignment = task.flexibilityWindowMinutes != null;
+      _flexibilityWindowMinutes = task.flexibilityWindowMinutes;
+      _useRelay = task.hasRelaySteps;
+      _relaySteps = task.relaySteps ?? [];
     } else {
-      _timeBlock = widget.initialTimeBlock;
+      // Use initialDate and initialTime if provided
+      if (widget.initialDate != null) {
+        _startDate = widget.initialDate;
+        _endDate = widget.initialDate;
+      }
+      if (widget.initialTime != null) {
+        _scheduledTime = widget.initialTime;
+      }
       if (widget.initialStage != null) {
         _stage = widget.initialStage!;
+      }
+      if (widget.initialTimeBlock != null) {
+        _timeBlock = widget.initialTimeBlock;
       }
       if (widget.initialOrganizers != null) {
         _organizers = List.from(widget.initialOrganizers!);
@@ -411,6 +438,56 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                               ),
                             ),
                           ],
+                          // Alignment tracking section (RA-P1-1)
+                          if (_scheduledTime != null) ...[
+                            const Divider(height: 24),
+                            Row(
+                              children: [
+                                const Text(
+                                  'Track Timing',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Switch.adaptive(
+                                  value: _trackAlignment,
+                                  onChanged: (v) => setState(() => _trackAlignment = v),
+                                  activeThumbColor: AppColors.primary,
+                                ),
+                              ],
+                            ),
+                            if (_trackAlignment) ...[
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Flexibility window (minutes late still counts as on time)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [5, 10, 15, 30].map((minutes) {
+                                  final isSelected = _flexibilityWindowMinutes == minutes;
+                                  return FilterChip(
+                                    label: Text('${minutes}m'),
+                                    selected: isSelected,
+                                    onSelected: (selected) {
+                                      setState(() {
+                                        _flexibilityWindowMinutes = selected ? minutes : null;
+                                      });
+                                    },
+                                    selectedColor: AppColors.primary.withValues(alpha: 0.15),
+                                    checkmarkColor: AppColors.primary,
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          ],
                           const Divider(height: 24),
                           // Duration
                           GestureDetector(
@@ -442,6 +519,106 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                               ],
                             ),
                           ),
+                          const Divider(height: 24),
+                          // Focus Relay section (RA-P1-3)
+                          Row(
+                            children: [
+                              const Text(
+                                'Break into Steps',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const Spacer(),
+                              Switch.adaptive(
+                                value: _useRelay,
+                                onChanged: (v) => setState(() => _useRelay = v),
+                                activeThumbColor: AppColors.primary,
+                              ),
+                            ],
+                          ),
+                          if (_useRelay) ...[
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Define the sequence of steps for this task',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ...List.generate(_relaySteps.length, (index) {
+                              final step = _relaySteps[index];
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceVariantColor(context),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
+                                        initialValue: step.label,
+                                        decoration: InputDecoration(
+                                          isDense: true,
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          border: const OutlineInputBorder(),
+                                          labelText: 'Step ${index + 1}',
+                                        ),
+                                        onChanged: (value) {
+                                          _relaySteps[index] = step.copyWith(label: value);
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    SizedBox(
+                                      width: 70,
+                                      child: TextFormField(
+                                        keyboardType: TextInputType.number,
+                                        initialValue: step.durationMinutes.toString(),
+                                        decoration: const InputDecoration(
+                                          isDense: true,
+                                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                          border: OutlineInputBorder(),
+                                          labelText: 'min',
+                                        ),
+                                        onChanged: (value) {
+                                          final parsed = int.tryParse(value);
+                                          if (parsed != null && parsed > 0) {
+                                            _relaySteps[index] = step.copyWith(durationMinutes: parsed);
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline, size: 18),
+                                      onPressed: () {
+                                        setState(() {
+                                          _relaySteps.removeAt(index);
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                            TextButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _relaySteps.add(RelayStep(
+                                    label: 'Step ${_relaySteps.length + 1}',
+                                    durationMinutes: 25,
+                                  ));
+                                });
+                              },
+                              icon: const Icon(Icons.add, size: 18),
+                              label: const Text('Add Step'),
+                            ),
+                          ],
                           const Divider(height: 24),
                           if (hasDateRange) ...[
                             Row(
@@ -1757,6 +1934,8 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
           widget.existingTask?.rotationLastCompletedAtOccurrence,
       rotationDailyCompletions:
           widget.existingTask?.rotationDailyCompletions ?? {},
+      flexibilityWindowMinutes: _trackAlignment ? _flexibilityWindowMinutes : null,
+      relaySteps: _useRelay ? _relaySteps : null,
     );
 
     task.organizers.clear();

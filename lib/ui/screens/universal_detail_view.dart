@@ -1701,6 +1701,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           ? DateFormat('d MMM yyyy').format(resource.readDate!)
           : 'N/A';
       final statusColor = _resourceStatusColor(resource.status);
+      final highlights = MarkdownParser.extractHighlights(resource.synopsis ?? '');
 
       return [
         SliverToBoxAdapter(
@@ -1844,65 +1845,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    5,
-                    (i) => GestureDetector(
-                      onTap: () => _updateResourceRating(ref, resource, i + 1),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Icon(
-                          Icons.star_rounded,
-                          size: 32,
-                          color: i < resource.rating
-                              ? AppColors.warning
-                              : AppColors.textMuted.withValues(alpha: 0.25),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Sinopse & Destaques',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => setState(() => _isEditing = !_isEditing),
-                      child: Text(_isEditing ? 'Concluir' : 'Editar'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: AppTheme.cardDecoration(context),
-                  child: _isEditing
-                      ? RichTextEditor(
-                          content: resource.synopsis ?? '',
-                          onChanged: (newVal) {
-                            final updated = resource.copyWith(synopsis: newVal);
-                            ref
-                                .read(vaultProvider.notifier)
-                                .updateObject(updated);
-                            setState(() => object = updated);
-                          },
-                        )
-                      : MarkdownBodyView(
-                          content: resource.synopsis?.isNotEmpty == true
-                              ? resource.synopsis!
-                              : 'Sem sinopse ou destaques.',
-                        ),
-                ),
+                _buildRatingSection(context, ref, resource),
+                const SizedBox(height: 24),
+                _buildHighlightsSection(context, ref, resource, highlights),
+                const SizedBox(height: 24),
+                _buildSynopsisSection(context, ref, resource),
               ],
             ),
           ),
@@ -3244,10 +3192,11 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     bool isEmpty = false,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: AppTheme.cardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
@@ -3259,7 +3208,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             value,
             style: TextStyle(
@@ -5615,6 +5564,186 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
     await ref.read(resourcesProvider.notifier).updateResource(updated);
     if (mounted) setState(() => object = updated);
+  }
+
+  Widget _buildRatingSection(
+    BuildContext context,
+    WidgetRef ref,
+    Resource resource,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Avaliação',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            5,
+            (i) => GestureDetector(
+              onTap: () => _updateResourceRating(ref, resource, i + 1),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Icon(
+                  Icons.star_rounded,
+                  size: 32,
+                  color: i < resource.rating
+                      ? AppColors.warning
+                      : AppColors.textMuted.withValues(alpha: 0.25),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHighlightsSection(
+    BuildContext context,
+    WidgetRef ref,
+    Resource resource,
+    List<HighlightItem> highlights,
+  ) {
+    if (highlights.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Highlights',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${highlights.length}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...highlights.map((highlight) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: AppTheme.cardDecoration(context),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 3,
+                      height: double.infinity,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            highlight.text,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
+                              height: 1.4,
+                            ),
+                          ),
+                          if (highlight.date != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              highlight.date!,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )),
+      ],
+    );
+  }
+
+  Widget _buildSynopsisSection(
+    BuildContext context,
+    WidgetRef ref,
+    Resource resource,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Sinopse',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            TextButton(
+              onPressed: () => setState(() => _isEditing = !_isEditing),
+              child: Text(_isEditing ? 'Concluir' : 'Editar'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: AppTheme.cardDecoration(context),
+          child: _isEditing
+              ? RichTextEditor(
+                  content: resource.synopsis ?? '',
+                  onChanged: (newVal) {
+                    final updated = resource.copyWith(synopsis: newVal);
+                    ref
+                        .read(vaultProvider.notifier)
+                        .updateObject(updated);
+                    setState(() => object = updated);
+                  },
+                )
+              : MarkdownBodyView(
+                  content: resource.synopsis?.isNotEmpty == true
+                      ? resource.synopsis!
+                      : 'Sem sinopse.',
+                ),
+        ),
+      ],
+    );
   }
 
   Widget _buildHabitChecklistSliver(

@@ -17,6 +17,9 @@ import '../../models/tracker_model.dart';
 import '../../models/reminder_model.dart';
 import '../../models/reminder_config.dart';
 import '../widgets/timeline_day_view.dart';
+import '../widgets/week_time_grid.dart';
+import '../widgets/day_dial_widget.dart';
+import '../../services/day_dial_aggregator.dart';
 import '../../services/scheduler_service.dart';
 import '../../providers/google_calendar_provider.dart';
 import 'package:googleapis/calendar/v3.dart' as google_calendar;
@@ -95,11 +98,14 @@ class PlannerScreen extends ConsumerStatefulWidget {
 }
 
 class _PlannerScreenState extends ConsumerState<PlannerScreen> {
-  int _viewMode = 0; // 0=Day, 1=Week, 2=Month
+  int _viewMode = 0; // 0=Day, 1=Week, 2=Month, 3=Dial
   bool _isTimeline = true;
   late DateTime _selectedDate;
   final ScrollController _scrollController = ScrollController();
   bool _showOverdue = true;
+  bool _showJumpToNowFab = false;
+  int _gridGranularity = 30; // 15, 30, or 60 minutes
+  bool _showBacklogPanel = false;
 
   @override
   void initState() {
@@ -118,12 +124,42 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       });
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToNow());
+    
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!mounted) return;
+    
+    // Show FAB when scrolled away from current time
+    if (_isSameDay(_selectedDate, DateTime.now()) && _isTimeline && _viewMode == 0) {
+      const hourHeight = 80.0;
+      const sliverHeaderEstimate = 190.0;
+      final now = DateTime.now();
+      final viewport = MediaQuery.of(context).size.height;
+      final currentOffset = sliverHeaderEstimate +
+          (now.hour * hourHeight) +
+          (now.minute / 60 * hourHeight) -
+          (viewport / 3);
+      
+      final currentScrollOffset = _scrollController.offset;
+      final threshold = 100.0;
+      
+      setState(() {
+        _showJumpToNowFab = (currentScrollOffset - currentOffset).abs() > threshold;
+      });
+    } else {
+      setState(() {
+        _showJumpToNowFab = false;
+      });
+    }
   }
 
   @override
@@ -327,8 +363,24 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
               IconButton(
                 icon: const Icon(Icons.inbox_rounded, color: AppColors.primary),
                 tooltip: 'Backlog / Sem data',
-                onPressed: _showBacklogSheet,
+                onPressed: () => setState(() => _showBacklogPanel = !_showBacklogPanel),
               ),
+              if (_viewMode == 0 && _isTimeline)
+                IconButton(
+                  icon: Icon(Icons.grid_view_rounded, color: AppTheme.textMutedColor(context)),
+                  tooltip: 'Grid density',
+                  onPressed: () {
+                    setState(() {
+                      if (_gridGranularity == 30) {
+                        _gridGranularity = 15;
+                      } else if (_gridGranularity == 15) {
+                        _gridGranularity = 60;
+                      } else {
+                        _gridGranularity = 30;
+                      }
+                    });
+                  },
+                ),
               if (_viewMode == 0)
                 IconButton(
                   icon: Icon(
@@ -398,6 +450,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                           orElse: () => [],
                         ),
                         timeBlocks: activeTimeBlocks,
+                        gridGranularity: _gridGranularity,
+                        pomodoroSessions: ref.watch(pomodoroProvider).history,
                         onTaskDrop: (task, time) {
                           final timeStr = DateFormat('HH:mm').format(time);
                           final isBacklog =
@@ -520,17 +574,153 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                   ),
           ] else if (_viewMode == 1)
             _buildWeekView(tasks, habits)
-          else
-            _buildMonthView(tasks, habits),
+          else if (_viewMode == 2)
+            _buildMonthView(tasks, habits)
+          else if (_viewMode == 3)
+            _buildDialView(tasks, habits, googleEvents),
 
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
       ),
+      floatingActionButton: _showJumpToNowFab && _isTimeline && _viewMode == 0
+          ? FloatingActionButton.extended(
+              onPressed: () => _scrollToNow(animate: true),
+              icon: const Icon(Icons.access_time_rounded),
+              label: const Text('Jump to now'),
+              backgroundColor: AppColors.accent,
+            )
+          : null,
     );
   }
 
+  Widget _buildBacklogPanel() {
+    final tasks = ref.read(tasksProvider);
+    final routines = ref
+        .read(notesProvider)
+        .where(
+          (note) => note.subtype == NoteSubtype.text && note.showInPlanner,
+        )
+        .toList();
+    final backlog = tasks
+        .where(
+          (t) =>
+              (t.stage == TaskStage.idea ||
+                  (t.startDate == null && t.deadline == null)) &&
+              t.stage != TaskStage.finalized,
+        )
+        .toList();
+
+    final isTablet = MediaQuery.of(context).size.width > 600;
+
+    if (isTablet) {
+      // Side drawer for tablet/desktop
+      return Drawer(
+        width: 350,
+        child: Container(
+          color: AppTheme.surfaceColor(context),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceVariantColor(context),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Backlog / Idea Box',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => setState(() => _showBacklogPanel = false),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: backlog.isEmpty && routines.isEmpty
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(40),
+                          child: Text(
+                            'Nenhuma tarefa sem data.',
+                            style: TextStyle(color: AppColors.textMuted),
+                          ),
+                        ),
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          ...backlog.map(_buildTaskItem),
+                          ...routines.map(_buildRoutineItem),
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else {
+      // Bottom strip for mobile
+      return Container(
+        height: 200,
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor(context),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceVariantColor(context),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Backlog',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => setState(() => _showBacklogPanel = false),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: backlog.isEmpty && routines.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'Nenhuma tarefa sem data.',
+                        style: TextStyle(color: AppColors.textMuted),
+                      ),
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        ...backlog.take(5).map(_buildTaskItem),
+                        ...routines.take(3).map(_buildRoutineItem),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   Widget _buildViewToggle() {
-    final labels = ['Day', 'Week', 'Month'];
+    final labels = ['Day', 'Week', 'Month', 'Dial'];
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surfaceVariantColor(context),
@@ -538,7 +728,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       ),
       padding: const EdgeInsets.all(4),
       child: Row(
-        children: List.generate(3, (i) {
+        children: List.generate(4, (i) {
           final selected = _viewMode == i;
           return Expanded(
             child: GestureDetector(
@@ -1949,174 +2139,101 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   Widget _buildWeekView(List<Task> tasks, List<Habit> habits) {
-    final projects = ref.watch(projectsProvider);
-    final reminders = ref.watch(remindersProvider);
+    final timeBlocks = ref.watch(timeBlocksProvider);
     final startOfWeek = DateTime.now().subtract(
       Duration(days: DateTime.now().weekday - 1),
     );
 
     return SliverPadding(
       padding: const EdgeInsets.all(20),
-      sliver: SliverList(
-        delegate: SliverChildBuilderDelegate((context, index) {
-          final date = startOfWeek.add(Duration(days: index));
-
-          final baseDayTasks = tasks
-              .where((t) => t.deadline != null && _isSameDay(t.deadline!, date))
-              .toList();
-          final dayTasks = mergeDayTasksWithRotation(
-            baseDayTasks,
-            date,
-            tasks,
-            projects,
-          );
-          final dayHabits = habits.where((h) {
-            for (final s in h.schedulers) {
-              if (SchedulerService.shouldFire(
-                s,
-                date,
-                // Although we don't have isThemeActive easily available in this scope,
-                // we can pass them if we redefine them or just use null for the week view fallback.
-                // But wait, actually _buildWeekView doesn't have isThemeActive...
-              )) {
-                return true;
-              }
-            }
-            return false;
-          }).toList();
-          final dayReminders = reminders.where((r) {
-            if (r.isCompleted) return false;
-            return _isSameDay(r.time, date) ||
-                (r.scheduler != null &&
-                    SchedulerService.shouldFire(r.scheduler!, date));
-          }).toList();
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(16),
-            decoration: AppTheme.cardDecoration(context),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        index == 0
-                            ? 'Today'
-                            : DateFormat('EEEE, d MMM').format(date),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: _isSameDay(date, DateTime.now())
-                              ? AppColors.primary
-                              : AppColors.textPrimary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (dayTasks.isNotEmpty || dayReminders.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${dayTasks.length + dayReminders.length} itens',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                  ],
+      sliver: SliverToBoxAdapter(
+        child: SizedBox(
+          height: 600,
+          child: WeekTimeGrid(
+            tasks: tasks,
+            habits: habits,
+            startOfWeek: startOfWeek,
+            onTaskTap: (task, date) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => UniversalDetailView(object: task),
                 ),
-                const SizedBox(height: 12),
-                if (dayTasks.isEmpty &&
-                    dayHabits.isEmpty &&
-                    dayReminders.isEmpty)
-                  Consumer(
-                    builder: (context, ref, _) {
-                      final googleEvents = ref
-                          .watch(googleCalendarEventsProvider(date))
-                          .maybeWhen(
-                            data: (events) => events,
-                            orElse: () => <google_calendar.Event>[],
-                          );
-                      if (googleEvents.isEmpty) {
-                        return const Text(
-                          'Nada agendado',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textMuted,
-                          ),
-                        );
-                      }
-                      return Column(
-                        children: googleEvents
-                            .map(
-                              (e) => _buildCompactItem(
-                                e.summary ?? '(Untitled)',
-                                AppColors.info,
-                                () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          GoogleEventDetailScreen(event: e),
-                                    ),
-                                  );
-                                },
-                              ),
-                            )
-                            .toList(),
-                      );
-                    },
-                  )
-                else ...[
-                  ...dayTasks.map((t) => _buildCompactTaskItem(t)),
-                  ...dayHabits.map((h) => _buildCompactHabitItem(h, date)),
-                  ...dayReminders.map(_buildCompactReminderItem),
-                  Consumer(
-                    builder: (context, ref, _) {
-                      final googleEvents = ref
-                          .watch(googleCalendarEventsProvider(date))
-                          .maybeWhen(
-                            data: (events) => events,
-                            orElse: () => <google_calendar.Event>[],
-                          );
-                      return Column(
-                        children: googleEvents
-                            .map(
-                              (e) => _buildCompactItem(
-                                e.summary ?? '(Untitled)',
-                                AppColors.info,
-                                () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          GoogleEventDetailScreen(event: e),
-                                    ),
-                                  );
-                                },
-                              ),
-                            )
-                            .toList(),
-                      );
-                    },
-                  ),
-                ],
-              ],
+              );
+            },
+            onHabitTap: (habit) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => UniversalDetailView(object: habit),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDialView(
+    List<Task> tasks,
+    List<Habit> habits,
+    AsyncValue<List<google_calendar.Event>> googleEvents,
+  ) {
+    final pomodoroSessions = ref.watch(pomodoroProvider).history;
+    final events = googleEvents.maybeWhen(
+      data: (events) => events,
+      orElse: () => <google_calendar.Event>[],
+    );
+
+    final hourStates = DayDialAggregator.aggregateForDate(
+      date: _selectedDate,
+      tasks: tasks,
+      habits: habits,
+      pomodoroSessions: pomodoroSessions,
+      googleEvents: events,
+    );
+
+    return SliverPadding(
+      padding: const EdgeInsets.all(20),
+      sliver: SliverToBoxAdapter(
+        child: Column(
+          children: [
+            DayDialWidget(
+              hourStates: hourStates,
+              selectedDate: _selectedDate,
+              onHourTap: (hour) {
+                // Switch to timeline view and scroll to that hour
+                setState(() {
+                  _viewMode = 0;
+                  _isTimeline = true;
+                });
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  const hourHeight = 80.0;
+                  const sliverHeaderEstimate = 190.0;
+                  final viewport = MediaQuery.of(context).size.height;
+                  final targetOffset = sliverHeaderEstimate +
+                      (hour * hourHeight) -
+                      (viewport / 3);
+                  _scrollController.animateTo(
+                    targetOffset,
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeInOut,
+                  );
+                });
+              },
             ),
-          );
-        }, childCount: 7),
+            const SizedBox(height: 24),
+            Text(
+              'Tap on an hour to navigate to that time in the timeline view',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppTheme.textMutedColor(context),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

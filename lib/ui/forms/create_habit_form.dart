@@ -62,6 +62,10 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
 
   bool _useChecklist = false;
   List<ChecklistSection> _checklistSections = [];
+  
+  // Alignment tracking (RA-P1-1)
+  bool _trackAlignment = false;
+  int? _flexibilityWindowMinutes;
 
   static const _colorSwatches = [
     '#DC2626',
@@ -143,6 +147,8 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
             ),
           )
           .toList();
+      _trackAlignment = habit.flexibilityWindowMinutes != null;
+      _flexibilityWindowMinutes = habit.flexibilityWindowMinutes;
     } else {
       _timeBlock = widget.initialTimeBlock;
       if (widget.initialOrganizers != null) {
@@ -713,6 +719,66 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                   ),
 
                   const SizedBox(height: 12),
+
+                  // Alignment tracking section (RA-P1-1)
+                  if (_slots > 0 && _slotConfigs[0].time != null) ...[
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                'Track Timing',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const Spacer(),
+                              Switch.adaptive(
+                                value: _trackAlignment,
+                                onChanged: (v) => setState(() => _trackAlignment = v),
+                                activeThumbColor: AppColors.primary,
+                              ),
+                            ],
+                          ),
+                          if (_trackAlignment) ...[
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Flexibility window (minutes late still counts as on time)',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [5, 10, 15, 30].map((minutes) {
+                                final isSelected = _flexibilityWindowMinutes == minutes;
+                                return FilterChip(
+                                  label: Text('${minutes}m'),
+                                  selected: isSelected,
+                                  onSelected: (selected) {
+                                    setState(() {
+                                      _flexibilityWindowMinutes = selected ? minutes : null;
+                                    });
+                                  },
+                                  selectedColor: AppColors.primary.withValues(alpha: 0.15),
+                                  checkmarkColor: AppColors.primary,
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
 
                   Container(
                     decoration: AppTheme.cardDecoration(context),
@@ -1484,6 +1550,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
               : (_schedulers.first.rules.first.period == 'month' ? 30 : 365))
           : null,
       checklistSections: _useChecklist ? _checklistSections : [],
+      flexibilityWindowMinutes: _trackAlignment ? _flexibilityWindowMinutes : null,
     );
     try {
       if (widget.existingHabit != null) {

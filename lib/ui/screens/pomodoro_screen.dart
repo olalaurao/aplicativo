@@ -133,7 +133,14 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                         ),
                         const SizedBox(height: 16),
                         _buildPhaseBadge(state.currentType),
-                        const SizedBox(height: 40),
+                        // RA-P2-3: Relay step progress indicator
+                        if (state.isRelayMode && state.relaySteps != null) ...[
+                          const SizedBox(height: 12),
+                          _buildRelayStepIndicator(state),
+                          const SizedBox(height: 28),
+                        ] else ...[
+                          const SizedBox(height: 40),
+                        ],
 
                         SizedBox(
                           width: 240,
@@ -906,6 +913,67 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
           color: color,
         ),
       ),
+    );
+  }
+
+  // RA-P2-3: Build relay step progress indicator
+  Widget _buildRelayStepIndicator(PomodoroState state) {
+    if (state.relaySteps == null || state.relaySteps!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final steps = state.relaySteps!;
+    final currentIndex = state.currentRelayIndex;
+
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Step ${currentIndex + 1} of ${steps.length}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            Text(
+              steps[currentIndex].label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.accent,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: List.generate(steps.length, (index) {
+            final isCompleted = index < currentIndex;
+            final isCurrent = index == currentIndex;
+            final isBreak = steps[index].isBreak;
+
+            return Expanded(
+              child: Container(
+                margin: EdgeInsets.only(
+                  right: index < steps.length - 1 ? 4 : 0,
+                ),
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isCompleted
+                      ? AppColors.success
+                      : isCurrent
+                          ? AppColors.accent
+                          : AppColors.textMuted.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
     );
   }
 

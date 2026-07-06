@@ -95,6 +95,9 @@ class AppSettings {
   // ── Recent Searches ──
   final List<String> recentSearches;
 
+  // ── Timeline settings (RA-P2-2) ──
+  final int dayStartHour; // Hour when the day starts (0-23), default 0 (midnight)
+
   AppSettings({
     required this.vaultName,
     this.vaultPath = '',
@@ -155,6 +158,7 @@ class AppSettings {
     this.omdbApiKey = '55335ca0',
     this.suppressedConflicts = const {},
     this.recentSearches = const [],
+    this.dayStartHour = 0,
   });
 
   /// All saved filters deserialized.
@@ -247,6 +251,7 @@ class AppSettings {
     String? omdbApiKey,
     Map<String, DateTime>? suppressedConflicts,
     List<String>? recentSearches,
+    int? dayStartHour,
   }) {
     return AppSettings(
       vaultName: vaultName ?? this.vaultName,
@@ -322,6 +327,7 @@ class AppSettings {
       omdbApiKey: omdbApiKey ?? this.omdbApiKey,
       suppressedConflicts: suppressedConflicts ?? this.suppressedConflicts,
       recentSearches: recentSearches ?? this.recentSearches,
+      dayStartHour: dayStartHour ?? this.dayStartHour,
     );
   }
 }
@@ -461,6 +467,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
         }
       }(),
       recentSearches: prefs.getStringList('recentSearches') ?? const [],
+      dayStartHour: prefs.getInt('dayStartHour') ?? 0,
     );
   }
 
