@@ -7,11 +7,16 @@ import '../../models/project_model.dart';
 import '../../models/task_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/template_model.dart';
+import '../../models/kpi_model.dart' as kpi_model;
+import '../../models/scheduler.dart';
+import '../../models/habit_model.dart';
+import '../../models/tracker_model.dart';
 import '../../providers/vault_provider.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../../services/collection_row_service.dart';
 import '../theme.dart';
+import 'scheduler_picker.dart';
 
 class CreateProjectForm extends ConsumerStatefulWidget {
   final String? initialTitle;
@@ -37,6 +42,8 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
   String? _methodLabel;
   List<RotationGroup> _rotationGroups = [];
   final _methodLabelController = TextEditingController();
+  List<kpi_model.KPI> _kpis = [];
+  Scheduler? _scheduler;
 
   static const _colorSwatches = [
     '#3B82F6',
@@ -76,6 +83,8 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
       _methodLabel = project.methodLabel;
       _methodLabelController.text = project.methodLabel ?? '';
       _rotationGroups = List.from(project.rotationGroups);
+      _kpis = List.from(project.kpis);
+      _scheduler = project.scheduler;
     } else {
       if (widget.initialOrganizers != null) {
         _organizers = List.from(widget.initialOrganizers!);
@@ -310,7 +319,109 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
 
                   const SizedBox(height: 12),
 
-                  // âÂ”Â€âÂ”Â€âÂ”Â€ Organizers âÂ”Â€âÂ”Â€âÂ”Â€
+                  // KPIs
+                  Container(
+                    decoration: AppTheme.cardDecoration(context),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'KPIs',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: _addKpi,
+                              icon: const Icon(Icons.add_rounded, size: 18),
+                              label: const Text('Add KPI'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        if (_kpis.isEmpty)
+                          const Text(
+                            'No KPIs configured',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textMuted,
+                            ),
+                          )
+                        else
+                          ..._kpis.asMap().entries.map((e) {
+                            final kpi = e.value;
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(kpi.title),
+                              subtitle: Text(
+                                '${kpi.currentValue.toStringAsFixed(0)} / ${kpi.targetValue.toStringAsFixed(0)}',
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () => setState(() => _kpis.removeAt(e.key)),
+                              ),
+                            );
+                          }),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Scheduler
+                  Container(
+                    decoration: AppTheme.cardDecoration(context),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Scheduler',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            if (_scheduler != null)
+                              TextButton.icon(
+                                onPressed: () => setState(() => _scheduler = null),
+                                icon: const Icon(Icons.delete_outline, size: 18),
+                                label: const Text('Remove'),
+                              )
+                            else
+                              TextButton.icon(
+                                onPressed: _addScheduler,
+                                icon: const Icon(Icons.add_rounded, size: 18),
+                                label: const Text('Add Scheduler'),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        if (_scheduler != null)
+                          Text(
+                            'Scheduler configured',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Organizers
                   Container(
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -496,6 +607,32 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
     );
   }
 
+  void _addKpi() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => _KpiBuilderSheet(
+        onSave: (kpi) {
+          setState(() => _kpis.add(kpi));
+        },
+      ),
+    );
+  }
+
+  void _addScheduler() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SchedulerPicker(
+        initialScheduler: _scheduler,
+      ),
+    ).then((scheduler) {
+      if (scheduler != null) {
+        setState(() => _scheduler = scheduler);
+      }
+    });
+  }
+
   void _addRotationGroup() {
     final nameController = TextEditingController();
     final daysController = TextEditingController(text: '7');
@@ -644,6 +781,8 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
       endDate: _endDate,
       color: _selectedColor,
       organizers: _organizers,
+      kpis: _kpis,
+      scheduler: _scheduler,
     );
 
     project = project.copyProjectWith(
@@ -667,6 +806,189 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
           'Project "${project.title}" ${widget.existingProject != null ? 'updated' : 'created'}!',
         ),
         backgroundColor: _parseColor(_selectedColor),
+      ),
+    );
+  }
+}
+
+class _KpiBuilderSheet extends ConsumerStatefulWidget {
+  final Function(kpi_model.KPI) onSave;
+  const _KpiBuilderSheet({required this.onSave});
+
+  @override
+  ConsumerState<_KpiBuilderSheet> createState() => _KpiBuilderSheetState();
+}
+
+class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
+  final _titleController = TextEditingController();
+  final _targetController = TextEditingController();
+  kpi_model.KPISourceType _sourceType = kpi_model.KPISourceType.manualQuantity;
+  String? _sourceId;
+  String? _fieldId;
+
+  @override
+  Widget build(BuildContext context) {
+    final habits = ref.watch(objectsByTypeProvider('habit')).whereType<Habit>().toList();
+    final trackers = ref.watch(objectsByTypeProvider('tracker')).whereType<TrackerDefinition>().toList();
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 16,
+        right: 16,
+        top: 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Add KPI',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _titleController,
+            decoration: const InputDecoration(
+              labelText: 'KPI Title',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<kpi_model.KPISourceType>(
+            initialValue: _sourceType,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Tipo de Fonte',
+              border: OutlineInputBorder(),
+            ),
+            items: kpi_model.KPISourceType.values
+                .map(
+                  (t) => DropdownMenuItem(
+                    value: t,
+                    child: Text(
+                      t.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) {
+              setState(() {
+                _sourceType = v!;
+                _sourceId = null;
+                _fieldId = null;
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+
+          if (_sourceType.name.startsWith('habit'))
+            DropdownButtonFormField<String>(
+              initialValue: _sourceId,
+              decoration: const InputDecoration(
+                labelText: 'Selecionar Habit',
+                border: OutlineInputBorder(),
+              ),
+              items: habits
+                  .map<DropdownMenuItem<String>>(
+                    (h) => DropdownMenuItem(
+                      value: h.id,
+                      child: Text(h.displayTitle),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) => setState(() => _sourceId = v),
+            ),
+
+          if (_sourceType.name.startsWith('tracker')) ...[
+            DropdownButtonFormField<String>(
+              initialValue: _sourceId,
+              decoration: const InputDecoration(
+                labelText: 'Selecionar Rastreador',
+                border: OutlineInputBorder(),
+              ),
+              items: trackers
+                  .map<DropdownMenuItem<String>>(
+                    (t) => DropdownMenuItem(value: t.id, child: Text(t.title)),
+                  )
+                  .toList(),
+              onChanged: (v) => setState(() {
+                _sourceId = v;
+                _fieldId = null;
+              }),
+            ),
+            const SizedBox(height: 12),
+            if (_sourceId != null) ...[
+              Builder(
+                builder: (context) {
+                  final tracker = trackers.firstWhere(
+                    (t) => t.id == _sourceId,
+                    orElse: () => trackers.first,
+                  );
+                  final allFields = tracker.sections
+                      .expand((s) => s.inputFields)
+                      .toList();
+                  return DropdownButtonFormField<String>(
+                    initialValue: _fieldId,
+                    decoration: const InputDecoration(
+                      labelText: 'Selecionar Campo',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: allFields
+                        .map(
+                          (f) => DropdownMenuItem(
+                            value: f.id,
+                            child: Text(f.title),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setState(() => _fieldId = v),
+                  );
+                },
+              ),
+            ],
+          ],
+
+          if (_sourceType.name.startsWith('habit') ||
+              _sourceType.name.startsWith('tracker'))
+            const SizedBox(height: 12),
+
+          TextField(
+            controller: _targetController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Valor Meta',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () {
+                if (_titleController.text.isEmpty ||
+                    _targetController.text.isEmpty) {
+                  return;
+                }
+                final newKpi = kpi_model.KPI(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  title: _titleController.text,
+                  sourceType: _sourceType,
+                  sourceId: _sourceId,
+                  fieldId: _fieldId,
+                  targetValue: double.tryParse(_targetController.text) ?? 100,
+                  autoComplete: false,
+                );
+                widget.onSave(newKpi);
+                Navigator.pop(context);
+              },
+              child: const Text('Save KPI'),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
       ),
     );
   }

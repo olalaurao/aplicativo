@@ -2206,23 +2206,23 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
   String _priorityLabel(TaskPriority priority) {
     switch (priority) {
       case TaskPriority.high:
-        return 'Alta';
+        return 'High';
       case TaskPriority.medium:
-        return 'Média';
+        return 'Medium';
       case TaskPriority.low:
-        return 'Baixa';
+        return 'Low';
       case TaskPriority.none:
-        return 'Nenhuma';
+        return 'None';
     }
   }
 
   String _schedulerLabel(Scheduler scheduler) {
-    if (scheduler.rules.isEmpty) return 'Não recorrente';
+    if (scheduler.rules.isEmpty) return 'Non-recurring';
     final rule = scheduler.rules.first;
     switch (rule.repeatType) {
       case RepeatType.numberOfDays:
-        if (rule.interval == 1) return 'Diário';
-        return 'A cada ${rule.interval} dias';
+        if (rule.interval == 1) return 'Daily';
+        return 'Every ${rule.interval} days';
       case RepeatType.daysOfWeek:
         if (rule.daysOfWeek != null && rule.daysOfWeek!.isNotEmpty) {
           final days = rule.daysOfWeek!

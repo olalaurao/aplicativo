@@ -68,10 +68,10 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen>
               child: activeHabits.isEmpty
                   ? EmptyState(
                       icon: Icons.loop_rounded,
-                      headline: 'Nenhum hábito ainda',
+                      headline: 'No habits yet',
                       subtext:
-                          'Crie hábitos para acompanhar sua consistência e crescimento diário.',
-                      ctaLabel: 'Criar Hábito',
+                          'Create habits to track your consistency and daily growth.',
+                      ctaLabel: 'Create Habit',
                       onCta: () => Navigator.push(
                         context,
                         MaterialPageRoute(

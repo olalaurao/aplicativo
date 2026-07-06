@@ -775,19 +775,9 @@ String _userFacingText(String value, {String fallback = ''}) {
 }
 
 Map<String, dynamic> _overdueSnapshot(List<OverdueItem> overdueItems) {
+  // Only include count in widget snapshot, not the full list
+  // Overdue items will be shown in a separate detail screen
   return {
-    'overdue': overdueItems
-        .map((item) => {
-              'id': item.object.id,
-              'title': item.object.title,
-              'type': item.itemType,
-              'daysLate': item.daysLate,
-              'linkUri': 'citrine:///detail/${item.object.id}',
-              if (item.itemType == 'task')
-                'toggleUri':
-                    'citrine://widget-toggle?type=task&id=${Uri.encodeComponent(item.object.id)}&action=complete',
-            })
-        .toList(),
     'overdueCount': overdueItems.length,
   };
 }

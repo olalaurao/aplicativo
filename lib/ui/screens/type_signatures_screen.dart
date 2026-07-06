@@ -73,43 +73,43 @@ class TypeSignaturesScreen extends ConsumerWidget {
   String _translateType(String type) {
     switch (type) {
       case 'task':
-        return 'Tarefa';
+        return 'Task';
       case 'idea':
-        return 'Ideia';
+        return 'Idea';
       case 'habit':
-        return 'Hábito';
+        return 'Habit';
       case 'project':
-        return 'Projeto';
+        return 'Project';
       case 'goal':
-        return 'Meta';
+        return 'Goal';
       case 'event':
         return 'Event';
       case 'note':
-        return 'Nota';
+        return 'Note';
       case 'resource':
-        return 'Recurso';
+        return 'Resource';
       case 'person':
-        return 'Pessoa';
+        return 'Person';
       case 'system':
-        return 'Sistema';
+        return 'System';
       case 'tracker':
-        return 'Rastreador';
+        return 'Tracker';
       case 'entry':
-        return 'Entrada de Diário';
+        return 'Journal Entry';
       case 'reminder':
-        return 'Lembrete';
+        return 'Reminder';
       case 'social_post':
-        return 'Post Social';
+        return 'Social Post';
       case 'mood_definition':
-        return 'Definição de Humor';
+        return 'Mood Definition';
       case 'area':
-        return 'Área';
+        return 'Area';
       case 'activity':
-        return 'Atividade';
+        return 'Activity';
       case 'label':
-        return 'Marcador';
+        return 'Label';
       case 'organizer':
-        return 'Organizador';
+        return 'Organizer';
       default:
         return type;
     }

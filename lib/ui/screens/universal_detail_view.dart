@@ -3126,6 +3126,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       NoteSubtype.collection => 'Coleção',
     };
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         if (note.pinned) ...[
@@ -4884,7 +4885,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               if (!context.mounted) return;
               if (oldObject is JournalEntry) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Entrada removida do diário.')),
+                  const SnackBar(content: Text('Journal entry removed.')),
                 );
               } else {
                 UndoService.showUndoSnackbar(
@@ -4943,46 +4944,46 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     if (obj is Organizer) {
       switch (obj.organizerType) {
         case OrganizerType.area:
-          return 'Área';
+          return 'Area';
         case OrganizerType.project:
-          return 'Projeto';
+          return 'Project';
         case OrganizerType.activity:
-          return 'Atividade';
+          return 'Activity';
         case OrganizerType.label:
-          return 'Etiqueta';
+          return 'Tag';
         case OrganizerType.person:
-          return 'Pessoa';
+          return 'Person';
         case OrganizerType.task:
-          return 'Tarefa';
+          return 'Task';
         case OrganizerType.goal:
-          return 'Objetivo';
+          return 'Goal';
         case OrganizerType.habit:
-          return 'Hábito';
+          return 'Habit';
         case OrganizerType.tracker:
-          return 'Rastreador';
+          return 'Tracker';
       }
     }
     switch (obj.type) {
       case 'task':
-        return 'Tarefa';
+        return 'Task';
       case 'habit':
-        return 'Hábito';
+        return 'Habit';
       case 'goal':
-        return 'Objetivo';
+        return 'Goal';
       case 'entry':
-        return 'Diário';
+        return 'Journal';
       case 'event':
-        return 'Evento';
+        return 'Event';
       case 'project':
-        return 'Projeto';
+        return 'Project';
       case 'person':
-        return 'Pessoa';
+        return 'Person';
       case 'resource':
-        return 'Recurso';
+        return 'Resource';
       case 'note':
-        return 'Nota';
+        return 'Note';
       case 'tracker':
-        return 'Rastreador';
+        return 'Tracker';
       case 'system':
         return 'System';
       default:
@@ -5233,6 +5234,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         endDate: candidate.endDate,
         displayType: candidate.displayType,
         completed: nextValue >= candidate.targetValue,
+        autoComplete: candidate.autoComplete,
         autoCompleteAction: candidate.autoCompleteAction,
       );
     }).toList();

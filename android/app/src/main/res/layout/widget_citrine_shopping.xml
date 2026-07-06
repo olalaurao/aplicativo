@@ -43,14 +43,31 @@
                 android:textSize="13sp" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/shopping_add_btn"
+        <LinearLayout
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="+"
-            android:textSize="24sp"
-            android:textColor="#1F2937"
-            android:padding="8dp" />
+            android:layout_height="32dp"
+            android:orientation="horizontal"
+            android:padding="2dp">
+
+            <TextView
+                android:id="@+id/shopping_sync_btn"
+                android:layout_width="32dp"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="↻"
+                android:textColor="#6B7280"
+                android:textSize="18sp" />
+
+            <TextView
+                android:id="@+id/shopping_add_btn"
+                android:layout_width="32dp"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="+"
+                android:textColor="#1F2937"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+        </LinearLayout>
     </LinearLayout>
 
     <LinearLayout

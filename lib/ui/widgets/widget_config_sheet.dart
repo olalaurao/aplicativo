@@ -354,10 +354,10 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                   ),
                   initialValue: settings.quickAddWidgetButton1Target,
                   items: const [
-                    DropdownMenuItem(value: 'journal', child: Text('Diário')),
-                    DropdownMenuItem(value: 'task', child: Text('Tarefa')),
-                    DropdownMenuItem(value: 'habit', child: Text('Hábito')),
-                    DropdownMenuItem(value: 'note', child: Text('Nota')),
+                    DropdownMenuItem(value: 'journal', child: Text('Journal')),
+                    DropdownMenuItem(value: 'task', child: Text('Task')),
+                    DropdownMenuItem(value: 'habit', child: Text('Habit')),
+                    DropdownMenuItem(value: 'note', child: Text('Note')),
                   ],
                   onChanged: (val) {
                     if (val != null) {
@@ -409,10 +409,10 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                   ),
                   initialValue: settings.quickAddWidgetButton2Target,
                   items: const [
-                    DropdownMenuItem(value: 'journal', child: Text('Diário')),
-                    DropdownMenuItem(value: 'task', child: Text('Tarefa')),
-                    DropdownMenuItem(value: 'habit', child: Text('Hábito')),
-                    DropdownMenuItem(value: 'note', child: Text('Nota')),
+                    DropdownMenuItem(value: 'journal', child: Text('Journal')),
+                    DropdownMenuItem(value: 'task', child: Text('Task')),
+                    DropdownMenuItem(value: 'habit', child: Text('Habit')),
+                    DropdownMenuItem(value: 'note', child: Text('Note')),
                   ],
                   onChanged: (val) {
                     if (val != null) {
@@ -681,14 +681,14 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
         : {'task', 'habit'};
 
     const filterObjectTypes = <String, String>{
-      'task': 'Tarefas',
-      'habit': 'Hábitos',
+      'task': 'Tasks',
+      'habit': 'Habits',
       'pomodoro': 'Pomodoros',
-      'goal': 'Objetivos',
-      'note': 'Notas',
-      'entry': 'Diário',
-      'resource': 'Recursos',
-      'person': 'Pessoas',
+      'goal': 'Goals',
+      'note': 'Notes',
+      'entry': 'Journal',
+      'resource': 'Resources',
+      'person': 'People',
     };
 
     return Container(

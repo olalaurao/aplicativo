@@ -18,8 +18,10 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
         final savedItems = decoded
             .map((item) => NavigationItem.fromMap(item))
             .toList();
+        // Remove 'Map' items
+        final filteredItems = savedItems.where((item) => item.label != 'Map').toList();
         final migratedItems = _normalizeItems(
-          _withMissingDefaultItems(savedItems),
+          _withMissingDefaultItems(filteredItems),
         );
         if (jsonEncode(migratedItems.map((e) => e.toMap()).toList()) !=
             jsonEncode(savedItems.map((e) => e.toMap()).toList())) {

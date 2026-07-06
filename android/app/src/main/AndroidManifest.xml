@@ -85,7 +85,40 @@
         <activity
             android:name=".DayPopupActivity"
             android:exported="false"
-            android:theme="@style/CitrineWidgetDialogTheme" />
+            android:theme="@style/CitrineWidgetDialogTheme"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:windowIsTranslucent="true"
+            android:windowIsFloating="true" />
+
+        <activity
+            android:name=".OverduePopupActivity"
+            android:exported="false"
+            android:theme="@style/CitrineWidgetDialogTheme"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:windowIsTranslucent="true"
+            android:windowIsFloating="true" />
+
+        <activity
+            android:name=".QuickAddPopupActivity"
+            android:exported="false"
+            android:theme="@style/CitrineWidgetDialogTheme"
+            android:windowSoftInputMode="adjustResize"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:windowIsTranslucent="true"
+            android:windowIsFloating="true" />
+
+        <activity
+            android:name=".ShoppingAddPopupActivity"
+            android:exported="false"
+            android:theme="@style/CitrineWidgetDialogTheme"
+            android:windowSoftInputMode="adjustResize"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:windowIsTranslucent="true"
+            android:windowIsFloating="true" />
 
         <service
             android:name=".CitrineCalendarItemsService"

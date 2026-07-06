@@ -274,26 +274,6 @@ class Subtask {
   }) : id = id ?? const Uuid().v4();
 }
 
-class KPI {
-  final String id;
-  final String title;
-  final String source; // e.g., 'habit', 'tracker', 'pomodoro', 'manual'
-  final String? sourceId;
-  final String? sourceField;
-  final double goalValue;
-  final String unit;
-
-  KPI({
-    required this.id,
-    required this.title,
-    required this.source,
-    this.sourceId,
-    this.sourceField,
-    required this.goalValue,
-    this.unit = '',
-  });
-}
-
 class VaultLinkRef {
   final String? objectSlug;
   final String? objectType;

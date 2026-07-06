@@ -162,10 +162,30 @@ class MarkdownParser {
         return _convertNode(doc) as Map<String, dynamic>;
       }
     } catch (e) {
-      final repaired = _repairLegacyInlineAnalysisYaml(yamlStr);
+      // Try repairing special characters (like @ symbols)
+      final repaired = _repairSpecialCharactersInYaml(yamlStr);
       if (repaired != yamlStr) {
         try {
           final doc = loadYaml(repaired);
+          if (doc is YamlMap) {
+            debugPrint(
+              'Repaired YAML with special characters after parse error: $e',
+            );
+            final result = _convertNode(doc) as Map<String, dynamic>;
+            // Signal to the vault loader that this file needs to be rewritten
+            result['__needs_rewrite__'] = true;
+            return result;
+          }
+        } catch (_) {
+          // Fall through to legacy repair
+        }
+      }
+      
+      // Try legacy repair for inline analysis YAML
+      final legacyRepaired = _repairLegacyInlineAnalysisYaml(yamlStr);
+      if (legacyRepaired != yamlStr) {
+        try {
+          final doc = loadYaml(legacyRepaired);
           if (doc is YamlMap) {
             debugPrint(
               'Repaired legacy YAML frontmatter after parse error: $e',
@@ -213,6 +233,21 @@ class MarkdownParser {
     for (final key in const ['label', 'color']) {
       repaired = quoteFlowValue(repaired, key);
     }
+    return repaired;
+  }
+
+  static String _repairSpecialCharactersInYaml(String yamlStr) {
+    // Repair values that start with @ or contain special characters that break YAML parsing
+    String quoteProblematicValues(String input) {
+      return input.replaceAllMapped(RegExp(r'^(\w+):\s*(@\S+)$', multiLine: true), (match) {
+        final key = match.group(1)!;
+        final value = match.group(2)!;
+        final escaped = value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+        return '$key: "$escaped"';
+      });
+    }
+
+    var repaired = quoteProblematicValues(yamlStr);
     return repaired;
   }
 

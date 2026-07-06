@@ -147,8 +147,8 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
           _buildMoodDonutCard(entries, moods),
           const SizedBox(height: 24),
 
-          // ─── Diário Estatísticas ───
-          _buildSectionHeader('Hábitos de Escrita'),
+          // ─── Journal Statistics ───
+          _buildSectionHeader('Writing Habits'),
           _buildJournalStatsCard(entries),
           const SizedBox(height: 24),
 
@@ -239,7 +239,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Frequência de registros no diário e atividades nos últimos 60 dias.',
+            'Journal entry frequency and activity over the last 60 days.',
             style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
@@ -783,7 +783,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
         padding: const EdgeInsets.all(24),
         child: const Center(
           child: Text(
-            'Nenhuma entrada do diário.',
+            'No journal entries.',
             style: TextStyle(color: AppColors.textMuted, fontSize: 13),
           ),
         ),
@@ -880,7 +880,22 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
       );
     }
 
-    final currentGoal = _selectedGoalForKPIChart ?? goalsWithKPIs.first;
+    final currentGoal = (_selectedGoalForKPIChart != null && goalsWithKPIs.any((g) => g.id == _selectedGoalForKPIChart!.id))
+        ? goalsWithKPIs.firstWhere((g) => g.id == _selectedGoalForKPIChart!.id)
+        : (goalsWithKPIs.isNotEmpty ? goalsWithKPIs.first : null);
+
+    if (currentGoal == null) {
+      return Container(
+        decoration: AppTheme.cardDecoration(context),
+        padding: const EdgeInsets.all(24),
+        child: const Center(
+          child: Text(
+            'Nenhuma meta com KPIs cadastrada.',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+          ),
+        ),
+      );
+    }
 
     // Simulate standard dynamic progress trend points (from currentValue, targetValue)
     final double target = currentGoal.kpis.first.targetValue;
@@ -1170,7 +1185,7 @@ ${goalsSummary.isEmpty ? '- Nenhuma meta ativa monitorada nesta semana.' : goals
                 ),
                 SizedBox(height: 6),
                 Text(
-                  'Gere um relatório consolidado com o resumo das suas métricas da semana diretamente em uma nova entrada do seu diário para reflexão.',
+                  'Generate a consolidated report with a summary of your weekly metrics directly in a new journal entry for reflection.',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -1250,7 +1265,7 @@ ${goalsSummary.isEmpty ? '- Nenhuma meta ativa monitorada nesta semana.' : goals
                 Icon(Icons.edit_note_rounded, size: 20),
                 SizedBox(width: 8),
                 Text(
-                  'Criar Review no Diário',
+                  'Create Journal Review',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
               ],

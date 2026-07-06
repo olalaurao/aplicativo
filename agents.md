@@ -342,7 +342,8 @@ organizers:: [[trabalho]]
 7. **Usar `const` constructors** onde possível para performance
 8. **Respeitar a hierarquia de navegação** — back button volta ao anterior, não ao pai
 9. **Preservar comentários existentes** — não remova documentação que não esteja relacionada à sua mudança
-10. **Usar PT-BR** em todos os textos de UI
+10. **Usar ingles** em todos os textos de UI
+11. **Após cada implementação, verificar se `agents.md` ou `guidelines.md` precisam ser atualizados** — se a mudança altera arquitetura, padrões ou regras, documente
 
 ### 8.2 ❌ NUNCA FAZER
 
@@ -593,7 +594,7 @@ Toda mutação (create/update/delete) enfileira uma `SyncAction`. A fila é proc
 - [ ] Funciona em light mode E dark mode
 - [ ] Nenhum overflow em resoluções comuns (360x640, 390x844, 412x915)
 - [ ] Textos em listas têm `maxLines` + `overflow: ellipsis`
-- [ ] Textos de UI em PT-BR
+- [ ] Textos de UI em ingles
 - [ ] Empty states com mensagem + CTA
 - [ ] Modais com X ou handle pill
 

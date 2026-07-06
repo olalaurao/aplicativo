@@ -67,6 +67,42 @@ object CitrineWidgetUtils {
         return openUriIntent(context, "citrine:///planner/day/$date")
     }
 
+    /** Abre popup de tarefas atrasadas */
+    fun overduePopupIntent(context: Context): PendingIntent {
+        val intent = Intent(context, OverduePopupActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return PendingIntent.getActivity(
+            context,
+            1001,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    /** Abre popup de adição rápida de tarefa */
+    fun quickAddPopupIntent(context: Context): PendingIntent {
+        val intent = Intent(context, QuickAddPopupActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return PendingIntent.getActivity(
+            context,
+            1002,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    /** Abre popup de adição de item de shopping */
+    fun shoppingAddPopupIntent(context: Context): PendingIntent {
+        val intent = Intent(context, ShoppingAddPopupActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return PendingIntent.getActivity(
+            context,
+            1003,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
     /**
      * Abre um item pelo seu linkUri (ex: "citrine:///detail/{id}").
      * Usa um requestCode único baseado no uri para evitar colisão de PendingIntents.

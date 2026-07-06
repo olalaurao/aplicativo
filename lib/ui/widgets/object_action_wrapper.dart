@@ -525,38 +525,38 @@ Future<void> _confirmDelete(
 }
 
 String _typeLabel(ContentObject object) {
-  if (object is Task) return 'Tarefa';
-  if (object is Habit) return 'Hábito';
-  if (object is Goal) return 'Objetivo';
-  if (object is Note) return 'Nota';
-  if (object is JournalEntry) return 'Diário';
-  if (object is Project) return 'Projeto';
-  if (object is Person) return 'Pessoa';
-  if (object is Resource) return 'Recurso';
-  if (object is TrackerDefinition) return 'Rastreador';
+  if (object is Task) return 'Task';
+  if (object is Habit) return 'Habit';
+  if (object is Goal) return 'Goal';
+  if (object is Note) return 'Note';
+  if (object is JournalEntry) return 'Journal';
+  if (object is Project) return 'Project';
+  if (object is Person) return 'Person';
+  if (object is Resource) return 'Resource';
+  if (object is TrackerDefinition) return 'Tracker';
   if (object is Organizer) {
     switch (object.organizerType) {
       case OrganizerType.area:
-        return 'Área';
+        return 'Area';
       case OrganizerType.project:
-        return 'Projeto';
+        return 'Project';
       case OrganizerType.activity:
-        return 'Atividade';
+        return 'Activity';
       case OrganizerType.label:
-        return 'Etiqueta';
+        return 'Tag';
       case OrganizerType.person:
-        return 'Pessoa';
+        return 'Person';
       case OrganizerType.task:
-        return 'Tarefa';
+        return 'Task';
       case OrganizerType.goal:
-        return 'Objetivo';
+        return 'Goal';
       case OrganizerType.habit:
-        return 'Hábito';
+        return 'Habit';
       case OrganizerType.tracker:
-        return 'Rastreador';
+        return 'Tracker';
     }
   }
-  if (object is Reminder) return 'Lembrete';
-  if (object is TrackingRecord) return 'Registro';
+  if (object is Reminder) return 'Reminder';
+  if (object is TrackingRecord) return 'Record';
   return object.type;
 }

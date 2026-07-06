@@ -21,6 +21,7 @@ class SchedulerService {
     bool Function(String id, DateTime date)? isItemScheduled,
     bool Function(String themeId, DateTime date)? isThemeActive,
     bool Function(String blockId, DateTime date)? isBlockActive,
+    DateTime? Function(String targetType, String fieldName)? referenceDateValue,
   }) {
     // 1. Check basic bounds
     final normalizedDate = DateTime(date.year, date.month, date.day);
@@ -50,6 +51,7 @@ class SchedulerService {
         lastCompletionDate,
         isThemeActive,
         isBlockActive,
+        referenceDateValue,
       )) {
         return false;
       }
@@ -67,6 +69,7 @@ class SchedulerService {
         lastCompletionDate,
         isThemeActive,
         isBlockActive,
+        referenceDateValue,
       )) {
         return true;
       }
@@ -83,6 +86,7 @@ class SchedulerService {
     DateTime? lastCompletionDate,
     bool Function(String, DateTime)? isThemeActive,
     bool Function(String, DateTime)? isBlockActive,
+    DateTime? Function(String targetType, String fieldName)? referenceDateValue,
   ) {
     switch (rule.repeatType) {
       case RepeatType.numberOfDays:
@@ -209,15 +213,21 @@ class SchedulerService {
         return isBlockActive(rule.blockId!, date);
 
       case RepeatType.daysAfterReferenceField:
-        // F2.13: This type requires a specific date field value from the target object
-        // (e.g. last_contact_date on Person). Resolution happens at the call site
-        // via the referenceDateValue callback.
+        // V5: fires N days after any date-type field on any object
+        // Config: { targetType, fieldName, days }
         if (rule.targetType == null || rule.fieldName == null || rule.interval == null) {
           return false;
         }
-        // The actual check is done by the caller providing referenceDateValue
-        // For now, return false - the caller must implement the specific logic
-        return false;
+        if (referenceDateValue == null) return false;
+        
+        final refDate = referenceDateValue(rule.targetType!, rule.fieldName!);
+        if (refDate == null) return false;
+        
+        final normalizedRefDate = DateTime(refDate.year, refDate.month, refDate.day);
+        final normalizedDate = DateTime(date.year, date.month, date.day);
+        
+        final targetDate = normalizedRefDate.add(Duration(days: rule.interval!));
+        return normalizedDate.isAtSameMomentAs(targetDate);
     }
   }
 

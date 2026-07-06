@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/app_theme_config.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../theme.dart';
@@ -21,7 +22,7 @@ class AppearanceScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor(context),
       appBar: AppBar(
-        title: const Text('Aparência'),
+        title: const Text('Appearance'),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -45,7 +46,7 @@ class AppearanceScreen extends ConsumerWidget {
                     const SizedBox(width: 12),
                     const Expanded(
                       child: Text(
-                        'Modo de tema',
+                        'Theme mode',
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 15,
@@ -57,9 +58,9 @@ class AppearanceScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 Text(
                   switch (mode) {
-                    ThemeMode.light => 'Tema claro fixo',
-                    ThemeMode.dark => 'Tema escuro fixo',
-                    ThemeMode.system => 'Segue a configuração do sistema',
+                    ThemeMode.light => 'Fixed light theme',
+                    ThemeMode.dark => 'Fixed dark theme',
+                    ThemeMode.system => 'Follow system setting',
                   },
                   style: TextStyle(
                     fontSize: 12,
@@ -73,19 +74,19 @@ class AppearanceScreen extends ConsumerWidget {
                   children: [
                     _modeChip(
                       context,
-                      label: 'Sistema',
+                      label: 'System',
                       selected: mode == ThemeMode.system,
                       onTap: () => notifier.updateThemeMode('system'),
                     ),
                     _modeChip(
                       context,
-                      label: 'Claro',
+                      label: 'Light',
                       selected: mode == ThemeMode.light,
                       onTap: () => notifier.updateThemeMode('light'),
                     ),
                     _modeChip(
                       context,
-                      label: 'Escuro',
+                      label: 'Dark',
                       selected: mode == ThemeMode.dark,
                       onTap: () => notifier.updateThemeMode('dark'),
                     ),
@@ -103,7 +104,7 @@ class AppearanceScreen extends ConsumerWidget {
                 Row(
                   children: [
                     const Text(
-                      'Tema ativo',
+                      'Active theme',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
@@ -216,12 +217,130 @@ class AppearanceScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'A seleção é salva nas preferências do app e aplicada imediatamente.',
+                  'Selection is saved in app preferences and applied immediately.',
                   style: TextStyle(
                     fontSize: 11,
                     color: AppTheme.textMutedColor(context),
                     height: 1.4,
                   ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            decoration: AppTheme.cardDecoration(context),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Font',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _fontChip(
+                      context,
+                      label: 'Inter',
+                      selected: activeTheme.fontFamily == 'Inter',
+                      onTap: () => _updateFont(context, ref, 'Inter'),
+                    ),
+                    _fontChip(
+                      context,
+                      label: 'Roboto',
+                      selected: activeTheme.fontFamily == 'Roboto',
+                      onTap: () => _updateFont(context, ref, 'Roboto'),
+                    ),
+                    _fontChip(
+                      context,
+                      label: 'Open Sans',
+                      selected: activeTheme.fontFamily == 'OpenSans',
+                      onTap: () => _updateFont(context, ref, 'OpenSans'),
+                    ),
+                    _fontChip(
+                      context,
+                      label: 'Lato',
+                      selected: activeTheme.fontFamily == 'Lato',
+                      onTap: () => _updateFont(context, ref, 'Lato'),
+                    ),
+                    _fontChip(
+                      context,
+                      label: 'Poppins',
+                      selected: activeTheme.fontFamily == 'Poppins',
+                      onTap: () => _updateFont(context, ref, 'Poppins'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Container(
+            decoration: AppTheme.cardDecoration(context),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Background color',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _colorChip(
+                      context,
+                      color: const Color(0xFFF8F9FB),
+                      selected: activeTheme.backgroundColor == const Color(0xFFF8F9FB),
+                      onTap: () => _updateBackgroundColor(context, ref, const Color(0xFFF8F9FB)),
+                    ),
+                    _colorChip(
+                      context,
+                      color: const Color(0xFFFFFBF0),
+                      selected: activeTheme.backgroundColor == const Color(0xFFFFFBF0),
+                      onTap: () => _updateBackgroundColor(context, ref, const Color(0xFFFFFBF0)),
+                    ),
+                    _colorChip(
+                      context,
+                      color: const Color(0xFFF0F9FF),
+                      selected: activeTheme.backgroundColor == const Color(0xFFF0F9FF),
+                      onTap: () => _updateBackgroundColor(context, ref, const Color(0xFFF0F9FF)),
+                    ),
+                    _colorChip(
+                      context,
+                      color: const Color(0xFFF0FDF4),
+                      selected: activeTheme.backgroundColor == const Color(0xFFF0FDF4),
+                      onTap: () => _updateBackgroundColor(context, ref, const Color(0xFFF0FDF4)),
+                    ),
+                    _colorChip(
+                      context,
+                      color: const Color(0xFFFDF2F8),
+                      selected: activeTheme.backgroundColor == const Color(0xFFFDF2F8),
+                      onTap: () => _updateBackgroundColor(context, ref, const Color(0xFFFDF2F8)),
+                    ),
+                    _colorChip(
+                      context,
+                      color: const Color(0xFFF5F3FF),
+                      selected: activeTheme.backgroundColor == const Color(0xFFF5F3FF),
+                      onTap: () => _updateBackgroundColor(context, ref, const Color(0xFFF5F3FF)),
+                    ),
+                    _colorChip(
+                      context,
+                      color: Colors.white,
+                      selected: activeTheme.backgroundColor == Colors.white,
+                      onTap: () => _updateBackgroundColor(context, ref, Colors.white),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -259,5 +378,95 @@ class AppearanceScreen extends ConsumerWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       showCheckmark: false,
     );
+  }
+
+  Widget _fontChip(
+    BuildContext context, {
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      selectedColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.16),
+      labelStyle: TextStyle(
+        fontWeight: FontWeight.w600,
+        color: selected
+            ? Theme.of(context).colorScheme.primary
+            : AppTheme.textSecondaryColor(context),
+      ),
+      side: BorderSide(
+        color: selected
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.28)
+            : Theme.of(context).dividerColor,
+      ),
+      backgroundColor: AppTheme.surfaceVariantColor(context),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      showCheckmark: false,
+    );
+  }
+
+  Widget _colorChip(
+    BuildContext context, {
+    required Color color,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).dividerColor,
+            width: selected ? 2.5 : 1,
+          ),
+        ),
+        child: selected
+            ? Icon(
+                Icons.check_rounded,
+                color: Theme.of(context).colorScheme.primary,
+                size: 20,
+              )
+            : null,
+      ),
+    );
+  }
+
+  void _updateFont(BuildContext context, WidgetRef ref, String fontFamily) {
+    final settings = ref.read(settingsProvider);
+    final activeTheme = ref.read(activeThemeConfigProvider);
+    final updatedTheme = AppThemeConfig(
+      id: activeTheme.id,
+      label: activeTheme.label,
+      accentColor: activeTheme.accentColor,
+      backgroundColor: activeTheme.backgroundColor,
+      icon: activeTheme.icon,
+      description: activeTheme.description,
+      fontFamily: fontFamily,
+    );
+    ref.read(settingsProvider.notifier).updateCustomTheme(updatedTheme);
+  }
+
+  void _updateBackgroundColor(BuildContext context, WidgetRef ref, Color backgroundColor) {
+    final settings = ref.read(settingsProvider);
+    final activeTheme = ref.read(activeThemeConfigProvider);
+    final updatedTheme = AppThemeConfig(
+      id: activeTheme.id,
+      label: activeTheme.label,
+      accentColor: activeTheme.accentColor,
+      backgroundColor: backgroundColor,
+      icon: activeTheme.icon,
+      description: activeTheme.description,
+      fontFamily: activeTheme.fontFamily,
+    );
+    ref.read(settingsProvider.notifier).updateCustomTheme(updatedTheme);
   }
 }

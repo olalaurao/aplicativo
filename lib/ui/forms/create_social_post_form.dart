@@ -507,7 +507,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
   }
 
   Future<void> _fetchMetadata() async {
-    final url = _urlController.text.trim();
+    final url = _normalizeUrl(_urlController.text.trim());
     if (url.isEmpty || _isFetching) return;
 
     setState(() {
@@ -610,10 +610,10 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
     final navigator = Navigator.of(context);
 
     if (widget.existingPost == null) {
-      final url = _urlController.text.trim();
+      final url = _normalizeUrl(_urlController.text.trim());
       final existing = ref
           .read(socialPostsProvider)
-          .where((p) => p.url.trim() == url)
+          .where((p) => _normalizeUrl(p.url.trim()) == url)
           .toList();
       if (existing.isNotEmpty) {
         final existingPost = existing.first;
@@ -705,7 +705,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
   }
 
   SocialPost _fallbackDraft() {
-    final url = _urlController.text.trim();
+    final url = _normalizeUrl(_urlController.text.trim());
     final platform = OEmbedService.detectPlatform(url);
     return SocialPost(
       title: url.isEmpty ? 'Post social' : url,
@@ -935,6 +935,28 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
     return cleaned.split('|').first.trim();
   }
 
+  String _normalizeUrl(String url) {
+    var normalized = url.trim().toLowerCase();
+    // Remove trailing slash
+    if (normalized.endsWith('/')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    // Remove common tracking parameters
+    final uri = Uri.tryParse(normalized);
+    if (uri != null) {
+      final paramsToRemove = {
+        'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+        'fbclid', 'igshid', '_nc_ht', '_nc_cat', 'si', 'ref'
+      };
+      final newQuery = uri.queryParameters.entries
+          .where((e) => !paramsToRemove.contains(e.key))
+          .map((e) => '${e.key}=${e.value}')
+          .join('&');
+      normalized = uri.replace(query: newQuery.isEmpty ? '' : newQuery).toString();
+    }
+    return normalized;
+  }
+
   String _objectWikiLink(ContentObject object) {
     final target = object.obsidianFileName.trim().isNotEmpty
         ? object.obsidianFileName
@@ -1031,3 +1053,5 @@ IconData _platformIcon(SocialPlatform platform) {
     SocialPlatform.other => Icons.link_rounded,
   };
 }
+
+

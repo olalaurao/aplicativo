@@ -217,6 +217,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen>
     return PopScope(
       canPop: false,
       child: Scaffold(
+        backgroundColor: Colors.transparent,
         body: Container(
           width: double.infinity,
           height: double.infinity,
@@ -224,7 +225,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen>
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [_primaryColor, _primaryColorDark],
+              colors: [_primaryColor.withValues(alpha: 0.95), _primaryColorDark.withValues(alpha: 0.95)],
             ),
           ),
           child: SafeArea(

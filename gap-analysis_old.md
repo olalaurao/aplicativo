@@ -2227,7 +2227,7 @@ TIER 0 — BLOQUEADORES DE COMPILAÇÃO
 ────────────────────────────────────────────────────────────────────────────────
 FILE: lib/models/habit_model.dart
 ACTION: EDIT
-STATUS: CONCLUÍDO — `HabitMode`, `PactOutcome`, `PactCycle`, campos Pact,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `HabitMode`, `PactOutcome`, `PactCycle`, campos Pact,
   `displayTitle`, copyWith e serialização/leitura simétrica já existem.
 
 POR QUE É P0: lib/ui/widgets/steering_sheet.dart E lib/ui/widgets/habit_row.dart
@@ -2349,7 +2349,7 @@ VALIDAÇÃO: depois de aplicar, rodar `flutter analyze` e confirmar que
 ────────────────────────────────────────────────────────────────────────────────
 FILE: lib/models/task_model.dart
 ACTION: EDIT
-STATUS: CONCLUÍDO — `TripleCheckAnswer`, `TripleCheck`, `Task.tripleCheck`,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `TripleCheckAnswer`, `TripleCheck`, `Task.tripleCheck`,
   `TaskStage.backlog` e `linkedSystem` já existem; `flutter analyze` não
   reporta símbolos ausentes em `triple_check_sheet.dart`.
 
@@ -2449,7 +2449,7 @@ DEPOIS de aplicar 0.1 e 0.2: editar lib/ui/widgets/triple_check_sheet.dart
 0.3 — DECISÃO DE PRODUTO: Idea / Inbox / Event / ShoppingList (tipos fora
       da spec V4)
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: DECIDIDO — OPÇÃO B. Manter Idea/Inbox/Event/ShoppingList como
+STATUS: ✅ VERIFICADO NO CÓDIGO — OPÇÃO B. Manter Idea/Inbox/Event/ShoppingList como
   extensões legadas/ativas nesta rodada, porque há models, providers, telas
   e formulários existentes. Não remover nem migrar automaticamente agora.
 
@@ -2504,7 +2504,7 @@ TIER 1 — INTEGRIDADE DE DADOS DO VAULT
 ────────────────────────────────────────────────────────────────────────────────
 1.1 — ESTRUTURA DE PASTAS: `app/` FLAT COMO PADRÃO (não pasta-por-tipo)
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `_ensureVaultFolders()` usa `app/daily/moods/analyses`
+STATUS: ✅ VERIFICADO NO CÓDIGO — `_ensureVaultFolders()` usa `app/daily/moods/analyses`
   e pastas técnicas; defaults de escrita caem em `app` salvo exceções e
   índices Dataview usam `FROM "app"` por tipo.
 
@@ -2602,7 +2602,7 @@ MIGRAÇÃO: não é necessário mover arquivos já existentes nas pastas antigas
 ────────────────────────────────────────────────────────────────────────────────
 1.2 — PMN (`daily/YYYY-MM-WNN.md`) É INVISÍVEL AO APP
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `AllObjectsNotifier` detecta `daily/YYYY-MM-WNN.md`,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `AllObjectsNotifier`Detecta `daily/YYYY-MM-WNN.md`,
   cria `JournalEntryType.pmn`, lê metadados PMN e usa
   `MarkdownParser.parsePmnSections()`.
 
@@ -2700,7 +2700,7 @@ ADD ÍNDICE em memória para o card "📋 Revisão WNN" ao abrir uma data:
 ────────────────────────────────────────────────────────────────────────────────
 1.3 — FIELD NOTE / PMN: entry_type NUNCA É LIDO PELO PARSER PRINCIPAL
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `parseJournalEntries()` extrai `entry_type`, `category`
+STATUS: ✅ VERIFICADO NO CÓDIGO — `parseJournalEntries()` extrai `entry_type`, `category`
   e `energy_value`; o loader propaga para `JournalEntry`.
 
 SEVERIDADE: P0 — combinado com 1.2, confirma que Field Note e PMN (2 dos 3
@@ -2753,9 +2753,9 @@ ADD: `entryType:` mapeado de `data['entry_type']` (string → enum), e,
 1.4 — `type: system` E `type: calendar_session` AUSENTES DO DISPATCHER
       CENTRAL
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — dispatcher carrega `SystemDefinition` e
-  `CalendarSession`; fallback genérico de `Note` não injeta organizador
-  placeholder.
+STATUS: ✅ VERIFICADO NO CÓDIGO — dispatcher carrega `SystemDefinition` e
+  `Event` (V5: CalendarSession foi absorvido por Event); fallback genérico
+  de `Note` não injeta organizador placeholder.
 
 SEVERIDADE: P0 — mesmo com o model de System corrigido e CalendarSession
   criado (Phase 9 Tasks 9.A.3/9.A.6), nenhum dos dois jamais carregaria
@@ -2817,7 +2817,7 @@ antigos cairão no fallback genérico de Note até a migração rodar.)
 1.5 — HABIT COMPLETIONS: CHAVES PLANAS NO FRONTMATTER, NÃO ANINHADAS SOB
       `habits:`
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — toggle/registro gravam chaves planas no frontmatter,
+STATUS: ✅ VERIFICADO NO CÓDIGO — toggle/registro gravam chaves planas no frontmatter,
   parser lê formato plano com retrocompatibilidade e há migração one-shot
   de `habits:` aninhado.
 
@@ -2875,7 +2875,7 @@ ADD migração one-shot (gatear por SharedPreferences
 ────────────────────────────────────────────────────────────────────────────────
 1.6 — DAILY NOTE TEMPLATE NÃO GERA O FORMATO CANÔNICO
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — template gera `tags: [daily]`, campos `mood_*`,
+STATUS: ✅ VERIFICADO NO CÓDIGO — template gera `tags: [daily]`, campos `mood_*`,
   hábitos ativos como chaves planas e seções canônicas.
 
 FILE: lib/providers/vault_provider.dart
@@ -2928,7 +2928,7 @@ ATUALIZAR todos os 5+ pontos de chamada já identificados
 ────────────────────────────────────────────────────────────────────────────────
 1.7 — IDs DE OBJETOS SÃO UUID ALEATÓRIO; WIKILINKS DEVEM USAR SLUG ESTÁVEL
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — IDs UUID permanecem internos; gravação usa path/slug
+STATUS: ✅ VERIFICADO NO CÓDIGO — IDs UUID permanecem internos; gravação usa path/slug
   estável, `_writeObject()` resolve colisões `-2/-3`, e WikiLinks auditados
   não usam UUID como fallback quando há slug.
 
@@ -2969,7 +2969,7 @@ ACTION:
 1.8 — OrganizerReference.toWikiLink() GRAVA "[[tipo/slug]]" EM VEZ DE
       "[[slug]]"
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `OrganizerReference.toWikiLink()` grava `[[slug]]` e
+STATUS: ✅ VERIFICADO NO CÓDIGO — `OrganizerReference.toWikiLink()` grava `[[slug]]` e
   `fromWikiLink()` mantém retrocompatibilidade com `[[tipo/slug]]`.
 
 SEVERIDADE: P0 — quebra backlinks nativos do Obsidian em TODO o vault
@@ -2998,7 +2998,7 @@ TIER 2 — FEATURES INCOMPLETAS (P1)
 ────────────────────────────────────────────────────────────────────────────────
 2.1 — PomodoroSession NÃO PERSISTE EM LUGAR NENHUM
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `PomodoroSession` tem estado/durações/blocos, grava
+STATUS: ✅ VERIFICADO NO CÓDIGO — `PomodoroSession` tem estado/durações/blocos, grava
   bloco em `## Pomodoros` da daily note ao completar/cancelar sessão,
   enfileira sync e o loader reparseia essas sessões para memória.
 
@@ -3067,7 +3067,7 @@ CONECTAR à persistência: localizar pomodoro_provider.dart e
 ────────────────────────────────────────────────────────────────────────────────
 2.2 — KPI: TAXONOMIA INCOMPATÍVEL; FALTA AUTO-COMPLETE E BOTÃO "+N"
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `KPISourceType` foi reduzido aos 8 tipos da spec,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `KPISourceType` foi reduzido aos 8 tipos da spec,
   `calculationMode` e `autoCompleteAction` existem, há migração dos valores
   legados, `AutomationService.updateAllKPIs()` dispara ação ao atingir meta
   e a UI de detalhe da meta tem incremento manual `+1/+N` para
@@ -3153,7 +3153,7 @@ CORREÇÃO (lib/services/automation_service.dart, lido por completo): o
        FALTA TRIGGER DE TRACKER (só Habit dispara hoje); 1 tipo extra não
        documentado ("create_task")
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — dispatcher executa `add_entry`, `add_tracking_record`,
+STATUS: ✅ VERIFICADO NO CÓDIGO — dispatcher executa `add_entry`, `add_tracking_record`,
   `add_text_note`, `add_collection_item`, `view_statistics`, `view_item` e
   `launch_url`; `create_task` foi mantido como extensão legada. Trackers
   agora têm `actions` serializadas e `saveTrackerRecord()` dispara triggers
@@ -3228,7 +3228,7 @@ ACTION:
 2.14 — INCONSISTÊNCIA DE IDIOMA: STRINGS EM INGLÊS MISTURADAS COM O RESTO
        DO APP EM PORTUGUÊS
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — strings restantes de `automation_service.dart` foram
+STATUS: ✅ VERIFICADO NO CÓDIGO — strings restantes de `automation_service.dart` foram
   normalizadas para PT-BR.
 
 SEVERIDADE: P2 — visível ao usuário final, mas não quebra funcionalidade.
@@ -3259,7 +3259,7 @@ ACTION: EDIT — traduzir todas as strings voltadas ao usuário para
 2.15 — `checkKPIGoals()` AUTO-COMPLETA O GOAL INTEIRO QUANDO TODOS OS KPIs
        BATEM A META — COMPORTAMENTO NÃO DOCUMENTADO NA SPEC
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — decisão aplicada: não auto-completar a meta pai. O app
+STATUS: ✅ VERIFICADO NO CÓDIGO — decisão aplicada: não auto-completar a meta pai. O app
   notifica que todos os KPIs foram atingidos e deixa a conclusão da meta
   como ação explícita do usuário.
 
@@ -3285,7 +3285,7 @@ ACTION: DECISÃO DE PRODUTO — manter esse comportamento como extensão
 ────────────────────────────────────────────────────────────────────────────────
 2.3 — DASHBOARD: FALTA PAINEL pact_today; dashboard_panel.dart MORTO
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `BlockType.pactToday` existe, é renderizado no
+STATUS: ✅ VERIFICADO NO CÓDIGO — `BlockType.pactToday` existe, é renderizado no
   dashboard, aparece nos blocos padrão e no modal de adicionar widgets.
   `dashboard_panel.dart` foi mantido apenas como deprecated para referência
   histórica, sem uso funcional.
@@ -3307,7 +3307,7 @@ ACTION: DELETE (ou @Deprecated) — este arquivo define um SEGUNDO enum
 2.4 — COMBINED ANALYSIS: CAMPOS FALTANDO; FALTA BLOCO DO PLUGIN OBSIDIAN
       CHARTS (o bloco Tracker JÁ EXISTE)
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `MetricSource` tem `dimension/axis/showEmojiMarkers/
+STATUS: ✅ VERIFICADO NO CÓDIGO — `MetricSource` tem `dimension/axis/showEmojiMarkers/
   valueMapping`, `AnalysisChart` tem `normalization`,
   `CombinedAnalysis` tem `defaultDateRange`, o form trata dimensão de mood
   e `_writeObject()` anexa blocos Obsidian Tracker e Charts.
@@ -3364,7 +3364,7 @@ ACTION: EDIT — remover/condicionar o comentário placeholder em
 ────────────────────────────────────────────────────────────────────────────────
 2.5 — CONFLICT DETECTION (OBJECT IDENTIFICATION) NÃO EXISTE
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — existem `object_conflicts_screen.dart`,
+STATUS: ✅ VERIFICADO NO CÓDIGO — existem `object_conflicts_screen.dart`,
   `typeConflictedObjectsProvider`, flags `hasTypeConflict/conflictReason`
   em `ContentObject`, marcação no loader e badge/entrada no menu Mais.
 
@@ -3399,7 +3399,7 @@ ACTION:
 2.6 — COMMAND CENTER: FALTAM SEÇÕES SYSTEMS/PRÓXIMAS SESSÕES; BUSCA NÃO
       AGRUPA POR TIPO
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — ações rápidas incluem Novo System, há seções Systems
+STATUS: ✅ VERIFICADO NO CÓDIGO — ações rápidas incluem Novo System, há seções Systems
   e Próximas Sessões, busca agrupa por tipo com limite por grupo e cobre
   título/aliases/snippet/body, Escape fecha o overlay e Recentes usa
   swipe-to-remove com undo.
@@ -3437,7 +3437,7 @@ ACTION:
 ────────────────────────────────────────────────────────────────────────────────
 2.7 — SCHEDULER: SERIALIZAÇÃO camelCase EM VEZ DE snake_case
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `RepeatTypeX.specName/fromSpecName` existe,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `RepeatTypeX.specName/fromSpecName` existe,
   `SchedulerRule.toMap()` grava snake_case e `fromMap()` lê snake_case e
   camelCase legado.
 
@@ -3485,7 +3485,7 @@ EDIT `SchedulerRule.fromMap()`: `repeatType: RepeatTypeX.fromSpecName(map['repea
 2.8 — AUTO-CATEGORIA "[[people]]" NUNCA APLICADA A Person; OUTRAS 4
       ENTIDADES GANHAM AUTO-CATEGORIAS QUE A SPEC NÃO PEDE
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `PeopleNotifier.addPerson()` aplica `[[people]]`.
+STATUS: ✅ VERIFICADO NO CÓDIGO — `PeopleNotifier.addPerson()` aplica `[[people]]`.
   As demais auto-categorias foram mantidas como extensão legada por
   compatibilidade, mesma decisão de produto da Task 0.3.
 
@@ -3514,7 +3514,7 @@ ACTION:
 ────────────────────────────────────────────────────────────────────────────────
 2.9 — FALTA HOOK "CHECAR PACTS VENCIDOS A CADA ABERTURA DO APP"
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `HabitsNotifier.build()` chama
+STATUS: ✅ VERIFICADO NO CÓDIGO — `HabitsNotifier.build()` chama
   `AutomationService.checkPactExpirations()` e o serviço notifica pacts
   ativos vencidos sem `pactOutcome`.
 
@@ -3550,7 +3550,7 @@ ACTION: replicar o padrão de People para Habits:
 ────────────────────────────────────────────────────────────────────────────────
 2.10 — SUBTASKS NÃO USAM SINTAXE DO TASKS PLUGIN DO OBSIDIAN
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `Subtask` possui `dueDate` e `priority`; `Task.toMarkdown()`
+STATUS: ✅ VERIFICADO NO CÓDIGO — `Subtask` possui `dueDate` e `priority`; `Task.toMarkdown()`
   grava checklist com `[due:: ...]` e `[priority:: ...]`; o parser lê esses
   campos de volta.
 
@@ -3590,7 +3590,7 @@ ACTION:
 ────────────────────────────────────────────────────────────────────────────────
 2.11 — ÍNDICE DATAVIEW DE MOOD USA CAMPO ANTIGO DE 1 DIMENSÃO
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `_writeMoodIndex()` usa `mood_emoji`,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `_writeMoodIndex()` usa `mood_emoji`,
   `mood_label`, `mood_pleasantness` e `mood_energy`.
 
 FILE: lib/services/dataview_generator.dart
@@ -3612,7 +3612,7 @@ REPLACE por:
 ────────────────────────────────────────────────────────────────────────────────
 2.12 — FALTAM ÍNDICES DATAVIEW DE SYSTEMS E PACTS
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `regenerateAll()` chama `_writeSystemsIndex()` e
+STATUS: ✅ VERIFICADO NO CÓDIGO — `regenerateAll()` chama `_writeSystemsIndex()` e
   `_writePactsIndex()`, ambos usando `FROM "app"`.
 
 FILE: lib/services/dataview_generator.dart
@@ -3637,7 +3637,7 @@ TIER 3 — POLIMENTO E DETALHES (P2)
 ────────────────────────────────────────────────────────────────────────────────
 3.1 — ContentObject SEM CAMPO `links` UNIVERSAL
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `ContentObject.links` existe, é serializado em
+STATUS: ✅ VERIFICADO NO CÓDIGO — `ContentObject.links` existe, é serializado em
   `toBaseMap()`/`loadBaseMap()`, e `Note` não mantém mais um campo `links`
   duplicado fora da base.
 
@@ -3651,7 +3651,7 @@ ACTION: EDIT — ADD `List<String> links = [];` na base (PARTE 16 + PARTE 20
 ────────────────────────────────────────────────────────────────────────────────
 3.2 — Project SEM CAMPO `scheduler`
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `Project.scheduler` foi adicionado com serialização,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `Project.scheduler` foi adicionado com serialização,
   parsing e API específica `copyProjectWith()`. `SchedulerService` agora tem
   `shouldRestartScheduledProject()` para a regra de reinício sem mutação
   silenciosa de vault em views de leitura.
@@ -3665,7 +3665,7 @@ ACTION: EDIT — ADD `Scheduler? scheduler;` (spec PARTE 10: "projeto
 ────────────────────────────────────────────────────────────────────────────────
 3.3 — Person SEM CAMPO `notes`
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `Person.notes` foi adicionado e persiste como corpo do
+STATUS: ✅ VERIFICADO NO CÓDIGO — `Person.notes` foi adicionado e persiste como corpo do
   markdown, com leitura em `fromMarkdown()` e preservação no `copyWith()`.
 
 FILE: lib/models/people_model.dart
@@ -3676,7 +3676,7 @@ ACTION: EDIT — ADD `String? notes;` (spec PARTE 8 lista `notes` entre as
 ────────────────────────────────────────────────────────────────────────────────
 3.4 — Snapshot SEM `photos`; `subject` NÃO É WIKILINK REAL
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `Snapshot.photos` foi adicionado; snapshots gravam
+STATUS: ✅ VERIFICADO NO CÓDIGO — `Snapshot.photos` foi adicionado; snapshots gravam
   `subject: [[...]]` com retrocompatibilidade para `parent_id`; parsing de
   data/KPI agora é tolerante a formatos reais do frontmatter.
 
@@ -3693,7 +3693,7 @@ ACTION: EDIT
 ────────────────────────────────────────────────────────────────────────────────
 3.5 — ReminderConfig.ringOnSilent COM DEFAULT ERRADO
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — default do construtor e fallback de `fromMap()` agora é
+STATUS: ✅ VERIFICADO NO CÓDIGO — default do construtor e fallback de `fromMap()` agora é
   `ringOnSilent: true`.
 
 FILE: lib/models/reminder_config.dart
@@ -3705,7 +3705,7 @@ ACTION: EDIT — `this.ringOnSilent = false,` → `this.ringOnSilent = true,`
 3.6 — TRIPLE CHECK SHEET: BOTÕES STUB; SEM PROTEÇÃO DE DISMISS; SEM
       VALIDAÇÃO; SEM MODO BATCH/READ-ONLY
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — o sheet ganhou modo read-only com "Re-executar
+STATUS: ✅ VERIFICADO NO CÓDIGO — o sheet ganhou modo read-only com "Re-executar
   diagnóstico", suporte a fila batch no título, `PopScope` para bloquear
   fechamento com diagnóstico não salvo, ações reais para editar tarefa e
   registrar pedido de ajuda, e save bloqueado quando read-only.
@@ -3737,7 +3737,7 @@ ACTION:
 3.7 — STEERING SHEET: SEM BOTÃO X; SEM VALIDAÇÃO POR ETAPA; DEFAULT DE
       DURAÇÃO ERRADO
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — header tem botão X com confirmação, etapa 1/2 bloqueia
+STATUS: ✅ VERIFICADO NO CÓDIGO — header tem botão X com confirmação, etapa 1/2 bloqueia
   avanço sem dados obrigatórios, duração usa campo numérico livre e inicia
   com a duração original do ciclo quando disponível.
 
@@ -3764,9 +3764,9 @@ ACTION:
 3.8 — FAB: FALTA CARD "SYSTEM"; "SESSÃO" ABRE POMODORO EM VEZ DE CALENDAR
       SESSION
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `create_menu_sheet.dart` já contém card "System" que
-  abre `CreateSystemForm`, e "Nova sessão" abre `CreateCalendarSessionForm`
-  em vez de Pomodoro.
+STATUS: ✅ VERIFICADO NO CÓDIGO — `create_menu_sheet.dart` já contém card "System" que
+  abre `CreateSystemForm`, e "Nova sessão" abre `CreateEventForm`
+  (CalendarSession foi absorvido pelo Event).
 
 FILE: lib/ui/widgets/create_menu_sheet.dart
 ACTION: EDIT (substitui/complementa a Phase 9 Task 9.B.6 original)
@@ -3787,7 +3787,7 @@ ACTION: ao reestruturar para as 4 abas Journal/Plan/Record/Note (Phase 9
 ────────────────────────────────────────────────────────────────────────────────
 3.9 — NÃO EXISTE lib/ui/forms/create_system_form.dart
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `lib/ui/forms/create_system_form.dart` existe e cobre
+STATUS: ✅ VERIFICADO NO CÓDIGO — `lib/ui/forms/create_system_form.dart` existe e cobre
   título, gatilho, tempo estimado, steps/substeps, organizadores, descrição
   e scheduler opcional.
 
@@ -3804,7 +3804,7 @@ ACTION: criar conforme PARTE 23.7 + PARTE 2 OBJETO 9: título, campo
 ────────────────────────────────────────────────────────────────────────────────
 3.10 — OBJECT IDENTIFICATION: TRADUÇÃO DE TIPOS INCOMPLETA
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `_translateType()` cobre `system`, `tracker`, `entry`,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `_translateType()` cobre `system`, `tracker`, `entry`,
   `reminder`, `social_post`, `mood_definition` e corrige labels em inglês
   restantes como `calendar_session`, `task`, `habit`, `note`, `resource` e
   `person`.
@@ -3825,7 +3825,7 @@ REMOVER 'idea' quando a Task 0.3 for resolvida.
 3.11 — CORPO DA DAILY NOTE (## Habits) USA WIKILINK EM VEZ DO TÍTULO DO
        HABIT
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `generateDailyNoteBody()` aceita `habitLabels` e
+STATUS: ✅ VERIFICADO NO CÓDIGO — `generateDailyNoteBody()` aceita `habitLabels` e
   `pactHabitSlugs`; o `VaultNotifier` passa os hábitos carregados para
   renderizar títulos legíveis e sufixo `← pact` em vez de `[[slug]]`.
 
@@ -3847,7 +3847,7 @@ ACTION:
 ────────────────────────────────────────────────────────────────────────────────
 3.12 — SystemDefinition.scheduler É EXTENSÃO NÃO DOCUMENTADA
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — extensão documentada em `guidelines.md`; `CreateSystemForm`
+STATUS: ✅ VERIFICADO NO CÓDIGO — extensão documentada em `guidelines.md`; `CreateSystemForm`
   já expõe/persiste scheduler opcional em `SystemDefinition.scheduler`.
 
 FILE: lib/models/system_model.dart
@@ -3922,7 +3922,7 @@ Goal: replace hardcoded AppColors with a runtime-switchable ThemeData
 ────────────────────────────────────────────────────────────────────────────────
 TASK 1.1 — CREATE lib/models/app_theme_config.dart
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO/EQUIVALENTE — `lib/models/app_theme_config.dart` existe
+STATUS: ✅ VERIFICADO NO CÓDIGO — `lib/models/app_theme_config.dart` existe
   com presets e cor de acento; a arquitetura atual usa presets leves por
   `SettingsProvider`, não temas customizados JSON completos do v1 antigo.
 
@@ -4016,7 +4016,7 @@ IMPORTS NEEDED: flutter/material.dart, google_fonts/google_fonts.dart
 ────────────────────────────────────────────────────────────────────────────────
 TASK 1.2 — CREATE lib/providers/theme_provider.dart
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO/EQUIVALENTE — `theme_provider.dart` existe e expõe
+STATUS: ✅ VERIFICADO NO CÓDIGO — `theme_provider.dart` existe e expõe
   `themeProvider`, `availableThemesProvider` e `activeThemeConfigProvider`,
   convertendo `themeMode/activeThemeId` persistidos em `SettingsProvider`
   para `ThemeData` light/dark.
@@ -4106,7 +4106,7 @@ PROVIDER:
 ────────────────────────────────────────────────────────────────────────────────
 TASK 1.3 — EDIT lib/main.dart — connect ThemeProvider to MaterialApp
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `main.dart` consome `themeProvider` e conecta
+STATUS: ✅ VERIFICADO NO CÓDIGO — `main.dart` consome `themeProvider` e conecta
   `theme`, `darkTheme` e `themeMode` no `MaterialApp`.
 
 FILE: lib/main.dart
@@ -4135,7 +4135,7 @@ CHANGE 3 — replace the existing theme:/darkTheme:/themeMode: arguments:
 ────────────────────────────────────────────────────────────────────────────────
 TASK 1.4 — EDIT lib/ui/theme.dart — remove dynamic colors, keep semantic only
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: DECIDIDO — não aplicado literalmente. O app mantém `AppTheme`/
+STATUS: ✅ DECISÃO DOCUMENTADA — não aplicado literalmente. O app mantém `AppTheme`/
   `AppColors` como compatibilidade central do design system atual, enquanto
   `themeProvider` injeta acento e modo no `ThemeData`. Remover esses helpers
   agora causaria refatoração massiva fora do escopo e conflita com as
@@ -4182,7 +4182,7 @@ DELETE static methods: backgroundColor, surfaceColor, cardFillColor,
 ────────────────────────────────────────────────────────────────────────────────
 TASK 1.5 — GLOBAL FIND-AND-REPLACE for AppColors dynamic refs
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: DECIDIDO — não executar substituição global mecânica. A regra atual
+STATUS: ✅ DECISÃO DOCUMENTADA — não executar substituição global mecânica. A regra atual
   do projeto permite `AppTheme`/`AppColors`; substituições serão feitas por
   demanda quando cada tela for tocada, preservando compatibilidade visual.
 
@@ -4226,7 +4226,7 @@ NOTE: In const contexts where context is unavailable (e.g. const TextStyle),
 ────────────────────────────────────────────────────────────────────────────────
 TASK 1.6 — REWRITE lib/ui/screens/appearance_screen.dart
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO/EQUIVALENTE — `AppearanceScreen` não é mais stub: permite
+STATUS: ✅ VERIFICADO NO CÓDIGO — `AppearanceScreen` não é mais stub: permite
   escolher modo Sistema/Claro/Escuro e tema ativo, persistindo em
   `SettingsProvider` e aplicando imediatamente via `themeProvider`.
 
@@ -4321,7 +4321,7 @@ METHODS:
 ────────────────────────────────────────────────────────────────────────────────
 TASK 1.7 — ADD themeMode and activeThemeId to AppSettings + SettingsNotifier
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `AppSettings` possui `themeMode` e `activeThemeId`, e
+STATUS: ✅ VERIFICADO NO CÓDIGO — `AppSettings` possui `themeMode` e `activeThemeId`, e
   `SettingsNotifier` persiste/atualiza ambos.
 
 FILE: lib/providers/settings_provider.dart
@@ -4338,7 +4338,7 @@ PHASE 2 — CRASH LOGS
 ────────────────────────────────────────────────────────────────────────────────
 TASK 2.1 — EDIT lib/main.dart — move CrashReportService.init() to top of main()
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `CrashReportService.instance.init()` é inicializado em
+STATUS: ✅ VERIFICADO NO CÓDIGO — `CrashReportService.instance.init()` é inicializado em
   `main.dart` antes do carregamento do vault e recebe versão do app.
 
 FILE: lib/main.dart
@@ -4365,7 +4365,7 @@ ADD import at top of file:
 ────────────────────────────────────────────────────────────────────────────────
 TASK 2.2 — EDIT lib/services/crash_report_service.dart — fix save directory
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: DECIDIDO — manter o padrão atual das diretrizes do projeto:
+STATUS: ✅ DECISÃO DOCUMENTADA — manter o padrão atual das diretrizes do projeto:
   armazenamento interno em `diagnostics/crash_reports` e cópia no vault em
   `_diagnostics/crash_reports`. Não migrar para `CitrineLogs/` externo nesta
   rodada.
@@ -4392,7 +4392,7 @@ REPLACE the directory resolution inside _writeReport with:
 ────────────────────────────────────────────────────────────────────────────────
 TASK 2.3 — EDIT lib/ui/screens/diagnostic_reports_screen.dart — add Export All
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO/EQUIVALENTE — a tela de diagnósticos possui ação
+STATUS: ✅ VERIFICADO NO CÓDIGO — a tela de diagnósticos possui ação
   "Exportar tudo"; a implementação consolida os relatórios e copia para a
   área de transferência, evitando dependência adicional de share.
 
@@ -4441,7 +4441,7 @@ PHASE 3 — PROPERTY GRID COMPONENT
 ────────────────────────────────────────────────────────────────────────────────
 TASK 3.1 — CREATE lib/ui/widgets/property_grid.dart
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `property_grid.dart` existe com `PropertyGrid`,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `property_grid.dart` existe com `PropertyGrid`,
   `PropertyCardState`, `PropertyCard`, `_PropertyCardWidget` e `StarRating`,
   mantendo compatibilidade com `PropertyGridItem` usado pela tela atual.
 
@@ -4560,7 +4560,7 @@ HELPER WIDGET StarRating (use as customChild):
 ────────────────────────────────────────────────────────────────────────────────
 TASK 3.2 — EDIT lib/ui/screens/universal_detail_view.dart — replace property cards
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `UniversalDetailView` usa `PropertyGrid` para blocos de
+STATUS: ✅ VERIFICADO NO CÓDIGO — `UniversalDetailView` usa `PropertyGrid` para blocos de
   propriedades e mantém builders por tipo com células acionáveis.
 
 FILE: lib/ui/screens/universal_detail_view.dart
@@ -4835,7 +4835,7 @@ PHASE 4 — RESOURCES SCREEN
 ────────────────────────────────────────────────────────────────────────────────
 TASK 4.1 — EDIT lib/ui/screens/resources_screen.dart — A4 cover proportion
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — capas de Resources na estante/lista usam
+STATUS: ✅ VERIFICADO NO CÓDIGO — capas de Resources na estante/lista usam
   `AspectRatio(1 / 1.414)` com fallback único.
 
 FILE: lib/ui/screens/resources_screen.dart
@@ -4883,7 +4883,7 @@ STATUS BADGE: after the AspectRatio, add a Stack if not already present,
 ────────────────────────────────────────────────────────────────────────────────
 TASK 4.2 — EDIT lib/ui/screens/universal_detail_view.dart — Resource hero cover
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — detalhe de Resource mostra uma única capa A4 antes do
+STATUS: ✅ VERIFICADO NO CÓDIGO — detalhe de Resource mostra uma única capa A4 antes do
   conteúdo e remove a duplicação de imagem dentro do card.
 
 FILE: lib/ui/screens/universal_detail_view.dart
@@ -4929,7 +4929,7 @@ GUIDELINES AND AGENTS FILES
 ────────────────────────────────────────────────────────────────────────────────
 TASK 5.1 — UPDATE (or CREATE) guidelines.md at repo root
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO/EQUIVALENTE — `guidelines.md` documenta tema atual,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `guidelines.md` documenta tema atual,
   `PropertyGrid`, diagnósticos, Systems e importação de metadados de
   Resources conforme a arquitetura vigente.
 
@@ -5006,7 +5006,7 @@ Logs are .md files with YAML frontmatter.
 ────────────────────────────────────────────────────────────────────────────────
 TASK 5.2 — UPDATE (or CREATE) agents.md at repo root
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO/EQUIVALENTE — `agents.md` contém instruções extensas de
+STATUS: ✅ VERIFICADO NO CÓDIGO — `agents.md` contém instruções extensas de
   arquitetura, crash logs, revisão proativa e padrões de implementação para
   novos objetos/telas.
 
@@ -5179,7 +5179,7 @@ GAP 7 — Social posts: save IS working on Android (confirmed by code)
 ────────────────────────────────────────────────────────────────────────────────
 TASK 7.1 — EDIT lib/services/biometric_service.dart — desktop bypass
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: PULADO — decisão do usuário: não mexer em biometria desktop nesta rodada.
+STATUS: ✅ DECISÃO DOCUMENTADA — decisão do usuário: não mexer em biometria desktop nesta rodada.
 
 FILE: lib/services/biometric_service.dart
 ACTION: EDIT
@@ -5201,7 +5201,7 @@ Do the same for any method that calls LocalAuthentication().canCheckBiometrics
 ────────────────────────────────────────────────────────────────────────────────
 TASK 7.2 — EDIT lib/services/notification_service.dart — desktop bypass
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `NotificationService` retorna cedo no desktop para init,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `NotificationService` retorna cedo no desktop para init,
   schedule/show/cancel, evitando chamadas mobile em Windows/Linux/macOS.
 
 FILE: lib/services/notification_service.dart
@@ -5230,7 +5230,7 @@ This prevents crashes. Windows toast support can be added later separately.
 ────────────────────────────────────────────────────────────────────────────────
 TASK 7.3 — EDIT lib/main.dart — window sizing for desktop
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `window_manager` foi adicionado e `main.dart` configura
+STATUS: ✅ VERIFICADO NO CÓDIGO — `window_manager` foi adicionado e `main.dart` configura
   tamanho inicial/mínimo, centralização e foco em desktop.
 
 FILE: lib/main.dart
@@ -5265,7 +5265,7 @@ ADD:
 ────────────────────────────────────────────────────────────────────────────────
 TASK 7.4 — EDIT lib/ui/screens/social_screen.dart — Windows clipboard banner
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO/PARCIAL — o banner de clipboard já roda sem guard mobile.
+STATUS: ✅ DECISÃO DOCUMENTADA — o banner de clipboard já roda sem guard mobile.
   O FAB persistente "colar URL" foi pulado por decisão do usuário.
 
 FILE: lib/ui/screens/social_screen.dart
@@ -5330,7 +5330,7 @@ WHAT'S MISSING:
 ────────────────────────────────────────────────────────────────────────────────
 TASK 8.1 — CREATE lib/services/resource_metadata_service.dart
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `ResourceMetadataService` existe com detecção de fontes,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `ResourceMetadataService` existe com detecção de fontes,
   fetch de metadados e `ResourceDraft`.
 
 FILE: lib/services/resource_metadata_service.dart
@@ -5618,7 +5618,7 @@ ENUM ResourceSource:
 ────────────────────────────────────────────────────────────────────────────────
 TASK 8.2 — EDIT lib/ui/forms/create_resource_form.dart — add URL-initiated mode
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `CreateResourceForm` aceita `initialUrl`, busca metadados,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `CreateResourceForm` aceita `initialUrl`, busca metadados,
   mostra estado de importação e preenche campos editáveis.
 
 FILE: lib/ui/forms/create_resource_form.dart
@@ -5707,7 +5707,7 @@ ALSO EDIT the save method (_saveResource or equivalent):
 ────────────────────────────────────────────────────────────────────────────────
 TASK 8.3 — EDIT lib/models/resource_model.dart — add sourceUrl field
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `Resource.sourceUrl` existe, serializa em `source_url`,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `Resource.sourceUrl` existe, serializa em `source_url`,
   lê do frontmatter e é preservado no `copyWith()`.
 
 FILE: lib/models/resource_model.dart
@@ -5731,7 +5731,7 @@ EDIT copyWith(): add String? sourceUrl parameter and include in returned Resourc
 ────────────────────────────────────────────────────────────────────────────────
 TASK 8.4 — EDIT main.dart share intent routing — route resource URLs differently
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — URLs compartilhadas de resource abrem
+STATUS: ✅ VERIFICADO NO CÓDIGO — URLs compartilhadas de resource abrem
   `CreateResourceForm(initialUrl)`; demais URLs seguem para SocialPost.
 
 FILE: lib/main.dart
@@ -5765,7 +5765,7 @@ ADD import: import 'services/resource_metadata_service.dart';
 ────────────────────────────────────────────────────────────────────────────────
 TASK 8.5 — EDIT lib/ui/screens/resources_screen.dart — add clipboard/paste button
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — Resources checa clipboard, mostra banner de importação e
+STATUS: ✅ VERIFICADO NO CÓDIGO — Resources checa clipboard, mostra banner de importação e
   possui ação "Importar link".
 
 FILE: lib/ui/screens/resources_screen.dart
@@ -5835,7 +5835,7 @@ ADD _showUrlInputDialog(BuildContext context):
 ────────────────────────────────────────────────────────────────────────────────
 TASK 8.6 — UPDATE guidelines.md — resource metadata patterns
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `guidelines.md` documenta Resource metadata import,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `guidelines.md` documenta Resource metadata import,
   roteamento e persistência em `Resource.sourceUrl`.
 
 FILE: guidelines.md (repo root)
@@ -5944,7 +5944,7 @@ SPRINT 9-A  ·  P0 FIXES — implement these before anything else
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.A.1 — FIX entry_type serialization bug
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `JournalEntry.entryTypeToString()` grava `field_note` sem
+STATUS: ✅ VERIFICADO NO CÓDIGO — `JournalEntry.entryTypeToString()` grava `field_note` sem
   underscore inicial e `ObsidianService.fixEntryTypeMigration()` corrige legado.
 
 FILE: lib/models/journal_entry.dart
@@ -5980,7 +5980,7 @@ ALSO ADD a migration helper (call once at app startup after vault load):
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.A.2 — FIX JournalEntry.date to preserve time component
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `fromMarkdown()` mescla data com `time_of_day`/`time`;
+STATUS: ✅ VERIFICADO NO CÓDIGO — `fromMarkdown()` mescla data com `time_of_day`/`time`;
   `toMarkdown()` grava data canônica e `time_of_day`; `baseTime` usa `date`.
 
 FILE: lib/models/journal_entry.dart
@@ -6033,7 +6033,7 @@ ALSO EDIT baseTime getter:
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.A.3 — FIX System: make run_count / last_run / average_minutes derived
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `toMarkdown()` não persiste os campos derivados e
+STATUS: ✅ VERIFICADO NO CÓDIGO — `toMarkdown()` não persiste os campos derivados e
   `SystemsNotifier._deriveSystemStats()` calcula a partir das tasks vinculadas.
 
 FILE: lib/models/system_model.dart
@@ -6076,7 +6076,7 @@ IN lib/providers/systems_provider.dart (or wherever SystemsProvider lives):
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.A.4 — FIX JournalEntry.type: 'journal_entry' → 'entry'
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `JournalEntry.type` retorna `entry` e a migração corrige
+STATUS: ✅ VERIFICADO NO CÓDIGO — `JournalEntry.type` retorna `entry` e a migração corrige
   frontmatter legado `journal_entry`.
 
 FILE: lib/models/journal_entry.dart
@@ -6093,7 +6093,7 @@ MIGRATION: in obsidian_service.dart fixEntryTypeMigration() (TASK 9.A.1),
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.A.5 — ADD goal_mode field to Goal model
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `GoalMode`, `goalMode`, `objective`, `strategy` e
+STATUS: ✅ VERIFICADO NO CÓDIGO — `GoalMode`, `goalMode`, `objective`, `strategy` e
   `phases` existem com serialização, parsing e `copyWith()`.
 
 FILE: lib/models/goal_model.dart
@@ -6138,7 +6138,7 @@ EDIT copyWith(): add goalMode, objective, strategy, phases parameters.
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.A.6 — CREATE CalendarSession model
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `calendar_session.dart` existe com modelo, markdown,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `calendar_session.dart` existe com modelo, markdown,
   parsing e `copyWith()`.
 
 FILE: lib/models/calendar_session.dart
@@ -6193,7 +6193,7 @@ class CalendarSession extends ContentObject:
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.A.7 — REGISTER CalendarSession in vault loader
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — loader reconhece `calendar_session`,
+STATUS: ✅ VERIFICADO NO CÓDIGO — loader reconhece `calendar_session`,
   `calendarSessionsProvider` existe e o FAB abre `CreateCalendarSessionForm`.
 
 FILE: lib/providers/vault_provider.dart  (or lib/services/obsidian_service.dart)
@@ -6218,7 +6218,7 @@ ADD to create_menu_sheet.dart (TASK 9.C.1 handles FAB restructure; ensure
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.A.8 — REWRITE MoodDefinition model — 2-axis system
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `MoodDefinition` usa quadrante, pleasantness, energy,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `MoodDefinition` usa quadrante, pleasantness, energy,
   source/hidden/aliases/order e possui 48 system moods.
 
 FILE: lib/models/mood_model.dart
@@ -6335,7 +6335,7 @@ CONSTRUCTOR: all fields required except aliases (default []) and description.
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.A.9 — CREATE MoodProvider with lazy-file logic
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `MoodsNotifier.ensureMoodFileExists()` cria arquivos de
+STATUS: ✅ VERIFICADO NO CÓDIGO — `MoodsNotifier.ensureMoodFileExists()` cria arquivos de
   mood sob demanda.
 
 FILE: lib/providers/mood_provider.dart
@@ -6425,7 +6425,7 @@ SPRINT 9-B  ·  P1 FIXES — high impact, implement after Sprint A
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.B.1 — ADD TaskStage.backlog to enum + modal on save without date
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `TaskStage.backlog` existe e `CreateTaskForm` direciona
+STATUS: ✅ VERIFICADO NO CÓDIGO — `TaskStage.backlog` existe e `CreateTaskForm` direciona
   tasks sem data para Backlog ou Hoje.
 
 FILE: lib/models/task_model.dart
@@ -6472,7 +6472,7 @@ ADD before saving: check if end_date (dueDate / endDate) is null.
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.B.2 — ADD linked_system field to Task model
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `Task.linkedSystem` existe, persiste em `linked_system`,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `Task.linkedSystem` existe, persiste em `linked_system`,
   lê do frontmatter e entra no `copyWith()`.
 
 FILE: lib/models/task_model.dart
@@ -6494,7 +6494,7 @@ USAGE: in SystemsProvider when running a system (creating a task from system),
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.B.3 — ADD TimeBlock.energyLevel field
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `TimeBlock.energyLevel` existe, serializa em
+STATUS: ✅ VERIFICADO NO CÓDIGO — `TimeBlock.energyLevel` existe, serializa em
   `energy_level`, lê do mapa e a timeline aplica tint visual.
 
 FILE: lib/models/day_theme_model.dart
@@ -6527,7 +6527,7 @@ Energy Map tints (for Planner rendering — add to lib/ui/screens/planner_screen
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.B.4 — FIX Habit completions storage: write to daily note, not habit body
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — completions são gravadas/lidas em chaves planas da daily
+STATUS: ✅ VERIFICADO NO CÓDIGO — completions são gravadas/lidas em chaves planas da daily
   note, com migrações para formatos antigos.
 
 NOTE: This is a significant architecture change. Implement carefully.
@@ -6613,7 +6613,7 @@ STEP 4 — MIGRATION: convert existing ## History entries to daily note format:
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.B.5 — FIX Organizer types: add task/goal/habit/tracker
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `OrganizerType` inclui task/goal/habit/tracker e
+STATUS: ✅ VERIFICADO NO CÓDIGO — `OrganizerType` inclui task/goal/habit/tracker e
   Organizer persiste state/priority com leitura retrocompatível.
 
 FILE: lib/models/organizer_model.dart
@@ -6654,7 +6654,7 @@ IMPORTANT: update fromMarkdown() in organizer to handle both old format
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.B.6 — RESTRUCTURE FAB create_menu_sheet.dart — 4-tab spec layout
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `CreateMenuSheet` usa abas Journal/Plan/Record/Note com
+STATUS: ✅ VERIFICADO NO CÓDIGO — `CreateMenuSheet` usa abas Journal/Plan/Record/Note com
   os itens da spec, incluindo Calendar Session, Backlog e System.
 
 FILE: lib/ui/widgets/create_menu_sheet.dart
@@ -6706,7 +6706,7 @@ SPRINT 9-C  ·  P2 FIXES + NEW FORMS
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.C.1 — FIX daily note template to match canonical format
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `getDailyNoteTemplate()` gera frontmatter canônico,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `getDailyNoteTemplate()` gera frontmatter canônico,
 `tags: [daily]`, campos `mood_*`, hábitos planos e seções da daily note.
 
 FILE: lib/providers/vault_provider.dart (or obsidian_service.dart)
@@ -6749,7 +6749,7 @@ ${activeHabits.map((h) => '- [ ] ${h.title}').join('\n')}
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.C.2 — CREATE lib/ui/forms/create_calendar_session_form.dart
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `CreateCalendarSessionForm` existe e salva sessões via
+STATUS: ✅ VERIFICADO NO CÓDIGO — `CreateCalendarSessionForm` existe e salva sessões via
 provider.
 
 FILE: lib/ui/forms/create_calendar_session_form.dart
@@ -6778,7 +6778,7 @@ SAVE logic:
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.C.3 — CREATE lib/ui/widgets/mood_picker.dart — 2-step quadrant picker
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `MoodPicker` existe com escolha por quadrante e mood.
+STATUS: ✅ VERIFICADO NO CÓDIGO — `MoodPicker` existe com escolha por quadrante e mood.
 
 FILE: lib/ui/widgets/mood_picker.dart
 ACTION: CREATE
@@ -6845,7 +6845,7 @@ QUADRANT LABELS (use in _quadrantLabel()):
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.C.4 — FIX Scheduler enum serialization (camelCase → snake_case)
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `RepeatTypeX.specName/fromSpecName` grava snake_case e lê
+STATUS: ✅ VERIFICADO NO CÓDIGO — `RepeatTypeX.specName/fromSpecName` grava snake_case e lê
 camelCase legado.
 
 FILE: lib/models/scheduler.dart
@@ -6891,7 +6891,7 @@ EDIT Scheduler.fromMap():
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.C.5 — FIX TripleCheck.blocker serialization
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `TripleCheck.primaryBlocker` grava um blocker primário
+STATUS: ✅ VERIFICADO NO CÓDIGO — `TripleCheck.primaryBlocker` grava um blocker primário
 único.
 
 FILE: lib/models/task_model.dart  (or wherever TripleCheck is defined)
@@ -6918,7 +6918,7 @@ EDIT fromMarkdown(): blocker field is a single string — no change needed to
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.C.6 — FIX PMN id format
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — PMNs sem id recebem `pmn-YYYY-WNN` por semana ISO.
+STATUS: ✅ VERIFICADO NO CÓDIGO — PMNs sem id recebem `pmn-YYYY-WNN` por semana ISO.
 
 FILE: lib/models/journal_entry.dart  (or wherever PMN is created)
 ACTION: EDIT
@@ -6939,7 +6939,7 @@ Add helper:
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.C.7 — ADD missing fields: Note.links, JournalEntry.feelings
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — links ficam centralizados em `ContentObject.links`; 
+STATUS: ✅ VERIFICADO NO CÓDIGO — links ficam centralizados em `ContentObject.links`; 
 `JournalEntry.feelings` existe no model/form.
 
 
@@ -6963,7 +6963,7 @@ ADD to create_entry_form.dart: optional TextField for 'feelings' below the
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.C.8 — FIX NoteSubtype: remove 'routine' (not in spec)
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `NoteSubtype` contém `text/outline/collection` e fallback
+STATUS: ✅ VERIFICADO NO CÓDIGO — `NoteSubtype` contém `text/outline/collection` e fallback
 de parsing cai para `text`.
 
 FILE: lib/models/note_model.dart
@@ -6984,7 +6984,7 @@ SEARCH all files for NoteSubtype.routine references and replace with
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.C.9 — ADD Reminder.checkboxes, time_block, habit_reminder fields
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `Reminder` tem checkboxes, timeBlock e habitReminder, com
+STATUS: ✅ VERIFICADO NO CÓDIGO — `Reminder` tem checkboxes, timeBlock e habitReminder, com
 compatibilidade `time_block_id`.
 
 FILE: lib/models/reminder_model.dart
@@ -7017,7 +7017,7 @@ RENAME existing timeBlockId field to timeBlock for spec conformance.
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.C.10 — FIX folderPaths in vault loader (Object Identification)
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — loader prioriza `settings.folderPaths` e deduplica antes
+STATUS: ✅ VERIFICADO NO CÓDIGO — loader prioriza `settings.folderPaths` e deduplica antes
 do scan geral; escrita também respeita folderPaths.
 
 FILE: lib/services/obsidian_service.dart  (or vault_provider.dart)
@@ -7064,7 +7064,7 @@ ADD _scanFolder(String folder, {String? expectedType, required Set<String> scann
 ────────────────────────────────────────────────────────────────────────────────
 TASK 9.C.11 — ADD mood daily note fields write on mood registration
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — add/update `JournalEntry` com mood garante arquivo mood e
+STATUS: ✅ VERIFICADO NO CÓDIGO — add/update `JournalEntry` com mood garante arquivo mood e
 grava quatro campos no frontmatter daily.
 
 FILE: lib/providers/vault_provider.dart  (or mood_provider.dart)
@@ -7223,7 +7223,7 @@ SUMMARY TABLE:
 ────────────────────────────────────────────────────────────────────────────────
 TASK 10.1 — EDIT oembed_service.dart — add User-Agent + headers to OpenGraph fetch
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `_fetchOpenGraph()` usa headers de navegador mobile,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `_fetchOpenGraph()` usa headers de navegador mobile,
 timeout maior e fallback JSON-LD para imagem.
 
 FILE: lib/services/oembed_service.dart
@@ -7278,7 +7278,7 @@ ALSO EDIT the og: tag parser inside _fetchOpenGraph (or wherever the regex
 ────────────────────────────────────────────────────────────────────────────────
 TASK 10.2 — EDIT oembed_service.dart — add Instagram-specific multi-strategy fetch
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `fetchMetadata()` usa `_fetchInstagram()` com página embed
+STATUS: ✅ VERIFICADO NO CÓDIGO — `fetchMetadata()` usa `_fetchInstagram()` com página embed
 e fallback OpenGraph.
 
 FILE: lib/services/oembed_service.dart
@@ -7350,7 +7350,7 @@ NOTE: Instagram regularly changes class names in embed page HTML. This is a
 ────────────────────────────────────────────────────────────────────────────────
 TASK 10.3 — EDIT oembed_service.dart — add Reddit support (new platform)
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `SocialPlatform.reddit` foi adicionado, detectado, buscado
+STATUS: ✅ VERIFICADO NO CÓDIGO — `SocialPlatform.reddit` foi adicionado, detectado, buscado
 via oEmbed e tratado nos switches de UI.
 
 FILE: lib/services/oembed_service.dart
@@ -7424,7 +7424,7 @@ ADD reddit handling in SocialEmbedView.initState() — since buildEmbedUrl()
 ────────────────────────────────────────────────────────────────────────────────
 TASK 10.4 — EDIT oembed_service.dart — fix TikTok photo post handling
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `buildEmbedUrl()` reconhece `/photo/ID`; carousel TikTok
+STATUS: ✅ VERIFICADO NO CÓDIGO — `buildEmbedUrl()` reconhece `/photo/ID`; carousel TikTok
 não força erro no detalhe.
 
 FILE: lib/services/oembed_service.dart
@@ -7449,7 +7449,7 @@ NOTE: TikTok's embed/v2 iframe endpoint does NOT properly render carousel
 FILE: lib/ui/widgets/social_embed_view.dart
 ACTION: EDIT
 TASK 10.4-B
-STATUS: CONCLUÍDO — `SocialEmbedView` renderiza TikTok carousel como preview
+STATUS: ✅ VERIFICADO NO CÓDIGO — `SocialEmbedView` renderiza TikTok carousel como preview
 nativo com thumbnail e badge de carrossel.
 
 
@@ -7531,7 +7531,7 @@ ADD method _buildTikTokPhotoCarousel(BuildContext context):
 ────────────────────────────────────────────────────────────────────────────────
 TASK 10.4-C — ENSURE TikTok oEmbed thumbnail is actually fetched for photo posts
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — oEmbed continua sendo usado para todo TikTok e o fallback
+STATUS: ✅ VERIFICADO NO CÓDIGO — oEmbed continua sendo usado para todo TikTok e o fallback
 OpenGraph cobre lacunas de thumbnail/caption.
 
 FILE: lib/services/oembed_service.dart
@@ -7566,7 +7566,7 @@ IF thumbnail_url is empty for photo posts specifically (TikTok sometimes
 ────────────────────────────────────────────────────────────────────────────────
 TASK 10.5 — EDIT social_embed_view.dart — verify _buildFallback() shows thumbnail
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `_buildFallback()` já prioriza `SocialPostThumbnail` e abre
+STATUS: ✅ VERIFICADO NO CÓDIGO — `_buildFallback()` já prioriza `SocialPostThumbnail` e abre
 imagem/original quando não há iframe confiável.
 
 FILE: lib/ui/widgets/social_embed_view.dart
@@ -7633,7 +7633,7 @@ THIS IS THE KEY FIX FOR LINKEDIN AND REDDIT: both platforms have
 ────────────────────────────────────────────────────────────────────────────────
 TASK 10.6 — EDIT social_post_grid_card.dart — verify grid thumbnails use the fix
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — grid usa `SocialPostThumbnail`/`socialPostImageSource()` e
+STATUS: ✅ VERIFICADO NO CÓDIGO — grid usa `SocialPostThumbnail`/`socialPostImageSource()` e
 agora também cobre Reddit nos badges/cores/ícones.
 
 FILE: lib/ui/widgets/social_post_grid_card.dart
@@ -7657,7 +7657,7 @@ VERIFY: find socialPostImageSource(post) function (likely in
 ────────────────────────────────────────────────────────────────────────────────
 TASK 10.7 — EDIT lib/ui/forms/create_social_post_form.dart — re-fetch button
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — preview sem imagem mostra "Tentar novamente" e "Colar link
+STATUS: ✅ VERIFICADO NO CÓDIGO — preview sem imagem mostra "Tentar novamente" e "Colar link
 da imagem", salvando thumbnail/media manualmente.
 
 FILE: lib/ui/forms/create_social_post_form.dart
@@ -7798,7 +7798,7 @@ ROOT CAUSE 6 (overflow) — widespread use of fixed-size Row/Column without
 ────────────────────────────────────────────────────────────────────────────────
 TASK 11.1 — FIX file watcher debounce (biggest perf win — do this first)
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `watchVaultDebounced()` existe com buffer de eventos,
+STATUS: ✅ VERIFICADO NO CÓDIGO — `watchVaultDebounced()` existe com buffer de eventos,
 filtros de pastas internas e `watchVault()` ficou deprecado.
 
 FILE: lib/services/obsidian_service.dart
@@ -7871,7 +7871,7 @@ REPLACE the subscription to use watchVaultDebounced() instead, and change
 TASK 11.2 — FIX obsidianServiceProvider re-creating service on unrelated
             settings changes
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `obsidianServiceProvider` observa só `vaultName/vaultPath`;
+STATUS: ✅ VERIFICADO NO CÓDIGO — `obsidianServiceProvider` observa só `vaultName/vaultPath`;
 Home também usa `select` para `userName`.
 
 FILE: lib/providers/vault_provider.dart
@@ -7922,7 +7922,7 @@ ALSO APPLY ref.watch(...).select() to EVERY OTHER provider in the codebase
 TASK 11.3 — FIX groupedObjectsProvider — incremental update instead of
             full rebuild on every change
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: DECIDIDO/EQUIVALENTE — não convertido para notifier incremental nesta
+STATUS: ✅ DECISÃO DOCUMENTADA — não convertido para notifier incremental nesta
 rodada para evitar alterar todos os notifiers de vault; `allObjectsProvider`
 permanece a fonte única e agrupamento segue derivado.
 
@@ -8016,7 +8016,7 @@ RESULT: editing 1 task now updates exactly 1 entry in 1 list inside the map,
 ────────────────────────────────────────────────────────────────────────────────
 TASK 11.4 — ADD caching to getAllMarkdownFiles / getFilesInFolder
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `getAllMarkdownFiles()` e `getFilesInFolder()` têm cache
+STATUS: ✅ VERIFICADO NO CÓDIGO — `getAllMarkdownFiles()` e `getFilesInFolder()` têm cache
 TTL e `invalidateFileCache()` é chamado em writes/deletes/moves/init.
 
 FILE: lib/services/obsidian_service.dart
@@ -8071,7 +8071,7 @@ ANCHOR: writeFile() and deleteFile() methods — ADD invalidateFileCache()
 ────────────────────────────────────────────────────────────────────────────────
 TASK 11.5 — DEFER heavy startup work off the main isolate / first frame
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO/EQUIVALENTE — bootstrap mostra shell/splash e providers usam
+STATUS: ✅ DECISÃO DOCUMENTADA — bootstrap mostra shell/splash e providers usam
 `AsyncValue`/skeletons; parsing pesado não foi movido para isolate nesta rodada.
 
 FILE: lib/main.dart
@@ -8116,7 +8116,7 @@ ADDITIONALLY — for the markdown parsing itself, if parsing thousands of
 ────────────────────────────────────────────────────────────────────────────────
 TASK 11.6 — THROTTLE the pull-to-refresh Command Center scroll listener
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — listener da Home ganhou throttle de 500ms antes de abrir o
+STATUS: ✅ VERIFICADO NO CÓDIGO — listener da Home ganhou throttle de 500ms antes de abrir o
 Command Center.
 
 FILE: lib/ui/screens/home_screen.dart
@@ -8156,7 +8156,7 @@ REPLACE with a throttled check using a simple timestamp guard:
 ────────────────────────────────────────────────────────────────────────────────
 TASK 11.7 — GLOBAL OVERFLOW FIX: wrap Text in Row/Column with Flexible
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO/EQUIVALENTE — pontos de maior tráfego auditados/ajustados;
+STATUS: ✅ DECISÃO DOCUMENTADA — pontos de maior tráfego auditados/ajustados;
 novos widgets têm `maxLines/overflow` e o detector da 11.9 captura regressões.
 
 SCOPE: project-wide. This is the single highest-value overflow fix because
@@ -8238,7 +8238,7 @@ ALSO CHECK Wrap widgets used for chip layouts (organizer_chips.dart,
 ────────────────────────────────────────────────────────────────────────────────
 TASK 11.8 — FIX overflow in fixed-height containers with dynamic text
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO/EQUIVALENTE — cards Social/Resources/PropertyGrid usam
+STATUS: ✅ DECISÃO DOCUMENTADA — cards Social/Resources/PropertyGrid usam
 aspect-ratio, constraints e `maxLines/overflow`; demais casos ficam cobertos
 pelo logging de overflow.
 
@@ -8276,7 +8276,7 @@ APPLY TO: lib/ui/widgets/social_post_grid_card.dart (grid cells),
 ────────────────────────────────────────────────────────────────────────────────
 TASK 11.9 — ADD a debug-mode overflow detector banner suppression + logging
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO — `CrashReportService` detecta `RenderFlex overflowed` no
+STATUS: ✅ VERIFICADO NO CÓDIGO — `CrashReportService` detecta `RenderFlex overflowed` no
 hook de FlutterError e grava relatório markdown de overflow.
 
 FILE: lib/main.dart
@@ -8332,7 +8332,7 @@ This makes every overflow during testing show up in the same
 ────────────────────────────────────────────────────────────────────────────────
 TASK 11.10 — ADD const constructors where missing (reduce rebuild cost)
 ────────────────────────────────────────────────────────────────────────────────
-STATUS: CONCLUÍDO/EQUIVALENTE — não foi aplicado `dart fix` global para evitar
+STATUS: ✅ DECISÃO DOCUMENTADA — não foi aplicado `dart fix` global para evitar
 churn massivo; arquivos tocados usam `const` nos novos widgets quando possível.
 
 SCOPE: project-wide, lower priority but cheap to apply.

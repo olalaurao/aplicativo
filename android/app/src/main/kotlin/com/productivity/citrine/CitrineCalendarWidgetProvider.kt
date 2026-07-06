@@ -69,17 +69,14 @@ open class CitrineCalendarWidgetProvider : AppWidgetProvider() {
         views.setTextColor(R.id.widget_add_button, textColor)
         views.setOnClickPendingIntent(
             R.id.widget_sync_button,
-            CitrineWidgetUtils.openUriIntent(
+            CitrineWidgetUtils.backgroundIntent(
                 context,
-                "citrine://widget-toggle?type=calendar_offset&offset=0",
+                "citrine://widget-toggle?type=refresh_widgets"
             )
         )
         views.setOnClickPendingIntent(
             R.id.widget_add_button,
-            CitrineWidgetUtils.openUriIntent(
-                context,
-                "citrine:///",
-            )
+            CitrineWidgetUtils.quickAddPopupIntent(context)
         )
 
         if (mode == "month") {
@@ -151,6 +148,13 @@ open class CitrineCalendarWidgetProvider : AppWidgetProvider() {
                 "Atrasados ($overdueCount)",
             )
             views.setTextColor(R.id.overdue_header, 0xFFEF4444.toInt())
+            views.setOnClickPendingIntent(
+                R.id.overdue_header,
+                CitrineWidgetUtils.openUriIntent(
+                    context,
+                    "citrine:///overdue"
+                )
+            )
         } else {
             views.setViewVisibility(R.id.overdue_header, View.GONE)
         }

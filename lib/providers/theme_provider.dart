@@ -26,7 +26,7 @@ final availableThemesProvider = Provider<List<AppThemeConfig>>((ref) {
 final activeThemeConfigProvider = Provider<AppThemeConfig>((ref) {
   final settings = ref.watch(settingsProvider);
   final presets = ref.watch(availableThemesProvider);
-  return presets.firstWhere(
+  final baseTheme = presets.firstWhere(
     (theme) => theme.id == settings.activeThemeId,
     orElse: () {
       final accentHex = settings.accentColor.toUpperCase();
@@ -35,6 +35,22 @@ final activeThemeConfigProvider = Provider<AppThemeConfig>((ref) {
         orElse: () => presets.first,
       );
     },
+  );
+  
+  // Apply custom background color and font if set
+  Color? customBackgroundColor;
+  if (settings.backgroundColor != null) {
+    customBackgroundColor = AppThemeConfig.colorFromHex(settings.backgroundColor!);
+  }
+  
+  return AppThemeConfig(
+    id: baseTheme.id,
+    label: baseTheme.label,
+    accentColor: baseTheme.accentColor,
+    backgroundColor: customBackgroundColor ?? baseTheme.backgroundColor,
+    icon: baseTheme.icon,
+    description: baseTheme.description,
+    fontFamily: settings.fontFamily ?? baseTheme.fontFamily,
   );
 });
 
@@ -50,7 +66,14 @@ final themeProvider = Provider<AppThemeBundle>((ref) {
   return AppThemeBundle(
     config: config,
     themeMode: themeMode,
-    lightTheme: AppTheme.getLightTheme(config.accentColor),
-    darkTheme: AppTheme.getDarkTheme(config.accentColor),
+    lightTheme: AppTheme.getLightTheme(
+      config.accentColor,
+      backgroundColor: config.backgroundColor,
+      fontFamily: config.fontFamily,
+    ),
+    darkTheme: AppTheme.getDarkTheme(
+      config.accentColor,
+      fontFamily: config.fontFamily,
+    ),
   );
 });

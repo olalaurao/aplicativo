@@ -468,7 +468,25 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
 
     // Post-process Habits and Trackers
     for (final habit in finalResults.whereType<Habit>()) {
+      // Build a map of existing completions from habit's .md file to preserve them
+      final existingCompletions = <String, CompletionRecord>{};
+      for (final record in habit.completionHistory) {
+        final dateStr = record.date.toIso8601String().split('T').first;
+        existingCompletions[dateStr] = record;
+      }
+
+      // Clear history to avoid duplicates, then rebuild
       habit.completionHistory.clear();
+
+      // First add existing completions that aren't in daily notes (historical data)
+      final dailyNoteDates = dailyHabitCompletions.keys.toSet();
+      for (final entry in existingCompletions.entries) {
+        if (!dailyNoteDates.contains(entry.key)) {
+          habit.completionHistory.add(entry.value);
+        }
+      }
+
+      // Then add daily note completions (more authoritative for current state)
       dailyHabitCompletions.forEach((dateStr, completions) {
         final completion = completions.firstWhere(
           (c) => c['slug'] == habit.slug,

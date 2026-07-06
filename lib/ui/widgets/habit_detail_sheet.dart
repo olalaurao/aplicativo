@@ -328,7 +328,7 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
 
               // ─── Slots/Goal Section ───
               Text(
-                currentHabit.dailyGoal > 1 ? 'METAS DIÁRIAS' : 'REGISTRO DIÁRIO',
+                currentHabit.dailyGoal > 1 ? 'DAILY GOALS' : 'DAILY LOG',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,

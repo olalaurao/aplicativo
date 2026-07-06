@@ -24,6 +24,20 @@ class MainActivity : FlutterActivity() {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
         enableLockScreenPresentation()
+        
+        // Check if opened via fullScreenIntent notification
+        if (isNotificationLaunch(intent)) {
+            // Make window translucent for overlay effect
+            window.setBackgroundDrawableResource(android.R.color.transparent)
+            window.setDimAmount(0f)
+        }
+    }
+    
+    private fun isNotificationLaunch(intent: Intent?): Boolean {
+        if (intent == null) return false
+        // Check for notification payload or fullScreenIntent flags
+        return intent.hasExtra("payload") || 
+               (intent.getBooleanExtra("from_notification", false))
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -31,6 +45,13 @@ class MainActivity : FlutterActivity() {
         setIntent(intent)
         handleIntent(intent)
         enableLockScreenPresentation()
+        
+        // Check if opened via fullScreenIntent notification
+        if (isNotificationLaunch(intent)) {
+            // Make window translucent for overlay effect
+            window.setBackgroundDrawableResource(android.R.color.transparent)
+            window.setDimAmount(0f)
+        }
     }
 
     override fun onResume() {

@@ -27,9 +27,26 @@ open class CitrineShoppingWidgetProvider : AppWidgetProvider() {
         views.setInt(R.id.shopping_root, "setBackgroundColor", CitrineWidgetUtils.bgColor(context))
         views.setTextColor(R.id.shopping_title, CitrineWidgetUtils.textColor(context))
         views.setTextColor(R.id.shopping_subtitle, CitrineWidgetUtils.mutedColor(context))
+        views.setTextColor(R.id.shopping_sync_btn, CitrineWidgetUtils.mutedColor(context))
+        views.setTextColor(R.id.shopping_add_btn, CitrineWidgetUtils.textColor(context))
 
         views.setTextViewText(R.id.shopping_title, data.optString("title", "Lista de Mercado"))
         views.setTextViewText(R.id.shopping_subtitle, data.optString("subtitle", "0 pendentes"))
+
+        // Sync button - refresh widget without opening app
+        views.setOnClickPendingIntent(
+            R.id.shopping_sync_btn,
+            CitrineWidgetUtils.backgroundIntent(
+                context,
+                "citrine://widget-toggle?type=refresh_widgets"
+            )
+        )
+
+        // Add button - open shopping add popup
+        views.setOnClickPendingIntent(
+            R.id.shopping_add_btn,
+            CitrineWidgetUtils.shoppingAddPopupIntent(context)
+        )
 
         val isDark = CitrineWidgetUtils.isDark(context)
 
@@ -40,7 +57,8 @@ open class CitrineShoppingWidgetProvider : AppWidgetProvider() {
             emptyView.setTextColor(R.id.empty_text, CitrineWidgetUtils.mutedColor(context))
             views.addView(R.id.shopping_list, emptyView)
         } else {
-            for (i in 0 until minOf(items.length(), 6)) {
+            // Limit to 5 items for better performance and memory efficiency
+            for (i in 0 until minOf(items.length(), 5)) {
                 val item = items.getJSONObject(i)
                 val itemView = RemoteViews(context.packageName, R.layout.widget_item_shopping)
                 
@@ -68,11 +86,6 @@ open class CitrineShoppingWidgetProvider : AppWidgetProvider() {
 
         views.setOnClickPendingIntent(
             R.id.shopping_root,
-            CitrineWidgetUtils.openUriIntent(context, "citrine:///shopping")
-        )
-
-        views.setOnClickPendingIntent(
-            R.id.shopping_add_btn,
             CitrineWidgetUtils.openUriIntent(context, "citrine:///shopping")
         )
 

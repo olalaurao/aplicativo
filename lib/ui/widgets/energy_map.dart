@@ -176,7 +176,7 @@ class EnergyMap extends ConsumerWidget {
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'Adicione notas com category: energy ou registre seu humor diário para ver seu mapa de energia.',
+              'Add notes with category: energy or log your daily mood to see your energy map.',
               style: TextStyle(
                 color: AppColors.textMuted,
                 fontSize: 12,

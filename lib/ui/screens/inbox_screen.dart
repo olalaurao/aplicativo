@@ -475,8 +475,8 @@ class _TriageSheet extends ConsumerWidget {
               _TriageOption(
                 icon: Icons.menu_book_rounded,
                 color: AppColors.primary,
-                label: 'É uma entrada do journal',
-                subtitle: 'Adicionar ao diário de hoje',
+                label: 'It is a journal entry',
+                subtitle: 'Add to today\'s journal',
                 onTap: () async {
                   await _openFormAndTriage(
                     context,

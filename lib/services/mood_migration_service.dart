@@ -68,7 +68,7 @@ class MoodMigrationService {
         final migrated = migrateMood(mood);
         
         // Write the migrated mood back to disk
-        await _obsidianService.writeMarkdownFile(
+        await _obsidianService.writeFile(
           migrated.obsidianPath ?? 'moods/${mood.id}.md',
           migrated.toMarkdown(),
         );

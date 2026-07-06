@@ -58,6 +58,17 @@ class ObsidianService {
       'daily',
       'moods',
       'analyses',
+      'goals',
+      'tasks',
+      'habits',
+      'trackers',
+      'notes',
+      'resources',
+      'organizers/areas',
+      'organizers/projects',
+      'organizers/activities',
+      'organizers/people',
+      'organizers/labels',
       '_attachments',
       '_deleted',
       '_conflicts',
@@ -362,6 +373,8 @@ class ObsidianService {
       if (entity is File && entity.path.endsWith('.md')) {
         final path = entity.path.replaceAll('\\', '/');
         if (path.contains('/_attachments/') ||
+            path.contains('/_diagnostics/') ||
+            path.contains('/crash_reports/') ||
             (!includeDeleted && path.contains('/_deleted/'))) {
           continue;
         }

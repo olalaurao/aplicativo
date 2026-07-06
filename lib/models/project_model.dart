@@ -3,6 +3,7 @@ import 'organizer_model.dart';
 import 'scheduler.dart';
 import 'shared_types.dart';
 import 'task_model.dart';
+import 'kpi_model.dart' as kpi;
 
 enum ProjectState { active, paused, completed, archived }
 
@@ -94,6 +95,7 @@ class Project extends Organizer {
   String? description;
   String? primaryKpiId;
   List<String> secondaryKpiIds;
+  List<kpi.KPI> kpis;
   List<String> taskLinks; // List of Task slugs/IDs
   List<String> quickAccessLinks; // List of WikiLinks
   int totalPomodoroTime; // Minutes
@@ -137,6 +139,7 @@ class Project extends Organizer {
     this.description,
     this.primaryKpiId,
     List<String>? secondaryKpiIds,
+    List<kpi.KPI>? kpis,
     List<String>? taskLinks,
     List<String>? quickAccessLinks,
     this.totalPomodoroTime = 0,
@@ -163,6 +166,7 @@ class Project extends Organizer {
     super.updatedAt,
     super.obsidianPath,
   }) : secondaryKpiIds = secondaryKpiIds ?? [],
+       kpis = kpis ?? [],
        taskLinks = taskLinks ?? [],
        quickAccessLinks = quickAccessLinks ?? [],
        rotationGroups = rotationGroups ?? [],
@@ -188,6 +192,7 @@ class Project extends Organizer {
     if (description != null) frontmatter['description'] = description;
     if (primaryKpiId != null) frontmatter['primary_kpi'] = primaryKpiId;
     frontmatter['secondary_kpis'] = secondaryKpiIds;
+    if (kpis.isNotEmpty) frontmatter['kpis'] = kpis.map((e) => e.toMap()).toList();
     frontmatter['tasks'] = taskLinks;
     frontmatter['quick_access'] = quickAccessLinks;
     frontmatter['total_pomodoro_time'] = totalPomodoroTime;
@@ -260,6 +265,10 @@ class Project extends Organizer {
     project.secondaryKpiIds = List<String>.from(
       frontmatter['secondary_kpis'] as List? ?? [],
     );
+    project.kpis = (frontmatter['kpis'] as List? ?? [])
+        .whereType<Map>()
+        .map((e) => kpi.KPI.fromMap(Map<String, dynamic>.from(e)))
+        .toList();
     project.taskLinks = List<String>.from(frontmatter['tasks'] as List? ?? []);
     project.quickAccessLinks = List<String>.from(
       frontmatter['quick_access'] as List? ?? [],

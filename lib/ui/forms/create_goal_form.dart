@@ -883,6 +883,7 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
                   sourceId: _sourceId,
                   fieldId: _fieldId,
                   targetValue: double.tryParse(_targetController.text) ?? 100,
+                  autoComplete: false,
                 );
                 widget.onSave(kpi);
                 Navigator.pop(context);

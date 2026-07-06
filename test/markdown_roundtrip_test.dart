@@ -571,7 +571,7 @@ Texto original.
       );
       final block = DashboardBlock(
         id: 'home-area',
-        type: BlockType.organizerSummary,
+        type: BlockType.custom,
         title: 'Filtro',
         order: 0,
         metadata: {

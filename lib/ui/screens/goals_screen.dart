@@ -24,16 +24,16 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
   Widget build(BuildContext context) {
     final goals = ref.watch(goalsProvider);
     final activeGoals = goals
-        .where((g) => g.state == GoalStatus.active)
+        .where((g) => g.state == GoalStatus.active && !g.archived)
         .toList();
     final completedGoals = goals
-        .where((g) => g.state == GoalStatus.completed)
+        .where((g) => g.state == GoalStatus.completed && !g.archived)
         .toList();
     final onHoldGoals = goals
-        .where((g) => g.state == GoalStatus.onHold)
+        .where((g) => g.state == GoalStatus.onHold && !g.archived)
         .toList();
     final cancelledGoals = goals
-        .where((g) => g.state == GoalStatus.cancelled)
+        .where((g) => g.state == GoalStatus.cancelled && !g.archived)
         .toList();
 
     return Scaffold(
@@ -120,20 +120,20 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
                         if (activeGoals.isNotEmpty) ...[
                           _buildSectionHeader('IN PROGRESS'),
                           const SizedBox(height: 12),
-                          ...activeGoals.map((g) => _GoalCard(goal: g)),
+                          ...activeGoals.map((g) => _GoalCard(key: ValueKey(g.id), goal: g)),
                         ],
                         if (onHoldGoals.isNotEmpty) ...[
                           const SizedBox(height: 32),
                           _buildSectionHeader('ON HOLD'),
                           const SizedBox(height: 12),
-                          ...onHoldGoals.map((g) => _GoalCard(goal: g)),
+                          ...onHoldGoals.map((g) => _GoalCard(key: ValueKey(g.id), goal: g)),
                         ],
                         if (completedGoals.isNotEmpty) ...[
                           const SizedBox(height: 32),
                           _buildSectionHeader('COMPLETED'),
                           const SizedBox(height: 12),
                           ...completedGoals.map(
-                            (g) => _GoalCard(goal: g, isCompleted: true),
+                            (g) => _GoalCard(key: ValueKey(g.id), goal: g, isCompleted: true),
                           ),
                         ],
                         if (cancelledGoals.isNotEmpty) ...[
@@ -141,7 +141,7 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
                           _buildSectionHeader('CANCELLED'),
                           const SizedBox(height: 12),
                           ...cancelledGoals.map(
-                            (g) => _GoalCard(goal: g, isCompleted: true),
+                            (g) => _GoalCard(key: ValueKey(g.id), goal: g, isCompleted: true),
                           ),
                         ],
                       ],
@@ -193,7 +193,7 @@ class _GoalCard extends ConsumerWidget {
   final Goal goal;
   final bool isCompleted;
 
-  const _GoalCard({required this.goal, this.isCompleted = false});
+  const _GoalCard({super.key, required this.goal, this.isCompleted = false});
 
   Color _goalColor(String? rawColor) {
     if (rawColor == null || rawColor.trim().isEmpty) return AppColors.primary;
@@ -212,14 +212,12 @@ class _GoalCard extends ConsumerWidget {
     final color = _goalColor(goal.color);
     final accentColor = color;
 
-    return ObjectActionWrapper(
-      object: goal,
-      child: GestureDetector(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => UniversalDetailView(object: goal)),
-        ),
-        child: Container(
+    return InkWell(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => UniversalDetailView(object: goal)),
+      ),
+      child: Container(
           margin: const EdgeInsets.only(bottom: 16),
           decoration: AppTheme.cardDecoration(context),
           child: ClipRRect(
@@ -271,7 +269,6 @@ class _GoalCard extends ConsumerWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              // F3.11: Add Incomplete badge
                               IncompleteBadge(visible: goal.isIncomplete),
                               const SizedBox(width: 8),
                               const Icon(
@@ -305,7 +302,6 @@ class _GoalCard extends ConsumerWidget {
             ),
           ),
         ),
-      ),
     );
   }
 

@@ -214,13 +214,19 @@ class AppTheme {
   }
 
   // ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ Themes ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬ââââ€šÂ¬Ã‚Ââââ‚¬Å¡Ã‚Â¬
-  static ThemeData getLightTheme(Color accentColor) {
+  static ThemeData getLightTheme(
+    Color accentColor, {
+    Color? backgroundColor,
+    String? fontFamily,
+  }) {
     final base = ThemeData(brightness: Brightness.light, useMaterial3: true);
-    final textTheme = GoogleFonts.interTextTheme(base.textTheme);
+    final textTheme = fontFamily != null
+        ? GoogleFonts.getTextTheme(fontFamily, base.textTheme)
+        : GoogleFonts.interTextTheme(base.textTheme);
 
     return base.copyWith(
       
-      scaffoldBackgroundColor: AppColors.background,
+      scaffoldBackgroundColor: backgroundColor ?? AppColors.background,
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: CupertinoPageTransitionsBuilder(),
@@ -351,9 +357,14 @@ class AppTheme {
     );
   }
 
-  static ThemeData getDarkTheme(Color accentColor) {
+  static ThemeData getDarkTheme(
+    Color accentColor, {
+    String? fontFamily,
+  }) {
     final base = ThemeData(brightness: Brightness.dark, useMaterial3: true);
-    final textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(
+    final textTheme = (fontFamily != null
+        ? GoogleFonts.getTextTheme(fontFamily, base.textTheme)
+        : GoogleFonts.interTextTheme(base.textTheme)).apply(
       bodyColor: AppColors.darkTextPrimary,
       displayColor: AppColors.darkTextPrimary,
     );

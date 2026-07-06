@@ -210,7 +210,7 @@ class _PopupNotificationScreenState
     return PopScope(
       canPop: true,
       child: Scaffold(
-        backgroundColor: Colors.black.withValues(alpha: 0.6),
+        backgroundColor: Colors.transparent,
         body: FadeTransition(
           opacity: _fadeAnimation,
           child: GestureDetector(

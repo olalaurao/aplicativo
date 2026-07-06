@@ -179,7 +179,20 @@ class NotificationService with WidgetsBindingObserver {
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
-    await android?.requestNotificationsPermission();
+    
+    // Request notification permissions explicitly
+    final granted = await android?.requestNotificationsPermission();
+    debugPrint('NotificationService: notification permission granted: $granted');
+    
+    // Also request POST_NOTIFICATIONS permission for Android 13+
+    if (Platform.isAndroid) {
+      try {
+        final result = await PermissionService.requestAllPermissions();
+        debugPrint('NotificationService: permissions requested');
+      } catch (e) {
+        debugPrint('NotificationService: permission request failed: $e');
+      }
+    }
 
     // Register lifecycle observer
     WidgetsBinding.instance.addObserver(this);
@@ -292,7 +305,7 @@ class NotificationService with WidgetsBindingObserver {
     if (android == null) return;
 
     // Alarms Channel
-    const alarmChannel = AndroidNotificationChannel(
+    final alarmChannel = AndroidNotificationChannel(
       'alarm_channel_v5',
       'Alarms',
       description: 'High priority intrusive alarms',
@@ -300,28 +313,31 @@ class NotificationService with WidgetsBindingObserver {
       playSound: true,
       enableVibration: true,
       enableLights: true,
+      vibrationPattern: Int64List.fromList(<int>[0, 500, 200, 500]),
       audioAttributesUsage: AudioAttributesUsage.alarm,
     );
 
     // Popups Channel
-    const popupChannel = AndroidNotificationChannel(
+    final popupChannel = AndroidNotificationChannel(
       'popup_channel_v5',
       'Popups',
       description: 'Important visual popups',
       importance: Importance.max,
       playSound: true,
       enableVibration: true,
+      vibrationPattern: Int64List.fromList(<int>[0, 300, 200, 300]),
       audioAttributesUsage: AudioAttributesUsage.alarm,
     );
 
     // Reminders Channel
-    const reminderChannel = AndroidNotificationChannel(
+    final reminderChannel = AndroidNotificationChannel(
       'reminder_channel_v2',
       'Reminders',
       description: 'General task reminders',
       importance: Importance.max,
       playSound: true,
       enableVibration: true,
+      vibrationPattern: Int64List.fromList(<int>[0, 250, 150, 250]),
     );
 
     // Immediate Channel
@@ -555,11 +571,9 @@ class NotificationService with WidgetsBindingObserver {
           ? AndroidNotificationCategory.alarm
           : AndroidNotificationCategory.reminder,
       // Use user-configurable sound and vibration settings
-      playSound: isAlarm ? true : config.playSound,
-      enableVibration: isAlarm || config.vibrate,
-      vibrationPattern: (isAlarm || config.vibrate)
-          ? Int64List.fromList(const <int>[0, 700, 350, 700])
-          : null,
+      // Note: vibrationPattern is set at channel level, not here
+      playSound: (isAlarm || isPopup) ? true : config.playSound,
+      enableVibration: (isAlarm || isPopup) || config.vibrate,
       audioAttributesUsage: isAlarm || isPopup
           ? AudioAttributesUsage.alarm
           : AudioAttributesUsage.notification,

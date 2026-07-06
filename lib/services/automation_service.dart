@@ -11,7 +11,9 @@ import '../models/content_object.dart';
 import '../providers/vault_provider.dart';
 import '../services/kpi_engine.dart';
 import '../models/goal_model.dart';
+import '../models/project_model.dart';
 import '../models/tracker_model.dart';
+import '../models/kpi_model.dart' as kpi;
 import '../models/sync_action.dart';
 import 'notification_service.dart';
 import 'markdown_parser.dart';
@@ -429,6 +431,7 @@ class AutomationService {
     _updatingKpis = true;
     try {
       final goals = ref.read(goalsProvider);
+      final projects = ref.read(projectsProvider);
       final habits = ref.read(habitsProvider);
       final trackers = ref.read(trackingRecordsProvider);
       final entries = ref.read(allEntriesProvider);
@@ -461,7 +464,7 @@ class AutomationService {
               body:
                   '${kpi.title}: ${newValue.toStringAsFixed(0)} / ${kpi.targetValue.toStringAsFixed(0)}',
             );
-            if (kpi.autoCompleteAction != null) {
+            if (kpi.autoComplete && kpi.autoCompleteAction != null) {
               try {
                 final action = ActionDef.fromJson(kpi.autoCompleteAction!);
                 await _executeActionDef(ref, action, kpi.title, DateTime.now());
@@ -474,6 +477,59 @@ class AutomationService {
         if (goalChanged) {
           await ref.read(goalsProvider.notifier).updateGoal(goal);
           await checkKPIGoals(ref, goal);
+        }
+      }
+
+      // Update KPIs for projects
+      for (final project in projects) {
+        if (project.projectState != ProjectState.active) continue;
+        
+        bool projectChanged = false;
+        for (final kpi in project.kpis) {
+          final newValue = KPIEngine.calculateKPIValue(
+            kpi: kpi,
+            habits: habits,
+            trackerRecords: trackers,
+            entries: entries,
+            moods: moods,
+            notes: notes,
+            tasks: tasks,
+          );
+          if (kpi.currentValue != newValue) {
+            kpi.currentValue = newValue;
+            projectChanged = true;
+          }
+          if (!kpi.completed && newValue >= kpi.targetValue) {
+            kpi.completed = true;
+            projectChanged = true;
+            await NotificationService().showImmediateNotification(
+              id: kpi.id.hashCode.abs() % 1000000,
+              title: 'Project KPI atingido',
+              body:
+                  '${project.title} - ${kpi.title}: ${newValue.toStringAsFixed(0)} / ${kpi.targetValue.toStringAsFixed(0)}',
+            );
+            if (kpi.autoComplete && kpi.autoCompleteAction != null) {
+              try {
+                final action = ActionDef.fromJson(kpi.autoCompleteAction!);
+                await _executeActionDef(ref, action, kpi.title, DateTime.now());
+              } catch (e) {
+                debugPrint('Falha ao executar ação automática do KPI: $e');
+              }
+            }
+          }
+        }
+        if (projectChanged) {
+          await ref.read(projectsProvider.notifier).updateProject(project);
+          // Check if all KPIs are met to complete the project
+          if (project.kpis.isNotEmpty && project.kpis.every((k) => k.completed)) {
+            project.projectState = ProjectState.completed;
+            await ref.read(projectsProvider.notifier).updateProject(project);
+            await NotificationService().showImmediateNotification(
+              id: project.id.hashCode.abs() % 1000000,
+              title: 'Projeto completado',
+              body: 'Todos os KPIs do projeto "${project.title}" foram atingidos!',
+            );
+          }
         }
       }
     } finally {

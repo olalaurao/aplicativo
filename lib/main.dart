@@ -15,12 +15,14 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:uuid/uuid.dart';
 
 import 'ui/theme.dart';
 import 'models/task_model.dart';
 import 'models/habit_model.dart';
 import 'models/template_model.dart';
 import 'models/content_object.dart';
+import 'models/shopping_list_model.dart' as shopping_list_model;
 import 'providers/vault_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/theme_provider.dart';
@@ -65,6 +67,7 @@ import 'ui/screens/sync_conflicts_screen.dart';
 import 'ui/screens/day_theme_screen.dart';
 import 'ui/screens/universal_detail_view.dart';
 import 'ui/screens/organizer_detail_screen.dart';
+import 'ui/screens/overdue_detail_screen.dart';
 import 'ui/forms/create_social_post_form.dart';
 import 'ui/widgets/pomodoro_floating_clock.dart';
 import 'ui/widgets/notification_popup_overlay.dart';
@@ -126,6 +129,76 @@ Future<void> _handleWidgetToggleUri(
     debugPrint(
       '[WidgetCallback] calendar offset updated: ${currentOffset + offset}',
     );
+    return;
+  }
+
+  if (type == 'refresh_widgets') {
+    await forceWidgetSync(container);
+    debugPrint('[WidgetCallback] widgets refreshed');
+    return;
+  }
+
+  if (type == 'quick_add') {
+    final title = uri.queryParameters['title'];
+    if (title != null && title.isNotEmpty) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final newTask = Task(
+        id: const Uuid().v4(),
+        title: title,
+        createdAt: now,
+        updatedAt: now,
+        stage: TaskStage.todo,
+        endDate: today,
+        allDay: true,
+      );
+      await container.read(tasksProvider.notifier).addTask(newTask);
+      await forceWidgetSync(container);
+      debugPrint('[WidgetCallback] quick add task: $title');
+    }
+    return;
+  }
+
+  if (type == 'shopping_add') {
+    final name = uri.queryParameters['name'];
+    if (name != null && name.isNotEmpty) {
+      // Find first active shopping list or create default
+      final objects = await container.read(allObjectsProvider.future);
+      final shoppingLists = objects
+          .whereType<shopping_list_model.ShoppingList>()
+          .where((list) => !list.archived)
+          .toList();
+      
+      shopping_list_model.ShoppingList targetList;
+      if (shoppingLists.isEmpty) {
+        // Create default shopping list
+        targetList = shopping_list_model.ShoppingList(
+          id: const Uuid().v4(),
+          title: 'Lista de Mercado',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          archived: false,
+          items: [],
+        );
+        await container.read(vaultProvider.notifier).createObject(targetList);
+      } else {
+        targetList = shoppingLists.first;
+      }
+      
+      // Add item to list
+      final newItem = shopping_list_model.ShoppingItem(
+        id: const Uuid().v4(),
+        name: name,
+        status: shopping_list_model.ShoppingItemStatus.active,
+      );
+      final updatedList = targetList.copyWith(
+        items: [...targetList.items, newItem],
+        updatedAt: DateTime.now(),
+      );
+      await container.read(vaultProvider.notifier).updateObject(updatedList);
+      await forceWidgetSync(container);
+      debugPrint('[WidgetCallback] shopping add item: $name');
+    }
     return;
   }
 
@@ -240,6 +313,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
   Timer? _midnightTimer;
   DateTime _lastCheckedDate = DateTime.now();
   String? _pendingSharedUrl;
+  String? _lastProcessedSharedText;
 
   @override
   void initState() {
@@ -334,6 +408,12 @@ class _BootstrapAppState extends State<BootstrapApp> {
     try {
       const channel = MethodChannel('com.productivity.citrine/settings');
       final text = await channel.invokeMethod<String>('getAndClearSharedText');
+      if (text == null || text.trim().isEmpty) return;
+      if (text == _lastProcessedSharedText) {
+        debugPrint('Skipping duplicate shared text: $text');
+        return;
+      }
+      _lastProcessedSharedText = text;
       final url = _extractUrlFromText(text);
       if (url != null) {
         _openSharedUrl(url);
@@ -849,6 +929,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const DayThemeScreen(),
           ),
           GoRoute(
+            path: '/overdue',
+            builder: (context, state) => const OverdueDetailScreen(),
+          ),
+          GoRoute(
             path: '/detail/:id',
             builder: (context, state) {
               final extra = state.extra as Map<String, dynamic>?;
@@ -963,3 +1047,4 @@ class _OrganizerDetailResolver extends ConsumerWidget {
     return OrganizerDetailScreen(organizer: organizer);
   }
 }
+

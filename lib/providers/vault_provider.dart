@@ -484,6 +484,9 @@ class HabitsNotifier extends Notifier<List<Habit>> {
           if (h.id == updatedHabit.id) updatedHabit else h,
       ];
       ref.read(allObjectsProvider.notifier).replaceObjectInMemory(updatedHabit);
+      
+      // Save habit's own .md file with updated completion history
+      await ref.read(vaultProvider.notifier).updateObject(updatedHabit);
 
       // Write habit completions as flat frontmatter keys (Obsidian format)
       // Remove old nested 'habits' key if it exists
@@ -587,6 +590,9 @@ class HabitsNotifier extends Notifier<List<Habit>> {
           if (h.id == updatedHabit.id) updatedHabit else h,
       ];
       ref.read(allObjectsProvider.notifier).replaceObjectInMemory(updatedHabit);
+      
+      // Save habit's own .md file with updated completion history
+      await ref.read(vaultProvider.notifier).updateObject(updatedHabit);
 
       frontmatter.remove('habits');
       habitsMap.forEach((slug, value) {
@@ -765,6 +771,14 @@ class HabitsNotifier extends Notifier<List<Habit>> {
     } else {
       habitsMap[habit.slug] = value;
     }
+
+    // Update habit's completion history and save its .md file
+    final updatedHabit = _updateHabitCompletionState(habit, date, habitsMap[habit.slug]);
+    state = [
+      for (final h in state)
+        if (h.id == updatedHabit.id) updatedHabit else h,
+    ];
+    await ref.read(vaultProvider.notifier).updateObject(updatedHabit);
 
     // Write habit completions as flat frontmatter keys (Obsidian format)
     frontmatter.remove('habits');
@@ -2236,6 +2250,17 @@ class VaultNotifier extends Notifier<void> {
     return switch (type) {
       'mood_definition' => 'moods',
       'combined_analysis' => 'analyses',
+      'goal' => 'goals',
+      'task' => 'tasks',
+      'habit' => 'habits',
+      'tracker_definition' => 'trackers',
+      'note' => 'notes',
+      'resource' => 'resources',
+      'person' => 'organizers/people',
+      'project' => 'organizers/projects',
+      'area' => 'organizers/areas',
+      'activity' => 'organizers/activities',
+      'label' => 'organizers/labels',
       _ => 'app',
     };
   }

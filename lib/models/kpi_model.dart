@@ -48,6 +48,7 @@ class KPI {
   DateTime? endDate;
   KPIDisplayType displayType;
   bool completed;
+  bool autoComplete;
   Map<String, dynamic>? autoCompleteAction;
 
   KPI({
@@ -66,6 +67,7 @@ class KPI {
     this.endDate,
     this.displayType = KPIDisplayType.number,
     this.completed = false,
+    this.autoComplete = false,
     this.autoCompleteAction,
   }) : dataSource =
            dataSource ??
@@ -98,6 +100,7 @@ class KPI {
       'end_date': endDate?.toIso8601String(),
       'display_type': displayType.name,
       'completed': completed,
+      'auto_complete': autoComplete,
       if (autoCompleteAction != null) 'auto_complete_action': autoCompleteAction,
     };
 
@@ -130,6 +133,7 @@ class KPI {
         orElse: () => KPIDisplayType.number,
       ),
       completed: map['completed'] as bool? ?? false,
+      autoComplete: map['auto_complete'] as bool? ?? false,
       autoCompleteAction: map['auto_complete_action'] != null ? Map<String, dynamic>.from(map['auto_complete_action'] as Map) : null,
     );
   }

@@ -239,7 +239,7 @@ class _CombinedAnalysisScreenState
                       const SizedBox(height: 32),
 
                       Text(
-                        'Correlações e Insights',
+                        'Correlations and Insights',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -249,15 +249,15 @@ class _CombinedAnalysisScreenState
                       const SizedBox(height: 16),
 
                       _buildInsightCard(
-                        'Padrão de Coexistência',
+                        'Coexistence Pattern',
                         _generateInsightText(chartSeries),
                         Icons.auto_awesome_rounded,
                         AppColors.habitPurple,
                       ),
                       const SizedBox(height: 12),
                       _buildInsightCard(
-                        'Dica Citrine',
-                        'A correlação entre sono, humor e foco (Pomodoro) é frequentemente a mais reveladora. Tente manter o registro diário para análises perfeitas.',
+                        'Citrine Tip',
+                        'The correlation between sleep, mood, and focus (Pomodoro) is often the most revealing. Try to keep a daily log for perfect analyses.',
                         Icons.lightbulb_outline_rounded,
                         AppColors.warning,
                       ),
@@ -412,7 +412,7 @@ class _CombinedAnalysisScreenState
             ),
             const SizedBox(height: 24),
             Text(
-              'Nenhuma Análise Ativa',
+              'No Active Analysis',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
@@ -421,7 +421,7 @@ class _CombinedAnalysisScreenState
             ),
             const SizedBox(height: 8),
             Text(
-              'Crie uma análise multi-fonte para comparar simultaneamente seus hábitos, trackers, humor diário e sessões de Pomodoro.',
+              'Create a multi-source analysis to compare your habits, trackers, daily mood, and Pomodoro sessions simultaneously.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
@@ -1517,14 +1517,14 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                 ctx,
                 icon: Icons.face_rounded,
                 color: AppColors.primary,
-                title: 'Média de Humor',
-                subtitle: 'Humor diário baseado no Journal',
+                title: 'Average Mood',
+                subtitle: 'Daily mood based on Journal',
                 onTap: () {
                   _onSourceSelected(
                     MetricSource(
                       type: MetricType.mood,
                       id: 'mood',
-                      label: 'Humor',
+                      label: 'Mood',
                       color: AppColors.primary,
                       dimension: 'pleasantness',
                     ),
@@ -1538,14 +1538,14 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                 ctx,
                 icon: Icons.timer_outlined,
                 color: AppColors.habitPurple,
-                title: 'Minutos de Foco (Pomodoro)',
-                subtitle: 'Tempo diário focado no Pomodoro',
+                title: 'Focus Minutes (Pomodoro)',
+                subtitle: 'Daily focused time on Pomodoro',
                 onTap: () {
                   _onSourceSelected(
                     MetricSource(
                       type: MetricType.pomodoro,
                       id: 'pomodoro',
-                      label: 'Foco (Pomodoro)',
+                      label: 'Focus (Pomodoro)',
                       color: AppColors.habitPurple,
                     ),
                   );
@@ -1610,13 +1610,13 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                     icon: Icons.analytics_rounded,
                     color: trackerColor,
                     title: 'Total: ${t.title}',
-                    subtitle: 'Quantidade de registros diários',
+                    subtitle: 'Number of daily records',
                     onTap: () {
                       _onSourceSelected(
                         MetricSource(
                           type: MetricType.trackerScore,
                           id: t.id,
-                          label: 'Registros: ${t.title}',
+                          label: 'Records: ${t.title}',
                           color: trackerColor,
                         ),
                       );

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/shared_types.dart';
 import '../models/saved_filter.dart';
+import '../models/app_theme_config.dart';
 
 /// Loaded once in main() before runApp and overridden into the ProviderContainer.
 /// This ensures SettingsNotifier has real prefs from the very first build,
@@ -60,6 +61,8 @@ class AppSettings {
   final String accentColor;
   final String themeMode;
   final String activeThemeId;
+  final String? backgroundColor;
+  final String? fontFamily;
   final bool nlpTaskParsingEnabled;
   final bool showOverdueSection;
   final String dailyNoteIdentifier;
@@ -121,6 +124,8 @@ class AppSettings {
     this.accentColor = '#F97316',
     this.themeMode = 'system',
     this.activeThemeId = 'citrine',
+    this.backgroundColor,
+    this.fontFamily,
     this.nlpTaskParsingEnabled = true,
     this.showOverdueSection = true,
     this.dailyNoteIdentifier = 'filename_format',
@@ -130,9 +135,9 @@ class AppSettings {
     this.tiktokResolverEndpoint = '',
     this.tiktokResolverApiKey = '',
     this.folderPaths = const {},
-    this.quickAddWidgetButton1Label = 'Diário',
+    this.quickAddWidgetButton1Label = 'Journal',
     this.quickAddWidgetButton1Target = 'journal',
-    this.quickAddWidgetButton2Label = 'Tarefa',
+    this.quickAddWidgetButton2Label = 'Task',
     this.quickAddWidgetButton2Target = 'task',
     this.calendarWidgetType = 'week',
     this.calendarWidgetShowTasks = true,
@@ -141,7 +146,7 @@ class AppSettings {
     this.habitWidgetFilterType = 'all',
     this.habitWidgetOrganizer = '',
     this.ideaStrategy = 'tag',
-    this.ideaTag = 'ideia',
+    this.ideaTag = 'idea',
     this.ideaFolder = 'notes/ideas',
     this.userName,
     this.savedFiltersRaw = const [],
@@ -211,6 +216,8 @@ class AppSettings {
     String? accentColor,
     String? themeMode,
     String? activeThemeId,
+    String? backgroundColor,
+    String? fontFamily,
     bool? nlpTaskParsingEnabled,
     bool? showOverdueSection,
     String? dailyNoteIdentifier,
@@ -274,6 +281,8 @@ class AppSettings {
       accentColor: accentColor ?? this.accentColor,
       themeMode: themeMode ?? this.themeMode,
       activeThemeId: activeThemeId ?? this.activeThemeId,
+      backgroundColor: backgroundColor ?? this.backgroundColor,
+      fontFamily: fontFamily ?? this.fontFamily,
       nlpTaskParsingEnabled:
           nlpTaskParsingEnabled ?? this.nlpTaskParsingEnabled,
       showOverdueSection: showOverdueSection ?? this.showOverdueSection,
@@ -393,6 +402,8 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       accentColor: prefs.getString('accentColor') ?? '#F97316',
       themeMode: prefs.getString('themeMode') ?? 'system',
       activeThemeId: prefs.getString('activeThemeId') ?? 'citrine',
+      backgroundColor: prefs.getString('backgroundColor'),
+      fontFamily: prefs.getString('fontFamily'),
       nlpTaskParsingEnabled: prefs.getBool('nlpTaskParsingEnabled') ?? true,
       showOverdueSection: prefs.getBool('showOverdueSection') ?? true,
       dailyNoteIdentifier:
@@ -600,6 +611,26 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     await _prefs.setString('activeThemeId', themeId);
     await _prefs.setString('accentColor', accentColor);
     state = state.copyWith(activeThemeId: themeId, accentColor: accentColor);
+  }
+
+  Future<void> updateCustomTheme(AppThemeConfig theme) async {
+    await _prefs.setString('activeThemeId', theme.id);
+    await _prefs.setString('accentColor', theme.accentHex);
+    if (theme.backgroundColor != null) {
+      final hex = '#${theme.backgroundColor!.value.toRadixString(16).substring(2).toUpperCase()}';
+      await _prefs.setString('backgroundColor', hex);
+    }
+    if (theme.fontFamily != null) {
+      await _prefs.setString('fontFamily', theme.fontFamily!);
+    }
+    state = state.copyWith(
+      activeThemeId: theme.id,
+      accentColor: theme.accentHex,
+      backgroundColor: theme.backgroundColor != null 
+          ? '#${theme.backgroundColor!.value.toRadixString(16).substring(2).toUpperCase()}'
+          : null,
+      fontFamily: theme.fontFamily,
+    );
   }
 
   Future<void> updateAutoSync(bool value) async {
