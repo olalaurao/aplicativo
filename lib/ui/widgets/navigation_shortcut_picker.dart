@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/vault_provider.dart';
 import '../../models/navigation_item.dart';
+import '../../models/organizer_model.dart';
 import '../theme.dart';
 
 class NavigationShortcutPicker extends ConsumerStatefulWidget {
@@ -154,7 +155,7 @@ class _NavigationShortcutPickerState
                     .toList();
                 final filteredOrganizers = organizers
                     .where(
-                      (o) => o.title
+                      (Organizer o) => o.title
                           .toLowerCase()
                           .contains(_searchQuery.toLowerCase()),
                     )
@@ -172,12 +173,12 @@ class _NavigationShortcutPickerState
                       const SizedBox(height: 16),
                       _buildHeader('Organizers'),
                       ...filteredOrganizers.map(
-                        (o) => _buildItem(
+                        (Organizer o) => _buildItem(
                           context,
                           o.title,
-                          o.type,
-                          o.id,
-                          _getIcon(o.type),
+                          o.organizerType.name,
+                          o.id!,
+                          _getIcon(o.organizerType.name),
                           '/organizer/${o.id}',
                         ),
                       ),

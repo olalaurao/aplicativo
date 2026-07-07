@@ -175,10 +175,20 @@ class OEmbedService {
       if (platform == SocialPlatform.tiktok &&
           mediaType == SocialMediaType.video &&
           tiktokResolverEndpoint?.trim().isNotEmpty == true) {
-        videoUrl = await TikTokVideoResolver(
+        final tikwmData = await TikTokVideoResolver(
           endpoint: tiktokResolverEndpoint!,
           apiKey: tiktokResolverApiKey,
-        ).resolve(normalizedUrl);
+        ).resolveAll(normalizedUrl);
+        if (tikwmData != null) {
+          videoUrl = tikwmData.videoUrl;
+          thumbnailUrl ??= tikwmData.thumbnailUrl;
+          if (tikwmData.thumbnailUrl != null) thumbnailUrl = tikwmData.thumbnailUrl;
+          if (tikwmData.title != null && title == normalizedUrl) {
+            title = tikwmData.title!;
+          }
+          authorHandle ??= tikwmData.authorHandle;
+          authorName ??= tikwmData.authorName;
+        }
       }
     } catch (error) {
       debugPrint('OEmbedService.fetchMetadata failed: $error');

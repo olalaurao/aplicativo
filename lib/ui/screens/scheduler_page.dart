@@ -51,16 +51,16 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
       const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       final dayName = weekDayNames[date.weekday - 1];
       return dayThemes.any(
-        (theme) => theme?.id != null && theme!.id == themeId && theme.daysOfWeek.contains(dayName),
+        (theme) => theme.id == themeId && theme.daysOfWeek.contains(dayName),
       );
     }
 
     bool isBlockActive(String blockId, DateTime date) {
       return timeBlocks.any((block) {
-        if (block?.id == null || block!.id != blockId) return false;
+        if (block.id != blockId) return false;
         return dayThemes.any((theme) {
-          if (theme == null || !theme.organizers.any((ref) => ref.matches(block.id!, block.slug, block.title))) return false;
-          return isThemeActive(theme.id!, date);
+          if (!theme.organizers.any((ref) => ref.matches(block.id, block.slug, block.title))) return false;
+          return isThemeActive(theme.id, date);
         });
       });
     }

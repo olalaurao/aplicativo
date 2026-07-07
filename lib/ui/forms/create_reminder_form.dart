@@ -7,6 +7,7 @@ import '../../models/reminder_config.dart';
 import '../../models/scheduler.dart';
 import '../../models/shared_types.dart';
 import '../../models/template_model.dart';
+import '../../models/organizer_model.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import 'scheduler_picker.dart';
@@ -630,7 +631,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
               onTap: () => Navigator.pop(ctx, ''),
             ),
             ...blocks.map(
-              (block) => ListTile(
+              (Organizer block) => ListTile(
                 leading: const Icon(Icons.view_timeline_outlined),
                 title: Text(block.title),
                 subtitle: Text(_formatTimeBlock(block)),

@@ -17,6 +17,7 @@ import '../theme.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../widgets/social_post_grid_card.dart';
 import '../widgets/universal_search_picker.dart';
+import '../widgets/organizer_picker_modal.dart';
 
 enum _DuplicateAction { edit, doNothing, saveAnyway }
 
@@ -747,9 +748,12 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
     return showModalBottomSheet<_LinkAction>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: AppTheme.sheetDecoration(context),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          decoration: AppTheme.sheetDecoration(context),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
         child: SafeArea(
           top: false,
           child: Column(
@@ -819,7 +823,8 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   Future<void> _createAndLinkTask(SocialPost post) async {

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/organizer_model.dart';
+import '../../models/shared_types.dart';
 import '../../providers/day_theme_provider.dart';
 import '../theme.dart';
 import '../widgets/app_color_picker.dart';
@@ -13,7 +14,11 @@ class DayThemeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themes = ref.watch(dayThemesProvider);
     final blocks = [...ref.watch(timeBlocksProvider)]
-      ..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
+      ..sort((Organizer a, Organizer b) {
+        final aStart = a.timeRanges.isEmpty ? 24 * 60 : a.timeRanges.first.startHour * 60 + a.timeRanges.first.startMinute;
+        final bStart = b.timeRanges.isEmpty ? 24 * 60 : b.timeRanges.first.startHour * 60 + b.timeRanges.first.startMinute;
+        return aStart.compareTo(bStart);
+      });
 
     return DefaultTabController(
       length: 2,
@@ -87,10 +92,10 @@ class DayThemeScreen extends ConsumerWidget {
                           final reordered = [...blocks];
                           final item = reordered.removeAt(oldIndex);
                           reordered.insert(newIndex, item);
-                          for (int i = 0; i < reordered.length; i++) {
+                          for (final block in reordered) {
                             ref
                                 .read(timeBlocksProvider.notifier)
-                                .updateTimeBlock(reordered[i]..order = i);
+                                .updateTimeBlock(block);
                           }
                         },
                         children: blocks
@@ -224,7 +229,8 @@ class DayThemeScreen extends ConsumerWidget {
       fallback: AppTheme.accentColor(context),
     );
     final blockTitles = blocks
-        .where((block) => theme.blockIds.contains(block.id))
+        .where((block) => theme.organizers.any((ref) =>
+            ref.slug == block.id || ref.slug == block.slug))
         .map((block) => block.title)
         .join(', ');
     return Container(
@@ -428,7 +434,6 @@ class DayThemeScreen extends ConsumerWidget {
                   organizerType: OrganizerType.timeBlock,
                   color: selectedColor,
                   timeRanges: normalizedRanges,
-                  order: block?.order ?? ref.read(timeBlocksProvider).length,
                 );
                 if (block != null) updated.obsidianPath = block.obsidianPath;
                 if (block == null) {

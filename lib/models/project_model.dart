@@ -352,6 +352,9 @@ class Project extends Organizer {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? obsidianPath,
+    List<TimeRange>? timeRanges,
+    List<String>? daysOfWeek,
+    int? energyLevel,
   }) {
     return Project(
       id: id,

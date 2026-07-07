@@ -32,6 +32,7 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
   bool _hasError = false;
   bool _resolvingVideo = false;
   String? _resolvedVideoUrl;
+  String? _resolvedThumbnailUrl;
   SocialPost? _resolvedPost;
 
   double get _height {
@@ -53,6 +54,7 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
   void initState() {
     super.initState();
     _resolvedVideoUrl = widget.post.videoUrl;
+    _resolvedThumbnailUrl = widget.post.thumbnailUrl;
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setUserAgent(
@@ -171,7 +173,7 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
     if (videoUrl != null && videoUrl.isNotEmpty) {
       return SocialNativeVideoPlayer(
         videoUrl: videoUrl,
-        thumbnailUrl: widget.post.thumbnailUrl,
+        thumbnailUrl: _resolvedThumbnailUrl ?? widget.post.thumbnailUrl,
       );
     }
 
@@ -339,12 +341,13 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
     final apiKey = prefs.getString('tiktokResolverApiKey') ?? '';
 
     if (mounted) setState(() => _resolvingVideo = true);
-    final resolved = await TikTokVideoResolver(
+    final resolvedData = await TikTokVideoResolver(
       endpoint: endpoint,
       apiKey: apiKey,
-    ).resolve(widget.post.url);
+    ).resolveAll(widget.post.url);
     if (!mounted) return false;
 
+    final resolved = resolvedData?.videoUrl;
     if (resolved != null) {
       SocialEmbedView._videoCache[postId] = (resolved, DateTime.now());
     }
@@ -355,6 +358,10 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
       if (resolved != null) {
         _timeout?.cancel();
         _hasError = false;
+      }
+      // Also update thumbnail if we got one from tikwm
+      if (resolvedData?.thumbnailUrl != null) {
+        _resolvedThumbnailUrl = resolvedData!.thumbnailUrl;
       }
     });
     return resolved != null;

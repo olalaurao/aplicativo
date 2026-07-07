@@ -69,6 +69,8 @@ class ObsidianService {
       'organizers/activities',
       'organizers/people',
       'organizers/labels',
+      'organizers/day_themes',
+      'organizers/time_blocks',
       '_attachments',
       '_deleted',
       '_conflicts',

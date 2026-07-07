@@ -347,6 +347,8 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                   type == 'label' ||
                   type == 'day_theme' ||
                   type == 'time_block' ||
+                  type == 'dayTheme' ||
+                  type == 'timeBlock' ||
                   (type == 'task' && relativePath.startsWith('organizers/')) ||
                   (type == 'goal' && relativePath.startsWith('organizers/')) ||
                   (type == 'habit' && relativePath.startsWith('organizers/')) ||
@@ -354,9 +356,9 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                       relativePath.startsWith('organizers/'))) {
                 if (frontmatter['organizer_type'] == null &&
                     type != 'organizer') {
-                  if (type == 'day_theme') {
+                  if (type == 'day_theme' || type == 'dayTheme') {
                     frontmatter['organizer_type'] = 'dayTheme';
-                  } else if (type == 'time_block') {
+                  } else if (type == 'time_block' || type == 'timeBlock') {
                     frontmatter['organizer_type'] = 'timeBlock';
                   } else {
                     frontmatter['organizer_type'] = type;

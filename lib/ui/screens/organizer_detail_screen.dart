@@ -1,6 +1,7 @@
 // lib/ui/screens/organizer_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/organizer_model.dart';
 import 'package:intl/intl.dart';
 import '../../models/organizer_model.dart';
 import '../../models/content_object.dart';
@@ -820,7 +821,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
   Widget _buildChildrenList(BuildContext context) {
     final allOrganizers = ref.watch(organizersProvider);
     final children = allOrganizers
-        .where((o) => o.parentId == widget.organizer.id)
+        .where((Organizer o) => o.parentId == widget.organizer.id)
         .toList();
 
     if (children.isEmpty) {

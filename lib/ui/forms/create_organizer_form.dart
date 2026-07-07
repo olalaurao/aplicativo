@@ -22,6 +22,11 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
   String _selectedColor = '#3B82F6';
   String? _parentId;
   List<OrganizerReference> _organizers = [];
+  
+  // Specific fields for DayTheme and TimeBlock
+  List<String> _daysOfWeek = [];
+  List<TimeRange> _timeRanges = [];
+  int? _energyLevel;
 
   static const _colors = [
     '#DC2626',
@@ -47,6 +52,9 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
       _selectedColor = organizer.color ?? _selectedColor;
       _parentId = organizer.parentId;
       _organizers = List.from(organizer.organizers);
+      _daysOfWeek = List.from(organizer.daysOfWeek);
+      _timeRanges = List.from(organizer.timeRanges);
+      _energyLevel = organizer.energyLevel;
     }
   }
 
@@ -226,7 +234,7 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
                       final allOrganizers = ref.watch(organizersProvider);
                       // Avoid self-reference if editing
                       final availableParents = allOrganizers
-                          .where((o) => widget.organizer == null || o.id != widget.organizer!.id)
+                          .where((Organizer o) => widget.organizer == null || o.id != widget.organizer!.id)
                           .toList();
 
                       return Container(
@@ -246,7 +254,7 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
                                 child: Text('Sem Parente (Raiz)'),
                               ),
                               ...availableParents.map(
-                                (o) => DropdownMenuItem<String?>(
+                                (Organizer o) => DropdownMenuItem<String?>(
                                   value: o.id,
                                   child: Text(o.title),
                                 ),
@@ -258,6 +266,143 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
                       );
                     },
                   ),
+
+                  if (_type == OrganizerType.dayTheme) ...[
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Dias da Semana',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) {
+                        final selected = _daysOfWeek.contains(day);
+                        return FilterChip(
+                          label: Text(day),
+                          selected: selected,
+                          onSelected: (val) {
+                            setState(() {
+                              if (val) {
+                                _daysOfWeek.add(day);
+                              } else {
+                                _daysOfWeek.remove(day);
+                              }
+                            });
+                          },
+                          selectedColor: AppTheme.accentColor(context),
+                          checkmarkColor: Colors.white,
+                          labelStyle: TextStyle(
+                            color: selected ? Colors.white : AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+
+                  if (_type == OrganizerType.timeBlock) ...[
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Horários',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _timeRanges.add(TimeRange(startHour: 9, startMinute: 0, endHour: 10, endMinute: 0));
+                            });
+                          },
+                          child: const Text('+ Adicionar Horário'),
+                        ),
+                      ],
+                    ),
+                    ..._timeRanges.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final range = entry.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () async {
+                                  final time = await showTimePicker(
+                                    context: context,
+                                    initialTime: TimeOfDay(hour: range.startHour, minute: range.startMinute),
+                                  );
+                                  if (time != null) {
+                                    setState(() {
+                                      _timeRanges[idx] = TimeRange(
+                                        startHour: time.hour,
+                                        startMinute: time.minute,
+                                        endHour: range.endHour,
+                                        endMinute: range.endMinute,
+                                      );
+                                    });
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: BorderRadius.circular(8)),
+                                  alignment: Alignment.center,
+                                  child: Text('${range.startHour.toString().padLeft(2, '0')}:${range.startMinute.toString().padLeft(2, '0')}'),
+                                ),
+                              ),
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 12),
+                              child: Text('até'),
+                            ),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () async {
+                                  final time = await showTimePicker(
+                                    context: context,
+                                    initialTime: TimeOfDay(hour: range.endHour, minute: range.endMinute),
+                                  );
+                                  if (time != null) {
+                                    setState(() {
+                                      _timeRanges[idx] = TimeRange(
+                                        startHour: range.startHour,
+                                        startMinute: range.startMinute,
+                                        endHour: time.hour,
+                                        endMinute: time.minute,
+                                      );
+                                    });
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: BorderRadius.circular(8)),
+                                  alignment: Alignment.center,
+                                  child: Text('${range.endHour.toString().padLeft(2, '0')}:${range.endMinute.toString().padLeft(2, '0')}'),
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: AppColors.error),
+                              onPressed: () {
+                                setState(() => _timeRanges.removeAt(idx));
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
 
                   const SizedBox(height: 24),
                   const Text(
@@ -301,6 +446,9 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
       endDate: existing?.endDate,
       icon: existing?.icon,
       organizers: _organizers,
+      daysOfWeek: _daysOfWeek,
+      timeRanges: _timeRanges,
+      energyLevel: _energyLevel,
       categories: existing?.categories,
       createdAt: existing?.createdAt,
       obsidianPath: existing?.obsidianPath ?? '',

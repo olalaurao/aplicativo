@@ -11,7 +11,7 @@ import '../models/task_model.dart';
 import '../models/shopping_list_model.dart' as shopping_list_model;
 import '../models/journal_entry.dart';
 import '../models/habit_model.dart';
-import '../models/organizer_model.dart' as organizer_model;
+import '../models/organizer_model.dart';
 import '../models/goal_model.dart';
 import '../models/note_model.dart';
 import '../models/tracker_model.dart';
@@ -170,7 +170,7 @@ final conflictingObjectsProvider = Provider<Map<String, List<ContentObject>>>((
 
   for (final object in objects) {
     if (object.archived) continue;
-    if (object is! Note && object is! organizer_model.Organizer) continue;
+    if (object is! Note && object is! Organizer) continue;
 
     final keys = {
       object.slug,
@@ -188,7 +188,7 @@ final conflictingObjectsProvider = Provider<Map<String, List<ContentObject>>>((
       final types = entry.value.map((object) => object.type).toSet();
       return entry.value.length > 1 &&
           types.contains('note') &&
-          entry.value.any((object) => object is organizer_model.Organizer);
+          entry.value.any((object) => object is Organizer);
     }),
   );
 });
@@ -831,29 +831,29 @@ final habitsProvider = NotifierProvider<HabitsNotifier, List<Habit>>(() {
   return HabitsNotifier();
 });
 
-class OrganizersNotifier extends Notifier<List<organizer_model.Organizer>> {
+class OrganizersNotifier extends Notifier<List<Organizer>> {
   @override
-  List<organizer_model.Organizer> build() {
+  List<Organizer> build() {
     final areas = ref
         .watch(objectsByTypeProvider('area'))
-        .cast<organizer_model.Organizer>();
+        .cast<Organizer>();
     final projects = ref
         .watch(objectsByTypeProvider('project'))
-        .cast<organizer_model.Organizer>();
+        .cast<Organizer>();
     final activities = ref
         .watch(objectsByTypeProvider('activity'))
-        .cast<organizer_model.Organizer>();
+        .cast<Organizer>();
     final people = ref
         .watch(objectsByTypeProvider('person'))
-        .cast<organizer_model.Organizer>();
+        .cast<Organizer>();
     final labels = ref
         .watch(objectsByTypeProvider('label'))
-        .cast<organizer_model.Organizer>();
+        .cast<Organizer>();
 
     return [...areas, ...projects, ...activities, ...people, ...labels];
   }
 
-  Future<void> addOrganizer(organizer_model.Organizer organizer) async {
+  Future<void> addOrganizer(Organizer organizer) async {
     state = [...state, organizer];
     if (!organizer.categories.contains('[[organizers]]')) {
       organizer.categories.add('[[organizers]]');
@@ -861,7 +861,7 @@ class OrganizersNotifier extends Notifier<List<organizer_model.Organizer>> {
     await ref.read(vaultProvider.notifier).createObject(organizer);
   }
 
-  Future<void> updateOrganizer(organizer_model.Organizer organizer) async {
+  Future<void> updateOrganizer(Organizer organizer) async {
     state = [
       for (final o in state)
         if (o.id == organizer.id) organizer else o,
@@ -869,14 +869,14 @@ class OrganizersNotifier extends Notifier<List<organizer_model.Organizer>> {
     await ref.read(vaultProvider.notifier).updateObject(organizer);
   }
 
-  Future<void> deleteOrganizer(organizer_model.Organizer organizer) async {
+  Future<void> deleteOrganizer(Organizer organizer) async {
     state = state.where((o) => o.id != organizer.id).toList();
     await ref.read(vaultProvider.notifier).deleteObject(organizer);
   }
 }
 
 final organizersProvider =
-    NotifierProvider<OrganizersNotifier, List<organizer_model.Organizer>>(() {
+    NotifierProvider<OrganizersNotifier, List<Organizer>>(() {
       return OrganizersNotifier();
     });
 
@@ -1242,7 +1242,7 @@ final organizerListProvider = Provider<List<OrganizerReference>>((ref) {
   final data = asyncValue.valueOrNull;
   if (data != null) {
     return data
-        .whereType<organizer_model.Organizer>()
+        .whereType<Organizer>()
         .map(
           (o) => OrganizerReference(
             type: o.organizerType.name,
@@ -2239,7 +2239,7 @@ class VaultNotifier extends Notifier<void> {
     if (object is WellbeingIndicator) return 'wellbeing_indicator';
     // TimeBlock and DayTheme are now Organizer.
     if (object is TemplateDefinition) return 'template';
-    if (object is organizer_model.Organizer) {
+    if (object is Organizer) {
       return object.organizerType.name;
     }
     return object.type;
@@ -2260,6 +2260,8 @@ class VaultNotifier extends Notifier<void> {
       'area' => 'organizers/areas',
       'activity' => 'organizers/activities',
       'label' => 'organizers/labels',
+      'dayTheme' || 'day_theme' => 'organizers/day_themes',
+      'timeBlock' || 'time_block' => 'organizers/time_blocks',
       _ => 'app',
     };
   }
@@ -2909,7 +2911,7 @@ class VaultNotifier extends Notifier<void> {
       bodyContent = object.body;
     } else if (object is Project) {
       bodyContent = object.description ?? '';
-    } else if (object is organizer_model.Organizer) {
+    } else if (object is Organizer) {
       bodyContent = '';
     }
 
@@ -2986,11 +2988,11 @@ class VaultNotifier extends Notifier<void> {
         break;
       case 'organizer':
         final orgTypeStr = extraFields?['organizerType']?.toString() ?? 'area';
-        final orgType = organizer_model.OrganizerType.values.firstWhere(
+        final orgType = OrganizerType.values.firstWhere(
           (e) => e.name == orgTypeStr,
-          orElse: () => organizer_model.OrganizerType.area,
+          orElse: () => OrganizerType.area,
         );
-        newObject = organizer_model.Organizer(
+        newObject = Organizer(
           id: baseId,
           title: baseTitle,
           organizerType: orgType,
@@ -3959,3 +3961,4 @@ final inboxProvider = AsyncNotifierProvider<InboxNotifier, List<InboxItem>>(
 final inboxCountProvider = Provider<int>((ref) {
   return ref.watch(inboxProvider).valueOrNull?.length ?? 0;
 });
+

@@ -2,7 +2,6 @@
 import 'content_object.dart';
 import 'shared_types.dart';
 
-
 enum OrganizerType {
   area,
   project,
@@ -14,7 +13,7 @@ enum OrganizerType {
   label,
   person,
   dayTheme,
-  timeBlock
+  timeBlock,
 }
 
 class Organizer extends ContentObject {
@@ -87,14 +86,19 @@ class Organizer extends ContentObject {
     String body,
   ) {
     final typeStr = frontmatter['type']?.toString() ?? '';
-    final subtypeStr = frontmatter['organizer_type']?.toString() ?? typeStr;
+    var subtypeStr = frontmatter['organizer_type']?.toString() ?? typeStr;
+    if (subtypeStr == 'day_theme') subtypeStr = 'dayTheme';
+    if (subtypeStr == 'time_block') subtypeStr = 'timeBlock';
+
     final type = OrganizerType.values.firstWhere(
       (e) => e.name == subtypeStr,
       orElse: () => OrganizerType.label,
     );
 
     final organizer = Organizer(
-      title: frontmatter['title'] is List ? (frontmatter['title'] as List).join(', ') : frontmatter['title']?.toString() ?? '',
+      title: frontmatter['title'] is List
+          ? (frontmatter['title'] as List).join(', ')
+          : frontmatter['title']?.toString() ?? '',
       organizerType: type,
     );
     organizer.loadBaseMap(frontmatter);
@@ -110,13 +114,16 @@ class Organizer extends ContentObject {
     organizer.icon = frontmatter['icon'] as String?;
     organizer.state = frontmatter['state'] as String?;
     organizer.priority = frontmatter['priority'] as String?;
-    
-    organizer.timeRanges = (frontmatter['time_ranges'] as List?)
+
+    organizer.timeRanges =
+        (frontmatter['time_ranges'] as List?)
             ?.map((e) => TimeRange.fromMap(Map<String, dynamic>.from(e as Map)))
             .toList() ??
         [];
     organizer.energyLevel = frontmatter['energy_level'] as int?;
-    organizer.daysOfWeek = List<String>.from(frontmatter['days_of_week'] as List? ?? []);
+    organizer.daysOfWeek = List<String>.from(
+      frontmatter['days_of_week'] as List? ?? [],
+    );
 
     return organizer;
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/scheduler.dart';
+import '../../models/organizer_model.dart';
 import '../../providers/day_theme_provider.dart';
 import '../theme.dart';
 import '../widgets/wiki_link_picker.dart';
@@ -788,7 +789,7 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 16),
-        ...themes.map((theme) {
+        ...themes.map((Organizer theme) {
           final isSelected = _themeId == theme.id;
           return GestureDetector(
             onTap: () => setState(() => _themeId = theme.id),
@@ -853,7 +854,7 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 16),
-        ...blocks.map((block) {
+        ...blocks.map((Organizer block) {
           final isSelected = _blockId == block.id;
           final rangeLabel = block.timeRanges.isNotEmpty
               ? '${block.timeRanges.first.startHour.toString().padLeft(2, '0')}:${block.timeRanges.first.startMinute.toString().padLeft(2, '0')} – ${block.timeRanges.first.endHour.toString().padLeft(2, '0')}:${block.timeRanges.first.endMinute.toString().padLeft(2, '0')}'
