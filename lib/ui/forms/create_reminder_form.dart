@@ -97,9 +97,9 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
                     onPressed: () => Navigator.pop(context),
                   ),
                   IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.copy_all_rounded,
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                     ),
                     tooltip: 'Usar Template',
                     onPressed: _showTemplatePicker,
@@ -117,7 +117,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         color: hasTitle
-                            ? AppColors.primary
+                            ? AppTheme.accentColor(context)
                             : AppColors.textMuted,
                       ),
                     ),
@@ -286,7 +286,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
                               value: _completable,
                               onChanged: (v) =>
                                   setState(() => _completable = v),
-                              activeThumbColor: AppColors.primary,
+                              activeThumbColor: AppTheme.accentColor(context),
                             ),
                           ],
                         ),
@@ -393,7 +393,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : AppColors.surfaceVariant,
+          color: isSelected ? AppTheme.accentColor(context) : AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
@@ -543,11 +543,11 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: isActive
-              ? AppColors.primary.withValues(alpha: 0.1)
+              ? AppTheme.accentColor(context).withValues(alpha: 0.1)
               : AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isActive ? AppColors.primary : Colors.transparent,
+            color: isActive ? AppTheme.accentColor(context) : Colors.transparent,
           ),
         ),
         child: Row(
@@ -556,7 +556,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
             Icon(
               icon,
               size: 18,
-              color: isActive ? AppColors.primary : AppColors.textSecondary,
+              color: isActive ? AppTheme.accentColor(context) : AppColors.textSecondary,
             ),
             const SizedBox(width: 8),
             Text(
@@ -564,7 +564,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: isActive ? AppColors.primary : AppColors.textSecondary,
+                color: isActive ? AppTheme.accentColor(context) : AppColors.textSecondary,
               ),
             ),
           ],

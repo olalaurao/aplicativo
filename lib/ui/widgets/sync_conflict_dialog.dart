@@ -36,7 +36,7 @@ class SyncConflictDialog extends StatelessWidget {
                       context,
                       'Local (You)',
                       localContent,
-                      AppColors.primary,
+                      AppTheme.accentColor(context),
                     ),
                   ),
                   const SizedBox(width: 12),

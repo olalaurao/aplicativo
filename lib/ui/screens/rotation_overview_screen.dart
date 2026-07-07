@@ -97,7 +97,7 @@ class RotationOverviewScreen extends ConsumerWidget {
             return ListTile(
               contentPadding: EdgeInsets.zero,
               leading: CircleAvatar(
-                backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                backgroundColor: AppTheme.accentColor(context).withValues(alpha: 0.15),
                 child: Text(entry.group.emoji ?? '📍'),
               ),
               title: Text(
@@ -163,7 +163,7 @@ class _ActiveZoneHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _parseColor(status.group.colorHex) ?? AppColors.primary;
+    final color = _parseColor(status.group.colorHex) ?? AppTheme.accentColor(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(

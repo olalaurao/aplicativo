@@ -400,7 +400,7 @@ class ResourceMetadataService {
         .get(
           Uri.parse(url),
           headers: const {
-            'User-Agent': 'Mozilla/5.0 (compatible; Citrine/1.0)',
+            'User-Agent': 'Mozilla/5.0 (compatible; Quartzo/1.0)',
             'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
           },
         )

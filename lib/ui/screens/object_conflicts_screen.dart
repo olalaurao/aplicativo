@@ -24,7 +24,7 @@ class ObjectConflictsScreen extends ConsumerWidget {
         scrolledUnderElevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
+            icon: Icon(Icons.refresh_rounded, color: AppTheme.accentColor(context)),
             onPressed: () {
               ref.invalidate(allObjectsProvider);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -381,12 +381,12 @@ class _TransformationButton extends StatelessWidget {
       icon: Icon(icon, size: 16),
       label: Text(label),
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-        foregroundColor: AppColors.primary,
+        backgroundColor: AppTheme.accentColor(context).withValues(alpha: 0.1),
+        foregroundColor: AppTheme.accentColor(context),
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+          side: BorderSide(color: AppTheme.accentColor(context).withValues(alpha: 0.3)),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         minimumSize: Size.zero,

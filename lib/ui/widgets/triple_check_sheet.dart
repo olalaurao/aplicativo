@@ -143,7 +143,7 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
     if (allGood) return AppColors.success;
     if (_head != TripleCheckAnswer.yes) return AppColors.info;
     if (_heart != TripleCheckAnswer.yes) return AppColors.warning;
-    return AppColors.primary;
+    return AppTheme.accentColor(context);
   }
 
   // ── Save ─────────────────────────────────────────────────────────────────
@@ -615,7 +615,7 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
                             ? _save
                             : null,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: AppTheme.accentColor(context),
                           foregroundColor: Colors.white,
                           disabledBackgroundColor: AppColors.divider,
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -881,7 +881,7 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? AppColors.primary;
+    final c = color ?? AppTheme.accentColor(context);
     return OutlinedButton.icon(
       onPressed: onTap,
       icon: Icon(icon, size: 18),

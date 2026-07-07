@@ -96,7 +96,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen>
           context,
           MaterialPageRoute(builder: (_) => const CreateHabitForm()),
         ),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppTheme.accentColor(context),
         foregroundColor: Colors.white,
         child: const Icon(Icons.add_rounded),
       ),
@@ -144,12 +144,12 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen>
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.12),
+                color: AppTheme.accentColor(context).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.add_rounded,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
                 size: 20,
               ),
             ),
@@ -173,7 +173,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen>
         child: TabBar(
           controller: _tabController,
           indicator: BoxDecoration(
-            color: AppColors.primary,
+            color: AppTheme.accentColor(context),
             borderRadius: BorderRadius.circular(9),
           ),
           indicatorSize: TabBarIndicatorSize.tab,

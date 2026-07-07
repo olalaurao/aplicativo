@@ -165,7 +165,7 @@ class _QuadrantTile extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               _quadrantDescription(quadrant),
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.textMuted,
                 fontSize: 12,
               ),
@@ -317,7 +317,7 @@ class _MoodWordTile extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 mood.description!,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 11,
                   color: AppColors.textMuted,
                 ),

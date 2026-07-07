@@ -195,9 +195,9 @@ class _MoodFlag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.1),
+        color: AppTheme.accentColor(context).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+        border: Border.all(color: AppTheme.accentColor(context).withValues(alpha: 0.16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -211,10 +211,10 @@ class _MoodFlag extends StatelessWidget {
                 label!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+                  color: AppTheme.accentColor(context),
                 ),
               ),
             ),
@@ -491,10 +491,10 @@ class PmnCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
+                        color: AppTheme.accentColor(context).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.view_week_rounded, color: AppColors.primary, size: 20),
+                      child: Icon(Icons.view_week_rounded, color: AppTheme.accentColor(context), size: 20),
                     ),
                     const SizedBox(width: 12),
                     Expanded(

@@ -14,7 +14,7 @@ import '../../models/analysis_model.dart';
 import '../../models/pomodoro_session.dart';
 import '../../models/journal_entry.dart';
 import '../theme.dart';
-import '../widgets/citrine_chart.dart';
+import '../widgets/quartzo_chart.dart';
 import '../widgets/analysis_calendar.dart';
 import '../widgets/mood_emoji_timeline.dart';
 
@@ -74,7 +74,7 @@ class _CombinedAnalysisScreenState
         .map((s) => _getMetricData(s, 14))
         .toList();
     final List<Color> chartColors = visibleSources
-        .map((s) => s.color ?? AppColors.primary)
+        .map((s) => s.color ?? AppTheme.accentColor(context))
         .toList();
 
     // Prepare data for the calendar
@@ -93,7 +93,7 @@ class _CombinedAnalysisScreenState
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_chart_rounded, color: AppColors.primary),
+            icon: Icon(Icons.add_chart_rounded, color: AppTheme.accentColor(context)),
             tooltip: 'Nova Análise',
             onPressed: () => _showAnalysisFormSheet(context, null),
           ),
@@ -189,7 +189,7 @@ class _CombinedAnalysisScreenState
                             : Column(
                                 children: [
                                   Expanded(
-                                    child: CitrineChart(
+                                    child: QuartzoChart(
                                       type:
                                           _currentAnalysis
                                               ?.charts
@@ -285,12 +285,12 @@ class _CombinedAnalysisScreenState
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.12),
+              color: AppTheme.accentColor(context).withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.bubble_chart_rounded,
-              color: AppColors.primary,
+              color: AppTheme.accentColor(context),
               size: 22,
             ),
           ),
@@ -401,13 +401,13 @@ class _CombinedAnalysisScreenState
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
+                color: AppTheme.accentColor(context).withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.analytics_outlined,
                 size: 60,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
               ),
             ),
             const SizedBox(height: 24),
@@ -433,7 +433,7 @@ class _CombinedAnalysisScreenState
             ElevatedButton.icon(
               icon: const Icon(Icons.add_rounded),
               label: const Text('Nova Análise Personalizada'),
-              style: AppTheme.primaryButtonStyle.copyWith(
+              style: AppTheme.primaryButtonStyle(AppTheme.accentColor(context)).copyWith(
                 padding: WidgetStateProperty.all(
                   const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                 ),
@@ -489,7 +489,7 @@ class _CombinedAnalysisScreenState
           duration: const Duration(seconds: 5),
           action: SnackBarAction(
             label: 'Desfazer',
-            textColor: AppColors.accent,
+            textColor: AppTheme.accentColor(context),
             onPressed: () async {
               await ref
                   .read(vaultProvider.notifier)
@@ -543,7 +543,7 @@ class _CombinedAnalysisScreenState
             ? const Text('😊', style: TextStyle(fontSize: 14))
             : Icon(
                 Icons.circle,
-                color: source.color ?? AppColors.primary,
+                color: source.color ?? AppTheme.accentColor(context),
                 size: 12,
               ),
         label: Text(
@@ -555,7 +555,7 @@ class _CombinedAnalysisScreenState
           ),
         ),
         backgroundColor: AppTheme.surfaceVariantColor(context),
-        selectedColor: (source.color ?? AppColors.primary).withValues(
+        selectedColor: (source.color ?? AppTheme.accentColor(context)).withValues(
           alpha: 0.14,
         ),
         side: BorderSide.none,
@@ -981,8 +981,8 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
   final List<MetricSource> _tempSources = [];
   late ChartType _selectedChartType;
 
-  final List<Color> _colorPresets = [
-    AppColors.primary,
+  List<Color> get _colorPresets => [
+    AppTheme.accentColor(context),
     AppColors.secondary,
     AppColors.success,
     AppColors.warning,
@@ -1017,7 +1017,7 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
           type: MetricType.mood,
           id: 'mood',
           label: 'Meu Humor',
-          color: AppColors.primary,
+          color: AppTheme.accentColor(context),
           dimension: 'pleasantness',
         ),
       );
@@ -1214,7 +1214,7 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                         icon: const Icon(Icons.add_rounded),
                         label: const Text('Adicionar Fonte de Dados'),
                         style: TextButton.styleFrom(
-                          foregroundColor: AppColors.primary,
+                          foregroundColor: AppTheme.accentColor(context),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 12,
@@ -1222,7 +1222,7 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                             side: BorderSide(
-                              color: AppColors.primary.withValues(alpha: 0.3),
+                              color: AppTheme.accentColor(context).withValues(alpha: 0.3),
                             ),
                           ),
                         ),
@@ -1239,7 +1239,7 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                style: AppTheme.primaryButtonStyle,
+                style: AppTheme.primaryButtonStyle(AppTheme.accentColor(context)),
                 onPressed: _saveForm,
                 child: const Text('Salvar Configuração'),
               ),
@@ -1281,14 +1281,14 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: (source.color ?? AppColors.primary).withValues(
+                        color: (source.color ?? AppTheme.accentColor(context)).withValues(
                           alpha: 0.1,
                         ),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         _getIconForType(source.type),
-                        color: source.color ?? AppColors.primary,
+                        color: source.color ?? AppTheme.accentColor(context),
                         size: 16,
                       ),
                     ),
@@ -1516,7 +1516,7 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
               _buildPickerItem(
                 ctx,
                 icon: Icons.face_rounded,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
                 title: 'Average Mood',
                 subtitle: 'Daily mood based on Journal',
                 onTap: () {
@@ -1525,7 +1525,7 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                       type: MetricType.mood,
                       id: 'mood',
                       label: 'Mood',
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                       dimension: 'pleasantness',
                     ),
                   );
@@ -1796,11 +1796,11 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
   }
 
   Color _parseColor(String? colorStr) {
-    if (colorStr == null || colorStr.isEmpty) return AppColors.primary;
+    if (colorStr == null || colorStr.isEmpty) return AppTheme.accentColor(context);
     try {
       return Color(int.parse(colorStr.replaceAll('#', '0xFF')));
     } catch (_) {
-      return AppColors.primary;
+      return AppTheme.accentColor(context);
     }
   }
 

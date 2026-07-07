@@ -15,7 +15,7 @@
         android:src="@drawable/widget_checkbox_empty" />
 
     <TextView
-        android:id="@+id/shopping_title"
+        android:id="@+id/item_title"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"

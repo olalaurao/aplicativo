@@ -247,7 +247,7 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
           _chip(
             label: 'Todos',
             selected: _selectedPlatform == null,
-            color: AppColors.primary,
+            color: AppTheme.accentColor(context),
             onTap: () => setState(() => _selectedPlatform = null),
           ),
           for (final platform in platforms)
@@ -437,7 +437,7 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
         selected
             ? Icons.radio_button_checked_rounded
             : Icons.radio_button_unchecked_rounded,
-        color: selected ? AppColors.primary : AppColors.textMuted,
+        color: selected ? AppTheme.accentColor(context) : AppColors.textMuted,
       ),
       title: Text(label),
       onTap: () => onChanged(value),

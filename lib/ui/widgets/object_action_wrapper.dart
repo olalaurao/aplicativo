@@ -94,9 +94,9 @@ Future<void> showObjectActionSheet(
             ),
             const Divider(height: 8),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.edit_outlined,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
               ),
               title: const Text('Editar'),
               onTap: () {
@@ -105,9 +105,9 @@ Future<void> showObjectActionSheet(
               },
             ),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.swap_horiz_rounded,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
               ),
               title: const Text('Alterar Tipo'),
               onTap: () {
@@ -116,9 +116,9 @@ Future<void> showObjectActionSheet(
               },
             ),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.call_merge_rounded,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
               ),
               title: const Text('Mesclar com outra nota'),
               onTap: () {
@@ -219,7 +219,7 @@ Future<void> _confirmMergeIntoTarget(
         ),
         TextButton(
           onPressed: () => Navigator.pop(dialogContext, true),
-          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+          style: TextButton.styleFrom(foregroundColor: AppTheme.accentColor(context)),
           child: const Text('Mesclar'),
         ),
       ],
@@ -317,7 +317,7 @@ void _showChangeTypeSheet(
                 return ListTile(
                   leading: Icon(
                     t['icon'] as IconData,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
                   title: Text(t['label'] as String),
                   onTap: () async {
@@ -361,7 +361,7 @@ Future<void> _confirmAndChangeType(
         ),
         TextButton(
           onPressed: () => Navigator.pop(dialogContext, true),
-          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+          style: TextButton.styleFrom(foregroundColor: AppTheme.accentColor(context)),
           child: const Text('Confirmar'),
         ),
       ],
@@ -554,6 +554,10 @@ String _typeLabel(ContentObject object) {
         return 'Habit';
       case OrganizerType.tracker:
         return 'Tracker';
+      case OrganizerType.dayTheme:
+        return 'Day Theme';
+      case OrganizerType.timeBlock:
+        return 'Time Block';
     }
   }
   if (object is Reminder) return 'Reminder';

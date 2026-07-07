@@ -186,7 +186,7 @@ class _ConflictCard extends ConsumerWidget {
                         child: _PreviewBox(
                           title: 'Local',
                           content: local,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                         ),
                       ),
                       const SizedBox(width: 10),

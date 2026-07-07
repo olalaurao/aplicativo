@@ -1,7 +1,6 @@
 // lib/models/tracker_model.dart
 import 'content_object.dart';
 import 'shared_types.dart';
-import 'package:flutter/foundation.dart';
 
 // A6.2 — Alert levels for health tracker fields
 enum FieldAlertLevel { none, info, warning, critical }
@@ -240,7 +239,6 @@ class TrackerDefinition extends ContentObject {
           .map((action) => ActionDef.fromJson(Map<String, dynamic>.from(action)))
           .toList();
     }
-    debugPrint('Tracker sections: ${tracker.sections.length}');
     return tracker;
   }
 

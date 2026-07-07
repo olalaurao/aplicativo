@@ -240,10 +240,10 @@ class _StatRow extends StatelessWidget {
         ),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: AppColors.primary,
+            color: AppTheme.accentColor(context),
           ),
         ),
       ],

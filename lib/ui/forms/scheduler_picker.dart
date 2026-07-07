@@ -136,7 +136,7 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
               height: 4,
               margin: EdgeInsets.only(right: index < 2 ? 8 : 0),
               decoration: BoxDecoration(
-                color: isActive ? AppColors.primary : AppColors.surfaceVariant,
+                color: isActive ? AppTheme.accentColor(context) : AppColors.surfaceVariant,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -238,11 +238,11 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.1)
+              ? AppTheme.accentColor(context).withValues(alpha: 0.1)
               : AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.divider,
+            color: isSelected ? AppTheme.accentColor(context) : AppColors.divider,
             width: 1.5,
           ),
         ),
@@ -250,7 +250,7 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
           children: [
             Icon(
               icon,
-              color: isSelected ? AppColors.primary : AppColors.textMuted,
+              color: isSelected ? AppTheme.accentColor(context) : AppColors.textMuted,
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -263,9 +263,9 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
               ),
             ),
             if (isSelected)
-              const Icon(
+              Icon(
                 Icons.check_circle_rounded,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
                 size: 20,
               ),
           ],
@@ -419,11 +419,11 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: selected
-                  ? AppColors.primary.withValues(alpha: 0.1)
+                  ? AppTheme.accentColor(context).withValues(alpha: 0.1)
                   : AppColors.surfaceVariant,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: selected ? AppColors.primary : Colors.transparent,
+                color: selected ? AppTheme.accentColor(context) : Colors.transparent,
               ),
             ),
             child: Row(
@@ -433,7 +433,7 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
                       ? Icons.check_circle_rounded
                       : Icons.radio_button_unchecked_rounded,
                   size: 18,
-                  color: selected ? AppColors.primary : AppColors.textMuted,
+                  color: selected ? AppTheme.accentColor(context) : AppColors.textMuted,
                 ),
                 const SizedBox(width: 12),
                 Text(
@@ -727,7 +727,7 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
         selected
             ? Icons.radio_button_checked_rounded
             : Icons.radio_button_unchecked_rounded,
-        color: selected ? AppColors.primary : AppColors.textMuted,
+        color: selected ? AppTheme.accentColor(context) : AppColors.textMuted,
       ),
       title: Text(
         label,
@@ -797,11 +797,11 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primary.withValues(alpha: 0.1)
+                    ? AppTheme.accentColor(context).withValues(alpha: 0.1)
                     : AppColors.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: isSelected ? AppColors.primary : AppColors.divider,
+                  color: isSelected ? AppTheme.accentColor(context) : AppColors.divider,
                 ),
               ),
               child: Row(
@@ -819,9 +819,9 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
                     ),
                   ),
                   if (isSelected)
-                    const Icon(
+                    Icon(
                       Icons.check_circle_rounded,
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                       size: 18,
                     ),
                 ],
@@ -865,11 +865,11 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primary.withValues(alpha: 0.1)
+                    ? AppTheme.accentColor(context).withValues(alpha: 0.1)
                     : AppColors.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: isSelected ? AppColors.primary : AppColors.divider,
+                  color: isSelected ? AppTheme.accentColor(context) : AppColors.divider,
                 ),
               ),
               child: Row(
@@ -901,9 +901,9 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
                     ),
                   ),
                   if (isSelected)
-                    const Icon(
+                    Icon(
                       Icons.check_circle_rounded,
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                       size: 18,
                     ),
                 ],

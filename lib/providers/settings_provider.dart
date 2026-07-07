@@ -62,6 +62,7 @@ class AppSettings {
   final String themeMode;
   final String activeThemeId;
   final String? backgroundColor;
+  final String? darkBackgroundColor;
   final String? fontFamily;
   final bool nlpTaskParsingEnabled;
   final bool showOverdueSection;
@@ -110,7 +111,7 @@ class AppSettings {
     this.defaultPlannerView = 'day',
     this.categoryColors = const {},
     this.autoCategoryRules = const [],
-    this.driveSyncFolder = 'CitrineVault',
+    this.driveSyncFolder = 'QuartzoVault',
     this.driveSyncFolderId = '',
     this.driveSyncFolderPath = '',
     this.typeSignatures = const {},
@@ -126,8 +127,9 @@ class AppSettings {
     this.reviewDailyTemplateId = '',
     this.accentColor = '#F97316',
     this.themeMode = 'system',
-    this.activeThemeId = 'citrine',
+    this.activeThemeId = 'Quartzo',
     this.backgroundColor,
+    this.darkBackgroundColor,
     this.fontFamily,
     this.nlpTaskParsingEnabled = true,
     this.showOverdueSection = true,
@@ -221,6 +223,7 @@ class AppSettings {
     String? themeMode,
     String? activeThemeId,
     String? backgroundColor,
+    String? darkBackgroundColor,
     String? fontFamily,
     bool? nlpTaskParsingEnabled,
     bool? showOverdueSection,
@@ -287,6 +290,7 @@ class AppSettings {
       themeMode: themeMode ?? this.themeMode,
       activeThemeId: activeThemeId ?? this.activeThemeId,
       backgroundColor: backgroundColor ?? this.backgroundColor,
+      darkBackgroundColor: darkBackgroundColor ?? this.darkBackgroundColor,
       fontFamily: fontFamily ?? this.fontFamily,
       nlpTaskParsingEnabled:
           nlpTaskParsingEnabled ?? this.nlpTaskParsingEnabled,
@@ -385,7 +389,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       defaultPlannerView: prefs.getString('defaultPlannerView') ?? 'day',
       categoryColors: colors,
       autoCategoryRules: rules,
-      driveSyncFolder: prefs.getString('driveSyncFolder') ?? 'CitrineVault',
+      driveSyncFolder: prefs.getString('driveSyncFolder') ?? 'QuartzoVault',
       driveSyncFolderId: prefs.getString('driveSyncFolderId') ?? '',
       driveSyncFolderPath: prefs.getString('driveSyncFolderPath') ?? '',
       typeSignatures: sigs,
@@ -407,8 +411,9 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       reviewDailyTemplateId: prefs.getString('reviewDailyTemplateId') ?? '',
       accentColor: prefs.getString('accentColor') ?? '#F97316',
       themeMode: prefs.getString('themeMode') ?? 'system',
-      activeThemeId: prefs.getString('activeThemeId') ?? 'citrine',
+      activeThemeId: prefs.getString('activeThemeId') ?? 'Quartzo',
       backgroundColor: prefs.getString('backgroundColor'),
+      darkBackgroundColor: prefs.getString('darkBackgroundColor'),
       fontFamily: prefs.getString('fontFamily'),
       nlpTaskParsingEnabled: prefs.getBool('nlpTaskParsingEnabled') ?? true,
       showOverdueSection: prefs.getBool('showOverdueSection') ?? true,
@@ -477,71 +482,151 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
         objectType: 'shopping_list',
         markerType: MarkerType.property,
         markerValue: 'type: shopping_list',
+        emoji: '🛒',
       ),
       'task': TypeSignature(
         objectType: 'task',
         markerType: MarkerType.property,
         markerValue: 'type: task',
+        emoji: '✅',
       ),
       'idea': TypeSignature(
         objectType: 'idea',
         markerType: MarkerType.tag,
         markerValue: 'ideia',
+        emoji: '💡',
       ),
       'habit': TypeSignature(
         objectType: 'habit',
         markerType: MarkerType.property,
         markerValue: 'type: habit',
+        emoji: '🔄',
       ),
       'project': TypeSignature(
         objectType: 'project',
         markerType: MarkerType.property,
         markerValue: 'type: project',
+        emoji: '🚀',
       ),
       'goal': TypeSignature(
         objectType: 'goal',
         markerType: MarkerType.property,
         markerValue: 'type: goal',
+        emoji: '🎯',
       ),
       'note': TypeSignature(
         objectType: 'note',
         markerType: MarkerType.property,
         markerValue: 'type: note',
+        emoji: '📄',
       ),
       'resource': TypeSignature(
         objectType: 'resource',
         markerType: MarkerType.property,
         markerValue: 'type: resource',
+        emoji: '📚',
       ),
       'event': TypeSignature(
         objectType: 'event',
         markerType: MarkerType.property,
         markerValue: 'type: event',
+        emoji: '📅',
       ),
       'person': TypeSignature(
         objectType: 'person',
         markerType: MarkerType.property,
         markerValue: 'type: person',
+        emoji: '👤',
       ),
       'area': TypeSignature(
         objectType: 'area',
         markerType: MarkerType.folder,
         markerValue: 'organizers/areas/',
+        emoji: '🗺️',
       ),
       'activity': TypeSignature(
         objectType: 'activity',
         markerType: MarkerType.folder,
         markerValue: 'organizers/activities/',
+        emoji: '⚡',
       ),
       'label': TypeSignature(
         objectType: 'label',
         markerType: MarkerType.folder,
         markerValue: 'organizers/labels/',
+        emoji: '🏷️',
       ),
       'organizer': TypeSignature(
         objectType: 'organizer',
         markerType: MarkerType.property,
         markerValue: 'type: organizer',
+        emoji: '📋',
+      ),
+      'day_theme': TypeSignature(
+        objectType: 'day_theme',
+        markerType: MarkerType.property,
+        markerValue: 'type: day_theme',
+        emoji: '🌅',
+      ),
+      'time_block': TypeSignature(
+        objectType: 'time_block',
+        markerType: MarkerType.property,
+        markerValue: 'type: time_block',
+        emoji: '⏱️',
+      ),
+      'tracker': TypeSignature(
+        objectType: 'tracker',
+        markerType: MarkerType.property,
+        markerValue: 'type: tracker',
+        emoji: '📊',
+      ),
+      'reminder': TypeSignature(
+        objectType: 'reminder',
+        markerType: MarkerType.property,
+        markerValue: 'type: reminder',
+        emoji: '⏰',
+      ),
+      'social_post': TypeSignature(
+        objectType: 'social_post',
+        markerType: MarkerType.property,
+        markerValue: 'type: social_post',
+        emoji: '📱',
+      ),
+      'mood_definition': TypeSignature(
+        objectType: 'mood_definition',
+        markerType: MarkerType.property,
+        markerValue: 'type: mood_definition',
+        emoji: '😊',
+      ),
+      'system': TypeSignature(
+        objectType: 'system',
+        markerType: MarkerType.property,
+        markerValue: 'type: system',
+        emoji: '⚙️',
+      ),
+      'analysis': TypeSignature(
+        objectType: 'analysis',
+        markerType: MarkerType.property,
+        markerValue: 'type: analysis',
+        emoji: '📈',
+      ),
+      'wellbeing_indicator': TypeSignature(
+        objectType: 'wellbeing_indicator',
+        markerType: MarkerType.property,
+        markerValue: 'type: wellbeing_indicator',
+        emoji: '❤️',
+      ),
+      'template': TypeSignature(
+        objectType: 'template',
+        markerType: MarkerType.property,
+        markerValue: 'type: template',
+        emoji: '📝',
+      ),
+      'inbox': TypeSignature(
+        objectType: 'inbox',
+        markerType: MarkerType.property,
+        markerValue: 'type: inbox',
+        emoji: '📥',
       ),
     };
   }
@@ -624,8 +709,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     await _prefs.setString('activeThemeId', theme.id);
     await _prefs.setString('accentColor', theme.accentHex);
     if (theme.backgroundColor != null) {
-      final hex = '#${theme.backgroundColor!.value.toRadixString(16).substring(2).toUpperCase()}';
+      final hex = '#${theme.backgroundColor!.toARGB32().toRadixString(16).substring(2).toUpperCase()}';
       await _prefs.setString('backgroundColor', hex);
+    }
+    if (theme.darkBackgroundColor != null) {
+      final darkHex = '#${theme.darkBackgroundColor!.toARGB32().toRadixString(16).substring(2).toUpperCase()}';
+      await _prefs.setString('darkBackgroundColor', darkHex);
     }
     if (theme.fontFamily != null) {
       await _prefs.setString('fontFamily', theme.fontFamily!);
@@ -633,11 +722,33 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     state = state.copyWith(
       activeThemeId: theme.id,
       accentColor: theme.accentHex,
-      backgroundColor: theme.backgroundColor != null 
-          ? '#${theme.backgroundColor!.value.toRadixString(16).substring(2).toUpperCase()}'
+      backgroundColor: theme.backgroundColor != null
+          ? '#${theme.backgroundColor!.toARGB32().toRadixString(16).substring(2).toUpperCase()}'
+          : null,
+      darkBackgroundColor: theme.darkBackgroundColor != null
+          ? '#${theme.darkBackgroundColor!.toARGB32().toRadixString(16).substring(2).toUpperCase()}'
           : null,
       fontFamily: theme.fontFamily,
     );
+  }
+
+  Future<void> updateLightBackgroundColor(String hex) async {
+    await _prefs.setString('backgroundColor', hex);
+    state = state.copyWith(backgroundColor: hex);
+  }
+
+  Future<void> updateDarkBackgroundColor(String hex) async {
+    await _prefs.setString('darkBackgroundColor', hex);
+    state = state.copyWith(darkBackgroundColor: hex);
+  }
+
+  Future<void> updateFontFamily(String? family) async {
+    if (family != null) {
+      await _prefs.setString('fontFamily', family);
+    } else {
+      await _prefs.remove('fontFamily');
+    }
+    state = state.copyWith(fontFamily: family);
   }
 
   Future<void> updateAutoSync(bool value) async {

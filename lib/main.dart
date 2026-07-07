@@ -267,7 +267,7 @@ void main() async {
           minimumSize: Size(900, 600),
           size: Size(1280, 820),
           center: true,
-          title: 'Citrine',
+          title: 'Quartzo',
           titleBarStyle: TitleBarStyle.normal,
         );
         await windowManager.waitUntilReadyToShow(windowOptions, () async {
@@ -406,7 +406,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
   Future<void> _checkPendingSharedTextFromNative() async {
     if (!Platform.isAndroid) return;
     try {
-      const channel = MethodChannel('com.productivity.citrine/settings');
+      const channel = MethodChannel('com.productivity.quartzo/settings');
       final text = await channel.invokeMethod<String>('getAndClearSharedText');
       if (text == null || text.trim().isEmpty) return;
       if (text == _lastProcessedSharedText) {
@@ -426,7 +426,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
   Future<void> _checkPendingWidgetUriFromNative() async {
     if (!Platform.isAndroid) return;
     try {
-      const channel = MethodChannel('com.productivity.citrine/settings');
+      const channel = MethodChannel('com.productivity.quartzo/settings');
       final rawUri = await channel.invokeMethod<String>(
         'getAndClearPendingWidgetUri',
       );
@@ -975,7 +975,7 @@ class MyApp extends ConsumerWidget {
 
     return WithForegroundTask(
       child: MaterialApp.router(
-        title: 'Citrine',
+        title: 'Quartzo',
         debugShowCheckedModeBanner: false,
         theme: themeBundle.lightTheme,
         darkTheme: themeBundle.darkTheme,

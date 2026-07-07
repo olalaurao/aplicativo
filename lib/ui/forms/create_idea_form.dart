@@ -111,7 +111,7 @@ class _CreateIdeaFormState extends ConsumerState<CreateIdeaForm> {
             child: Text(
               'Salvar',
               style: TextStyle(
-                color: hasTitle ? AppColors.primary : AppColors.textMuted,
+                color: hasTitle ? AppTheme.accentColor(context) : AppColors.textMuted,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -159,10 +159,10 @@ class _CreateIdeaFormState extends ConsumerState<CreateIdeaForm> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.task_alt_rounded,
                       size: 20,
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -299,7 +299,7 @@ class _TaskPickerSheetState extends State<_TaskPickerSheet> {
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: AppTheme.accentColor(context),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),

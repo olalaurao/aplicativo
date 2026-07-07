@@ -7,7 +7,6 @@ import '../../services/kpi_engine.dart';
 import '../theme.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/overdue_section.dart';
-import '../widgets/object_action_wrapper.dart';
 import '../widgets/incomplete_badge.dart';
 import '../forms/create_goal_form.dart';
 import 'universal_detail_view.dart';
@@ -42,11 +41,11 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 12, 0),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 8, 12, 0),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Goals',
                       textAlign: TextAlign.center,
@@ -77,10 +76,10 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
                       ),
                       Text(
                         '${completedGoals.length}/${goals.length}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                         ),
                       ),
                     ],
@@ -94,8 +93,8 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
                           : completedGoals.length / goals.length,
                       minHeight: 6,
                       backgroundColor: AppTheme.surfaceVariantColor(context),
-                      valueColor: const AlwaysStoppedAnimation(
-                        AppColors.primary,
+                      valueColor: AlwaysStoppedAnimation(
+                        AppTheme.accentColor(context),
                       ),
                     ),
                   ),
@@ -155,7 +154,7 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
           context,
           MaterialPageRoute(builder: (_) => const CreateGoalForm()),
         ),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppTheme.accentColor(context),
         child: const Icon(Icons.add_rounded, color: Colors.white),
       ),
     );

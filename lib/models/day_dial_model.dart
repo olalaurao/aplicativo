@@ -1,5 +1,7 @@
 // lib/models/day_dial_model.dart
 /// Models for the circular day dial widget
+library;
+
 
 /// The kind of activity filling an hour on the dial
 enum DialHourKind {
@@ -17,6 +19,8 @@ class DayDialHourState {
   final double fillFraction; // 0.0-1.0, how much of this hour is covered
   final String? habitIconName; // set only if a habit is scheduled at this hour
   final String? habitId;
+  final String? reminderIconName; // set only if a reminder is scheduled at this hour
+  final String? reminderId;
 
   DayDialHourState({
     required this.hour,
@@ -24,6 +28,8 @@ class DayDialHourState {
     required this.fillFraction,
     this.habitIconName,
     this.habitId,
+    this.reminderIconName,
+    this.reminderId,
   });
 
   /// Create a default idle state for an hour
@@ -41,6 +47,8 @@ class DayDialHourState {
     double? fillFraction,
     String? habitIconName,
     String? habitId,
+    String? reminderIconName,
+    String? reminderId,
   }) {
     return DayDialHourState(
       hour: hour ?? this.hour,
@@ -48,6 +56,8 @@ class DayDialHourState {
       fillFraction: fillFraction ?? this.fillFraction,
       habitIconName: habitIconName ?? this.habitIconName,
       habitId: habitId ?? this.habitId,
+      reminderIconName: reminderIconName ?? this.reminderIconName,
+      reminderId: reminderId ?? this.reminderId,
     );
   }
 
@@ -57,6 +67,8 @@ class DayDialHourState {
     'fillFraction': fillFraction,
     if (habitIconName != null) 'habitIconName': habitIconName,
     if (habitId != null) 'habitId': habitId,
+    if (reminderIconName != null) 'reminderIconName': reminderIconName,
+    if (reminderId != null) 'reminderId': reminderId,
   };
 
   factory DayDialHourState.fromMap(Map<String, dynamic> map) {
@@ -69,6 +81,8 @@ class DayDialHourState {
       fillFraction: (map['fillFraction'] as num).toDouble(),
       habitIconName: map['habitIconName'] as String?,
       habitId: map['habitId'] as String?,
+      reminderIconName: map['reminderIconName'] as String?,
+      reminderId: map['reminderId'] as String?,
     );
   }
 }

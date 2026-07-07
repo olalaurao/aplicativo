@@ -4,7 +4,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 android {
-    namespace = "com.productivity.citrine"
+    namespace = "com.productivity.quartzo"
     compileSdk = 36
     ndkVersion = "28.2.13676358"
     compileOptions {
@@ -36,4 +36,16 @@ dependencies {
 }
 flutter {
     source = "../.."
+}
+
+// Workaround: Flutter Gradle plugin sets fileMode = 0644 (POSIX) on asset copy tasks,
+// which fails on Windows. This removes the fileMode setting after the plugin configures
+// the tasks so the build can complete successfully on Windows.
+if (org.gradle.internal.os.OperatingSystem.current().isWindows) {
+    afterEvaluate {
+        tasks.withType<Copy>().configureEach {
+            filePermissions { }
+            dirPermissions { }
+        }
+    }
 }

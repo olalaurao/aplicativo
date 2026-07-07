@@ -252,11 +252,11 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
             onSelected: (selected) {
               if (selected) setState(() => _timeframeDays = 7);
             },
-            selectedColor: AppColors.primary.withValues(alpha: 0.15),
-            checkmarkColor: AppColors.primary,
+            selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.15),
+            checkmarkColor: AppTheme.accentColor(context),
             labelStyle: TextStyle(
               color: _timeframeDays == 7
-                  ? AppColors.primary
+                  ? AppTheme.accentColor(context)
                   : AppColors.textMuted,
               fontWeight: _timeframeDays == 7
                   ? FontWeight.bold
@@ -271,11 +271,11 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
             onSelected: (selected) {
               if (selected) setState(() => _timeframeDays = 30);
             },
-            selectedColor: AppColors.primary.withValues(alpha: 0.15),
-            checkmarkColor: AppColors.primary,
+            selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.15),
+            checkmarkColor: AppTheme.accentColor(context),
             labelStyle: TextStyle(
               color: _timeframeDays == 30
-                  ? AppColors.primary
+                  ? AppTheme.accentColor(context)
                   : AppColors.textMuted,
               fontWeight: _timeframeDays == 30
                   ? FontWeight.bold
@@ -395,15 +395,15 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: AppTheme.accentColor(context).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
               scheduler.rules.first.repeatType.name,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
               ),
             ),
           ),
@@ -524,7 +524,7 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
 
     final themeColor = forecast.theme.color != null
         ? Color(int.tryParse(forecast.theme.color!) ?? 0xFFE0E0E0)
-        : AppColors.primary;
+        : AppTheme.accentColor(context);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),

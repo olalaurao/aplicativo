@@ -194,7 +194,7 @@ class _CollectionEditorState extends State<CollectionEditor> {
               onPressed: () => setState(() => _isConfiguringSchema = false),
               icon: const Icon(Icons.table_chart_outlined, size: 16),
               label: const Text('Ver itens'),
-              style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+              style: TextButton.styleFrom(foregroundColor: AppTheme.accentColor(context)),
             ),
           if (!_isConfiguringSchema) ...[
             IconButton(
@@ -208,7 +208,7 @@ class _CollectionEditorState extends State<CollectionEditor> {
               icon: const Icon(Icons.add_rounded, size: 16),
               label: const Text('+ Linha'),
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: AppTheme.accentColor(context),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 minimumSize: Size.zero,
@@ -238,14 +238,14 @@ class _CollectionEditorState extends State<CollectionEditor> {
                 onPressed: _addProperty,
                 icon: const Icon(Icons.add_rounded, size: 16),
                 label: const Text('Add Property'),
-                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                style: TextButton.styleFrom(foregroundColor: AppTheme.accentColor(context)),
               ),
               if (_schema.isNotEmpty) ...[
                 const Spacer(),
                 FilledButton(
                   onPressed: () => setState(() => _isConfiguringSchema = false),
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: AppTheme.accentColor(context),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     minimumSize: Size.zero,
@@ -450,7 +450,7 @@ class _CollectionEditorState extends State<CollectionEditor> {
       final value = item[p.id] == true || item[p.id] == 'true';
       return Checkbox(
         value: value,
-        activeColor: AppColors.primary,
+        activeColor: AppTheme.accentColor(context),
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         visualDensity: VisualDensity.compact,
         onChanged: (v) {

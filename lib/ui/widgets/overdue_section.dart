@@ -67,7 +67,7 @@ class _OverdueCard extends ConsumerWidget {
         ),
       'goal' => (Icons.flag_outlined, AppColors.warning),
       'project' => (Icons.folder_outlined, AppColors.info),
-      'idea' => (Icons.lightbulb_outline_rounded, AppColors.accent),
+      'idea' => (Icons.lightbulb_outline_rounded, AppTheme.accentColor(context)),
       _ => (Icons.circle_outlined, AppColors.textMuted),
     };
 

@@ -3,6 +3,7 @@ import '../models/day_dial_model.dart';
 import '../models/task_model.dart';
 import '../models/habit_model.dart';
 import '../models/pomodoro_session.dart';
+import '../models/reminder_model.dart';
 import 'package:googleapis/calendar/v3.dart' as google_calendar;
 
 /// Aggregates data from multiple sources to produce a per-hour summary for the day dial
@@ -14,6 +15,7 @@ class DayDialAggregator {
     required List<Habit> habits,
     required List<PomodoroSession> pomodoroSessions,
     required List<google_calendar.Event> googleEvents,
+    required List<Reminder> reminders,
   }) {
     // Initialize 24 hours with idle state
     final hourStates = List.generate(
@@ -120,11 +122,40 @@ class DayDialAggregator {
       }
     }
 
+    // Process reminders
+    for (final reminder in reminders) {
+      if (reminder.isCompleted) continue;
+      if (reminder.habitReminder) continue; // Skip habit reminders, they're handled by habits
+      
+      if (!_isSameDay(reminder.time, date)) continue;
+      
+      final startHour = reminder.time.hour;
+      
+      if (startHour >= 0 && startHour < 24) {
+        // Reminder icon (bell emoji)
+        hourStates[startHour] = hourStates[startHour].copyWith(
+          reminderIconName: '🔔',
+          reminderId: reminder.id,
+        );
+      }
+    }
+
     return hourStates;
   }
 
   static bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  /// Convert hour states to widget-compatible format
+  static List<Map<String, dynamic>> hourStatesToWidgetFormat(List<DayDialHourState> hourStates) {
+    return hourStates.map((state) {
+      return {
+        'hour': state.hour,
+        'kind': state.kind.name,
+        'fillFraction': state.fillFraction,
+      };
+    }).toList();
   }
 
   static DateTime? _parseScheduledTime(String timeStr, DateTime date) {

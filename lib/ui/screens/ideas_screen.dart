@@ -26,7 +26,7 @@ class IdeasScreen extends ConsumerWidget {
             MaterialPageRoute(builder: (_) => const CreateIdeaForm()),
           );
         },
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppTheme.accentColor(context),
         child: const Icon(Icons.add_rounded, color: Colors.white),
       ),
       body: _IdeasList(ideas: ref.watch(ideasProvider)),
@@ -227,7 +227,7 @@ class _ConvertOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(icon, color: AppColors.primary),
+      leading: Icon(icon, color: AppTheme.accentColor(context)),
       title: Text(label),
       onTap: onTap,
     );

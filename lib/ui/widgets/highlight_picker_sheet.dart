@@ -44,9 +44,9 @@ class HighlightPickerSheet extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.07),
-                      border: const Border(
-                        left: BorderSide(color: AppColors.primary, width: 2),
+                      color: AppTheme.accentColor(context).withValues(alpha: 0.07),
+                      border: Border(
+                        left: BorderSide(color: AppTheme.accentColor(context), width: 2),
                       ),
                       borderRadius: const BorderRadius.only(
                         topRight: Radius.circular(8),
@@ -61,10 +61,10 @@ class HighlightPickerSheet extends StatelessWidget {
                             padding: const EdgeInsets.only(bottom: 4),
                             child: Text(
                               '#${hl.tag}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.primary,
+                                color: AppTheme.accentColor(context),
                               ),
                             ),
                           ),

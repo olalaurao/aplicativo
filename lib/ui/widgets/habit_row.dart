@@ -142,16 +142,16 @@ class HabitRow extends StatelessWidget {
           color: AppColors.habitGreen.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Row(
+        child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.check_rounded,
               size: 10,
               color: AppColors.habitGreen,
             ),
-            const SizedBox(width: 4),
-            const Text(
+            SizedBox(width: 4),
+            Text(
               'Done today',
               style: TextStyle(
                 fontSize: 10,

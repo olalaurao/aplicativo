@@ -142,7 +142,7 @@ class GoogleDriveSyncService {
     if (fileList.files != null && fileList.files!.isNotEmpty) {
       final remoteFile = fileList.files!.first;
       final remoteId = remoteFile.id!;
-      final remoteHash = remoteFile.appProperties?['citrine_hash'];
+      final remoteHash = remoteFile.appProperties?['Quartzo_hash'];
 
       // Conflict Resolution:
       // If remoteHash exists and is different from our baseHash, someone else modified it.
@@ -153,7 +153,7 @@ class GoogleDriveSyncService {
 
       final updateFile = drive.File()
         ..name = fileName
-        ..appProperties = {'citrine_hash': localHash};
+        ..appProperties = {'Quartzo_hash': localHash};
 
       await _driveApi!.files.update(
         updateFile,
@@ -167,7 +167,7 @@ class GoogleDriveSyncService {
       final newFile = drive.File()
         ..name = fileName
         ..parents = [parentId]
-        ..appProperties = {'citrine_hash': localHash};
+        ..appProperties = {'Quartzo_hash': localHash};
 
       await _driveApi!.files.create(
         newFile,
@@ -238,7 +238,7 @@ class GoogleDriveSyncService {
     final media = drive.Media(Stream.value(mergedBytes), mergedBytes.length);
     final updateFile = drive.File()
       ..name = fileName
-      ..appProperties = {'citrine_hash': calculateHash(mergedContent)};
+      ..appProperties = {'Quartzo_hash': calculateHash(mergedContent)};
 
     await _driveApi!.files.update(
       updateFile,

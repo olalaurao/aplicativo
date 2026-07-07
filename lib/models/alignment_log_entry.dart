@@ -1,5 +1,4 @@
 // lib/models/alignment_log_entry.dart
-import 'package:flutter/material.dart';
 
 enum AlignmentState { early, aligned, drifting, missed }
 

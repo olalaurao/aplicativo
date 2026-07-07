@@ -41,9 +41,9 @@ class VaultFilesScreen extends ConsumerWidget {
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: AppTheme.cardDecoration(context),
                 child: ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.description_outlined,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
                   title: Text(
                     relativePath,

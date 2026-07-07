@@ -296,11 +296,11 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
         decoration: BoxDecoration(
           color:
               isActive
-                  ? AppColors.primary.withValues(alpha: 0.15)
+                  ? AppTheme.accentColor(context).withValues(alpha: 0.15)
                   : AppTheme.surfaceVariantColor(context),
           border:
               isActive
-                  ? Border.all(color: AppColors.primary.withValues(alpha: 0.3))
+                  ? Border.all(color: AppTheme.accentColor(context).withValues(alpha: 0.3))
                   : null,
           borderRadius: BorderRadius.circular(20),
         ),
@@ -310,7 +310,7 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
             fontSize: 11,
             fontWeight: FontWeight.w600,
             color:
-                isActive ? AppColors.primary : AppTheme.textSecondaryColor(context),
+                isActive ? AppTheme.accentColor(context) : AppTheme.textSecondaryColor(context),
           ),
         ),
       ),
@@ -608,11 +608,11 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
           decoration: BoxDecoration(
             color:
                 active
-                    ? AppColors.primary.withValues(alpha: 0.12)
+                    ? AppTheme.accentColor(context).withValues(alpha: 0.12)
                     : AppTheme.surfaceVariantColor(context),
             border:
                 active
-                    ? Border.all(color: AppColors.primary.withValues(alpha: 0.3))
+                    ? Border.all(color: AppTheme.accentColor(context).withValues(alpha: 0.3))
                     : null,
             borderRadius: BorderRadius.circular(9),
           ),
@@ -624,7 +624,7 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
                 fontWeight: FontWeight.w600,
                 color:
                     active
-                        ? AppColors.primary
+                        ? AppTheme.accentColor(context)
                         : AppTheme.textSecondaryColor(context),
               ),
             ),
@@ -644,11 +644,11 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
           decoration: BoxDecoration(
             color:
                 active
-                    ? AppColors.primary.withValues(alpha: 0.12)
+                    ? AppTheme.accentColor(context).withValues(alpha: 0.12)
                     : AppTheme.surfaceVariantColor(context),
             border:
                 active
-                    ? Border.all(color: AppColors.primary.withValues(alpha: 0.3))
+                    ? Border.all(color: AppTheme.accentColor(context).withValues(alpha: 0.3))
                     : null,
             borderRadius: BorderRadius.circular(9),
           ),
@@ -660,7 +660,7 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
                 fontWeight: FontWeight.w600,
                 color:
                     active
-                        ? AppColors.primary
+                        ? AppTheme.accentColor(context)
                         : AppTheme.textSecondaryColor(context),
               ),
             ),

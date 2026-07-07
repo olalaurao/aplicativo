@@ -9,14 +9,15 @@ import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 
 class WidgetService {
-  static const _androidPackage = 'com.productivity.citrine';
-  static const _calendarProvider = 'CitrineCalendarWidgetReceiver';
-  static const _tasksProvider = 'CitrineTasksWidgetReceiver';
-  static const _shoppingProvider = 'CitrineShoppingWidgetProvider';
-  static const _pomodoroProvider = 'CitrinePomodoroWidgetProvider';
-  static const _quickAddProvider = 'CitrineQuickAddWidgetProvider';
-  static const _noteProvider = 'CitrineNoteWidgetProvider';
-  static const _checklistProvider = 'CitrineChecklistWidgetProvider';
+  static const _androidPackage = 'com.productivity.quartzo';
+  static const _calendarProvider = 'QuartzoCalendarWidgetReceiver';
+  static const _tasksProvider = 'QuartzoTasksWidgetReceiver';
+  static const _shoppingProvider = 'QuartzoShoppingWidgetProvider';
+  static const _pomodoroProvider = 'QuartzoPomodoroWidgetProvider';
+  static const _quickAddProvider = 'QuartzoQuickAddWidgetProvider';
+  static const _noteProvider = 'QuartzoNoteWidgetProvider';
+  // static const _checklistProvider = 'QuartzoChecklistWidgetProvider'; // Not implemented on Android
+  static const _dayDialProvider = 'QuartzoDayDialWidgetProvider';
 
   static bool get _isSupportedPlatform => Platform.isAndroid || Platform.isIOS;
 
@@ -29,13 +30,18 @@ class WidgetService {
     required Map<String, dynamic> calendar,
     required Map<String, dynamic> shopping,
     required Map<String, dynamic> pomodoro,
+    Map<String, dynamic>? tasks,
   }) async {
     try {
-      await Future.wait([
-        _saveJson('citrine_calendar', calendar),
-        _saveJson('citrine_shopping', shopping),
-        _saveJson('citrine_pomodoro', pomodoro),
-      ]);
+      final futures = [
+        _saveJson('Quartzo_calendar', calendar),
+        _saveJson('Quartzo_shopping', shopping),
+        _saveJson('Quartzo_pomodoro', pomodoro),
+      ];
+      if (tasks != null) {
+        futures.add(_saveJson('Quartzo_tasks', tasks));
+      }
+      await Future.wait(futures);
       await refreshAllWidgets();
     } catch (e, st) {
       debugPrint('[WidgetService] updateDashboardWidgets failed: $e\n$st');
@@ -51,7 +57,7 @@ class WidgetService {
     required List<Map<String, dynamic>> days,
     String type = 'week',
   }) async {
-    await _saveJson('citrine_calendar', {
+    await _saveJson('Quartzo_calendar', {
       'title': monthTitle,
       'mode': type,
       'days': days,
@@ -65,17 +71,17 @@ class WidgetService {
     required String content,
     required String slug,
   }) async {
-    await _saveJson('citrine_note_$widgetId', {
+    await _saveJson('Quartzo_note_$widgetId', {
       'title': title,
       'content': content,
       'slug': slug,
-      'linkUri': 'citrine:///detail/$slug',
+      'linkUri': 'Quartzo:///detail/$slug',
     });
-    await _saveJson('citrine_note', {
+    await _saveJson('Quartzo_note', {
       'title': title,
       'content': content,
       'slug': slug,
-      'linkUri': 'citrine:///detail/$slug',
+      'linkUri': 'Quartzo:///detail/$slug',
     });
     await _update(_noteProvider);
   }
@@ -86,20 +92,20 @@ class WidgetService {
     required List<Map<String, dynamic>> items,
     required String slug,
   }) async {
-    await _saveJson('citrine_checklist_$widgetId', {
+    await _saveJson('Quartzo_checklist_$widgetId', {
       'title': title,
       'items': items,
       'slug': slug,
-      'linkUri': 'citrine:///detail/$slug',
+      'linkUri': 'Quartzo:///detail/$slug',
     });
     // fallback for config
-    await _saveJson('citrine_checklist', {
+    await _saveJson('Quartzo_checklist', {
       'title': title,
       'items': items,
       'slug': slug,
-      'linkUri': 'citrine:///detail/$slug',
+      'linkUri': 'Quartzo:///detail/$slug',
     });
-    await _update(_checklistProvider);
+    // await _update(_checklistProvider); // Not implemented on Android
   }
 
   static Future<void> updateQuickAddLabels({
@@ -108,17 +114,17 @@ class WidgetService {
     String firstTarget = 'entry',
     String secondTarget = 'task',
   }) async {
-    await _saveJson('citrine_quick_add', {
+    await _saveJson('Quartzo_quick_add', {
       'buttons': [
         {
           'label': journalLabel,
           'target': firstTarget,
-          'uri': 'citrine:///create/$firstTarget',
+          'uri': 'Quartzo:///create/$firstTarget',
         },
         {
           'label': taskLabel,
           'target': secondTarget,
-          'uri': 'citrine:///create/$secondTarget',
+          'uri': 'Quartzo:///create/$secondTarget',
         },
       ],
     });
@@ -133,6 +139,7 @@ class WidgetService {
       _update(_pomodoroProvider),
       _update(_quickAddProvider),
       _update(_noteProvider),
+      _update(_dayDialProvider),
     ]);
   }
 
@@ -141,7 +148,7 @@ class WidgetService {
     required String time,
     required String date,
   }) async {
-    await _saveJson('citrine_lock_next_session', {
+    await _saveJson('Quartzo_lock_next_session', {
       'title': title,
       'time': time,
       'date': date,
@@ -164,7 +171,7 @@ class WidgetService {
     if (widgetId != null) {
       payload['widgetId'] = widgetId;
     }
-    await _saveJson('citrine_widget_$type', payload);
+    await _saveJson('Quartzo_widget_$type', payload);
     await refreshUniversalWidgets();
   }
 
@@ -176,7 +183,7 @@ class WidgetService {
           installed
               .where((widget) {
                 final className = widget.androidClassName ?? '';
-                return className.contains('Citrine');
+                return className.contains('Quartzo');
               })
               .map((widget) => widget.androidWidgetId)
               .whereType<int>()
@@ -187,7 +194,7 @@ class WidgetService {
     } catch (e, st) {
       debugPrint('[WidgetService] universalWidgetIds failed: $e\n$st');
       final stored = await HomeWidget.getWidgetData<String>(
-        'citrine_universal_widget_ids',
+        'Quartzo_universal_widget_ids',
         defaultValue: '[]',
       );
       final decoded = jsonDecode(stored ?? '[]');
@@ -212,10 +219,10 @@ class WidgetService {
     final existingIds = await universalWidgetIds();
     final ids = {...existingIds, widgetId}.toList()..sort();
     await HomeWidget.saveWidgetData<String>(
-      'citrine_universal_widget_ids',
+      'Quartzo_universal_widget_ids',
       jsonEncode(ids),
     );
-    await _saveJson('citrine_widget_config_$widgetId', {
+    await _saveJson('Quartzo_widget_config_$widgetId', {
       'widgetId': widgetId,
       'type': type,
       'title': title,
@@ -277,7 +284,7 @@ class WidgetService {
       'details': details,
       'barActive': barActive,
     };
-    await _saveJson('citrine_pomodoro_summary', payload);
+    await _saveJson('Quartzo_pomodoro_summary', payload);
     await _saveUniversalPayload(payload, widgetId: widgetId);
     await _update(_pomodoroProvider);
   }
@@ -291,7 +298,7 @@ class WidgetService {
     String timeRemaining, {
     String? taskTitle,
   }) async {
-    await _saveJson('citrine_pomodoro_live', {
+    await _saveJson('Quartzo_pomodoro_live', {
       'title': title,
       'timeRemaining': timeRemaining,
       'taskTitle': taskTitle,
@@ -304,7 +311,7 @@ class WidgetService {
     String content,
     String footer,
   ) async {
-    await _saveJson('citrine_planner', {
+    await _saveJson('Quartzo_planner', {
       'title': title,
       'content': content,
       'footer': footer,
@@ -329,7 +336,7 @@ class WidgetService {
       'stats': stats,
       'slug': slug,
     };
-    await _saveJson('citrine_organizer_summary', payload);
+    await _saveJson('Quartzo_organizer_summary', payload);
     await _saveUniversalPayload(payload);
   }
 
@@ -339,7 +346,7 @@ class WidgetService {
     String details,
     int? widgetId,
   ) async {
-    await _saveJson('citrine_pomodoro', {
+    await _saveJson('Quartzo_pomodoro', {
       'total': total,
       'details': details,
       'bars': heights,
@@ -360,17 +367,34 @@ class WidgetService {
       'monthTitle': monthTitle,
       'monthFocus': monthFocus,
     };
-    await _saveJson('citrine_planner_detailed', payload);
+    await _saveJson('Quartzo_planner_detailed', payload);
     await _saveUniversalPayload(payload);
+  }
+
+  static Future<void> updateDayDial({
+    required String currentTime,
+    required String dateLabel,
+    required List<Map<String, dynamic>> hours,
+    required int currentHour,
+    required String summary,
+  }) async {
+    await _saveJson('Quartzo_day_dial', {
+      'currentTime': currentTime,
+      'dateLabel': dateLabel,
+      'hours': hours,
+      'currentHour': currentHour,
+      'summary': summary,
+    });
+    await _update(_dayDialProvider);
   }
 
   static Future<void> _saveUniversalPayload(
     Map<String, dynamic> payload, {
     int? widgetId,
   }) async {
-    await _saveJson('citrine_universal_widget', payload);
+    await _saveJson('Quartzo_universal_widget', payload);
     if (widgetId != null) {
-      await _saveJson('citrine_universal_widget_$widgetId', payload);
+      await _saveJson('Quartzo_universal_widget_$widgetId', payload);
     }
     await refreshUniversalWidgets();
   }
@@ -385,7 +409,7 @@ class WidgetService {
   }
 
   static Future<void> _updateTaskProviders() async {
-    await Future.wait([_update(_tasksProvider), _update(_shoppingProvider)]);
+    await _update(_tasksProvider);
   }
 
   static Future<void> _update(String provider) async {

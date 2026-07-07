@@ -212,8 +212,8 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
           children: [
             Expanded(
               child: activeList.items.isEmpty
-                  ? Center(
-                      child: const EmptyState(
+                  ? const Center(
+                      child: EmptyState(
                         icon: Icons.add_shopping_cart_rounded,
                         headline: 'Nenhum item adicionado',
                         subtext: 'Adicione itens usando o campo abaixo.',
@@ -272,14 +272,14 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.1),
+                  color: AppTheme.accentColor(context).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   count.toString(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color: AppColors.accent,
+                    color: AppTheme.accentColor(context),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -342,10 +342,10 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: isChecked ? AppColors.accent : Theme.of(context).dividerColor,
+                color: isChecked ? AppTheme.accentColor(context) : Theme.of(context).dividerColor,
                 width: 2,
               ),
-              color: isChecked ? AppColors.accent : Colors.transparent,
+              color: isChecked ? AppTheme.accentColor(context) : Colors.transparent,
             ),
             child: isChecked
                 ? const Icon(Icons.check, size: 14, color: Colors.white)
@@ -451,9 +451,9 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                 vertical: 12,
               ),
               suffixIcon: IconButton(
-                icon: const Icon(
+                icon: Icon(
                   Icons.arrow_upward_rounded,
-                  color: AppColors.accent,
+                  color: AppTheme.accentColor(context),
                 ),
                 onPressed: () => _submitItem(_textController.text, activeList),
               ),
@@ -489,7 +489,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                     leading: const Icon(Icons.shopping_cart_outlined),
                     title: Text(list.title),
                     trailing: list.id == _selectedListId
-                        ? const Icon(Icons.check, color: AppColors.accent)
+                        ? Icon(Icons.check, color: AppTheme.accentColor(context))
                         : null,
                     onTap: () {
                       setState(() => _selectedListId = list.id);

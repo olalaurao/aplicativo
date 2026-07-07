@@ -86,7 +86,7 @@ class ObsidianService {
     if (!await indexFile.exists()) {
       await indexFile.writeAsString(
         '---\ntype: index\n---\n\n'
-        '# Citrine Vault\n\n'
+        '# Quartzo Vault\n\n'
         'Welcome to your offline-first personal productivity vault.\n\n'
         '## Day Themes Query\n'
         '```dataview\n'

@@ -84,7 +84,7 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
                   'Save',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    color: hasTitle ? AppColors.primary : AppColors.textMuted,
+                    color: hasTitle ? AppTheme.accentColor(context) : AppColors.textMuted,
                   ),
                 ),
               ),
@@ -139,7 +139,7 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
                         ),
                         selected: selected,
                         onSelected: (v) => setState(() => _type = t),
-                        selectedColor: AppColors.primary,
+                        selectedColor: AppTheme.accentColor(context),
                         backgroundColor: AppColors.surfaceVariant,
                         side: BorderSide.none,
                         shape: RoundedRectangleBorder(
@@ -323,7 +323,7 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
     try {
       return Color(int.parse(hex.replaceAll('#', '0xFF')));
     } catch (_) {
-      return AppColors.primary;
+      return AppTheme.accentColor(context);
     }
   }
 }

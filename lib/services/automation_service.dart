@@ -13,7 +13,6 @@ import '../services/kpi_engine.dart';
 import '../models/goal_model.dart';
 import '../models/project_model.dart';
 import '../models/tracker_model.dart';
-import '../models/kpi_model.dart' as kpi;
 import '../models/sync_action.dart';
 import 'notification_service.dart';
 import 'markdown_parser.dart';

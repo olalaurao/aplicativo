@@ -1,4 +1,4 @@
-// lib/ui/screens/social_post_detail.dart
+﻿// lib/ui/screens/social_post_detail.dart
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -491,7 +491,7 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
                 ),
               ),
               const SizedBox(height: 12),
-              _actionTile(
+              _actionTile(context,
                 icon: Icons.edit_outlined,
                 label: 'Editar post',
                 onTap: () {
@@ -504,7 +504,7 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
                   );
                 },
               ),
-              _actionTile(
+              _actionTile(context,
                 icon: Icons.folder_outlined,
                 label: 'Adicionar a coleção',
                 onTap: () {
@@ -512,7 +512,7 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
                   _addToCollection(post);
                 },
               ),
-              _actionTile(
+              _actionTile(context,
                 icon: post.watched
                     ? Icons.visibility_off_outlined
                     : Icons.visibility_outlined,
@@ -524,7 +524,7 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
                   ref.read(socialPostsProvider.notifier).toggleWatched(post);
                 },
               ),
-              _actionTile(
+              _actionTile(context,
                 icon: Icons.open_in_new_rounded,
                 label: 'Abrir no Obsidian',
                 onTap: () {
@@ -532,7 +532,7 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
                   _openInObsidian(post);
                 },
               ),
-              _actionTile(
+              _actionTile(context,
                 icon: Icons.copy_rounded,
                 label: 'Copiar URL',
                 onTap: () {
@@ -540,7 +540,7 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
                   Clipboard.setData(ClipboardData(text: post.url));
                 },
               ),
-              _actionTile(
+              _actionTile(context,
                 icon: Icons.inventory_2_outlined,
                 label: 'Arquivar',
                 onTap: () {
@@ -550,7 +550,7 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
                       .updatePost(post.copyWith(archived: true));
                 },
               ),
-              _actionTile(
+              _actionTile(context,
                 icon: Icons.delete_outline_rounded,
                 label: 'Deletar post',
                 color: AppColors.error,
@@ -566,17 +566,20 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
     );
   }
 
-  Widget _actionTile({
+  Widget _actionTile(
+    BuildContext context, {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
-    Color color = AppColors.primary,
+    Color? color,
   }) {
+    final effectiveColor = color ?? AppTheme.accentColor(context);
+
     return ListTile(
-      leading: Icon(icon, color: color),
+      leading: Icon(icon, color: effectiveColor),
       title: Text(
         label,
-        style: TextStyle(color: color == AppColors.error ? color : null),
+        style: TextStyle(color: color == AppColors.error ? effectiveColor : null),
       ),
       onTap: onTap,
     );

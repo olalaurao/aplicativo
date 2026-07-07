@@ -31,7 +31,7 @@ import '../../providers/vault_provider.dart';
 import 'pomodoro_screen.dart';
 import '../theme.dart';
 import '../../services/undo_service.dart';
-import '../widgets/citrine_chart.dart';
+import '../widgets/quartzo_chart.dart';
 import '../widgets/tracker_metric_card.dart';
 import '../widgets/rich_text_editor.dart';
 import '../widgets/outline_editor.dart';
@@ -241,12 +241,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
                                     return ListTile(
                                       leading: CircleAvatar(
-                                        backgroundColor: AppColors.primary
+                                        backgroundColor: AppTheme.accentColor(context)
                                             .withValues(alpha: 0.1),
                                         child: Icon(
                                           _typeIcon(refObj.type),
                                           size: 18,
-                                          color: AppColors.primary,
+                                          color: AppTheme.accentColor(context),
                                         ),
                                       ),
                                       title: Text(
@@ -407,9 +407,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                       ),
                       IconButton(
                         onPressed: () => _showAddReminderSheet(context, ref),
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.add_alarm_rounded,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                           size: 20,
                         ),
                         visualDensity: VisualDensity.compact,
@@ -459,7 +459,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                                               ? Icons.picture_in_picture_rounded
                                               : Icons
                                                     .notifications_active_rounded),
-                                    color: AppColors.primary,
+                                    color: AppTheme.accentColor(context),
                                     size: 20,
                                   ),
                                   title: Text(
@@ -537,10 +537,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             ),
             Text(
               '$percentage%',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
               ),
             ),
           ],
@@ -551,7 +551,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           child: LinearProgressIndicator(
             value: progress,
             backgroundColor: AppColors.surfaceVariant,
-            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentColor(context)),
             minHeight: 8,
           ),
         ),
@@ -1331,9 +1331,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     icon: const Icon(Icons.account_tree_rounded, size: 16),
                     label: const Text('Aplicar System (Via B)'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
+                      foregroundColor: AppTheme.accentColor(context),
                       side: BorderSide(
-                        color: AppColors.primary.withValues(alpha: 0.4),
+                        color: AppTheme.accentColor(context).withValues(alpha: 0.4),
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -1399,7 +1399,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                         height: 40,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
+                          color: AppTheme.accentColor(context).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -1432,10 +1432,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                                 mood.title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.primary,
+                                  color: AppTheme.accentColor(context),
                                 ),
                               ),
                           ],
@@ -1552,10 +1552,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     children: [
                       Text(
                         '${(progress * 100).toInt()}% Concluído',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -1573,8 +1573,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                           value: progress,
                           minHeight: 24,
                           backgroundColor: AppColors.surfaceVariant,
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            AppColors.primary,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppTheme.accentColor(context),
                           ),
                         ),
                       ),
@@ -1649,10 +1649,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     children: [
                       Text(
                         '${(progress * 100).toInt()}%',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.w900,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -1662,8 +1662,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                           value: progress,
                           minHeight: 10,
                           backgroundColor: AppColors.surfaceVariant,
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            AppColors.primary,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppTheme.accentColor(context),
                           ),
                         ),
                       ),
@@ -1938,10 +1938,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                                 person.title.isNotEmpty
                                     ? person.title.substring(0, 1).toUpperCase()
                                     : '?',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 40,
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.primary,
+                                  color: AppTheme.accentColor(context),
                                 ),
                               )
                             : null,
@@ -1962,7 +1962,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                             ref,
                             Icons.message_outlined,
                             'Message',
-                            AppColors.primary,
+                            AppTheme.accentColor(context),
                           ),
                           _contactActionButton(
                             context,
@@ -2025,7 +2025,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                           minHeight: 12,
                           backgroundColor: AppColors.surfaceVariant,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            isOverdue ? AppColors.error : AppColors.primary,
+                            isOverdue ? AppColors.error : AppTheme.accentColor(context),
                           ),
                         ),
                       ),
@@ -2233,7 +2233,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                           linked != null
                               ? _typeIcon(linked.type)
                               : Icons.link_rounded,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                         ),
                         title: Text(
                           linked?.title ?? slug,
@@ -2298,7 +2298,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   width: double.infinity,
                   decoration: AppTheme.cardDecoration(context),
                   padding: const EdgeInsets.all(16),
-                  child: CitrineChart(
+                  child: QuartzoChart(
                     type: ChartType.heatmap,
                     color: AppColors.habitPurple,
                     data: List.generate(30, (i) {
@@ -2449,7 +2449,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                         width: double.infinity,
                         decoration: AppTheme.cardDecoration(context),
                         padding: const EdgeInsets.all(16),
-                        child: CitrineChart(
+                        child: QuartzoChart(
                           type: ChartType.pie,
                           data: counts.entries
                               .map(
@@ -2489,7 +2489,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   width: double.infinity,
                   decoration: AppTheme.cardDecoration(context),
                   padding: const EdgeInsets.all(16),
-                  child: CitrineChart(
+                  child: QuartzoChart(
                     type: ChartType.heatmap,
                     color: _parseColor(tracker.color),
                     data: List.generate(30, (i) {
@@ -2805,7 +2805,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         )
         .toList();
 
-    return CitrineChart(
+    return QuartzoChart(
       type: ChartType.line,
       data: data,
       color: Color(int.parse(habit.color.replaceAll('#', '0xFF'))),
@@ -2836,13 +2836,13 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           LineChartBarData(
             spots: spots,
             isCurved: true,
-            color: AppColors.primary,
+            color: AppTheme.accentColor(context),
             barWidth: 3,
             isStrokeCapRound: true,
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: AppTheme.accentColor(context).withValues(alpha: 0.1),
             ),
           ),
         ],
@@ -2926,7 +2926,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                           Expanded(
                             child: Text(
                               currentObject is MoodDefinition
-                                  ? '${(currentObject as MoodDefinition).emoji} ${currentObject.title}'
+                                  ? '${(currentObject).emoji} ${currentObject.title}'
                                   : currentObject.title,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -2967,19 +2967,19 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
+                  color: AppTheme.accentColor(context).withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.18),
+                    color: AppTheme.accentColor(context).withValues(alpha: 0.18),
                   ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Search Match',
                       style: TextStyle(
-                        color: AppColors.primary,
+                        color: AppTheme.accentColor(context),
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                       ),
@@ -3027,10 +3027,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 person.title.isNotEmpty
                     ? person.title.substring(0, 1).toUpperCase()
                     : '?',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.primary,
+                  color: AppTheme.accentColor(context),
                 ),
               )
             : null,
@@ -3044,7 +3044,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         height: 44,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.12),
+          color: AppTheme.accentColor(context).withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
@@ -3175,7 +3175,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               Icon(
                 Icons.chevron_right_rounded,
                 size: 16,
-                color: row.isOverdue ? AppColors.error : AppColors.primary,
+                color: row.isOverdue ? AppColors.error : AppTheme.accentColor(context),
               ),
             ],
           ],
@@ -3521,7 +3521,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       };
     }
     if (obj is Resource) return _resourceStatusColor(obj.status);
-    return AppColors.primary;
+    return AppTheme.accentColor(context);
   }
 
   IconData _statusIcon(ContentObject obj) {
@@ -3684,12 +3684,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
+                    color: AppTheme.accentColor(context).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.account_tree_rounded,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                     size: 18,
                   ),
                 ),
@@ -3848,7 +3848,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.accentColor(context)),
             child: const Text('Mesclar'),
           ),
         ],
@@ -3929,7 +3929,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.accentColor(context)),
             child: const Text('SALVAR'),
           ),
         ],
@@ -4063,7 +4063,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   return ListTile(
                     leading: Icon(
                       t['icon'] as IconData,
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                     ),
                     title: Text(
                       t['label'] as String,
@@ -4344,7 +4344,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     required IconData icon,
     required bool highlighted,
   }) {
-    final color = highlighted ? AppColors.primary : AppColors.textMuted;
+    final color = highlighted ? AppTheme.accentColor(context) : AppColors.textMuted;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -4910,6 +4910,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           return 'Habit';
         case OrganizerType.tracker:
           return 'Tracker';
+      case OrganizerType.dayTheme:
+        return 'Day Theme';
+      case OrganizerType.timeBlock:
+        return 'Time Block';
       }
     }
     switch (obj.type) {
@@ -4951,7 +4955,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       case 'entry':
         return AppColors.habitPurple;
       case 'event':
-        return AppColors.primary;
+        return AppTheme.accentColor(context);
       case 'project':
         return AppColors.priorityHigh;
       case 'person':
@@ -4959,7 +4963,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       case 'resource':
         return AppColors.warning;
       default:
-        return AppColors.primary;
+        return AppTheme.accentColor(context);
     }
   }
 
@@ -5058,10 +5062,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                     ),
                   ),
                 ),
@@ -5104,7 +5108,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               value: progress,
               backgroundColor: AppColors.surfaceVariant,
               valueColor: AlwaysStoppedAnimation<Color>(
-                isComplete ? AppColors.success : AppColors.primary,
+                isComplete ? AppColors.success : AppTheme.accentColor(context),
               ),
               minHeight: 8,
             ),
@@ -5276,7 +5280,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 minHeight: 8,
                 backgroundColor: AppColors.surfaceVariant,
                 valueColor: AlwaysStoppedAnimation<Color>(
-                  isOvertime ? AppColors.warning : AppColors.primary,
+                  isOvertime ? AppColors.warning : AppTheme.accentColor(context),
                 ),
               ),
             ),
@@ -5416,10 +5420,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                       ),
                     ),
                     const Spacer(),
-                    const Icon(
+                    Icon(
                       Icons.history_edu_rounded,
                       size: 16,
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                     ),
                   ],
                 ),
@@ -5545,7 +5549,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     try {
       return Color(int.parse(hex.replaceAll('#', '0xFF')));
     } catch (_) {
-      return AppColors.primary;
+      return AppTheme.accentColor(context);
     }
   }
 
@@ -5631,15 +5635,15 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
+                color: AppTheme.accentColor(context).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 '${highlights.length}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
+                  color: AppTheme.accentColor(context),
                 ),
               ),
             ),
@@ -5658,7 +5662,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                       width: 3,
                       height: double.infinity,
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
+                        color: AppTheme.accentColor(context),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -6271,8 +6275,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         label: Text(label),
         selected: selected,
         onSelected: (_) => setState(() => _rotationTaskFilter = value),
-        selectedColor: AppColors.primary.withValues(alpha: 0.15),
-        checkmarkColor: AppColors.primary,
+        selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.15),
+        checkmarkColor: AppTheme.accentColor(context),
       ),
     );
   }
@@ -6541,8 +6545,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           TextSpan(text: snippet.substring(0, index)),
           TextSpan(
             text: snippet.substring(index, index + normalizedQuery.length),
-            style: const TextStyle(
-              color: AppColors.primary,
+            style: TextStyle(
+              color: AppTheme.accentColor(context),
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -6599,10 +6603,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               ],
               Text(
                 object.title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
+                  color: AppTheme.accentColor(context),
                 ),
               ),
             ],
@@ -6680,7 +6684,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       case 'task':
         return AppColors.info;
       case 'entry':
-        return AppColors.primary;
+        return AppTheme.accentColor(context);
       case 'habit':
         return AppColors.habitGreen;
       case 'goal':
@@ -6859,7 +6863,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(ctx),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: AppTheme.accentColor(context),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(28),
@@ -7026,8 +7030,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       label: Text('${days}d'),
       selected: selected,
       onSelected: (_) => setState(() => _linkChartDays = days),
-      selectedColor: AppColors.accent.withValues(alpha: 0.2),
-      checkmarkColor: AppColors.accent,
+      selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.2),
+      checkmarkColor: AppTheme.accentColor(context),
     );
   }
 
@@ -7180,16 +7184,16 @@ class _SubtaskListViewState extends State<_SubtaskListView> {
                             ? Icons.chevron_right_rounded
                             : Icons.expand_more_rounded,
                         size: 20,
-                        color: AppColors.primary,
+                        color: AppTheme.accentColor(context),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         st.title.toUpperCase(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 1.1,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -7261,10 +7265,10 @@ class _SubtaskListViewState extends State<_SubtaskListView> {
                 ),
               ),
               if (st.slug != null)
-                const Icon(
+                Icon(
                   Icons.link_rounded,
                   size: 16,
-                  color: AppColors.primary,
+                  color: AppTheme.accentColor(context),
                 ),
             ],
           ),

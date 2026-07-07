@@ -18,8 +18,8 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <application
-        android:label="Citrine"
-        android:name=".CitrineApplication"
+        android:label="Quartzo"
+        android:name=".QuartzoApplication"
         android:icon="@mipmap/launcher_icon"
         android:usesCleartextTraffic="true"
         android:enableOnBackInvokedCallback="true">
@@ -50,7 +50,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="citrine" />
+                <data android:scheme="quartzo" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
@@ -85,7 +85,7 @@
         <activity
             android:name=".DayPopupActivity"
             android:exported="false"
-            android:theme="@style/CitrineWidgetDialogTheme"
+            android:theme="@style/QuartzoWidgetDialogTheme"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             android:windowIsTranslucent="true"
@@ -94,7 +94,7 @@
         <activity
             android:name=".OverduePopupActivity"
             android:exported="false"
-            android:theme="@style/CitrineWidgetDialogTheme"
+            android:theme="@style/QuartzoWidgetDialogTheme"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             android:windowIsTranslucent="true"
@@ -103,7 +103,7 @@
         <activity
             android:name=".QuickAddPopupActivity"
             android:exported="false"
-            android:theme="@style/CitrineWidgetDialogTheme"
+            android:theme="@style/QuartzoWidgetDialogTheme"
             android:windowSoftInputMode="adjustResize"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
@@ -113,7 +113,7 @@
         <activity
             android:name=".ShoppingAddPopupActivity"
             android:exported="false"
-            android:theme="@style/CitrineWidgetDialogTheme"
+            android:theme="@style/QuartzoWidgetDialogTheme"
             android:windowSoftInputMode="adjustResize"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
@@ -121,74 +121,85 @@
             android:windowIsFloating="true" />
 
         <service
-            android:name=".CitrineCalendarItemsService"
+            android:name=".QuartzoCalendarItemsService"
             android:exported="false"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
 
         <receiver
-            android:name=".CitrineCalendarWidgetReceiver"
+            android:name=".QuartzoCalendarWidgetReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/citrine_calendar_widget_info" />
+                android:resource="@xml/quartzo_calendar_widget_info" />
         </receiver>
 
         <receiver
-            android:name=".CitrineTasksWidgetReceiver"
+            android:name=".QuartzoTasksWidgetReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/citrine_tasks_widget_info" />
+                android:resource="@xml/quartzo_tasks_widget_info" />
         </receiver>
 
         <receiver
-            android:name=".CitrineShoppingWidgetProvider"
+            android:name=".QuartzoShoppingWidgetProvider"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/citrine_shopping_widget_info" />
+                android:resource="@xml/quartzo_shopping_widget_info" />
         </receiver>
 
         <receiver
-            android:name=".CitrinePomodoroWidgetProvider"
+            android:name=".QuartzoPomodoroWidgetProvider"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/citrine_pomodoro_widget_info" />
+                android:resource="@xml/quartzo_pomodoro_widget_info" />
         </receiver>
 
         <receiver
-            android:name=".CitrineQuickAddWidgetProvider"
+            android:name=".QuartzoQuickAddWidgetProvider"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/citrine_quick_add_widget_info" />
+                android:resource="@xml/quartzo_quick_add_widget_info" />
         </receiver>
 
         <receiver
-            android:name=".CitrineNoteWidgetProvider"
+            android:name=".QuartzoNoteWidgetProvider"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/citrine_note_widget_info" />
+                android:resource="@xml/quartzo_note_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".QuartzoDayDialWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quartzo_day_dial_widget_info" />
         </receiver>
 
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'content_object.dart';
 import 'shared_types.dart';
-import '../ui/widgets/citrine_chart.dart'; // for ChartType
+import '../ui/widgets/quartzo_chart.dart'; // for ChartType
 
 enum MetricType {
   mood,

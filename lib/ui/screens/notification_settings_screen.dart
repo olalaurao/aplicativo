@@ -72,7 +72,7 @@ class _NotificationSettingsScreenState
     try {
       return Color(int.parse(hex.replaceFirst('#', ''), radix: 16) | 0xFF000000);
     } catch (_) {
-      return AppColors.primary;
+      return AppTheme.accentColor(context);
     }
   }
 
@@ -194,7 +194,7 @@ class _NotificationSettingsScreenState
       padding: const EdgeInsets.all(16),
       child: Column(
         children: items.entries.map((entry) {
-          final color = _typeColors[entry.key] ?? AppColors.primary;
+          final color = _typeColors[entry.key] ?? AppTheme.accentColor(context);
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Row(
@@ -269,7 +269,7 @@ class _NotificationSettingsScreenState
                 trailing: Switch.adaptive(
                   value: visible,
                   onChanged: (v) => _saveButton(entry.key, v),
-                  activeThumbColor: AppColors.primary,
+                  activeThumbColor: AppTheme.accentColor(context),
                 ),
               ),
               if (entry.key != items.keys.last)

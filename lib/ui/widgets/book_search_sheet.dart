@@ -89,7 +89,7 @@ class _BookSearchSheetState extends ConsumerState<BookSearchSheet> {
                   icon: const Icon(Icons.search_rounded),
                   label: const Text('Search'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: AppTheme.accentColor(context),
                     foregroundColor: AppColors.textOnPrimary,
                   ),
                 ),

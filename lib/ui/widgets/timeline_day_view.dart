@@ -335,7 +335,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                                     width: colWidth - 4,
                                     height: height,
                                     decoration: BoxDecoration(
-                                      color: AppColors.primary.withValues(
+                                      color: AppTheme.accentColor(context).withValues(
                                         alpha: 0.8,
                                       ),
                                       borderRadius: BorderRadius.circular(10),
@@ -637,17 +637,17 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
               final ghostHeight = (duration / 60 * hourHeight);
 
               return Container(
-                color: AppColors.primary.withValues(alpha: 0.1),
+                color: AppTheme.accentColor(context).withValues(alpha: 0.1),
                 child: Center(
                   child: Container(
                     height: ghostHeight,
                     width: double.infinity,
                     margin: const EdgeInsets.symmetric(horizontal: 8),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.3),
+                      color: AppTheme.accentColor(context).withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: AppColors.primary,
+                        color: AppTheme.accentColor(context),
                         width: 2,
                       ),
                     ),
@@ -687,7 +687,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
         final endMinutes = rawEndMinutes.clamp(startMinutes + 1, 24 * 60);
         final topOffset = startMinutes / 60 * hourHeight;
         final height = (endMinutes - startMinutes) / 60 * hourHeight;
-        final bandColor = _parseOptionalColor(block.color) ?? AppColors.primary;
+        final bandColor = _parseOptionalColor(block.color) ?? AppTheme.accentColor(context);
 
         bands.add(
           Positioned(
@@ -746,7 +746,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
     final isTiny = height < 34;
 
     if (isPomodoro) {
-      final baseColor = AppColors.error;
+      const baseColor = AppColors.error;
       return Opacity(
         opacity: 0.75,
         child: ObjectActionWrapper(

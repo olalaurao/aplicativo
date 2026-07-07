@@ -65,7 +65,7 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
       if (colorStr.length == 6) colorStr = 'FF$colorStr';
       return Color(int.parse(colorStr, radix: 16));
     } catch (_) {
-      return AppColors.primary;
+      return AppTheme.accentColor(context);
     }
   }
 
@@ -586,7 +586,7 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
                 title: 'PIVOTAR',
                 subtitle: 'Ajustar pacto',
                 onTap: () => _handleDecision(PactOutcome.pivot),
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
               ),
             ),
           ],

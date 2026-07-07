@@ -226,9 +226,9 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
             actions: [
               if (widget.existingHabit == null)
                 IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.copy_all_rounded,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
                   tooltip: 'Usar Template',
                   onPressed: _showTemplatePicker,
@@ -242,7 +242,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                   onPressed: _deleteHabit,
                 ),
               IconButton(
-                icon: const Icon(Icons.check_rounded, color: AppColors.primary),
+                icon: Icon(Icons.check_rounded, color: AppTheme.accentColor(context)),
                 onPressed: canSave ? _saveHabit : null,
               ),
               const SizedBox(width: 8),
@@ -292,12 +292,12 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
                               color: _habitMode == HabitMode.habit
-                                  ? AppColors.primary
+                                  ? AppTheme.accentColor(context)
                                   : AppTheme.cardFillColor(context),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: _habitMode == HabitMode.habit
-                                    ? AppColors.primary
+                                    ? AppTheme.accentColor(context)
                                     : AppTheme.dividerColor(context),
                               ),
                             ),
@@ -324,12 +324,12 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
                               color: _habitMode == HabitMode.pact
-                                  ? AppColors.primary
+                                  ? AppTheme.accentColor(context)
                                   : AppTheme.cardFillColor(context),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: _habitMode == HabitMode.pact
-                                    ? AppColors.primary
+                                    ? AppTheme.accentColor(context)
                                     : AppTheme.dividerColor(context),
                               ),
                             ),
@@ -475,7 +475,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                         _propertyRow(
                           'Frequency',
                           _getScheduleSummary(),
-                          AppColors.primary,
+                          AppTheme.accentColor(context),
                           _pickSchedule,
                         ),
                       ],
@@ -615,14 +615,14 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                               vertical: 6,
                             ),
                             decoration: AppTheme.chipDecoration(
-                              AppColors.primary,
+                              AppTheme.accentColor(context),
                             ),
                             child: Text(
                               _completionUnit,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
+                                color: AppTheme.accentColor(context),
                               ),
                             ),
                           ),
@@ -668,7 +668,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                         _propertyRow(
                           'Goal',
                           _getGoalLabel(),
-                          AppColors.primary,
+                          AppTheme.accentColor(context),
                           _pickGoalType,
                         ),
                         const Divider(height: 24),
@@ -680,7 +680,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                         _propertyRow(
                           'Linked Tracker',
                           _linkedTrackerSlug ?? 'None',
-                          AppColors.primary,
+                          AppTheme.accentColor(context),
                           _pickTracker,
                         ),
                         const Divider(height: 24),
@@ -741,7 +741,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                               Switch.adaptive(
                                 value: _trackAlignment,
                                 onChanged: (v) => setState(() => _trackAlignment = v),
-                                activeThumbColor: AppColors.primary,
+                                activeThumbColor: AppTheme.accentColor(context),
                               ),
                             ],
                           ),
@@ -768,8 +768,8 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                                       _flexibilityWindowMinutes = selected ? minutes : null;
                                     });
                                   },
-                                  selectedColor: AppColors.primary.withValues(alpha: 0.15),
-                                  checkmarkColor: AppColors.primary,
+                                  selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.15),
+                                  checkmarkColor: AppTheme.accentColor(context),
                                 );
                               }).toList(),
                             ),
@@ -798,10 +798,10 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                             const Spacer(),
                             IconButton(
                               onPressed: _showAddActionSheet,
-                              icon: const Icon(
+                              icon: Icon(
                                 Icons.add_rounded,
                                 size: 20,
-                                color: AppColors.primary,
+                                color: AppTheme.accentColor(context),
                               ),
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
@@ -826,7 +826,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                                     ? Icons.auto_stories_rounded
                                     : Icons.check_circle_outline,
                                 size: 18,
-                                color: AppColors.primary,
+                                color: AppTheme.accentColor(context),
                               ),
                               title: Text(
                                 action.type == 'add_entry'
@@ -1066,10 +1066,10 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
               const Spacer(),
               IconButton(
                 onPressed: () => _pickSlotTime(index),
-                icon: const Icon(
+                icon: Icon(
                   Icons.access_time_rounded,
                   size: 18,
-                  color: AppColors.primary,
+                  color: AppTheme.accentColor(context),
                 ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -1084,7 +1084,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                     slot.clearReminders();
                   }
                 }),
-                activeThumbColor: AppColors.primary,
+                activeThumbColor: AppTheme.accentColor(context),
               ),
             ],
           ),
@@ -1101,16 +1101,16 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                               ? Icons.picture_in_picture_rounded
                               : Icons.notifications_active_outlined),
                     size: 14,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
                   const SizedBox(width: 8),
                   Text(
                     slot.primaryReminderTime != null
                         ? '${slot.primaryReminderTime!.format(context)} • ${slot.primaryReminderType.name.toUpperCase()}'
                         : 'Tap to set time \u0026 alert type',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1230,7 +1230,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                         Navigator.pop(ctx);
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: AppTheme.accentColor(context),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -1274,7 +1274,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
   Color _getStatusColor() {
     switch (_status) {
       case HabitStatus.active:
-        return AppColors.primary;
+        return AppTheme.accentColor(context);
       case HabitStatus.paused:
         return AppColors.warning;
       case HabitStatus.completed:
@@ -1293,7 +1293,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                 (s) => ListTile(
                   title: Text(s.name.toUpperCase()),
                   trailing: _status == s
-                      ? const Icon(Icons.check, color: AppColors.primary)
+                      ? Icon(Icons.check, color: AppTheme.accentColor(context))
                       : null,
                   onTap: () {
                     setState(() => _status = s);
@@ -1336,7 +1336,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                     (g) => ListTile(
                       title: Text(g),
                       trailing: _goalType == g
-                          ? const Icon(Icons.check, color: AppColors.primary)
+                          ? Icon(Icons.check, color: AppTheme.accentColor(context))
                           : null,
                       onTap: () {
                         setState(() => _goalType = g);
@@ -1377,7 +1377,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
             ListTile(
               title: const Text('None'),
               trailing: _linkedTrackerSlug == null
-                  ? const Icon(Icons.check, color: AppColors.primary)
+                  ? Icon(Icons.check, color: AppTheme.accentColor(context))
                   : null,
               onTap: () {
                 setState(() => _linkedTrackerSlug = null);
@@ -1388,7 +1388,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
               (t) => ListTile(
                 title: Text(t.title),
                 trailing: _linkedTrackerSlug == t.slug
-                    ? const Icon(Icons.check, color: AppColors.primary)
+                    ? Icon(Icons.check, color: AppTheme.accentColor(context))
                     : null,
                 onTap: () {
                   setState(() => _linkedTrackerSlug = t.slug);
@@ -1449,7 +1449,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                     decoration: InputDecoration(
                       hintText: 'Custom unit...',
                       suffixIcon: IconButton(
-                        icon: const Icon(Icons.check, color: AppColors.primary),
+                        icon: Icon(Icons.check, color: AppTheme.accentColor(context)),
                         onPressed: () {
                           if (controller.text.trim().isNotEmpty) {
                             setState(
@@ -1472,9 +1472,9 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                   (opt) => ListTile(
                     title: Text(opt, style: const TextStyle(fontSize: 15)),
                     trailing: _completionUnit == opt
-                        ? const Icon(
+                        ? Icon(
                             Icons.check_rounded,
-                            color: AppColors.primary,
+                            color: AppTheme.accentColor(context),
                           )
                         : null,
                     onTap: () {
@@ -1714,7 +1714,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: trigger,
+                initialValue: trigger,
                 decoration: const InputDecoration(labelText: 'Quando disparar?'),
                 items: const [
                   DropdownMenuItem(
@@ -1819,9 +1819,9 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                 },
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.bar_chart_rounded,
-                  color: AppColors.primary,
+                  color: AppTheme.accentColor(context),
                 ),
                 title: const Text('Add Tracking Record'),
                 onTap: () {
@@ -1864,9 +1864,9 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                 },
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.link_rounded,
-                  color: AppColors.accent,
+                  color: AppTheme.accentColor(context),
                 ),
                 title: const Text('Vincular item (link_item)'),
                 onTap: () {
@@ -1907,7 +1907,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: selected ? AppColors.primary : AppColors.surfaceVariant,
+                color: selected ? AppTheme.accentColor(context) : AppColors.surfaceVariant,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -2215,7 +2215,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
     try {
       return Color(int.parse(hex.replaceAll('#', '0xFF')));
     } catch (_) {
-      return AppColors.primary;
+      return AppTheme.accentColor(context);
     }
   }
 }

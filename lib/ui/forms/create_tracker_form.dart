@@ -115,9 +115,9 @@ class _CreateTrackerFormState extends ConsumerState<CreateTrackerForm> {
               actions: [
                 if (widget.tracker == null)
                   IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.copy_all_rounded,
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                     ),
                     tooltip: 'Usar Template',
                     onPressed: _showTemplatePicker,
@@ -272,7 +272,7 @@ class _CreateTrackerFormState extends ConsumerState<CreateTrackerForm> {
               height: 52,
               child: FilledButton(
                 onPressed: canSave ? _saveTracker : null,
-                style: AppTheme.primaryButtonStyle,
+                style: AppTheme.primaryButtonStyle(AppTheme.accentColor(context)),
                 child: Text(
                   widget.tracker == null ? 'Create Tracker' : 'Save Changes',
                 ),

@@ -2325,7 +2325,7 @@ class VaultNotifier extends Notifier<void> {
           title: object.title,
           config: config,
           payload: object is Habit && habitSlotIndex != null
-              ? 'citrine://notification?oid=${Uri.encodeComponent(object.id)}&type=habit&slot=$habitSlotIndex'
+              ? 'Quartzo://notification?oid=${Uri.encodeComponent(object.id)}&type=habit&slot=$habitSlotIndex'
               : object.id,
         );
       }

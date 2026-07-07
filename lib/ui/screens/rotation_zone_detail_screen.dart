@@ -241,7 +241,7 @@ class _ZoneHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _parseColor(group.colorHex) ?? AppColors.primary;
+    final color = _parseColor(group.colorHex) ?? AppTheme.accentColor(context);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(

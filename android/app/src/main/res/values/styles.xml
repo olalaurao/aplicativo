@@ -19,12 +19,12 @@
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
-    <style name="CitrineWidgetDialogTheme" parent="@android:style/Theme.Material.Light.Dialog.Alert">
+    <style name="QuartzoWidgetDialogTheme" parent="@android:style/Theme.Material.Light.Dialog.Alert">
         <item name="android:windowMinWidthMajor">88%</item>
         <item name="android:windowMinWidthMinor">88%</item>
         <item name="android:windowNoTitle">true</item>
     </style>
-    <style name="CitrineWidgetDay">
+    <style name="QuartzoWidgetDay">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">match_parent</item>
         <item name="android:layout_weight">1</item>
@@ -34,14 +34,14 @@
         <item name="android:textSize">12sp</item>
         <item name="android:textStyle">bold</item>
     </style>
-    <style name="CitrineWidgetDot">
+    <style name="QuartzoWidgetDot">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">match_parent</item>
         <item name="android:layout_weight">1</item>
         <item name="android:gravity">center</item>
         <item name="android:textSize">14sp</item>
     </style>
-    <style name="CitrineWidgetRowTitle">
+    <style name="QuartzoWidgetRowTitle">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:ellipsize">end</item>
@@ -49,27 +49,27 @@
         <item name="android:textSize">17sp</item>
         <item name="android:textStyle">bold</item>
     </style>
-    <style name="CitrineWidgetRowSubtitle">
+    <style name="QuartzoWidgetRowSubtitle">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:ellipsize">end</item>
         <item name="android:maxLines">1</item>
         <item name="android:textSize">13sp</item>
     </style>
-    <style name="CitrinePomoColumn">
+    <style name="QuartzoPomoColumn">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">match_parent</item>
         <item name="android:layout_weight">1</item>
         <item name="android:gravity">bottom|center_horizontal</item>
         <item name="android:orientation">vertical</item>
     </style>
-    <style name="CitrinePomoBar">
+    <style name="QuartzoPomoBar">
         <item name="android:layout_width">14dp</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:minHeight">4dp</item>
-        <item name="android:text"> </item>
+        <item name="android:text"></item>
     </style>
-    <style name="CitrinePomoLabel">
+    <style name="QuartzoPomoLabel">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:layout_marginTop">6dp</item>

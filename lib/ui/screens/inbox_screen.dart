@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 
 import '../../providers/vault_provider.dart';
 import '../../models/inbox_model.dart';
-import '../../models/idea_model.dart';
 import '../theme.dart';
 import '../forms/create_task_form.dart';
 import '../forms/create_note_form.dart';
@@ -69,7 +68,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                 content: Text(
                   '${titles.length} item(s) antigo(s) do Inbox arquivado(s) automaticamente: ${titles.join(", ")}',
                 ),
-                backgroundColor: AppColors.primary,
+                backgroundColor: AppTheme.accentColor(context),
                 duration: const Duration(seconds: 6),
               ),
             );
@@ -96,10 +95,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
             decoration: BoxDecoration(
               color: AppTheme.cardFillColor(context),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.primary, width: 1.5),
+              border: Border.all(color: AppTheme.accentColor(context), width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.10),
+                  color: AppTheme.accentColor(context).withValues(alpha: 0.10),
                   blurRadius: 12,
                 ),
               ],
@@ -125,9 +124,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                 ),
                 IconButton(
                   onPressed: _capture,
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.send_rounded,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
                 ),
               ],
@@ -204,7 +203,7 @@ class _EmptyInboxState extends StatelessWidget {
               icon: const Icon(Icons.add_rounded),
               label: const Text('Capturar agora'),
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: AppTheme.accentColor(context),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
                   vertical: 14,
@@ -277,13 +276,13 @@ class _InboxItemCard extends ConsumerWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
+                    color: AppTheme.accentColor(context).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.inbox_rounded,
                     size: 18,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -321,15 +320,15 @@ class _InboxItemCard extends ConsumerWidget {
                       vertical: 8,
                     ),
                     side: BorderSide(
-                      color: AppColors.primary.withValues(alpha: 0.4),
+                      color: AppTheme.accentColor(context).withValues(alpha: 0.4),
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Triar',
-                    style: TextStyle(fontSize: 12, color: AppColors.primary),
+                    style: TextStyle(fontSize: 12, color: AppTheme.accentColor(context)),
                   ),
                 ),
               ],
@@ -474,7 +473,7 @@ class _TriageSheet extends ConsumerWidget {
               const SizedBox(height: 10),
               _TriageOption(
                 icon: Icons.menu_book_rounded,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
                 label: 'It is a journal entry',
                 subtitle: 'Add to today\'s journal',
                 onTap: () async {

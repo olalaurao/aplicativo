@@ -25,7 +25,7 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
       if (colorStr.length == 6) colorStr = 'FF$colorStr';
       return Color(int.parse(colorStr, radix: 16));
     } catch (_) {
-      return AppColors.primary;
+      return AppTheme.accentColor(context);
     }
   }
 

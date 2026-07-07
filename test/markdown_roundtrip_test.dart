@@ -1,26 +1,26 @@
-import 'package:citrine/models/habit_model.dart';
-import 'package:citrine/models/analysis_model.dart';
-import 'package:citrine/models/journal_entry.dart';
+﻿import 'package:quartzo/models/habit_model.dart';
+import 'package:quartzo/models/analysis_model.dart';
+import 'package:quartzo/models/journal_entry.dart';
 
-import 'package:citrine/models/goal_model.dart';
-import 'package:citrine/models/mood_model.dart';
-import 'package:citrine/models/note_model.dart';
-import 'package:citrine/models/organizer_model.dart';
-import 'package:citrine/models/people_model.dart';
-import 'package:citrine/models/project_model.dart';
-import 'package:citrine/models/reminder_model.dart';
-import 'package:citrine/models/resource_model.dart';
-import 'package:citrine/models/shared_types.dart';
-import 'package:citrine/models/snapshot_model.dart';
-import 'package:citrine/models/social_post.dart';
-import 'package:citrine/models/task_model.dart';
-import 'package:citrine/models/tracker_model.dart';
-import 'package:citrine/models/kpi_model.dart' as kpi_model;
-import 'package:citrine/models/dashboard_block.dart';
-import 'package:citrine/providers/settings_provider.dart';
-import 'package:citrine/providers/widget_sync_provider.dart';
-import 'package:citrine/services/markdown_parser.dart';
-import 'package:citrine/services/kpi_engine.dart';
+import 'package:quartzo/models/goal_model.dart';
+import 'package:quartzo/models/mood_model.dart';
+import 'package:quartzo/models/note_model.dart';
+import 'package:quartzo/models/organizer_model.dart';
+import 'package:quartzo/models/people_model.dart';
+import 'package:quartzo/models/project_model.dart';
+import 'package:quartzo/models/reminder_model.dart';
+import 'package:quartzo/models/resource_model.dart';
+import 'package:quartzo/models/shared_types.dart';
+import 'package:quartzo/models/snapshot_model.dart';
+import 'package:quartzo/models/social_post.dart';
+import 'package:quartzo/models/task_model.dart';
+import 'package:quartzo/models/tracker_model.dart';
+import 'package:quartzo/models/kpi_model.dart' as kpi_model;
+import 'package:quartzo/models/dashboard_block.dart';
+import 'package:quartzo/providers/settings_provider.dart';
+import 'package:quartzo/providers/widget_sync_provider.dart';
+import 'package:quartzo/services/markdown_parser.dart';
+import 'package:quartzo/services/kpi_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -731,5 +731,3 @@ Texto original.
     });
   });
 }
-
-

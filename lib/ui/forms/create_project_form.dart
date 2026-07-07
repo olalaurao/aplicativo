@@ -150,9 +150,9 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
             actions: [
               if (widget.existingProject == null)
                 IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.copy_all_rounded,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
                   tooltip: 'Usar Template',
                   onPressed: _showTemplatePicker,
@@ -412,7 +412,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
                             'Scheduler configured',
                             style: TextStyle(
                               fontSize: 14,
-                              color: AppColors.primary,
+                              color: AppTheme.accentColor(context),
                             ),
                           ),
                       ],
@@ -547,10 +547,10 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
         DropdownButton<T>(
           value: value,
           underline: const SizedBox(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppColors.primary,
+            color: AppTheme.accentColor(context),
           ),
           onChanged: onChanged,
           items: values
@@ -592,7 +592,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
             date != null ? DateFormat('MMM d, yyyy').format(date) : 'Set date',
             style: TextStyle(
               fontSize: 14,
-              color: date != null ? AppColors.primary : AppColors.textMuted,
+              color: date != null ? AppTheme.accentColor(context) : AppColors.textMuted,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -762,7 +762,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
     try {
       return Color(int.parse(hex.replaceAll('#', '0xFF')));
     } catch (_) {
-      return AppColors.primary;
+      return AppTheme.accentColor(context);
     }
   }
 

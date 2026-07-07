@@ -134,7 +134,7 @@ class _OutlineEditorState extends State<OutlineEditor> {
               onPressed: () => setState(() => _focusIndex = null),
               icon: const Icon(Icons.arrow_back_rounded, size: 16),
               label: const Text('Sair do Modo Focus'),
-              style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+              style: TextButton.styleFrom(foregroundColor: AppTheme.accentColor(context)),
             ),
           ),
         ReorderableListView.builder(
@@ -196,7 +196,7 @@ class _OutlineEditorState extends State<OutlineEditor> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(4),
               ),
-              activeColor: AppColors.primary,
+              activeColor: AppTheme.accentColor(context),
             ),
           ),
           Expanded(

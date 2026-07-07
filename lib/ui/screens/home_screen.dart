@@ -357,7 +357,7 @@ class _QuickCaptureCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.primary),
+          Icon(icon, color: AppTheme.accentColor(context)),
           const SizedBox(width: 12),
           Expanded(
             child: TextField(
@@ -387,7 +387,7 @@ class _QuickCaptureCard extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.send_rounded),
-            color: AppColors.primary,
+            color: AppTheme.accentColor(context),
             tooltip: 'Save',
           ),
         ],
@@ -421,7 +421,7 @@ class _SummaryTile extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           child: Column(
             children: [
-              Icon(icon, color: AppColors.primary, size: 20),
+              Icon(icon, color: AppTheme.accentColor(context), size: 20),
               const SizedBox(height: 8),
               Text(
                 value,
@@ -476,7 +476,7 @@ class _ActionList extends StatelessWidget {
         children: [
           for (var i = 0; i < actions.length; i++) ...[
             ListTile(
-              leading: Icon(actions[i].icon, color: AppColors.primary),
+              leading: Icon(actions[i].icon, color: AppTheme.accentColor(context)),
               title: Text(
                 actions[i].label,
                 maxLines: 1,

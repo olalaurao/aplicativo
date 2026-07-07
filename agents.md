@@ -1,4 +1,4 @@
-# Citrine — Diretrizes para Agentes de IA
+# Quartzo — Diretrizes para Agentes de IA
 
 > **LEIA ESTE ARQUIVO INTEIRO antes de fazer qualquer alteração no código.**
 > Estas diretrizes são obrigatórias. Violá-las causa regressões, bugs e inconsistências que custam horas para corrigir.
@@ -7,7 +7,7 @@
 
 ## 1. VISÃO GERAL DO PROJETO
 
-**Citrine** é um aplicativo de produtividade pessoal e journaling construído com **Flutter** (Dart). Ele funciona como um frontend premium para um vault Obsidian — todos os dados do usuário são armazenados como arquivos `.md` (Markdown com frontmatter YAML), sincronizados via Google Drive.
+**Quartzo** é um aplicativo de produtividade pessoal e journaling construído com **Flutter** (Dart). Ele funciona como um frontend premium para um vault Obsidian — todos os dados do usuário são armazenados como arquivos `.md` (Markdown com frontmatter YAML), sincronizados via Google Drive.
 
 ### Princípios Fundamentais
 
@@ -128,7 +128,9 @@ vault/
 ├── organizers/
 │   ├── areas/       # Áreas de vida
 │   ├── projects/    # Projetos
-│   └── activities/  # Atividades recorrentes
+│   ├── activities/  # Atividades recorrentes
+│   ├── day_themes/  # Day Themes (organizer type)
+│   └── time_blocks/ # Time Blocks (organizer type)
 ├── resources/       # Recursos (livros, filmes, etc.)
 ├── sessions/        # (Legado) Antigas Calendar Sessions (não usar mais)
 ├── _attachments/    # Fotos, áudios, mídia
@@ -136,6 +138,8 @@ vault/
 ├── _conflicts/      # Backups de conflitos de sync
 └── _backups/        # ZIPs de backup periódico
 ```
+
+**NOTA**: A estrutura de pastas é configurável via Object Identification (Settings → Object Identification). O usuário pode definir onde cada tipo de objeto é armazenado (por tag, propriedade ou pasta).
 
 ---
 
@@ -161,20 +165,51 @@ O `VaultNotifier` (~54KB) é o **coração do aplicativo**. Ele:
 
 ## 5. TIPOS DE OBJETOS — REFERÊNCIA RÁPIDA
 
-| Tipo | Arquivo Vault | Provider | Modelo |
-|---|---|---|---|
-| Journal Entry | `daily/YYYY-MM-DD.md` (body) | `journalEntriesProvider` | `JournalEntry` |
-| Task | `tasks/SLUG.md` | `allObjectsProvider` → filter | `Task` |
-| Goal | `goals/SLUG.md` | `allObjectsProvider` → filter | `Goal` |
-| Habit | `habits/SLUG.md` | `allObjectsProvider` → filter | `HabitDefinition` |
-| Tracker | `trackers/SLUG.md` | `allObjectsProvider` → filter | `TrackerDefinition` |
-| Reminder | inline ou `daily/` | `allObjectsProvider` → filter | `Reminder` |
-| Reminder | inline ou `daily/` | `allObjectsProvider` → filter | `Reminder` |
-| Note | `notes/SLUG.md` | `allObjectsProvider` → filter | `Note` |
-| Person | `organizers/people/SLUG.md` | `allObjectsProvider` → filter | `Person` |
-| Resource | `resources/SLUG.md` | `allObjectsProvider` → filter | `Resource` |
-| Mood Def | `moods/SLUG.md` | `moodDefinitionsProvider` | `MoodDefinition` |
-| Organizer | `organizers/TYPE/SLUG.md` | `organizerListProvider` | `OrganizerReference` |
+| Tipo | Arquivo Vault | Provider | Modelo | Emoji Padrão |
+|---|---|---|---|---|
+| Journal Entry | `daily/YYYY-MM-DD.md` (body) | `journalEntriesProvider` | `JournalEntry` | 📝 |
+| Task | `tasks/SLUG.md` | `allObjectsProvider` → filter | `Task` | ✅ |
+| Goal | `goals/SLUG.md` | `allObjectsProvider` → filter | `Goal` | 🎯 |
+| Habit | `habits/SLUG.md` | `allObjectsProvider` → filter | `HabitDefinition` | 🔄 |
+| Tracker | `trackers/SLUG.md` | `allObjectsProvider` → filter | `TrackerDefinition` | 📊 |
+| Reminder | inline ou `daily/` | `allObjectsProvider` → filter | `Reminder` | ⏰ |
+| Note | `notes/SLUG.md` | `allObjectsProvider` → filter | `Note` | 📄 |
+| Person | `organizers/people/SLUG.md` | `allObjectsProvider` → filter | `Person` | 👤 |
+| Resource | `resources/SLUG.md` | `allObjectsProvider` → filter | `Resource` | 📚 |
+| Mood Def | `moods/SLUG.md` | `moodDefinitionsProvider` | `MoodDefinition` | 😊 |
+| Organizer (Area) | `organizers/areas/SLUG.md` | `organizerListProvider` → filter | `Organizer` | 🗺️ |
+| Organizer (Project) | `organizers/projects/SLUG.md` | `organizerListProvider` → filter | `Organizer` | 🚀 |
+| Organizer (Activity) | `organizers/activities/SLUG.md` | `organizerListProvider` → filter | `Organizer` | ⚡ |
+| Organizer (Label) | `organizers/labels/SLUG.md` | `organizerListProvider` → filter | `Organizer` | 🏷️ |
+| Organizer (Day Theme) | `organizers/day_themes/SLUG.md` | `organizerListProvider` → filter | `Organizer` | 🌅 |
+| Organizer (Time Block) | `organizers/time_blocks/SLUG.md` | `organizerListProvider` → filter | `Organizer` | ⏱️ |
+| Event | `events/SLUG.md` | `allObjectsProvider` → filter | `Event` | 📅 |
+| Idea | `ideas/SLUG.md` | `allObjectsProvider` → filter | `Idea` | 💡 |
+| System | `systems/SLUG.md` | `allObjectsProvider` → filter | `System` | ⚙️ |
+| Social Post | `social/SLUG.md` | `allObjectsProvider` → filter | `SocialPost` | 📱 |
+| Shopping List | `shopping/SLUG.md` | `allObjectsProvider` → filter | `ShoppingList` | 🛒 |
+| Template | `templates/SLUG.md` | `allObjectsProvider` → filter | `Template` | 📋 |
+| Analysis | `analyses/SLUG.md` | `allObjectsProvider` → filter | `Analysis` | 📈 |
+| Wellbeing Indicator | `wellbeing/SLUG.md` | `allObjectsProvider` → filter | `WellbeingIndicator` | ❤️ |
+
+**NOTA**: Emojis são configuráveis via Object Identification (Settings → Object Identification). O usuário pode personalizar o emoji de cada tipo de objeto conforme preferência.
+
+### 5.1 Transformação de Day Themes e Time Blocks para Organizers
+
+**DEPRECATION NOTICE**: Os modelos `DayTheme` e `TimeBlock` (em `lib/models/day_theme_model.dart`) estão **DEPRECIADOS**. Use o modelo unificado `Organizer` com os tipos `dayTheme` e `timeBlock` em vez disso.
+
+**Motivo da transformação**:
+- Unificar a arquitetura de organizadores
+- Permitir configuração flexível via Object Identification
+- Simplificar o código e reduzir duplicação
+
+**Como migrar**:
+1. **Day Themes**: Use `Organizer` com `organizerType: OrganizerType.dayTheme`
+   - Campos preservados: `blockIds` → `organizers` (via OrganizerReference), `daysOfWeek`, `color`
+2. **Time Blocks**: Use `Organizer` com `organizerType: OrganizerType.timeBlock`
+   - Campos preservados: `timeRanges`, `color`, `energyLevel`
+
+**Objetos existentes**: O app deve continuar suportando leitura de arquivos `.md` legados com `type: day_theme` e `type: time_block` para compatibilidade, mas novos objetos devem usar o sistema de organizadores.
 
 ---
 
@@ -248,6 +283,425 @@ color: Colors.purple,
 - O app suporta Dark Mode. TODA nova tela/widget DEVE funcionar em ambos os temas
 - Use SEMPRE `AppColors` e `Theme.of(context)` — nunca cores hardcoded
 - Teste visualmente em ambos os modos antes de considerar uma tela pronta
+
+### 6.7 Constantes de Design System — OBRIGATÓRIO
+
+**NUNCA use valores hardcoded para spacing, border radius, font sizes, ou border width.** Use SEMPRE as constantes definidas em `lib/ui/theme.dart`:
+
+```dart
+// ✅ CORRETO
+padding: const EdgeInsets.all(AppSpacing.lg),
+borderRadius: BorderRadius.circular(AppBorderRadius.md),
+fontSize: AppTextSize.md,
+borderWidth: AppBorder.normal,
+
+// ❌ ERRADO
+padding: const EdgeInsets.all(16),
+borderRadius: BorderRadius.circular(12),
+fontSize: 14,
+borderWidth: 1.5,
+```
+
+**Constantes disponíveis:**
+
+#### AppBorderRadius
+- `xs` = 4.0 (elementos muito pequenos)
+- `sm` = 8.0 (badges, chips pequenos)
+- `md` = 12.0 (inputs, botões)
+- `lg` = 16.0 (cards padrão)
+- `xl` = 20.0 (cards destacados, chips)
+- `xxl` = 24.0 (sheets, modais)
+- `xxxl` = 32.0 (elementos grandes)
+
+#### AppSpacing
+- `xs` = 4.0 (espaçamento mínimo)
+- `sm` = 8.0 (espaçamento compacto)
+- `md` = 12.0 (espaçamento padrão)
+- `lg` = 16.0 (espaçamento confortável)
+- `xl` = 20.0 (espaçamento generoso)
+- `xxl` = 24.0 (espaçamento grande)
+- `xxxl` = 32.0 (espaçamento muito grande)
+
+#### AppTextSize
+- `xs` = 10.0 (labels pequenas, captions)
+- `sm` = 12.0 (textos auxiliares, metadata)
+- `md` = 14.0 (texto de corpo padrão)
+- `lg` = 16.0 (títulos de itens, corpo grande)
+- `xl` = 18.0 (títulos de seção)
+- `xxl` = 20.0 (títulos grandes)
+- `display` = 28.0 (títulos de tela)
+
+#### AppBorder
+- `thin` = 1.0 (bordas sutis)
+- `normal` = 1.5 (bordas padrão)
+- `thick` = 2.0 (bordas destacadas)
+- `extraThick` = 3.0 (bordas muito destacadas)
+
+#### AppIconSize
+- `xs` = 12.0 (ícones muito pequenos)
+- `sm` = 16.0 (ícones pequenos)
+- `md` = 20.0 (ícones padrão)
+- `lg` = 24.0 (ícones grandes)
+- `xl` = 32.0 (ícones muito grandes)
+- `xxl` = 48.0 (ícones de destaque)
+- `display` = 56.0 (ícones hero)
+
+### 6.8 Componentes Reutilizáveis — OBRIGATÓRIO
+
+**Use SEMPRE os componentes reutilizáveis disponíveis em `lib/ui/widgets/` em vez de reimplementar padrões duplicados:**
+
+#### StandardSheet (`lib/ui/widgets/standard_sheet.dart`)
+Use para TODOS os bottom sheets e modais:
+
+```dart
+// ✅ CORRETO
+StandardSheet(
+  radius: SheetRadius.large,
+  showHandle: true,
+  child: YourContent(),
+)
+
+// ❌ ERRADO
+Container(
+  decoration: BoxDecoration(
+    color: Theme.of(context).scaffoldBackgroundColor,
+    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+  ),
+  child: YourContent(),
+)
+```
+
+#### AppChip (`lib/ui/widgets/app_chip.dart`)
+Use para TODOS os chips (choice, filter, action):
+
+```dart
+// ✅ CORRETO
+AppChip(
+  label: 'Label',
+  selected: isSelected,
+  onTap: () => {},
+  variant: ChipVariant.choice,
+  size: ChipSize.medium,
+)
+
+// ❌ ERRADO
+ChoiceChip(
+  label: Text('Label'),
+  selected: isSelected,
+  onSelected: (_) => {},
+  // ... reimplementando estilos manualmente
+)
+```
+
+#### StatusBadge (`lib/ui/widgets/status_badge.dart`)
+Use para TODOS os badges de status:
+
+```dart
+// ✅ CORRETO
+StatusBadge(
+  label: 'Completed',
+  variant: BadgeVariant.success,
+  size: BadgeSize.medium,
+)
+
+// ❌ ERRADO
+Container(
+  decoration: BoxDecoration(
+    color: AppColors.success.withValues(alpha: 0.1),
+    borderRadius: BorderRadius.circular(6),
+  ),
+  child: Text('Completed'),
+)
+```
+
+#### DatePickerField (`lib/ui/widgets/date_picker_field.dart`)
+Use para TODOS os seletores de data:
+
+```dart
+// ✅ CORRETO
+DatePickerField(
+  selectedDate: _date,
+  onDateChanged: (date) => setState(() => _date = date),
+  label: 'Due Date',
+)
+
+// ❌ ERRADO
+GestureDetector(
+  onTap: () async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _date ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (date != null) setState(() => _date = date);
+  },
+  child: TextField(...),
+)
+```
+
+#### TimePickerField (`lib/ui/widgets/time_picker_field.dart`)
+Use para TODOS os seletores de hora:
+
+```dart
+// ✅ CORRETO
+TimePickerField(
+  selectedTime: _time,
+  onTimeChanged: (time) => setState(() => _time = time),
+  label: 'Start Time',
+)
+
+// ❌ ERRADO
+GestureDetector(
+  onTap: () async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _time ?? TimeOfDay.now(),
+    );
+    if (time != null) setState(() => _time = time);
+  },
+  child: TextField(...),
+)
+```
+
+#### AppDropdown (`lib/ui/widgets/app_dropdown.dart`)
+Use para TODOS os dropdowns:
+
+```dart
+// ✅ CORRETO
+AppDropdown<String>(
+  value: _selectedValue,
+  items: [
+    DropdownMenuItem(value: 'option1', child: Text('Option 1')),
+    DropdownMenuItem(value: 'option2', child: Text('Option 2')),
+  ],
+  onChanged: (value) => setState(() => _selectedValue = value),
+  label: 'Select Option',
+)
+
+// ❌ ERRADO
+DropdownButtonFormField<String>(
+  value: _selectedValue,
+  items: [...],
+  onChanged: (value) => setState(() => _selectedValue = value),
+  decoration: InputDecoration(...),
+)
+```
+
+#### AppSwitchTile (`lib/ui/widgets/app_switch_tile.dart`)
+Use para TODOS os switches em listas:
+
+```dart
+// ✅ CORRETO
+AppSwitchTile(
+  value: _isEnabled,
+  onChanged: (value) => setState(() => _isEnabled = value),
+  title: 'Enable Feature',
+  subtitle: 'Description of the feature',
+)
+
+// ❌ ERRADO
+SwitchListTile.adaptive(
+  contentPadding: EdgeInsets.zero,
+  title: Text('Enable Feature'),
+  subtitle: Text('Description'),
+  value: _isEnabled,
+  onChanged: (value) => setState(() => _isEnabled = value),
+)
+```
+
+#### ConfirmDialog (`lib/ui/widgets/confirm_dialog.dart`)
+Use para TODOS os diálogos de confirmação:
+
+```dart
+// ✅ CORRETO
+final confirmed = await ConfirmDialog.show(
+  context,
+  title: 'Delete item?',
+  content: 'This action can be undone for 30 days.',
+  confirmText: 'Delete',
+  cancelText: 'Cancel',
+  isDestructive: true,
+);
+
+// ❌ ERRADO
+final confirmed = await showDialog<bool>(
+  context: context,
+  builder: (_) => AlertDialog(
+    title: const Text('Delete item?'),
+    content: const Text('This action can be undone for 30 days.'),
+    actions: [
+      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+      TextButton(
+        onPressed: () => Navigator.pop(context, true),
+        style: TextButton.styleFrom(foregroundColor: AppColors.error),
+        child: const Text('Delete'),
+      ),
+    ],
+  ),
+);
+```
+
+#### FormSection (`lib/ui/widgets/form_section.dart`)
+Use para TODAS as seções de formulário:
+
+```dart
+// ✅ CORRETO
+FormSection(
+  title: 'Basic Information',
+  description: 'Enter the basic details',
+  children: [
+    TextFormField(...),
+    TextFormField(...),
+  ],
+)
+
+// ❌ ERRADO
+Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Text('Basic Information', style: ...),
+    Text('Description', style: ...),
+    const SizedBox(height: 12),
+    TextFormField(...),
+    TextFormField(...),
+    const SizedBox(height: 16),
+  ],
+)
+```
+
+#### ListItem (`lib/ui/widgets/list_item.dart`)
+Use para TODOS os itens de lista interativos:
+
+```dart
+// ✅ CORRETO
+ListItem(
+  leading: Icon(Icons.task),
+  title: Text('Task Title'),
+  subtitle: Text('Task description'),
+  trailing: Icon(Icons.chevron_right),
+  onTap: () => navigateToDetail(),
+)
+
+// ❌ ERRADO
+InkWell(
+  onTap: () => navigateToDetail(),
+  borderRadius: BorderRadius.circular(12),
+  child: Container(
+    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    decoration: BoxDecoration(
+      color: AppColors.surfaceVariant,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(...),
+  ),
+)
+```
+
+#### UniversalSearchPickerSheet (`lib/ui/widgets/universal_search_picker.dart`)
+Use para TODOS os pickers de busca de objetos do vault:
+
+```dart
+// ✅ CORRETO
+final selected = await showModalBottomSheet<ContentObject>(
+  context: context,
+  isScrollControlled: true,
+  backgroundColor: Colors.transparent,
+  builder: (_) => UniversalSearchPickerSheet(
+    title: 'Vincular objeto',
+    initialFilter: 'task',
+    onSelected: (obj) => Navigator.pop(context, obj),
+  ),
+);
+
+// ❌ ERRADO
+// Não implemente seu próprio picker de busca
+```
+
+#### WikiLinkPicker (`lib/ui/widgets/wiki_link_picker.dart`)
+Use para TODOS os pickers de WikiLinks em editores de texto rico:
+
+```dart
+// ✅ CORRETO
+showModalBottomSheet(
+  context: context,
+  isScrollControlled: true,
+  backgroundColor: Colors.transparent,
+  builder: (context) => WikiLinkPicker(
+    onSelected: (obj) {
+      // Inserir link [[obj.title]]
+    },
+  ),
+);
+
+// ❌ ERRADO
+// Não implemente seu próprio picker de wiki links
+```
+
+#### showOrganizerPickerModal (`lib/ui/widgets/organizer_picker_modal.dart`)
+Use para TODOS os pickers de seleção múltipla de organizers:
+
+```dart
+// ✅ CORRETO
+final selected = await showOrganizerPickerModal(
+  context,
+  ref,
+  initialSelected,
+);
+if (selected != null) {
+  setState(() => _organizers = selected);
+}
+
+// ❌ ERRADO
+// Não implemente seu próprio modal de seleção de organizers
+```
+
+#### OrganizerSelectorField (`lib/ui/widgets/organizer_selector_field.dart`)
+Use para TODOS os campos de seleção de organizers em formulários:
+
+```dart
+// ✅ CORRETO
+OrganizerSelectorField(
+  label: 'Coleções',
+  selectedOrganizers: _organizers,
+  onChanged: (value) => setState(() => _organizers = value),
+)
+
+// ❌ ERRADO
+// Não implemente seu próprio campo de seleção de organizers
+```
+
+### 6.9 Propriedades Themeable
+
+O `AppThemeConfig` agora suporta as seguintes propriedades themeable:
+
+- `borderRadius` (default: 16.0) - Arredondamento global da UI
+- `spacingScale` (default: 1.0) - Escala de espaçamento (0.8 = compact, 1.2 = spacious)
+- `fontScale` (default: 1.0) - Escala de fonte (0.9 = smaller, 1.1 = larger)
+- `cardElevation` (default: 0.0) - Elevação de cards
+- `useShadows` (default: true) - Uso de sombras
+- `habitColors` - Paleta de cores de hábitos customizável
+- `statusColors` - Paleta de cores de status customizável
+- `priorityColors` - Paleta de cores de prioridade customizável
+
+**Ao atualizar o tema via `AppearanceScreen`, preserve TODAS as propriedades existentes:**
+
+```dart
+final updatedTheme = AppThemeConfig(
+  id: activeTheme.id,
+  label: activeTheme.label,
+  accentColor: activeTheme.accentColor,
+  backgroundColor: backgroundColor,
+  icon: activeTheme.icon,
+  description: activeTheme.description,
+  fontFamily: activeTheme.fontFamily,
+  borderRadius: activeTheme.borderRadius,           // ← Preserve
+  spacingScale: activeTheme.spacingScale,           // ← Preserve
+  fontScale: activeTheme.fontScale,                 // ← Preserve
+  cardElevation: activeTheme.cardElevation,         // ← Preserve
+  useShadows: activeTheme.useShadows,               // ← Preserve
+);
+```
 
 ---
 
@@ -705,7 +1159,7 @@ context.push('/create/event')  // no form
 
 ### 8. Import de arquivo inexistente
 ```dart
-import 'package:citrine/models/event_model.dart';
+import 'package:Quartzo/models/event_model.dart';
 // event_model.dart não existe na lista de arquivos
 ```
 🚨 Alerta: compile error — app não builda.
@@ -778,7 +1232,7 @@ Exemplo real encontrado neste projeto:
    Chama:   updatePlanner(title, content, footer) — chamado pelo dashboard ao atualizar
    Destino: corpo do método é {} — não faz nada
    Impacto: widget de planner no dashboard nunca atualiza
-   Fix:     await _saveJson('citrine_planner', {'title': title, 'content': content,
+   Fix:     await _saveJson('Quartzo_planner', {'title': title, 'content': content,
             'footer': footer}); await _update(_plannerProvider);
 ```
 

@@ -142,7 +142,7 @@ class _CreateScanDocumentFormState
                   )
                 : const Icon(Icons.check_rounded),
             label: const Text('Save Document Note'),
-            style: AppTheme.primaryButtonStyle,
+            style: AppTheme.primaryButtonStyle(AppTheme.accentColor(context)),
           ),
         ],
       ),
@@ -161,7 +161,7 @@ class _CreateScanDocumentFormState
               attachment.isImage
                   ? Icons.image_outlined
                   : Icons.insert_drive_file_outlined,
-              color: AppColors.primary,
+              color: AppTheme.accentColor(context),
             ),
             title: Text(
               attachment.name,

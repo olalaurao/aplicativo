@@ -204,16 +204,16 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
       itemBuilder: (context, index) {
         if (index == filtered.length) {
           return ListTile(
-            leading: const Icon(
+            leading: Icon(
               Icons.add_circle_outline_rounded,
-              color: AppColors.primary,
+              color: AppTheme.accentColor(context),
             ),
             title: Text(
               'Usar "[[$query]]"',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.primary,
+              style: TextStyle(
+                color: AppTheme.accentColor(context),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -262,10 +262,10 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
         label: Text(label),
         selected: selected,
         onSelected: (_) => onTap(),
-        selectedColor: AppColors.primary.withValues(alpha: 0.14),
+        selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.14),
         backgroundColor: AppColors.surfaceVariant,
         side: BorderSide(
-          color: selected ? AppColors.primary : AppColors.divider,
+          color: selected ? AppTheme.accentColor(context) : AppColors.divider,
         ),
       ),
     );

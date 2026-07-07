@@ -22,8 +22,10 @@ import '../models/shopping_list_model.dart' as shopping_list_model;
 import '../models/journal_entry.dart';
 import '../models/note_model.dart';
 import '../models/resource_model.dart';
+import '../models/day_dial_model.dart';
 import '../services/scheduler_service.dart';
 import '../services/widget_service.dart';
+import '../services/day_dial_aggregator.dart';
 import 'dashboard_provider.dart';
 import 'pomodoro_provider.dart';
 import 'vault_provider.dart';
@@ -149,11 +151,22 @@ Future<void> _updateAllWidgets(
     );
     final shopping = _buildShoppingSnapshot(allObjects);
     final pomodoro = _buildPomodoroSnapshot(pomodoroHistory);
+    final tasks = _buildTasksSnapshot(allObjects, settings);
     await WidgetService.updateDashboardWidgets(
       calendar: calendar,
       shopping: shopping,
       pomodoro: pomodoro,
+      tasks: tasks,
     );
+    
+    // Update note widget with pinned note
+    await _updateNoteWidget(allObjects);
+    
+    // Update quick add widget
+    await WidgetService.updateQuickAddLabels();
+    
+    // Update day dial widget
+    await _updateDayDialWidget(allObjects, pomodoroHistory, googleEvents);
   } catch (e, st) {
     debugPrint('[WidgetSync] failed: $e\n$st');
   }
@@ -440,9 +453,9 @@ List<Map<String, dynamic>> _dayItems(
         'subtitle': _organizerLabel(task, organizerObjects),
         'sort': _sortTime(task.scheduledTime),
         'completed': task.isCompleted,
-        'linkUri': 'citrine:///detail/${task.id}',
+        'linkUri': 'Quartzo:///detail/${task.id}',
         'toggleUri':
-            'citrine://widget-toggle?type=task&id=${Uri.encodeComponent(task.id)}&date=${_dateKey(date)}',
+            'Quartzo://widget-toggle?type=task&id=${Uri.encodeComponent(task.id)}&date=${_dateKey(date)}',
       });
     }
   }
@@ -460,7 +473,7 @@ List<Map<String, dynamic>> _dayItems(
       'time': DateFormat('HH:mm').format(reminder.time),
       'subtitle': _organizerLabel(reminder, organizerObjects),
       'sort': _sortTime(DateFormat('HH:mm').format(reminder.time)),
-      'linkUri': 'citrine:///detail/${reminder.id}',
+      'linkUri': 'Quartzo:///detail/${reminder.id}',
     });
   }
 
@@ -488,9 +501,9 @@ List<Map<String, dynamic>> _dayItems(
           'subtitle': _organizerLabel(habit, organizerObjects),
           'sort': 0,
           'completed': completed,
-          'linkUri': 'citrine:///detail/${habit.id}',
+          'linkUri': 'Quartzo:///detail/${habit.id}',
           'toggleUri':
-              'citrine://widget-toggle?type=habit&id=${Uri.encodeComponent(habit.id)}&date=${_dateKey(date)}',
+              'Quartzo://widget-toggle?type=habit&id=${Uri.encodeComponent(habit.id)}&date=${_dateKey(date)}',
         });
       } else {
         for (var index = 0; index < slotTimes.length; index++) {
@@ -506,9 +519,9 @@ List<Map<String, dynamic>> _dayItems(
             'subtitle': _organizerLabel(habit, organizerObjects),
             'sort': _sortTime(time),
             'completed': completed,
-            'linkUri': 'citrine:///detail/${habit.id}',
+            'linkUri': 'Quartzo:///detail/${habit.id}',
             'toggleUri':
-                'citrine://widget-toggle?type=habit&id=${Uri.encodeComponent(habit.id)}&date=${_dateKey(date)}&slot=$index',
+                'Quartzo://widget-toggle?type=habit&id=${Uri.encodeComponent(habit.id)}&date=${_dateKey(date)}&slot=$index',
           });
         }
       }
@@ -541,7 +554,7 @@ List<Map<String, dynamic>> _dayItems(
         'sort': event.start?.dateTime != null
             ? _sortTime(DateFormat('HH:mm').format(start.toLocal()))
             : 0,
-        'linkUri': 'citrine:///planner',
+        'linkUri': 'Quartzo:///planner',
       });
     }
   }
@@ -570,7 +583,7 @@ Map<String, dynamic> _buildShoppingSnapshot(
         'title': item.name,
         'type': 'shopping_item',
         'completed': false,
-        'toggleUri': 'citrine://widget-toggle?type=shopping_list_item&listId=${Uri.encodeComponent(list.id)}&itemId=${Uri.encodeComponent(item.id)}',
+        'toggleUri': 'Quartzo://widget-toggle?type=shopping_list_item&listId=${Uri.encodeComponent(list.id)}&itemId=${Uri.encodeComponent(item.id)}',
       });
     }
   }
@@ -666,9 +679,9 @@ Map<String, dynamic> _buildFilterSnapshot(
           ? _isHabitCompletedOn(item, DateTime.now())
           : false;
       final String? toggleUri = item is Task
-          ? 'citrine://widget-toggle?type=task&id=${Uri.encodeComponent(item.id)}&date=$todayKey'
+          ? 'Quartzo://widget-toggle?type=task&id=${Uri.encodeComponent(item.id)}&date=$todayKey'
           : item is Habit
-          ? 'citrine://widget-toggle?type=habit&id=${Uri.encodeComponent(item.id)}&date=$todayKey'
+          ? 'Quartzo://widget-toggle?type=habit&id=${Uri.encodeComponent(item.id)}&date=$todayKey'
           : null;
       final row = {
         'id': item.id,
@@ -678,7 +691,7 @@ Map<String, dynamic> _buildFilterSnapshot(
             ? _displayType(item)
             : _organizerLabel(item, organizers),
         'completed': completed,
-        'linkUri': 'citrine:///detail/${item.id}',
+        'linkUri': 'Quartzo:///detail/${item.id}',
       };
       if (toggleUri != null) {
         row['toggleUri'] = toggleUri;
@@ -721,6 +734,65 @@ Map<String, dynamic> _buildPomodoroSnapshot(List<PomodoroSession> history) {
         '~${(totalMinutes / 60 / now.weekday).toStringAsFixed(0)}h por dia',
     'bars': bars,
   };
+}
+
+Map<String, dynamic> _buildTasksSnapshot(
+  List<ContentObject> allObjects,
+  AppSettings settings,
+) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final tasks = allObjects.whereType<Task>().toList();
+  final habits = allObjects.whereType<Habit>().toList();
+  final reminders = allObjects.whereType<Reminder>().toList();
+  final organizerObjects = allObjects
+      .where(
+        (object) =>
+            object is Organizer ||
+            object is Goal ||
+            object.type == 'project' ||
+            object.type == 'person',
+      )
+      .toList();
+
+  final items = _dayItems(
+    today,
+    tasks,
+    habits,
+    reminders,
+    organizerObjects,
+    [],
+    settings,
+  );
+
+  return {
+    'title': 'Tarefas',
+    'subtitle': '${items.length} ${items.length == 1 ? 'tarefa' : 'tarefas'}',
+    'items': items.take(8).toList(),
+  };
+}
+
+Future<void> _updateNoteWidget(List<ContentObject> allObjects) async {
+  try {
+    // Get the most recently updated pinned note
+    final pinnedNote = allObjects
+        .whereType<Note>()
+        .where((note) => note.pinned)
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    if (pinnedNote.isNotEmpty) {
+      final note = pinnedNote.first;
+      await WidgetService.updateNote(
+        widgetId: 0,
+        title: note.title,
+        content: note.body,
+        slug: note.slug,
+      );
+    }
+  } catch (e, st) {
+    debugPrint('[WidgetSync] _updateNoteWidget failed: $e\n$st');
+  }
 }
 
 String _organizerLabel(
@@ -818,4 +890,55 @@ class _SimpleTime {
   final int minute;
 
   _SimpleTime(this.hour, this.minute);
+}
+
+Future<void> _updateDayDialWidget(
+  List<ContentObject> allObjects,
+  List<PomodoroSession> pomodoroHistory,
+  List<calendar.Event> googleEvents,
+) async {
+  try {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    final tasks = allObjects.whereType<Task>().toList();
+    final habits = allObjects.whereType<Habit>().toList();
+    final reminders = allObjects.whereType<Reminder>().toList();
+    
+    final hourStates = DayDialAggregator.aggregateForDate(
+      date: today,
+      tasks: tasks,
+      habits: habits,
+      pomodoroSessions: pomodoroHistory,
+      googleEvents: googleEvents,
+      reminders: reminders,
+    );
+    
+    // Count activities for summary
+    int taskCount = 0;
+    int eventCount = 0;
+    int pomodoroCount = 0;
+    
+    for (final state in hourStates) {
+      if (state.kind == DialHourKind.pomodoroCompleted) {
+        pomodoroCount++;
+      } else if (state.kind == DialHourKind.pomodoroPlanned) {
+        taskCount++;
+      } else if (state.kind == DialHourKind.event) {
+        eventCount++;
+      }
+    }
+    
+    final summary = '$taskCount tasks • $eventCount events • $pomodoroCount pomodoros';
+
+    await WidgetService.updateDayDial(
+      currentTime: DateFormat('HH:mm').format(now),
+      dateLabel: 'Today',
+      hours: DayDialAggregator.hourStatesToWidgetFormat(hourStates),
+      currentHour: now.hour,
+      summary: summary,
+    );
+  } catch (e, st) {
+    debugPrint('[WidgetSync] _updateDayDialWidget failed: $e\n$st');
+  }
 }

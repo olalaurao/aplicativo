@@ -208,9 +208,9 @@ class _DiagnosticReportsScreenState extends State<DiagnosticReportsScreen> {
                 final size = file.lengthSync();
                 final kb = (size / 1024).toStringAsFixed(1);
                 return ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.bug_report_outlined,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
                   title: Text(
                     fileName,

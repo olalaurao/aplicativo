@@ -1,5 +1,5 @@
-# Script para compilar e instalar o app Citrine no celular conectado
-Write-Host "🚀 Iniciando build do Citrine..." -ForegroundColor Cyan
+# Script para compilar e instalar o app Quartzo no celular conectado
+Write-Host "🚀 Iniciando build do Quartzo..." -ForegroundColor Cyan
 
 # Entrar na pasta android e compilar
 Set-Location android
@@ -16,7 +16,7 @@ if ($LASTEXITCODE -eq 0) {
     if ($LASTEXITCODE -eq 0) {
         Write-Host "`n🎉 App instalado e pronto para usar!" -ForegroundColor Green
         # Opcional: Abre o app automaticamente
-        adb shell am start -n com.productivity.citrine/com.productivity.citrine.MainActivity
+        adb shell am start -n com.productivity.Quartzo/com.productivity.Quartzo.MainActivity
     } else {
         Write-Host "`n❌ Erro ao instalar. Verifique se o celular está conectado e com o Debug USB ativo." -ForegroundColor Red
     }

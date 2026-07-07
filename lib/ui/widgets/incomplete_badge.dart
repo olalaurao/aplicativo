@@ -25,7 +25,7 @@ class IncompleteBadge extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Row(
+      child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
@@ -33,8 +33,8 @@ class IncompleteBadge extends StatelessWidget {
             size: 12,
             color: AppColors.textMuted,
           ),
-          const SizedBox(width: 4),
-          const Text(
+          SizedBox(width: 4),
+          Text(
             'Incomplete',
             style: TextStyle(
               fontSize: 10,

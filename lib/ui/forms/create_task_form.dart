@@ -233,17 +233,17 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
               centerTitle: true,
               actions: [
                 IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.copy_all_rounded,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
                   tooltip: 'Usar Template',
                   onPressed: _showTemplatePicker,
                 ),
                 IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.inbox_rounded,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
                   tooltip: 'Mover para Backlog',
                   onPressed: () {
@@ -270,7 +270,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                     'Salvar',
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
-                      color: hasTitle ? AppColors.primary : AppColors.textMuted,
+                      color: hasTitle ? AppTheme.accentColor(context) : AppColors.textMuted,
                     ),
                   ),
                 ),
@@ -398,7 +398,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                               Switch.adaptive(
                                 value: _allDay,
                                 onChanged: (v) => setState(() => _allDay = v),
-                                activeThumbColor: AppColors.primary,
+                                activeThumbColor: AppTheme.accentColor(context),
                               ),
                             ],
                           ),
@@ -423,7 +423,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: _scheduledTime != null
-                                          ? AppColors.primary
+                                          ? AppTheme.accentColor(context)
                                           : AppColors.textMuted,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -454,7 +454,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                 Switch.adaptive(
                                   value: _trackAlignment,
                                   onChanged: (v) => setState(() => _trackAlignment = v),
-                                  activeThumbColor: AppColors.primary,
+                                  activeThumbColor: AppTheme.accentColor(context),
                                 ),
                               ],
                             ),
@@ -481,8 +481,8 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                         _flexibilityWindowMinutes = selected ? minutes : null;
                                       });
                                     },
-                                    selectedColor: AppColors.primary.withValues(alpha: 0.15),
-                                    checkmarkColor: AppColors.primary,
+                                    selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.15),
+                                    checkmarkColor: AppTheme.accentColor(context),
                                   );
                                 }).toList(),
                               ),
@@ -504,9 +504,9 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                 const Spacer(),
                                 Text(
                                   '${_durationMinutes ?? 15} min',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
-                                    color: AppColors.primary,
+                                    color: AppTheme.accentColor(context),
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -534,7 +534,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                               Switch.adaptive(
                                 value: _useRelay,
                                 onChanged: (v) => setState(() => _useRelay = v),
-                                activeThumbColor: AppColors.primary,
+                                activeThumbColor: AppTheme.accentColor(context),
                               ),
                             ],
                           ),
@@ -638,9 +638,9 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                   child: Text(
                                     _dateRange!,
                                     textAlign: TextAlign.right,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 13,
-                                      color: AppColors.primary,
+                                      color: AppTheme.accentColor(context),
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -676,7 +676,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                 onChanged: hasDateRange
                                     ? null
                                     : (v) => setState(() => _untilDone = v),
-                                activeThumbColor: AppColors.primary,
+                                activeThumbColor: AppTheme.accentColor(context),
                               ),
                             ],
                           ),
@@ -704,7 +704,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: _pomodoroCount != null
-                                        ? AppColors.primary
+                                        ? AppTheme.accentColor(context)
                                         : AppColors.textMuted,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -739,7 +739,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: _estimatedMinutes != null
-                                        ? AppColors.primary
+                                        ? AppTheme.accentColor(context)
                                         : AppColors.textMuted,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -783,7 +783,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: _scheduler != null
-                                        ? AppColors.primary
+                                        ? AppTheme.accentColor(context)
                                         : AppColors.textMuted,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -857,9 +857,9 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                               ),
                               const Spacer(),
                               IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.add_rounded,
-                                  color: AppColors.primary,
+                                  color: AppTheme.accentColor(context),
                                 ),
                                 onPressed: () {
                                   showModalBottomSheet(
@@ -973,9 +973,9 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                               ),
                               IconButton(
                                 onPressed: _addSubtask,
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.add_rounded,
-                                  color: AppColors.primary,
+                                  color: AppTheme.accentColor(context),
                                 ),
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
@@ -1067,12 +1067,12 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                 height: 36,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: selected ? AppColors.primary : Colors.transparent,
+                  color: selected ? AppTheme.accentColor(context) : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: selected
                       ? [
                           BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.3),
+                            color: AppTheme.accentColor(context).withValues(alpha: 0.3),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -1167,17 +1167,17 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
           if (subtask.slug == null)
             IconButton(
               onPressed: () => _promoteSubtask(index),
-              icon: const Icon(
+              icon: Icon(
                 Icons.rocket_launch_outlined,
                 size: 16,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
               ),
               tooltip: 'Promote to Task',
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
             ),
           if (subtask.slug != null)
-            const Icon(Icons.link_rounded, size: 16, color: AppColors.primary),
+            Icon(Icons.link_rounded, size: 16, color: AppTheme.accentColor(context)),
           IconButton(
             onPressed: () => setState(() => _subtasks.removeAt(index)),
             icon: const Icon(
@@ -1249,7 +1249,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                 style: TextStyle(
                   fontSize: 14,
                   color: _startDate != null
-                      ? AppColors.primary
+                      ? AppTheme.accentColor(context)
                       : AppColors.textMuted,
                   fontWeight: FontWeight.w500,
                 ),
@@ -1280,7 +1280,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                 style: TextStyle(
                   fontSize: 14,
                   color: _endDate != null
-                      ? AppColors.primary
+                      ? AppTheme.accentColor(context)
                       : AppColors.textMuted,
                   fontWeight: FontWeight.w500,
                 ),
@@ -1329,11 +1329,11 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.1)
+              ? AppTheme.accentColor(context).withValues(alpha: 0.1)
               : AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? AppColors.primary : Colors.transparent,
+            color: isSelected ? AppTheme.accentColor(context) : Colors.transparent,
           ),
         ),
         child: Text(
@@ -1341,7 +1341,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            color: isSelected ? AppTheme.accentColor(context) : AppColors.textSecondary,
           ),
         ),
       ),
@@ -1369,7 +1369,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.add_link_rounded),
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
                 onPressed: _pickSocialReference,
               ),
             ],
@@ -1573,7 +1573,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
             ),
             const Spacer(),
             IconButton(
-              icon: const Icon(Icons.add_rounded, color: AppColors.primary),
+              icon: Icon(Icons.add_rounded, color: AppTheme.accentColor(context)),
               onPressed: _addReminder,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
@@ -1594,7 +1594,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                     Icon(
                       _getNotificationIcon(reminder.type),
                       size: 16,
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -1776,7 +1776,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                           icon: Icon(
                             _getNotificationIcon(t),
                             color: isSelected
-                                ? AppColors.primary
+                                ? AppTheme.accentColor(context)
                                 : AppColors.textMuted,
                           ),
                           onPressed: () => setDialogState(() => type = t),
@@ -1789,7 +1789,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                 ? FontWeight.bold
                                 : FontWeight.normal,
                             color: isSelected
-                                ? AppColors.primary
+                                ? AppTheme.accentColor(context)
                                 : AppColors.textMuted,
                           ),
                         ),
@@ -2112,7 +2112,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         children: [
           Row(
             children: [
-              const Icon(Icons.sync_rounded, size: 18, color: AppColors.primary),
+              Icon(Icons.sync_rounded, size: 18, color: AppTheme.accentColor(context)),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -2134,7 +2134,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: groups.any((g) => g.id == _rotationGroupId)
+            initialValue: groups.any((g) => g.id == _rotationGroupId)
                 ? _rotationGroupId
                 : null,
             decoration: const InputDecoration(
@@ -2157,7 +2157,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<RotationFrequencyType>(
-            value: _rotationFrequencyType == RotationFrequencyType.none
+            initialValue: _rotationFrequencyType == RotationFrequencyType.none
                 ? null
                 : _rotationFrequencyType,
             decoration: const InputDecoration(
@@ -2252,7 +2252,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.3),
+          color: AppTheme.accentColor(context).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -2261,10 +2261,10 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.auto_awesome_rounded,
                 size: 16,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
               ),
               const SizedBox(width: 6),
               const Text(
@@ -2292,17 +2292,17 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                     }
                   });
                 },
-                icon: const Icon(
+                icon: Icon(
                   Icons.check_rounded,
                   size: 14,
-                  color: AppColors.primary,
+                  color: AppTheme.accentColor(context),
                 ),
-                label: const Text(
+                label: Text(
                   'Aplicar',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
                 ),
                 style: TextButton.styleFrom(
@@ -2325,13 +2325,13 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                 _nlpChip(
                   icon: Icons.calendar_today_rounded,
                   label: DateFormat('dd/MM/yyyy').format(parsed.startDate!),
-                  color: AppColors.primary,
+                  color: AppTheme.accentColor(context),
                 ),
               if (parsed.scheduledTime != null)
                 _nlpChip(
                   icon: Icons.access_time_rounded,
                   label: parsed.scheduledTime!.format(context),
-                  color: AppColors.primary,
+                  color: AppTheme.accentColor(context),
                 ),
               if (parsed.priority != null)
                 _nlpChip(
@@ -2343,7 +2343,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                 _nlpChip(
                   icon: Icons.repeat_rounded,
                   label: _schedulerLabel(parsed.scheduler!),
-                  color: AppColors.accent,
+                  color: AppTheme.accentColor(context),
                 ),
             ],
           ),

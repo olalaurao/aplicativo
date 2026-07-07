@@ -38,7 +38,7 @@ class LinkedObjectsSection extends ConsumerWidget {
           padding: const EdgeInsets.only(left: 20, right: 12, top: 24, bottom: 12),
           child: Row(
             children: [
-              const Icon(Icons.link_rounded, size: 20, color: AppColors.primary),
+              Icon(Icons.link_rounded, size: 20, color: AppTheme.accentColor(context)),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

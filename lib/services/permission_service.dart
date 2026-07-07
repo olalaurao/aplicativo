@@ -6,7 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class PermissionService {
-  static const _channel = MethodChannel('com.productivity.citrine/settings');
+  static const _channel = MethodChannel('com.productivity.Quartzo/settings');
 
   static Future<void> requestBatteryOptimizationBypass() async {
     try {
@@ -141,7 +141,7 @@ class PermissionService {
         title: const Text('Permissão de Alarme Exato'),
         content: const Text(
           'Para disparar alarmes e notificações popup no horário exato, '
-          'o Citrine precisa da permissão "Agendar alarmes exatos".\n\n'
+          'o Quartzo precisa da permissão "Agendar alarmes exatos".\n\n'
           'Você será levado às configurações do sistema.',
         ),
         actions: [

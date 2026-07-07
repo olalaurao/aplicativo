@@ -228,7 +228,7 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                           ? data['energy_value'] as int
                           : int.tryParse(data['energy_value']?.toString() ?? '');
                       // F3.15: Clamp energy value to 0-10 range
-                      return ev != null ? ev.clamp(0, 10) : null;
+                      return ev?.clamp(0, 10);
                     })(),
                   );
                   if (data['organizers'] != null) {
@@ -430,28 +430,26 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                 )..obsidianPath = relativePath;
               }
 
-              if (obj != null) {
-                obj.loadBaseMap(frontmatter, fallbackId: stableId);
-                obj.literalType = literalType;
-                if (literalType != null && literalType != type) {
-                  obj.hasTypeConflict = true;
-                  obj.conflictReason =
-                      'Tipo no frontmatter ("$literalType") diverge do tipo detectado pela assinatura ("$type").';
-                }
-
-                if (obj.title == 'Untitled' ||
-                    obj.title.toLowerCase() == 'untitled' ||
-                    obj.title.isEmpty) {
-                  obj.title = fallbackTitle;
-                }
-                results.add(obj);
-
-                // If the YAML was repaired in memory, flag it for main thread rewriting
-                if (frontmatter['__needs_rewrite__'] == true) {
-                  needsRewritePaths.add(relativePath);
-                }
+              obj.loadBaseMap(frontmatter, fallbackId: stableId);
+              obj.literalType = literalType;
+              if (literalType != null && literalType != type) {
+                obj.hasTypeConflict = true;
+                obj.conflictReason =
+                    'Tipo no frontmatter ("$literalType") diverge do tipo detectado pela assinatura ("$type").';
               }
-            }
+
+              if (obj.title == 'Untitled' ||
+                  obj.title.toLowerCase() == 'untitled' ||
+                  obj.title.isEmpty) {
+                obj.title = fallbackTitle;
+              }
+              results.add(obj);
+
+              // If the YAML was repaired in memory, flag it for main thread rewriting
+              if (frontmatter['__needs_rewrite__'] == true) {
+                needsRewritePaths.add(relativePath);
+              }
+                        }
           } catch (e, st) {
             debugPrint('Error processing file ${file.path}: $e\n$st');
           }

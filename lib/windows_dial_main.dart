@@ -4,16 +4,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'models/day_dial_model.dart';
 import 'services/day_dial_aggregator.dart';
 import 'ui/widgets/day_dial_widget.dart';
 import 'ui/theme.dart';
 import 'providers/vault_provider.dart';
-import 'providers/settings_provider.dart';
-import 'models/task_model.dart';
-import 'models/habit_model.dart';
-import 'models/pomodoro_session.dart';
-import 'package:googleapis/calendar/v3.dart' as google_calendar;
 import 'providers/pomodoro_provider.dart';
 
 void main() async {
@@ -39,7 +33,7 @@ class WindowsDialApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
-      title: 'Citrine Dial',
+      title: 'Quartzo Dial',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.accent),
         useMaterial3: true,
@@ -104,6 +98,7 @@ class _WindowsDialHomeState extends ConsumerState<WindowsDialHome> {
       habits: dayHabits,
       pomodoroSessions: pomodoroSessions,
       googleEvents: [], // No Google Calendar in Windows companion
+      reminders: [], // No reminders in Windows companion
     );
 
     return Scaffold(

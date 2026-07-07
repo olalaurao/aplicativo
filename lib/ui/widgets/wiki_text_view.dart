@@ -79,7 +79,7 @@ class WikiTextView extends ConsumerWidget {
               child: Text(
                 linkText,
                 style: (style ?? const TextStyle()).copyWith(
-                  color: AppColors.primary,
+                  color: AppTheme.accentColor(context),
                   fontWeight: FontWeight.bold,
                   decoration: TextDecoration.underline,
                 ),

@@ -612,7 +612,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
   /// Dynamic session summary card
   Widget _buildSessionSummary(int count) {
     final shortBreaks = count - 1;
-    final longBreaks = 1;
+    const longBreaks = 1;
     // Using default 25min work / 5min short break / 15min long break
     final totalMin = count * 25 + shortBreaks * 5 + longBreaks * 15;
     final hours = totalMin ~/ 60;
@@ -890,7 +890,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
         break;
       case PomodoroType.longBreak:
         label = 'PAUSA LONGA';
-        color = AppColors.primary;
+        color = AppTheme.accentColor(context);
         break;
       case PomodoroType.custom:
         label = 'PERSONALIZADO';
@@ -940,10 +940,10 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
             ),
             Text(
               steps[currentIndex].label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: AppColors.accent,
+                color: AppTheme.accentColor(context),
               ),
             ),
           ],
@@ -965,7 +965,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                   color: isCompleted
                       ? AppColors.success
                       : isCurrent
-                          ? AppColors.accent
+                          ? AppTheme.accentColor(context)
                           : AppColors.textMuted.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
@@ -1337,7 +1337,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                         notifier.start();
                       },
                       style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: AppTheme.accentColor(context),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -1537,15 +1537,15 @@ class _PomodoroSetupSheetState extends ConsumerState<_PomodoroSetupSheet> {
               return ChoiceChip(
                 label: Text(_typeLabel(type)),
                 selected: isSelected,
-                selectedColor: AppColors.primary.withValues(alpha: 0.1),
+                selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.1),
                 labelStyle: TextStyle(
                   color: isSelected
-                      ? AppColors.primary
+                      ? AppTheme.accentColor(context)
                       : AppColors.textSecondary,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 ),
                 side: isSelected
-                    ? const BorderSide(color: AppColors.primary)
+                    ? BorderSide(color: AppTheme.accentColor(context))
                     : BorderSide(
                         color: AppColors.textMuted.withValues(alpha: 0.3),
                       ),
@@ -1591,7 +1591,7 @@ class _PomodoroSetupSheetState extends ConsumerState<_PomodoroSetupSheet> {
                   }
                 },
                 icon: const Icon(Icons.remove_circle_outline_rounded),
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
                 iconSize: 32,
               ),
               const SizedBox(width: 12),
@@ -1629,7 +1629,7 @@ class _PomodoroSetupSheetState extends ConsumerState<_PomodoroSetupSheet> {
                   });
                 },
                 icon: const Icon(Icons.add_circle_outline_rounded),
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
                 iconSize: 32,
               ),
             ],
@@ -1659,9 +1659,9 @@ class _PomodoroSetupSheetState extends ConsumerState<_PomodoroSetupSheet> {
               ),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.link_rounded,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                     size: 20,
                   ),
                   const SizedBox(width: 12),
@@ -1718,7 +1718,7 @@ class _PomodoroSetupSheetState extends ConsumerState<_PomodoroSetupSheet> {
                 Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: AppTheme.accentColor(context),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(28),

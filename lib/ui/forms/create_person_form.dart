@@ -161,7 +161,7 @@ class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
             child: FilledButton(
               onPressed: hasName ? _savePerson : null,
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: AppTheme.accentColor(context),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -193,10 +193,10 @@ class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
           child: TextField(
             controller: controller,
             textAlign: TextAlign.end,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.primary,
+              color: AppTheme.accentColor(context),
             ),
             decoration: InputDecoration(
               hintText: hint,
@@ -227,10 +227,10 @@ class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
             controller: _frequencyController,
             textAlign: TextAlign.end,
             keyboardType: TextInputType.number,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.primary,
+              color: AppTheme.accentColor(context),
             ),
             decoration: const InputDecoration(
               prefixText: 'Every ',
@@ -261,10 +261,10 @@ class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
         DropdownButton<TaskPriority>(
           value: _priority,
           underline: const SizedBox(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppColors.primary,
+            color: AppTheme.accentColor(context),
           ),
           onChanged: (val) => setState(() => _priority = val!),
           items: TaskPriority.values

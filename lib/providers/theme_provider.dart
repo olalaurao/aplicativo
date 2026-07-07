@@ -36,18 +36,25 @@ final activeThemeConfigProvider = Provider<AppThemeConfig>((ref) {
       );
     },
   );
-  
-  // Apply custom background color and font if set
-  Color? customBackgroundColor;
+
+  // Apply custom light background color if set
+  Color? customBgColor;
   if (settings.backgroundColor != null) {
-    customBackgroundColor = AppThemeConfig.colorFromHex(settings.backgroundColor!);
+    customBgColor = AppThemeConfig.colorFromHex(settings.backgroundColor!);
   }
-  
+
+  // Apply custom dark background color if set
+  Color? customDarkBgColor;
+  if (settings.darkBackgroundColor != null) {
+    customDarkBgColor = AppThemeConfig.colorFromHex(settings.darkBackgroundColor!);
+  }
+
   return AppThemeConfig(
     id: baseTheme.id,
     label: baseTheme.label,
     accentColor: baseTheme.accentColor,
-    backgroundColor: customBackgroundColor ?? baseTheme.backgroundColor,
+    backgroundColor: customBgColor ?? baseTheme.backgroundColor,
+    darkBackgroundColor: customDarkBgColor ?? baseTheme.darkBackgroundColor,
     icon: baseTheme.icon,
     description: baseTheme.description,
     fontFamily: settings.fontFamily ?? baseTheme.fontFamily,
@@ -73,6 +80,7 @@ final themeProvider = Provider<AppThemeBundle>((ref) {
     ),
     darkTheme: AppTheme.getDarkTheme(
       config.accentColor,
+      backgroundColor: config.darkBackgroundColor,
       fontFamily: config.fontFamily,
     ),
   );

@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Citrine</string>
-    <string name="widget_calendar_description">Citrine calendario</string>
-    <string name="widget_tasks_description">Citrine tarefas</string>
-    <string name="widget_filter_description">Citrine filtro</string>
-    <string name="widget_pomodoro_description">Citrine pomodoro</string>
-    <string name="widget_quick_add_description">Citrine adicionar rapido</string>
-    <string name="widget_note_description">Citrine nota</string>
+    <string name="app_name">Quartzo</string>
+    <string name="widget_calendar_description">Quartzo Calendar</string>
+    <string name="widget_tasks_description">Quartzo Tasks</string>
+    <string name="widget_filter_description">Quartzo Filter</string>
+    <string name="widget_pomodoro_description">Quartzo Pomodoro</string>
+    <string name="widget_quick_add_description">Quartzo Quick Add</string>
+    <string name="widget_note_description">Quartzo Note</string>
+    <string name="widget_day_dial_description">Quartzo Day Dial</string>
+    <string name="widget_shopping_description">Quartzo Shopping List</string>
 </resources>

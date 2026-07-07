@@ -132,13 +132,13 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
+                              color: AppTheme.accentColor(context).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.add_rounded,
                               size: 20,
-                              color: AppColors.primary,
+                              color: AppTheme.accentColor(context),
                             ),
                           ),
                           onPressed: () => showCreateMenu(context),
@@ -206,7 +206,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     Icon(
                       Icons.sticky_note_2_outlined,
                       size: 56,
-                      color: AppColors.primary.withValues(alpha: 0.3),
+                      color: AppTheme.accentColor(context).withValues(alpha: 0.3),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -280,7 +280,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       margin: const EdgeInsets.only(right: 6),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       decoration: BoxDecoration(
-        color: selected ? AppColors.primary : AppTheme.surfaceVariantColor(context),
+        color: selected ? AppTheme.accentColor(context) : AppTheme.surfaceVariantColor(context),
         borderRadius: BorderRadius.circular(20)),
       child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
         color: selected ? Colors.black : AppTheme.textSecondaryColor(context)))));

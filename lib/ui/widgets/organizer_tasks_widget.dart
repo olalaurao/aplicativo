@@ -63,7 +63,7 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
         .firstOrNull;
     final organizerColor = selectedOrganizer is Organizer
         ? _parseHexColor(selectedOrganizer.color)
-        : AppColors.accent;
+        : AppTheme.accentColor(context);
 
     final selectedSlug = _selectedSlug;
     bool belongsToSelected(List<OrganizerReference> organizers) {
@@ -136,7 +136,7 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
             children: [
               Row(
                 children: [
-                  Icon(_iconForFilter(widget.objectTypes), color: AppColors.accent, size: 20),
+                  Icon(_iconForFilter(widget.objectTypes), color: AppTheme.accentColor(context), size: 20),
                   const SizedBox(width: 8),
                   Text(
                     'Filtro',
@@ -161,7 +161,7 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
             child: Row(
               children: validOrganizers.map((org) {
                 final isSelected = org.slug == _selectedSlug || org.id == _selectedSlug;
-                final color = org is Organizer ? _parseHexColor(org.color) : AppColors.accent;
+                final color = org is Organizer ? _parseHexColor(org.color) : AppTheme.accentColor(context);
                 return Padding(
                   padding: const EdgeInsets.only(right: 8.0),
                   child: FilterChip(
@@ -577,10 +577,10 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
   }
 
   Color _parseHexColor(String? hex) {
-    if (hex == null || hex.isEmpty) return AppColors.accent;
+    if (hex == null || hex.isEmpty) return AppTheme.accentColor(context);
     final cleaned = hex.replaceFirst('#', '').replaceFirst('0x', '');
     final withAlpha = cleaned.length == 6 ? 'FF$cleaned' : cleaned;
-    return Color(int.tryParse(withAlpha, radix: 16) ?? AppColors.accent.toARGB32());
+    return Color(int.tryParse(withAlpha, radix: 16) ?? AppTheme.accentColor(context).toARGB32());
   }
 }
 

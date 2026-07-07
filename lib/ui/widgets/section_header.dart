@@ -23,7 +23,7 @@ class SectionHeader extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 20, color: iconColor ?? AppColors.primary),
+          Icon(icon, size: 20, color: iconColor ?? AppTheme.accentColor(context)),
           const SizedBox(width: 8),
           Flexible(
             child: Text(

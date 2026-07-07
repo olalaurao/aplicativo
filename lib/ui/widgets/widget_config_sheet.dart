@@ -153,7 +153,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
           ElevatedButton(
             onPressed: () => _saveAndSyncWidgets(dashboardBlocks),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: AppTheme.accentColor(context),
               minimumSize: const Size(double.infinity, 50),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -207,9 +207,9 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
       await forceWidgetSync(container);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Configurações dos widgets sincronizadas.'),
-          backgroundColor: AppColors.primary,
+          backgroundColor: AppTheme.accentColor(context),
         ),
       );
       Navigator.pop(context);
@@ -246,7 +246,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isExpanded
-                  ? AppColors.primary.withValues(alpha: 0.3)
+                  ? AppTheme.accentColor(context).withValues(alpha: 0.3)
                   : Colors.transparent,
               width: 1.5,
             ),
@@ -257,14 +257,14 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: isExpanded
-                      ? AppColors.primary.withValues(alpha: 0.1)
+                      ? AppTheme.accentColor(context).withValues(alpha: 0.1)
                       : AppTheme.surfaceColor(context),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   icon,
                   color: isExpanded
-                      ? AppColors.primary
+                      ? AppTheme.accentColor(context)
                       : AppTheme.textMutedColor(context),
                   size: 24,
                 ),
@@ -477,7 +477,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
               style: TextStyle(fontSize: 13),
             ),
             value: settings.calendarWidgetShowTasks,
-            activeThumbColor: AppColors.primary,
+            activeThumbColor: AppTheme.accentColor(context),
             contentPadding: EdgeInsets.zero,
             dense: true,
             onChanged: (val) {
@@ -492,7 +492,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
               style: TextStyle(fontSize: 13),
             ),
             value: settings.calendarWidgetShowHabits,
-            activeThumbColor: AppColors.primary,
+            activeThumbColor: AppTheme.accentColor(context),
             contentPadding: EdgeInsets.zero,
             dense: true,
             onChanged: (val) {
@@ -507,7 +507,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
               style: TextStyle(fontSize: 13),
             ),
             value: settings.calendarWidgetShowSessions,
-            activeThumbColor: AppColors.primary,
+            activeThumbColor: AppTheme.accentColor(context),
             contentPadding: EdgeInsets.zero,
             dense: true,
             onChanged: (val) {
@@ -779,8 +779,8 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                         .updateBlock(block.copyWith(metadata: updatedMetadata));
                   }
                 },
-                selectedColor: AppColors.primary.withValues(alpha: 0.16),
-                checkmarkColor: AppColors.primary,
+                selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.16),
+                checkmarkColor: AppTheme.accentColor(context),
               );
             }).toList(),
           ),

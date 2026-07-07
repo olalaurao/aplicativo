@@ -362,7 +362,7 @@ class JournalEntry extends ContentObject {
       if (ev != null) {
         final parsed = ev is int ? ev : int.tryParse(ev.toString());
         // F3.15: Clamp energy value to 0-10 range
-        entry.energyValue = parsed != null ? parsed.clamp(0, 10) : null;
+        entry.energyValue = parsed?.clamp(0, 10);
       }
       entry.text = frontmatter['text']?.toString();
     } else if (type == JournalEntryType.pmn) {

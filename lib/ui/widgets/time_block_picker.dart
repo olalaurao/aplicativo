@@ -75,7 +75,7 @@ class TimeBlockPicker extends ConsumerWidget {
     required VoidCallback onTap,
   }) {
     final blockColor = _parseColor(colorStr);
-    final activeColor = blockColor ?? AppColors.accent;
+    final activeColor = blockColor ?? AppTheme.accentColor(context);
 
     return GestureDetector(
       onTap: onTap,

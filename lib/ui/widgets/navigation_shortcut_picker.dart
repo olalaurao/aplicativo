@@ -238,9 +238,9 @@ class _NavigationShortcutPickerState
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
+            child: Text(
               'Pin to Footer',
-              style: TextStyle(color: AppColors.primary),
+              style: TextStyle(color: AppTheme.accentColor(context)),
             ),
           ),
         ],
@@ -271,10 +271,10 @@ class _NavigationShortcutPickerState
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: AppColors.accent.withValues(alpha: 0.1),
+          color: AppTheme.accentColor(context).withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, size: 20, color: AppColors.accent),
+        child: Icon(icon, size: 20, color: AppTheme.accentColor(context)),
       ),
       title: Text(
         label,
@@ -313,10 +313,10 @@ class _NavigationShortcutPickerState
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.1),
+          color: AppTheme.accentColor(context).withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, size: 20, color: AppColors.primary),
+        child: Icon(icon, size: 20, color: AppTheme.accentColor(context)),
       ),
       title: Text(
         title,

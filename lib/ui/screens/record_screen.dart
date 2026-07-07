@@ -63,15 +63,15 @@ class RecordScreen extends ConsumerWidget {
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primaryLight, AppColors.primary],
+                  gradient: LinearGradient(
+                    colors: [AppColors.primaryLight, AppTheme.accentColor(context)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.3),
+                      color: AppTheme.accentColor(context).withValues(alpha: 0.3),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),
@@ -123,12 +123,12 @@ class RecordScreen extends ConsumerWidget {
                       context,
                       MaterialPageRoute(builder: (_) => const TrackersScreen()),
                     ),
-                    child: const Text(
+                    child: Text(
                       'View All',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
+                        color: AppTheme.accentColor(context),
                       ),
                     ),
                   ),
@@ -211,12 +211,12 @@ class RecordScreen extends ConsumerWidget {
                       context,
                       MaterialPageRoute(builder: (_) => const TrackersScreen()),
                     ),
-                    child: const Text(
+                    child: Text(
                       '+ New Tracker',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
+                        color: AppTheme.accentColor(context),
                       ),
                     ),
                   ),

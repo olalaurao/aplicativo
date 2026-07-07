@@ -709,7 +709,7 @@ class _CreateRecordFormState extends ConsumerState<CreateRecordForm> {
     try {
       return Color(int.parse(hex.replaceAll('#', '0xFF')));
     } catch (_) {
-      return AppColors.primary;
+      return AppTheme.accentColor(context);
     }
   }
 

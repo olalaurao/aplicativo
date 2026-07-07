@@ -115,10 +115,10 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                         decoration: BoxDecoration(
-                          color: sel ? AppColors.primary : AppTheme.surfaceVariantColor(ctx),
+                          color: sel ? AppTheme.accentColor(context) : AppTheme.surfaceVariantColor(ctx),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: sel ? AppColors.primary : AppTheme.dividerColor(ctx),
+                            color: sel ? AppTheme.accentColor(context) : AppTheme.dividerColor(ctx),
                           ),
                         ),
                         child: Text(
@@ -137,7 +137,7 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                   width: double.infinity,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: AppTheme.accentColor(context),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -269,7 +269,7 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                   'Salvar',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    color: _hasTitle ? AppColors.primary : AppColors.textMuted,
+                    color: _hasTitle ? AppTheme.accentColor(context) : AppColors.textMuted,
                   ),
                 ),
               ),
@@ -328,9 +328,9 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                               child: TextField(
                                 controller: _triggerController,
                                 textAlign: TextAlign.end,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 14,
-                                  color: AppColors.primary,
+                                  color: AppTheme.accentColor(context),
                                   fontWeight: FontWeight.w500,
                                 ),
                                 decoration: InputDecoration(
@@ -363,7 +363,7 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                                 _scheduler != null ? _getScheduleSummary(_scheduler!) : 'Nenhum',
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: _scheduler != null ? AppColors.primary : AppColors.textMuted,
+                                  color: _scheduler != null ? AppTheme.accentColor(context) : AppColors.textMuted,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -396,7 +396,7 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                                 _estimatedMinutes > 0 ? '$_estimatedMinutes min' : 'Não estimado',
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: _estimatedMinutes > 0 ? AppColors.primary : AppColors.textMuted,
+                                  color: _estimatedMinutes > 0 ? AppTheme.accentColor(context) : AppColors.textMuted,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -426,7 +426,7 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                             ),
                             const Spacer(),
                             IconButton(
-                              icon: const Icon(Icons.add_rounded, color: AppColors.primary),
+                              icon: Icon(Icons.add_rounded, color: AppTheme.accentColor(context)),
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
                               onPressed: _addStep,
@@ -542,7 +542,7 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: _hasTitle ? AppColors.primary : AppColors.textMuted,
+                backgroundColor: _hasTitle ? AppTheme.accentColor(context) : AppColors.textMuted,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 padding: const EdgeInsets.symmetric(vertical: 18),

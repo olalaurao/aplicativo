@@ -131,6 +131,18 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
       route: '/inbox',
       inBottomBar: false,
     ),
+    NavigationItem(
+      section: NavSection.dayThemes,
+      label: 'Day Themes',
+      route: '/day-themes',
+      inBottomBar: false,
+    ),
+    NavigationItem(
+      section: NavSection.timeBlocks,
+      label: 'Time Blocks',
+      route: '/time-blocks',
+      inBottomBar: false,
+    ),
   ];
 
   Future<void> _save() async {
@@ -202,6 +214,7 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
     NavigationItem item, {
     bool? inBottomBar,
     String? label,
+    Map<String, String>? queryParams,
   }) {
     return NavigationItem(
       section: item.section,
@@ -211,13 +224,18 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
       isCustom: item.isCustom,
       id: item.id,
       type: item.type,
+      queryParams: queryParams ?? item.queryParams,
     );
   }
 
   static String _itemKey(NavigationItem item) {
-    return item.isCustom
-        ? 'custom:${item.id ?? item.route}'
-        : item.section.name;
+    if (item.isCustom) {
+      final queryParamsStr = item.queryParams?.entries
+          .map((e) => '${e.key}=${e.value}')
+          .join('&') ?? '';
+      return 'custom:${item.id ?? item.route}::$queryParamsStr';
+    }
+    return item.section.name;
   }
 
   static bool _sameItem(NavigationItem a, NavigationItem b) {
@@ -366,6 +384,74 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
           item,
     ]);
     await _save();
+  }
+
+  Future<void> pinCurrentScreen(
+    String label,
+    String route,
+    Map<String, String>? queryParams,
+    String? type,
+  ) async {
+    final current = state.valueOrNull ?? [];
+    
+    // Generate a unique ID for this pin
+    final id = 'pin_${DateTime.now().millisecondsSinceEpoch}';
+    
+    // Check if this exact screen is already pinned
+    for (final item in current) {
+      if (item.isCustom &&
+          item.route == route &&
+          _mapsEqual(item.queryParams, queryParams)) {
+        // Already pinned, just toggle it to bottom bar
+        await toggleInBottomBar(item.id);
+        return;
+      }
+    }
+    
+    // Create new pinned item
+    final newItem = NavigationItem(
+      section: NavSection.shortcut,
+      label: label,
+      route: route,
+      inBottomBar: true,
+      isCustom: true,
+      id: id,
+      type: type ?? 'screen',
+      queryParams: queryParams,
+    );
+    
+    state = AsyncData(_normalizeItems([...current, newItem]));
+    await _save();
+  }
+
+  Future<void> unpinScreen(String route, Map<String, String>? queryParams) async {
+    final current = state.valueOrNull ?? [];
+    state = AsyncData([
+      for (final item in current)
+        if (!(item.isCustom &&
+            item.route == route &&
+            _mapsEqual(item.queryParams, queryParams)))
+          item,
+    ]);
+    await _save();
+  }
+
+  bool isScreenPinned(String route, Map<String, String>? queryParams) {
+    final current = state.valueOrNull ?? [];
+    return current.any((item) =>
+        item.isCustom &&
+        item.route == route &&
+        _mapsEqual(item.queryParams, queryParams));
+  }
+
+  bool _mapsEqual(Map<String, String>? a, Map<String, String>? b) {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    if (a.length != b.length) return false;
+    for (final key in a.keys) {
+      if (!b.containsKey(key) || b[key] != a[key]) return false;
+    }
+    return true;
   }
 }
 

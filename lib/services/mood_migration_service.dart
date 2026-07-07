@@ -38,7 +38,7 @@ class MoodMigrationService {
     final newPleasantness = ((oldNumericValue - 1) / 14 * 10).round().clamp(0, 10);
     
     // Energy defaults to 5 (neutral) since old model never captured this dimension
-    final newEnergy = 5;
+    const newEnergy = 5;
     
     // Description defaults to empty (non-blocking per Rule 13)
     final newDescription = oldMood.description?.trim().isEmpty == true 
@@ -46,7 +46,7 @@ class MoodMigrationService {
         : (oldMood.description ?? '');
     
     // is_system = false for user-created moods
-    final newSource = MoodSource.user;
+    const newSource = MoodSource.user;
     
     // Create migrated mood with new schema
     return oldMood.copyWith(

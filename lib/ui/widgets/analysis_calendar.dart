@@ -280,7 +280,7 @@ class _CalendarDayCell extends StatelessWidget {
     final dateKey = DateTime(date.year, date.month, date.day);
     final isToday = dateKey == todayKey;
     final isFuture = dateKey.isAfter(todayKey);
-    final primaryColor = primarySource?.color ?? AppColors.primary;
+    final primaryColor = primarySource?.color ?? AppTheme.accentColor(context);
     final primaryValue = primarySource == null
         ? null
         : sourceValues[primarySource!.id];
@@ -294,14 +294,14 @@ class _CalendarDayCell extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         decoration: BoxDecoration(
           color: isToday
-              ? AppColors.primary.withValues(alpha: 0.10)
+              ? AppTheme.accentColor(context).withValues(alpha: 0.10)
               : heatAlpha > 0
               ? primaryColor.withValues(alpha: heatAlpha)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isToday
-                ? AppColors.primary
+                ? AppTheme.accentColor(context)
                 : AppTheme.dividerColor(context).withValues(alpha: 0.25),
           ),
         ),
@@ -313,7 +313,7 @@ class _CalendarDayCell extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: isToday
-                    ? AppColors.primary
+                    ? AppTheme.accentColor(context)
                     : isFuture
                     ? AppTheme.textMutedColor(context).withValues(alpha: 0.4)
                     : AppTheme.textSecondaryColor(context),
@@ -356,7 +356,7 @@ class _DotsRow extends StatelessWidget {
             height: 4,
             margin: const EdgeInsets.symmetric(horizontal: 1),
             decoration: BoxDecoration(
-              color: (source.color ?? AppColors.primary).withValues(
+              color: (source.color ?? AppTheme.accentColor(context)).withValues(
                 alpha: _dotAlpha(values[source.id]),
               ),
               shape: BoxShape.circle,
@@ -443,7 +443,7 @@ class _MetricValueRow extends StatelessWidget {
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color: source.color ?? AppColors.primary,
+              color: source.color ?? AppTheme.accentColor(context),
               shape: BoxShape.circle,
             ),
           ),

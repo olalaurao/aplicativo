@@ -95,7 +95,7 @@ class PomodoroWeekOverview extends ConsumerWidget {
                   '${totalHoursThisWeek.toStringAsFixed(0)}h',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w900,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
                 ),
                 Text(
@@ -118,10 +118,10 @@ class PomodoroWeekOverview extends ConsumerWidget {
               icon: const Icon(Icons.play_arrow_rounded, size: 16),
               label: const Text('Iniciar'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
+                backgroundColor: AppTheme.accentColor(context),
                 foregroundColor: Colors.white,
                 elevation: 6,
-                shadowColor: AppColors.accent.withValues(alpha: 0.32),
+                shadowColor: AppTheme.accentColor(context).withValues(alpha: 0.32),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -173,7 +173,7 @@ class PomodoroWeekOverview extends ConsumerWidget {
                   barRods: [
                     BarChartRodData(
                       toY: entry.value / 60.0, // Convert minutes to hours
-                      color: AppColors.primary.withValues(alpha: 0.8),
+                      color: AppTheme.accentColor(context).withValues(alpha: 0.8),
                       width: 12,
                       borderRadius: BorderRadius.circular(4),
                     ),

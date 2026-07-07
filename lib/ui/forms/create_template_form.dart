@@ -207,7 +207,7 @@ class _CreateTemplateFormState extends ConsumerState<CreateTemplateForm> {
                     }
                     Navigator.pop(ctx);
                   },
-                  style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+                  style: TextButton.styleFrom(foregroundColor: AppTheme.accentColor(context)),
                   child: const Text('ADICIONAR'),
                 ),
               ],
@@ -230,7 +230,7 @@ class _CreateTemplateFormState extends ConsumerState<CreateTemplateForm> {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             IconButton(
-              icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary, size: 20),
+              icon: Icon(Icons.add_circle_outline_rounded, color: AppTheme.accentColor(context), size: 20),
               onPressed: _showAddPropertyDialog,
               tooltip: 'Adicionar propriedade',
             ),
@@ -276,9 +276,9 @@ class _CreateTemplateFormState extends ConsumerState<CreateTemplateForm> {
         actions: [
           TextButton(
             onPressed: _saveTemplate,
-            child: const Text(
+            child: Text(
               'Salvar',
-              style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold),
+              style: TextStyle(color: AppTheme.accentColor(context), fontWeight: FontWeight.bold),
             ),
           ),
         ],

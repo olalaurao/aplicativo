@@ -159,7 +159,7 @@ class _DayDialPainter extends CustomPainter {
       final markerY = center.dy + markerRadius * sin(currentAngle);
 
       final markerPaint = Paint()
-        ..color = AppColors.accent
+        ..color = AppColors.primary
         ..style = PaintingStyle.fill;
       
       canvas.drawCircle(Offset(markerX, markerY), 6, markerPaint);
@@ -186,7 +186,7 @@ class _DayDialPainter extends CustomPainter {
 
       labelPaint.text = TextSpan(
         text: entry.value,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: AppColors.textMuted,
@@ -220,7 +220,7 @@ class _DayDialPainter extends CustomPainter {
       case DialHourKind.pomodoroCompleted:
         return AppColors.success;
       case DialHourKind.pomodoroPlanned:
-        return AppColors.accent.withValues(alpha: 0.6);
+        return AppColors.primary.withValues(alpha: 0.6);
       case DialHourKind.event:
         return AppColors.info;
     }

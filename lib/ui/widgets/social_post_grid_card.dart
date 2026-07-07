@@ -242,7 +242,7 @@ class _SelectionBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return CircleAvatar(
       radius: 13,
-      backgroundColor: selected ? AppColors.primary : AppColors.surface,
+      backgroundColor: selected ? AppTheme.accentColor(context) : AppColors.surface,
       child: Icon(
         selected ? Icons.check_rounded : Icons.circle_outlined,
         size: 17,

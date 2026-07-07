@@ -28,13 +28,13 @@ class EmptyState extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.05),
+                color: AppTheme.accentColor(context).withValues(alpha: 0.05),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
                 size: 64,
-                color: AppColors.primary.withValues(alpha: 0.4),
+                color: AppTheme.accentColor(context).withValues(alpha: 0.4),
               ),
             ),
             const SizedBox(height: 24),
@@ -62,7 +62,7 @@ class EmptyState extends StatelessWidget {
               ElevatedButton(
                 onPressed: onCta,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: AppTheme.accentColor(context),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,

@@ -51,14 +51,14 @@ class OrganizerSelectorField extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  color: AppTheme.accentColor(context).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   '${selectedOrganizers.length}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -268,13 +268,13 @@ class OrganizerSelectorField extends ConsumerWidget {
                               );
                               return ListTile(
                                 leading: CircleAvatar(
-                                  backgroundColor: AppColors.primary.withValues(
+                                  backgroundColor: AppTheme.accentColor(context).withValues(
                                     alpha: 0.1,
                                   ),
                                   child: Icon(
                                     _getIconForType(obj.type),
                                     size: 18,
-                                    color: AppColors.primary,
+                                    color: AppTheme.accentColor(context),
                                   ),
                                 ),
                                 title: Text(
@@ -292,9 +292,9 @@ class OrganizerSelectorField extends ConsumerWidget {
                                   ),
                                 ),
                                 trailing: isSelected
-                                    ? const Icon(
+                                    ? Icon(
                                         Icons.check_circle_rounded,
-                                        color: AppColors.primary,
+                                        color: AppTheme.accentColor(context),
                                       )
                                     : null,
                                 onTap: () {
@@ -351,7 +351,7 @@ class OrganizerSelectorField extends ConsumerWidget {
                         icon: const Icon(Icons.add_rounded),
                         label: Text('Criar "${searchQuery.trim()}" como...'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: AppTheme.accentColor(context),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
@@ -467,7 +467,7 @@ class OrganizerSelectorField extends ConsumerWidget {
                   return ListTile(
                     leading: Icon(
                       t['icon'] as IconData,
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                     ),
                     title: Text(t['label'] as String),
                     onTap: () async {
@@ -612,6 +612,10 @@ class OrganizerSelectorField extends ConsumerWidget {
           return 'Hábito';
         case OrganizerType.tracker:
           return 'Rastreador';
+      case OrganizerType.dayTheme:
+        return 'Tema do Dia';
+      case OrganizerType.timeBlock:
+        return 'Bloco de Tempo';
       }
     }
     switch (obj.type) {

@@ -16,7 +16,6 @@ class AppearanceScreen extends ConsumerWidget {
     final themes = ref.watch(availableThemesProvider);
     final activeTheme = ref.watch(activeThemeConfigProvider);
     final notifier = ref.read(settingsProvider.notifier);
-    final currentHex = settings.accentColor.toUpperCase();
     final mode = themeBundle.themeMode;
 
     return Scaffold(
@@ -55,18 +54,6 @@ class AppearanceScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  switch (mode) {
-                    ThemeMode.light => 'Fixed light theme',
-                    ThemeMode.dark => 'Fixed dark theme',
-                    ThemeMode.system => 'Follow system setting',
-                  },
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textMutedColor(context),
-                  ),
-                ),
                 const SizedBox(height: 16),
                 Wrap(
                   spacing: 8,
@@ -95,52 +82,129 @@ class AppearanceScreen extends ConsumerWidget {
               ],
             ),
           ),
+          
+          if (mode == ThemeMode.dark || (mode == ThemeMode.system && Theme.of(context).brightness == Brightness.dark)) ...[
+            Container(
+              decoration: AppTheme.cardDecoration(context),
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Dark Mode Background',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      _backgroundSwatch(
+                        context,
+                        label: 'Default',
+                        colorHex: AppColors.darkBackground.value.toRadixString(16).padLeft(8, '0').toUpperCase(),
+                        currentColor: settings.darkBackgroundColor,
+                        onTap: () => notifier.updateDarkBackgroundColor('#1A1A2E'),
+                      ),
+                      _backgroundSwatch(
+                        context,
+                        label: 'Pure Black',
+                        colorHex: 'FF000000',
+                        currentColor: settings.darkBackgroundColor,
+                        onTap: () => notifier.updateDarkBackgroundColor('#000000'),
+                      ),
+                      _backgroundSwatch(
+                        context,
+                        label: 'Navy',
+                        colorHex: 'FF0B1021',
+                        currentColor: settings.darkBackgroundColor,
+                        onTap: () => notifier.updateDarkBackgroundColor('#0B1021'),
+                      ),
+                      _backgroundSwatch(
+                        context,
+                        label: 'Plum',
+                        colorHex: 'FF1A0B1C',
+                        currentColor: settings.darkBackgroundColor,
+                        onTap: () => notifier.updateDarkBackgroundColor('#1A0B1C'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          if (mode == ThemeMode.light || (mode == ThemeMode.system && Theme.of(context).brightness == Brightness.light)) ...[
+            Container(
+              decoration: AppTheme.cardDecoration(context),
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Light Mode Background',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      _backgroundSwatch(
+                        context,
+                        label: 'Default',
+                        colorHex: AppColors.background.value.toRadixString(16).padLeft(8, '0').toUpperCase(),
+                        currentColor: settings.backgroundColor,
+                        onTap: () => notifier.updateLightBackgroundColor('#F8F8F8'),
+                      ),
+                      _backgroundSwatch(
+                        context,
+                        label: 'Pure White',
+                        colorHex: 'FFFFFFFF',
+                        currentColor: settings.backgroundColor,
+                        onTap: () => notifier.updateLightBackgroundColor('#FFFFFF'),
+                      ),
+                      _backgroundSwatch(
+                        context,
+                        label: 'Warm',
+                        colorHex: 'FFFFFDF8',
+                        currentColor: settings.backgroundColor,
+                        onTap: () => notifier.updateLightBackgroundColor('#FFFFDF8'),
+                      ),
+                      _backgroundSwatch(
+                        context,
+                        label: 'Cool',
+                        colorHex: 'FFF5F7FA',
+                        currentColor: settings.backgroundColor,
+                        onTap: () => notifier.updateLightBackgroundColor('#F5F7FA'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           Container(
             decoration: AppTheme.cardDecoration(context),
+            margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Text(
-                      'Active theme',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      width: 22,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        color: activeTheme.accentColor,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Theme.of(context).dividerColor,
-                          width: 1.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      currentHex,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  activeTheme.description,
+                const Text(
+                  'Active theme',
                   style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textMutedColor(context),
-                    height: 1.4,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -215,15 +279,6 @@ class AppearanceScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Selection is saved in app preferences and applied immediately.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.textMutedColor(context),
-                    height: 1.4,
-                  ),
-                ),
               ],
             ),
           ),
@@ -248,103 +303,39 @@ class AppearanceScreen extends ConsumerWidget {
                     _fontChip(
                       context,
                       label: 'Inter',
-                      selected: activeTheme.fontFamily == 'Inter',
-                      onTap: () => _updateFont(context, ref, 'Inter'),
+                      selected: settings.fontFamily == 'Inter' || (settings.fontFamily?.isEmpty ?? true),
+                      onTap: () => notifier.updateFontFamily('Inter'),
                     ),
                     _fontChip(
                       context,
                       label: 'Roboto',
-                      selected: activeTheme.fontFamily == 'Roboto',
-                      onTap: () => _updateFont(context, ref, 'Roboto'),
+                      selected: settings.fontFamily == 'Roboto',
+                      onTap: () => notifier.updateFontFamily('Roboto'),
                     ),
                     _fontChip(
                       context,
-                      label: 'Open Sans',
-                      selected: activeTheme.fontFamily == 'OpenSans',
-                      onTap: () => _updateFont(context, ref, 'OpenSans'),
+                      label: 'Outfit',
+                      selected: settings.fontFamily == 'Outfit',
+                      onTap: () => notifier.updateFontFamily('Outfit'),
                     ),
                     _fontChip(
                       context,
-                      label: 'Lato',
-                      selected: activeTheme.fontFamily == 'Lato',
-                      onTap: () => _updateFont(context, ref, 'Lato'),
+                      label: 'Lora',
+                      selected: settings.fontFamily == 'Lora',
+                      onTap: () => notifier.updateFontFamily('Lora'),
                     ),
                     _fontChip(
                       context,
-                      label: 'Poppins',
-                      selected: activeTheme.fontFamily == 'Poppins',
-                      onTap: () => _updateFont(context, ref, 'Poppins'),
+                      label: 'JetBrains Mono',
+                      selected: settings.fontFamily == 'JetBrains Mono',
+                      onTap: () => notifier.updateFontFamily('JetBrains Mono'),
                     ),
                   ],
                 ),
               ],
             ),
           ),
-          Container(
-            decoration: AppTheme.cardDecoration(context),
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Background color',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _colorChip(
-                      context,
-                      color: const Color(0xFFF8F9FB),
-                      selected: activeTheme.backgroundColor == const Color(0xFFF8F9FB),
-                      onTap: () => _updateBackgroundColor(context, ref, const Color(0xFFF8F9FB)),
-                    ),
-                    _colorChip(
-                      context,
-                      color: const Color(0xFFFFFBF0),
-                      selected: activeTheme.backgroundColor == const Color(0xFFFFFBF0),
-                      onTap: () => _updateBackgroundColor(context, ref, const Color(0xFFFFFBF0)),
-                    ),
-                    _colorChip(
-                      context,
-                      color: const Color(0xFFF0F9FF),
-                      selected: activeTheme.backgroundColor == const Color(0xFFF0F9FF),
-                      onTap: () => _updateBackgroundColor(context, ref, const Color(0xFFF0F9FF)),
-                    ),
-                    _colorChip(
-                      context,
-                      color: const Color(0xFFF0FDF4),
-                      selected: activeTheme.backgroundColor == const Color(0xFFF0FDF4),
-                      onTap: () => _updateBackgroundColor(context, ref, const Color(0xFFF0FDF4)),
-                    ),
-                    _colorChip(
-                      context,
-                      color: const Color(0xFFFDF2F8),
-                      selected: activeTheme.backgroundColor == const Color(0xFFFDF2F8),
-                      onTap: () => _updateBackgroundColor(context, ref, const Color(0xFFFDF2F8)),
-                    ),
-                    _colorChip(
-                      context,
-                      color: const Color(0xFFF5F3FF),
-                      selected: activeTheme.backgroundColor == const Color(0xFFF5F3FF),
-                      onTap: () => _updateBackgroundColor(context, ref, const Color(0xFFF5F3FF)),
-                    ),
-                    _colorChip(
-                      context,
-                      color: Colors.white,
-                      selected: activeTheme.backgroundColor == Colors.white,
-                      onTap: () => _updateBackgroundColor(context, ref, Colors.white),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 40),
         ],
       ),
     );
@@ -356,27 +347,33 @@ class AppearanceScreen extends ConsumerWidget {
     required bool selected,
     required VoidCallback onTap,
   }) {
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onTap(),
-      selectedColor: Theme.of(
-        context,
-      ).colorScheme.primary.withValues(alpha: 0.16),
-      labelStyle: TextStyle(
-        fontWeight: FontWeight.w600,
-        color: selected
-            ? Theme.of(context).colorScheme.primary
-            : AppTheme.textSecondaryColor(context),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppTheme.accentColor(context).withValues(alpha: 0.1)
+              : Colors.transparent,
+          border: Border.all(
+            color: selected
+                ? AppTheme.accentColor(context)
+                : AppTheme.dividerColor(context),
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected
+                ? AppTheme.accentColor(context)
+                : AppTheme.textSecondaryColor(context),
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
       ),
-      side: BorderSide(
-        color: selected
-            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.28)
-            : Theme.of(context).dividerColor,
-      ),
-      backgroundColor: AppTheme.surfaceVariantColor(context),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      showCheckmark: false,
     );
   }
 
@@ -386,87 +383,90 @@ class AppearanceScreen extends ConsumerWidget {
     required bool selected,
     required VoidCallback onTap,
   }) {
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onTap(),
-      selectedColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.16),
-      labelStyle: TextStyle(
-        fontWeight: FontWeight.w600,
-        color: selected
-            ? Theme.of(context).colorScheme.primary
-            : AppTheme.textSecondaryColor(context),
-      ),
-      side: BorderSide(
-        color: selected
-            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.28)
-            : Theme.of(context).dividerColor,
-      ),
-      backgroundColor: AppTheme.surfaceVariantColor(context),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      showCheckmark: false,
-    );
-  }
-
-  Widget _colorChip(
-    BuildContext context, {
-    required Color color,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
       child: Container(
-        width: 40,
-        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(20),
+          color: selected
+              ? AppTheme.accentColor(context).withValues(alpha: 0.1)
+              : Colors.transparent,
           border: Border.all(
             color: selected
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).dividerColor,
-            width: selected ? 2.5 : 1,
+                ? AppTheme.accentColor(context)
+                : AppTheme.dividerColor(context),
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected
+                ? AppTheme.accentColor(context)
+                : AppTheme.textSecondaryColor(context),
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 14,
           ),
         ),
-        child: selected
-            ? Icon(
-                Icons.check_rounded,
-                color: Theme.of(context).colorScheme.primary,
-                size: 20,
-              )
-            : null,
       ),
     );
   }
 
-  void _updateFont(BuildContext context, WidgetRef ref, String fontFamily) {
-    final settings = ref.read(settingsProvider);
-    final activeTheme = ref.read(activeThemeConfigProvider);
-    final updatedTheme = AppThemeConfig(
-      id: activeTheme.id,
-      label: activeTheme.label,
-      accentColor: activeTheme.accentColor,
-      backgroundColor: activeTheme.backgroundColor,
-      icon: activeTheme.icon,
-      description: activeTheme.description,
-      fontFamily: fontFamily,
-    );
-    ref.read(settingsProvider.notifier).updateCustomTheme(updatedTheme);
-  }
+  Widget _backgroundSwatch(
+    BuildContext context, {
+    required String label,
+    required String colorHex,
+    required String? currentColor,
+    required VoidCallback onTap,
+  }) {
+    final color = Color(int.parse(colorHex, radix: 16));
+    final isSelected = (currentColor?.toUpperCase() ?? '') == colorHex.toUpperCase() ||
+                       (currentColor == null && colorHex == AppColors.background.value.toRadixString(16).padLeft(8, '0').toUpperCase()) ||
+                       (currentColor == null && colorHex == AppColors.darkBackground.value.toRadixString(16).padLeft(8, '0').toUpperCase());
 
-  void _updateBackgroundColor(BuildContext context, WidgetRef ref, Color backgroundColor) {
-    final settings = ref.read(settingsProvider);
-    final activeTheme = ref.read(activeThemeConfigProvider);
-    final updatedTheme = AppThemeConfig(
-      id: activeTheme.id,
-      label: activeTheme.label,
-      accentColor: activeTheme.accentColor,
-      backgroundColor: backgroundColor,
-      icon: activeTheme.icon,
-      description: activeTheme.description,
-      fontFamily: activeTheme.fontFamily,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Column(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isSelected ? AppTheme.accentColor(context) : AppTheme.dividerColor(context),
+                width: isSelected ? 2.5 : 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: isSelected
+                ? Icon(
+                    Icons.check,
+                    color: color.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+                    size: 24,
+                  )
+                : null,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              color: isSelected ? AppTheme.accentColor(context) : AppTheme.textSecondaryColor(context),
+            ),
+          ),
+        ],
+      ),
     );
-    ref.read(settingsProvider.notifier).updateCustomTheme(updatedTheme);
   }
 }

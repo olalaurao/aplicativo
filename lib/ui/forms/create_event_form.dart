@@ -91,9 +91,9 @@ class _CreateEventFormState extends ConsumerState<CreateEventForm> {
         actions: [
           if (widget.existingEvent == null)
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.copy_all_rounded,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
               ),
               tooltip: 'Usar Template',
               onPressed: _showTemplatePicker,

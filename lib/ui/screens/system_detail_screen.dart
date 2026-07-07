@@ -229,10 +229,10 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
+                          color: AppTheme.accentColor(context).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.account_tree_rounded, color: AppColors.primary, size: 24),
+                        child: Icon(Icons.account_tree_rounded, color: AppTheme.accentColor(context), size: 24),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -310,7 +310,7 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
                         ? DateFormat('d/M').format(system.lastRun!)
                         : 'Nunca',
                     icon: Icons.calendar_today_rounded,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
                 ],
               ),
@@ -520,8 +520,8 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
                             icon: const Icon(Icons.add_task_rounded, size: 18),
                             label: const Text('Criar Task', style: TextStyle(fontWeight: FontWeight.w600)),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.primary,
-                              side: const BorderSide(color: AppColors.primary),
+                              foregroundColor: AppTheme.accentColor(context),
+                              side: BorderSide(color: AppTheme.accentColor(context)),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                               padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
@@ -538,7 +538,7 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
                               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                             ),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
+                              backgroundColor: AppTheme.accentColor(context),
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -595,7 +595,7 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
                 TextButton(
                   onPressed: () => _showAllHistory(context, history),
                   style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primary,
+                    foregroundColor: AppTheme.accentColor(context),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     minimumSize: const Size(0, 36),
                   ),
@@ -771,7 +771,7 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
       TaskStage.pending => AppColors.warning,
       TaskStage.backlog => AppColors.textMuted,
       TaskStage.idea => AppColors.secondary,
-      TaskStage.todo => AppColors.primary,
+      TaskStage.todo => AppTheme.accentColor(context),
     };
 
     return Container(

@@ -42,13 +42,13 @@ class TrackersScreen extends ConsumerWidget {
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
+                            color: AppTheme.accentColor(context).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.add_rounded,
                             size: 20,
-                            color: AppColors.primary,
+                            color: AppTheme.accentColor(context),
                           ),
                         ),
                         onPressed: () {
@@ -266,8 +266,8 @@ class TrackersScreen extends ConsumerWidget {
                                 fontSize: 10, color: AppTheme.textMutedColor(context)), maxLines: 1,
                                 overflow: TextOverflow.ellipsis)),
                               Text(firstField.value.toString(),
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
-                                  color: AppColors.primary)),
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
+                                  color: AppTheme.accentColor(context))),
                               const SizedBox(width: 6),
                               Text(DateFormat('d/M').format(last!.date),
                                 style: TextStyle(fontSize: 10, color: AppTheme.textMutedColor(context))),

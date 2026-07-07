@@ -14,7 +14,6 @@ import '../widgets/rich_text_editor.dart';
 import '../theme.dart';
 import '../widgets/organizer_picker_modal.dart';
 import 'package:go_router/go_router.dart';
-import '../../models/mood_model.dart';
 import '../widgets/mood_picker_sheet.dart';
 
 class CreateEntryForm extends ConsumerStatefulWidget {
@@ -213,11 +212,11 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
                   const Spacer(),
                   TextButton(
                     onPressed: _content.isEmpty ? null : _saveEntry,
-                    child: const Text(
+                    child: Text(
                       'Save',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
+                        color: AppTheme.accentColor(context),
                       ),
                     ),
                   ),
@@ -372,11 +371,11 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isActive
-              ? AppColors.primary.withValues(alpha: 0.1)
+              ? AppTheme.accentColor(context).withValues(alpha: 0.1)
               : AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isActive ? AppColors.primary : Colors.transparent,
+            color: isActive ? AppTheme.accentColor(context) : Colors.transparent,
           ),
         ),
         child: Row(
@@ -385,7 +384,7 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
             Icon(
               icon,
               size: 16,
-              color: isActive ? AppColors.primary : AppColors.textSecondary,
+              color: isActive ? AppTheme.accentColor(context) : AppColors.textSecondary,
             ),
             const SizedBox(width: 6),
             Text(
@@ -393,7 +392,7 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: isActive ? AppColors.primary : AppColors.textSecondary,
+                color: isActive ? AppTheme.accentColor(context) : AppColors.textSecondary,
               ),
             ),
           ],

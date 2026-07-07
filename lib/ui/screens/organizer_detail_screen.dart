@@ -152,7 +152,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
     );
     final color = widget.organizer.color != null
         ? _parseColor(widget.organizer.color!)
-        : AppColors.primary;
+        : AppTheme.accentColor(context);
 
     final allItems = associatedItemsAsync.valueOrNull ?? [];
     final outgoingItems = ref.watch(
@@ -332,7 +332,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
                 ),
                 indicatorSize: TabBarIndicatorSize.tab,
                 dividerColor: Colors.transparent,
-                labelColor: AppColors.primary,
+                labelColor: AppTheme.accentColor(context),
                 unselectedLabelColor: AppColors.textMuted,
                 labelStyle: const TextStyle(
                   fontSize: 13,
@@ -613,7 +613,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
                 selected: _selectedPeriod == period.$1,
                 showCheckmark: false,
                 side: BorderSide.none,
-                selectedColor: AppColors.accent,
+                selectedColor: AppTheme.accentColor(context),
                 backgroundColor: AppColors.surfaceVariant,
                 labelStyle: TextStyle(
                   color: _selectedPeriod == period.$1
@@ -837,7 +837,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         final item = children[index];
         final itemColor = item.color != null
             ? _parseColor(item.color!)
-            : AppColors.primary;
+            : AppTheme.accentColor(context);
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
@@ -1103,6 +1103,10 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         return Icons.loop_rounded;
       case OrganizerType.tracker:
         return Icons.analytics_outlined;
+      case OrganizerType.dayTheme:
+        return Icons.wb_sunny_outlined;
+      case OrganizerType.timeBlock:
+        return Icons.timer_outlined;
     }
   }
 
@@ -1157,9 +1161,9 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
       case 'entry':
         return AppColors.habitPurple;
       case 'event':
-        return AppColors.primary;
+        return AppTheme.accentColor(context);
       case 'area':
-        return AppColors.primary;
+        return AppTheme.accentColor(context);
       case 'project':
         return AppColors.priorityHigh;
       case 'activity':
@@ -1171,7 +1175,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
       case 'reminder':
         return AppColors.textMuted;
       case 'system':
-        return AppColors.primary;
+        return AppTheme.accentColor(context);
       case 'social_post':
         return AppColors.habitPink;
       default:
@@ -1218,7 +1222,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
     try {
       return Color(int.parse(hex.replaceAll('#', '0xFF')));
     } catch (_) {
-      return AppColors.primary;
+      return AppTheme.accentColor(context);
     }
   }
 
@@ -1346,7 +1350,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
             chipButton(
               label: 'Projeto',
               icon: Icons.folder_outlined,
-              color: AppColors.primary,
+              color: AppTheme.accentColor(context),
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(

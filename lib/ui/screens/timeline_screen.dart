@@ -175,21 +175,21 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
                   selected: _activeFilter == f,
                   onSelected: (val) => setState(() => _activeFilter = f),
                   backgroundColor: Colors.transparent,
-                  selectedColor: AppColors.primary.withValues(alpha: 0.1),
+                  selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.1),
                   labelStyle: TextStyle(
                     fontSize: 12,
                     fontWeight: _activeFilter == f
                         ? FontWeight.w700
                         : FontWeight.w500,
                     color: _activeFilter == f
-                        ? AppColors.primary
+                        ? AppTheme.accentColor(context)
                         : AppColors.textSecondary,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                     side: BorderSide(
                       color: _activeFilter == f
-                          ? AppColors.primary
+                          ? AppTheme.accentColor(context)
                           : AppColors.divider,
                     ),
                   ),
@@ -316,9 +316,9 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.1),
+        color: AppTheme.accentColor(context).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+        border: Border.all(color: AppTheme.accentColor(context).withValues(alpha: 0.16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -331,10 +331,10 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
               ),
             ),
           ),
@@ -378,7 +378,7 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
       color = AppColors.habitGreen;
     } else if (item is Project) {
       icon = Icons.folder_copy_rounded;
-      color = AppColors.primary;
+      color = AppTheme.accentColor(context);
     } else if (item is Person) {
       icon = Icons.person_rounded;
       color = AppColors.info;

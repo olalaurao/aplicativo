@@ -106,7 +106,7 @@ class _CreatePmnFormState extends ConsumerState<CreatePmnForm> {
         actions: [
           TextButton(
             onPressed: _savePmn,
-            child: const Text('Save', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+            child: Text('Save', style: TextStyle(color: AppTheme.accentColor(context), fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -123,7 +123,7 @@ class _CreatePmnFormState extends ConsumerState<CreatePmnForm> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.calendar_today, color: AppColors.primary),
+                  Icon(Icons.calendar_today, color: AppTheme.accentColor(context)),
                   const SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

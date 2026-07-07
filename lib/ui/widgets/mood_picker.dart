@@ -151,9 +151,9 @@ class _MoodPickerState extends ConsumerState<MoodPicker> {
                       )
                     : null,
                 selected: isSelected,
-                selectedColor: AppColors.primary,
+                selectedColor: AppTheme.accentColor(context),
                 trailing: isSelected
-                    ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
+                    ? Icon(Icons.check_circle_rounded, color: AppTheme.accentColor(context))
                     : null,
                 onTap: () {
                   ref.read(moodsProvider.notifier).ensureMoodFileExists(mood.id);

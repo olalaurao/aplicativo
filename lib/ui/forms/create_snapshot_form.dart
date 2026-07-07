@@ -131,7 +131,7 @@ class _CreateSnapshotFormState extends ConsumerState<CreateSnapshotForm> {
                   )
                 : const Icon(Icons.check_rounded),
             label: const Text('Save Snapshot'),
-            style: AppTheme.primaryButtonStyle,
+            style: AppTheme.primaryButtonStyle(AppTheme.accentColor(context)),
           ),
         ],
       ),

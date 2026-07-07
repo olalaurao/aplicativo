@@ -56,10 +56,10 @@ class TypeSignaturesScreen extends ConsumerWidget {
                 ],
               ),
               trailing: IconButton(
-                icon: const Icon(
+                icon: Icon(
                   Icons.edit_rounded,
                   size: 20,
-                  color: AppColors.primary,
+                  color: AppTheme.accentColor(context),
                 ),
                 onPressed: () => _showEditDialog(context, ref, notifier, sig),
               ),

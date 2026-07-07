@@ -211,7 +211,7 @@ class JournalBodyView extends ConsumerWidget {
               child: Text(
                 linkText,
                 style: style.copyWith(
-                  color: AppColors.primary,
+                  color: AppTheme.accentColor(context),
                   fontWeight: FontWeight.w700,
                   decoration: TextDecoration.underline,
                 ),
@@ -428,10 +428,10 @@ class _EmbeddedMedia extends ConsumerWidget {
     final ext = normalized.split('.').last.toLowerCase();
     final isImage = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}.contains(ext);
     if (!isImage) {
-      return const _MediaPill(
+      return _MediaPill(
         label: 'Anexo',
         icon: Icons.attachment_rounded,
-        color: AppColors.primary,
+        color: AppTheme.accentColor(context),
       );
     }
 

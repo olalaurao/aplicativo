@@ -32,12 +32,15 @@ abstract final class ObjectTypes {
   static const String activity     = 'activity';
   static const String label        = 'label';
   static const String person       = 'person';
+  static const String dayTheme     = 'day_theme';
+  static const String timeBlock    = 'time_block';
 
   /// All canonical types in insertion order.
   static const List<String> all = [
     task, habit, tracker, goal, note, entry, event, reminder, system,
     socialPost, moodDef, idea, inbox, shoppingList, template, dailyNote,
     analysis, wellbeingIndicator, area, project, activity, label, person,
+    dayTheme, timeBlock,
   ];
 
   /// Returns true if [type] is a known canonical type string.
@@ -51,17 +54,20 @@ class TypeSignature {
   final String objectType;
   final MarkerType markerType;
   final String markerValue;
+  final String emoji;
 
   TypeSignature({
     required this.objectType,
     required this.markerType,
     required this.markerValue,
+    this.emoji = '',
   });
 
   Map<String, dynamic> toMap() => {
     'objectType': objectType,
     'markerType': markerType.name,
     'markerValue': markerValue,
+    'emoji': emoji,
   };
 
   factory TypeSignature.fromMap(Map<String, dynamic> map) => TypeSignature(
@@ -71,6 +77,7 @@ class TypeSignature {
       orElse: () => MarkerType.property,
     ),
     markerValue: map['markerValue'] ?? '',
+    emoji: map['emoji'] ?? '',
   );
 }
 

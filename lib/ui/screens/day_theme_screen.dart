@@ -34,13 +34,13 @@ class DayThemeScreen extends ConsumerWidget {
               ],
             ),
           ],
-          bottom: const TabBar(
+          bottom: TabBar(
             tabs: [
               Tab(text: 'Themes', icon: Icon(Icons.wb_sunny_outlined)),
               Tab(text: 'Blocks', icon: Icon(Icons.view_day_outlined)),
             ],
-            indicatorColor: AppColors.primary,
-            labelColor: AppColors.primary,
+            indicatorColor: AppTheme.accentColor(context),
+            labelColor: AppTheme.accentColor(context),
           ),
         ),
         body: TabBarView(
@@ -63,8 +63,8 @@ class DayThemeScreen extends ConsumerWidget {
                     icon: const Icon(Icons.add_rounded, size: 16),
                     label: const Text('Novo Tema do Dia'),
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
-                      foregroundColor: AppColors.primary,
+                      side: BorderSide(color: AppTheme.accentColor(context).withValues(alpha: 0.4)),
+                      foregroundColor: AppTheme.accentColor(context),
                     ),
                     onPressed: () => _showThemeDialog(context, ref),
                   ),
@@ -111,8 +111,8 @@ class DayThemeScreen extends ConsumerWidget {
                     icon: const Icon(Icons.add_rounded, size: 16),
                     label: const Text('Novo Bloco de Tempo'),
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
-                      foregroundColor: AppColors.primary,
+                      side: BorderSide(color: AppTheme.accentColor(context).withValues(alpha: 0.4)),
+                      foregroundColor: AppTheme.accentColor(context),
                     ),
                     onPressed: () => _showBlockDialog(context, ref),
                   ),
@@ -144,7 +144,7 @@ class DayThemeScreen extends ConsumerWidget {
   Widget _buildBlockTile(BuildContext context, WidgetRef ref, TimeBlock block, int reorderIndex) {
     final color = AppColorPicker.parseHex(
       block.color ?? '#FFB000',
-      fallback: AppColors.accent,
+      fallback: AppTheme.accentColor(context),
     );
     final rangeText = block.timeRanges.isEmpty
         ? 'Sem horário definido'
@@ -221,7 +221,7 @@ class DayThemeScreen extends ConsumerWidget {
   ) {
     final themeColor = AppColorPicker.parseHex(
       theme.color ?? '#FFB000',
-      fallback: AppColors.accent,
+      fallback: AppTheme.accentColor(context),
     );
     final blockTitles = blocks
         .where((block) => theme.blockIds.contains(block.id))

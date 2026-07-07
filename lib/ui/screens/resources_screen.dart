@@ -346,7 +346,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
             color: selected
-                ? AppColors.primary
+                ? AppTheme.accentColor(context)
                 : AppTheme.surfaceVariantColor(context),
             borderRadius: BorderRadius.circular(20),
           ),
@@ -376,9 +376,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.08),
+        color: AppTheme.accentColor(context).withValues(alpha: 0.08),
         border: Border(
-          bottom: BorderSide(color: AppColors.primary.withValues(alpha: 0.2)),
+          bottom: BorderSide(color: AppTheme.accentColor(context).withValues(alpha: 0.2)),
         ),
       ),
       child: SingleChildScrollView(
@@ -404,21 +404,21 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.15),
+          color: AppTheme.accentColor(context).withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+          border: Border.all(color: AppTheme.accentColor(context).withValues(alpha: 0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: AppColors.primary),
+            Icon(icon, size: 14, color: AppTheme.accentColor(context)),
             const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
               ),
             ),
           ],
@@ -477,7 +477,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: List.generate(5, (i) => IconButton(
-                icon: Icon(Icons.star_rounded, size: 32, color: AppColors.warning),
+                icon: const Icon(Icons.star_rounded, size: 32, color: AppColors.warning),
                 onPressed: () async {
                   final resources = ref.read(resourcesProvider);
                   final selectedResources = resources.where((r) => _selectedIds.contains(r.id)).toList();
@@ -842,7 +842,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
 
   Color _resourceColor(Resource r) => switch (r.mediaType.toLowerCase()) {
     'podcast' => AppColors.info,
-    'book' || 'livro' => AppColors.primary,
+    'book' || 'livro' => AppTheme.accentColor(context),
     _ => AppColors.habitPurple,
   };
 
@@ -880,10 +880,10 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : null,
+          color: isSelected ? AppTheme.accentColor(context).withValues(alpha: 0.1) : null,
           borderRadius: BorderRadius.circular(12),
           border: isSelected
-              ? Border.all(color: AppColors.primary, width: 2)
+              ? Border.all(color: AppTheme.accentColor(context), width: 2)
               : null,
         ),
         child: ListTile(
@@ -918,7 +918,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                     ),
                     child: Icon(
                       isSelected ? Icons.check_circle : Icons.circle_outlined,
-                      color: isSelected ? AppColors.primary : Colors.white,
+                      color: isSelected ? AppTheme.accentColor(context) : Colors.white,
                       size: 18,
                     ),
                   ),
@@ -986,10 +986,10 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : null,
+          color: isSelected ? AppTheme.accentColor(context).withValues(alpha: 0.1) : null,
           borderRadius: BorderRadius.circular(12),
           border: isSelected
-              ? Border.all(color: AppColors.primary, width: 2)
+              ? Border.all(color: AppTheme.accentColor(context), width: 2)
               : null,
         ),
         clipBehavior: Clip.antiAlias,
@@ -1021,7 +1021,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                             ),
                             child: Icon(
                               isSelected ? Icons.check_circle : Icons.circle_outlined,
-                              color: isSelected ? AppColors.primary : Colors.white,
+                              color: isSelected ? AppTheme.accentColor(context) : Colors.white,
                               size: 20,
                             ),
                           ),
@@ -1122,7 +1122,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
           resource.category!,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 9,
             color: AppColors.info,
           ),

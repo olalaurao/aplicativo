@@ -261,7 +261,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                                   elevation: 0,
                                   selectedFontSize: 10,
                                   unselectedFontSize: 10,
-                                  selectedItemColor: AppColors.accent,
+                                  selectedItemColor: AppTheme.accentColor(context),
                                   unselectedItemColor: AppColors.textMuted,
                                   items: bottomBarItems.map((item) {
                                     final iconWidget = Icon(
@@ -402,7 +402,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      gradient: AppTheme.primaryGradient,
+                      gradient: AppTheme.primaryGradient(context),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -432,7 +432,7 @@ class _AppShellState extends ConsumerState<AppShell> {
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  gradient: AppTheme.primaryGradient,
+                  gradient: AppTheme.primaryGradient(context),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -457,11 +457,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                         horizontal: 16,
                       ),
                       decoration: BoxDecoration(
-                        gradient: AppTheme.primaryGradient,
+                        gradient: AppTheme.primaryGradient(context),
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.3),
+                            color: AppTheme.accentColor(context).withValues(alpha: 0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
@@ -491,7 +491,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                     onPressed: () => showCreateMenu(context),
                     icon: const Icon(Icons.add_rounded),
                     style: IconButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: AppTheme.accentColor(context),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.all(12),
                     ),
@@ -531,7 +531,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
                 final iconWidget = Icon(
                   isSelected ? item.activeIcon : item.icon,
-                  color: isSelected ? AppColors.accent : AppColors.textMuted,
+                  color: isSelected ? AppTheme.accentColor(context) : AppColors.textMuted,
                   size: 24,
                 );
 
@@ -547,7 +547,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                       ),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? AppColors.primary.withValues(alpha: 0.1)
+                            ? AppTheme.accentColor(context).withValues(alpha: 0.1)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -574,7 +574,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                                       ? FontWeight.w600
                                       : FontWeight.normal,
                                   color: isSelected
-                                      ? AppColors.accent
+                                      ? AppTheme.accentColor(context)
                                       : AppColors.textPrimary,
                                 ),
                               ),
@@ -586,7 +586,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppColors.accent,
+                                  color: AppTheme.accentColor(context),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
@@ -661,9 +661,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       backgroundColor: isDark ? AppColors.darkSurface : AppColors.surface,
       child: Column(
         children: [
-          const DrawerHeader(
-            decoration: BoxDecoration(gradient: AppTheme.primaryGradient),
-            child: Center(
+          DrawerHeader(
+            decoration: BoxDecoration(gradient: AppTheme.primaryGradient(context)),
+            child: const Center(
               child: Text(
                 'History',
                 style: TextStyle(

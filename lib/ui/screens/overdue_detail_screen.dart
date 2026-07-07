@@ -508,12 +508,12 @@ class _ActionButton extends StatelessWidget {
       icon: Icon(icon, size: 16),
       label: Text(label),
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-        foregroundColor: AppColors.primary,
+        backgroundColor: AppTheme.accentColor(context).withValues(alpha: 0.1),
+        foregroundColor: AppTheme.accentColor(context),
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+          side: BorderSide(color: AppTheme.accentColor(context).withValues(alpha: 0.3)),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         minimumSize: Size.zero,

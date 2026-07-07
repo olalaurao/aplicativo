@@ -92,9 +92,9 @@ class SchedulerManagementScreen extends ConsumerWidget {
                       ),
                     ),
                     trailing: IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.edit_calendar_rounded,
-                        color: AppColors.primary,
+                        color: AppTheme.accentColor(context),
                       ),
                       onPressed: () =>
                           _editScheduler(context, ref, obj, scheduler),

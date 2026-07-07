@@ -131,7 +131,7 @@ class _SocialNativeVideoPlayerState extends State<SocialNativeVideoPlayer> {
               _controller,
               allowScrubbing: true,
               colors: VideoProgressColors(
-                playedColor: AppColors.primary,
+                playedColor: AppTheme.accentColor(context),
                 bufferedColor: Colors.white.withValues(alpha: 0.35),
                 backgroundColor: Colors.white.withValues(alpha: 0.18),
               ),

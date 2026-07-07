@@ -75,7 +75,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                 children: [
                   Icon(
                     PhosphorIcons.calendarBlank(),
-                    color: AppColors.accent,
+                    color: AppTheme.accentColor(context),
                     size: 18,
                   ),
                   const SizedBox(width: 8),
@@ -207,7 +207,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? AppColors.accent.withValues(alpha: 0.12)
+                        ? AppTheme.accentColor(context).withValues(alpha: 0.12)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -233,7 +233,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                               ? FontWeight.w800
                               : FontWeight.w600,
                           color: isSelected
-                              ? AppColors.accent
+                              ? AppTheme.accentColor(context)
                               : AppTheme.textPrimaryColor(context),
                         ),
                       ),
@@ -241,7 +241,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          if (dayTasks.isNotEmpty) _weekDot(AppColors.accent),
+                          if (dayTasks.isNotEmpty) _weekDot(AppTheme.accentColor(context)),
                           if (dayTasks.length > 1) _weekDot(AppColors.error),
                           if (hasHabits) _weekDot(AppColors.secondary),
                         ],
@@ -525,7 +525,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
-            Icon(_habitIcon(habit), size: 19, color: AppColors.accent),
+            Icon(_habitIcon(habit), size: 19, color: AppTheme.accentColor(context)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

@@ -25,11 +25,11 @@ class MetadataStrip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: chip.isActive
-              ? AppColors.primary.withValues(alpha: 0.1)
+              ? AppTheme.accentColor(context).withValues(alpha: 0.1)
               : AppColors.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: chip.isActive ? AppColors.primary : AppColors.divider,
+            color: chip.isActive ? AppTheme.accentColor(context) : AppColors.divider,
             width: 1,
           ),
         ),
@@ -39,7 +39,7 @@ class MetadataStrip extends StatelessWidget {
               chip.icon,
               size: 16,
               color: chip.isActive
-                  ? AppColors.primary
+                  ? AppTheme.accentColor(context)
                   : AppColors.textSecondary,
             ),
             const SizedBox(width: 8),
@@ -48,7 +48,7 @@ class MetadataStrip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 color: chip.isActive
-                    ? AppColors.primary
+                    ? AppTheme.accentColor(context)
                     : AppColors.textSecondary,
                 fontWeight: chip.isActive ? FontWeight.w600 : FontWeight.w400,
               ),

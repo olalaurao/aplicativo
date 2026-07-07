@@ -12,7 +12,9 @@ enum OrganizerType {
   habit,
   tracker,
   label,
-  person
+  person,
+  dayTheme,
+  timeBlock
 }
 
 class Organizer extends ContentObject {

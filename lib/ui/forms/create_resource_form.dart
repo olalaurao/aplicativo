@@ -420,10 +420,10 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
         DropdownButton<String>(
           value: _resourceType,
           underline: const SizedBox(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppColors.primary,
+            color: AppTheme.accentColor(context),
           ),
           onChanged: (val) => setState(() => _resourceType = val!),
           items: types
@@ -457,10 +457,10 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
         DropdownButton<ResourcePriority>(
           value: _priority,
           underline: const SizedBox(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppColors.primary,
+            color: AppTheme.accentColor(context),
           ),
           onChanged: (val) => setState(() => _priority = val!),
           items: ResourcePriority.values
@@ -487,10 +487,10 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
         DropdownButton<ResourceStatus>(
           value: _status,
           underline: const SizedBox(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppColors.primary,
+            color: AppTheme.accentColor(context),
           ),
           onChanged: (val) => setState(() => _status = val!),
           items: ResourceStatus.values
@@ -553,10 +553,10 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
             controller: controller,
             textAlign: TextAlign.end,
             keyboardType: keyboardType,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.primary,
+              color: AppTheme.accentColor(context),
             ),
             decoration: InputDecoration(
               hintText: hint,
@@ -575,9 +575,9 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.08),
+        color: AppTheme.accentColor(context).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+        border: Border.all(color: AppTheme.accentColor(context).withValues(alpha: 0.16)),
       ),
       child: Row(
         children: [
@@ -598,12 +598,12 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
               height: 56,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.12),
+                color: AppTheme.accentColor(context).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.auto_awesome_rounded,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
               ),
             ),
           const SizedBox(width: 12),
@@ -659,10 +659,10 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
             _readDate != null
                 ? "${_readDate!.day}/${_readDate!.month}/${_readDate!.year}"
                 : 'Select Date',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.primary,
+              color: AppTheme.accentColor(context),
             ),
           ),
         ),

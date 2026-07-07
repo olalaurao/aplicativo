@@ -219,7 +219,7 @@ class SyncManager {
       final remoteFile = (await driveSync.fetchRemoteFiles())
           .where((file) => file.name == relativePath)
           .firstOrNull;
-      final remoteHash = remoteFile?.appProperties?['citrine_hash'];
+      final remoteHash = remoteFile?.appProperties?['Quartzo_hash'];
       final localChanged = baseHash != null && localHash != baseHash;
       final remoteChanged =
           baseHash != null && remoteHash != null && remoteHash != baseHash;
@@ -323,7 +323,7 @@ class SyncManager {
         continue;
       }
 
-      final remoteHash = remoteFile.appProperties?['citrine_hash'];
+      final remoteHash = remoteFile.appProperties?['Quartzo_hash'];
       if (remoteHash == localHash) {
         await queue.upsertFileSyncState(
           relativePath: relPath,

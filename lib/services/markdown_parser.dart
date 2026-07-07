@@ -618,9 +618,7 @@ class MarkdownParser {
             ? int.tryParse(energyMatch.group(1)!)
             : null;
         // F3.15: Clamp energy value to 0-10 range
-        final clampedEnergyValue = energyValue != null
-            ? energyValue.clamp(0, 10)
-            : null;
+        final clampedEnergyValue = energyValue?.clamp(0, 10);
 
         final hashtags = extractTags(entryBody);
 

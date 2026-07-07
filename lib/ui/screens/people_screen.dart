@@ -167,7 +167,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
           style: TextStyle(fontSize: 12, color: urgencyColor, fontWeight: FontWeight.w600)),
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
           _contactActionWidget(person, Icons.chat_bubble_outline_rounded,
-              AppColors.primary, _ContactType.sms),
+              AppTheme.accentColor(context), _ContactType.sms),
           const SizedBox(width: 6),
           _contactActionWidget(person, Icons.call_outlined,
               AppColors.habitGreen, _ContactType.call),
@@ -225,7 +225,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
             const SizedBox(height: 10),
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               _contactActionWidget(person, Icons.chat_bubble_outline_rounded,
-                  AppColors.primary, _ContactType.sms),
+                  AppTheme.accentColor(context), _ContactType.sms),
               const SizedBox(width: 8),
               _contactActionWidget(person, Icons.call_outlined,
                   AppColors.habitGreen, _ContactType.call),

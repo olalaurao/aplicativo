@@ -8,7 +8,6 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/task_model.dart';
 import '../../models/note_model.dart';
-import '../../models/saved_filter.dart';
 import '../../models/habit_model.dart';
 import '../../services/undo_service.dart';
 import '../theme.dart';
@@ -150,7 +149,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
           (viewport / 3);
       
       final currentScrollOffset = _scrollController.offset;
-      final threshold = 100.0;
+      const threshold = 100.0;
       
       setState(() {
         _showJumpToNowFab = (currentScrollOffset - currentOffset).abs() > threshold;
@@ -353,7 +352,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                       fontWeight: FontWeight.w500,
                       color:
                           _parsePlannerColor(activeTheme.color) ??
-                          AppColors.primary,
+                          AppTheme.accentColor(context),
                     ),
                   ),
               ],
@@ -361,7 +360,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             pinned: true,
             actions: [
               IconButton(
-                icon: const Icon(Icons.inbox_rounded, color: AppColors.primary),
+                icon: Icon(Icons.inbox_rounded, color: AppTheme.accentColor(context)),
                 tooltip: 'Backlog / Sem data',
                 onPressed: () => setState(() => _showBacklogPanel = !_showBacklogPanel),
               ),
@@ -394,7 +393,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                   onPressed: () => setState(() => _isTimeline = !_isTimeline),
                 ),
               IconButton(
-                icon: const Icon(Icons.today_rounded, color: AppColors.primary),
+                icon: Icon(Icons.today_rounded, color: AppTheme.accentColor(context)),
                 onPressed: () {
                   setState(() {
                     _selectedDate = DateTime.now();
@@ -431,9 +430,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
 
           if (_viewMode == 0) ...[
             if (_isSameDay(_selectedDate, DateTime.now()) && _showOverdue)
-              SliverToBoxAdapter(
+              const SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
                   child: OverdueSection(),
                 ),
               ),
@@ -587,7 +586,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
               onPressed: () => _scrollToNow(animate: true),
               icon: const Icon(Icons.access_time_rounded),
               label: const Text('Jump to now'),
-              backgroundColor: AppColors.accent,
+              backgroundColor: AppTheme.accentColor(context),
             )
           : null,
     );
@@ -849,10 +848,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 (_) => _scrollToNow(animate: true),
               );
             },
-            child: const Text(
+            child: Text(
               'Hoje',
               style: TextStyle(
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
@@ -884,7 +883,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            const Icon(
               Icons.warning_amber_rounded,
               color: AppColors.error,
               size: 16,
@@ -1230,10 +1229,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     return GestureDetector(
       onTap: () {}, // Absorbs the tap so ExpansionTile doesn't toggle
       child: PopupMenuButton<String>(
-        icon: const Icon(
+        icon: Icon(
           Icons.add_circle_outline_rounded,
           size: 20,
-          color: AppColors.primary,
+          color: AppTheme.accentColor(context),
         ),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(),
@@ -1255,25 +1254,25 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
           }
         },
         itemBuilder: (context) => [
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'task',
             child: Row(
               children: [
                 Icon(
                   Icons.check_circle_outline_rounded,
                   size: 18,
-                  color: AppColors.primary,
+                  color: AppTheme.accentColor(context),
                 ),
                 SizedBox(width: 8),
                 Text('Criar Tarefa'),
               ],
             ),
           ),
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'habit',
             child: Row(
               children: [
-                Icon(Icons.loop_rounded, size: 18, color: AppColors.primary),
+                Icon(Icons.loop_rounded, size: 18, color: AppTheme.accentColor(context)),
                 SizedBox(width: 8),
                 Text('Criar Hábito'),
               ],
@@ -1298,10 +1297,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
           tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
           title: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.wb_sunny_rounded,
                 size: 18,
-                color: AppColors.accent,
+                color: AppTheme.accentColor(context),
               ),
               const SizedBox(width: 8),
               const Expanded(
@@ -1405,10 +1404,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
           tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
           title: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.view_day_rounded,
                 size: 18,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -1610,7 +1609,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
           padding: const EdgeInsets.all(16),
           decoration: AppTheme.cardDecoration(
             context,
-          ).copyWith(color: AppColors.primary.withValues(alpha: 0.9)),
+          ).copyWith(color: AppTheme.accentColor(context).withValues(alpha: 0.9)),
           child: Text(
             task.title,
             style: const TextStyle(
@@ -1758,7 +1757,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                         Icon(
                           Icons.access_time_rounded,
                           size: 14,
-                          color: AppColors.primary.withValues(alpha: 0.8),
+                          color: AppTheme.accentColor(context).withValues(alpha: 0.8),
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -1766,7 +1765,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.primary.withValues(alpha: 0.8),
+                            color: AppTheme.accentColor(context).withValues(alpha: 0.8),
                           ),
                         ),
                       ],
@@ -1785,10 +1784,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                   ),
                 ),
                 if (task.untilDone)
-                  const Icon(
+                  Icon(
                     Icons.all_inclusive_rounded,
                     size: 14,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
               ],
             ),
@@ -2192,6 +2191,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       habits: habits,
       pomodoroSessions: pomodoroSessions,
       googleEvents: events,
+      reminders: const [],
     );
 
     return SliverPadding(
@@ -2414,11 +2414,11 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   color: isToday
-                      ? AppColors.primary.withValues(alpha: 0.1)
+                      ? AppTheme.accentColor(context).withValues(alpha: 0.1)
                       : AppColors.surfaceVariant,
                   borderRadius: BorderRadius.circular(12),
                   border: isToday
-                      ? Border.all(color: AppColors.primary, width: 2)
+                      ? Border.all(color: AppTheme.accentColor(context), width: 2)
                       : null,
                 ),
                 child: Column(
@@ -2430,7 +2430,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                         fontSize: 14,
                         fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
                         color: isToday
-                            ? AppColors.primary
+                            ? AppTheme.accentColor(context)
                             : AppColors.textPrimary,
                       ),
                     ),
@@ -2840,7 +2840,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                   Navigator.pop(ctx);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: AppTheme.accentColor(context),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(

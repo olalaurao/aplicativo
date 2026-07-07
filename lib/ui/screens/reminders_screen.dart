@@ -111,7 +111,7 @@ class _ReminderList extends ConsumerWidget {
                         : Icons.check_circle_outline_rounded,
                     color: reminder.isCompleted
                         ? AppColors.textMuted
-                        : AppColors.primary,
+                        : AppTheme.accentColor(context),
                   ),
                   onPressed: () {
                     reminder.isCompleted = !reminder.isCompleted;

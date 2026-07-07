@@ -213,7 +213,7 @@ class _ReminderConfigSheetState extends State<ReminderConfigSheet> {
               child: ElevatedButton(
                 onPressed: _save,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: AppTheme.accentColor(context),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -257,7 +257,7 @@ class _ReminderConfigSheetState extends State<ReminderConfigSheet> {
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   color: selected
-                      ? AppColors.primary
+                      ? AppTheme.accentColor(context)
                       : AppTheme.surfaceVariantColor(context),
                   borderRadius: BorderRadius.circular(20),
                 ),
@@ -539,7 +539,7 @@ class _ReminderConfigSheetState extends State<ReminderConfigSheet> {
         ),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: AppColors.primary),
+            Icon(icon, size: 18, color: AppTheme.accentColor(context)),
             const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -573,7 +573,7 @@ class _ReminderConfigSheetState extends State<ReminderConfigSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : AppColors.surfaceVariant,
+          color: isSelected ? AppTheme.accentColor(context) : AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(

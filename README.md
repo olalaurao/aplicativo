@@ -1,4 +1,4 @@
-# Citrine
+# Quartzo
 
 A Obsidian-linked productivity application.
 

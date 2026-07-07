@@ -130,25 +130,33 @@ class MoodSettingsScreen extends ConsumerWidget {
                 _openMoodForm(context, ref, mood);
               }
             : null,
-        onDelete: mood.source == MoodSource.user
-            ? () async {
+        onDelete: () async {
                 final confirmed = await _confirmDeleteMood(sheetContext, mood);
                 if (confirmed != true) return;
                 await ref.read(moodsProvider.notifier).deleteMood(mood);
                 if (sheetContext.mounted) Navigator.pop(sheetContext);
-              }
-            : null,
+              },
       ),
     );
   }
 
   Future<bool?> _confirmDeleteMood(BuildContext context, MoodDefinition mood) {
+    final isSystem = mood.source == MoodSource.system;
     return showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Delete ${mood.label}?'),
-        content: const Text(
-          "Historical records are preserved, but this mood won't appear in the picker.",
+        icon: isSystem
+            ? const Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 32)
+            : null,
+        title: Text('Delete "${mood.label}"?'),
+        content: Text(
+          isSystem
+              ? 'This is a built-in system mood. Deleting it is permanent — '
+                'it will not be restored automatically.\n\n'
+                'Past journal entries that used this mood will keep their record, '
+                'but the mood will no longer appear anywhere in the app.\n\n'
+                'Tip: you can just hide it instead of deleting.'
+              : "Historical records are preserved, but this mood won't appear in the picker anymore.",
         ),
         actions: [
           TextButton(
@@ -766,7 +774,7 @@ class _MoodFormScreenState extends ConsumerState<_MoodFormScreen> {
           padding: const EdgeInsets.all(20),
           child: FilledButton(
             onPressed: canSave ? _save : null,
-            style: AppTheme.primaryButtonStyle,
+            style: AppTheme.primaryButtonStyle(AppTheme.accentColor(context)),
             child: const Text('Save'),
           ),
         ),
@@ -1154,7 +1162,7 @@ class _MoodEmptyState extends StatelessWidget {
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: onAdd,
-              style: AppTheme.primaryButtonStyle,
+              style: AppTheme.primaryButtonStyle(AppTheme.accentColor(context)),
               icon: const Icon(Icons.add_rounded),
               label: const Text('Add mood'),
             ),

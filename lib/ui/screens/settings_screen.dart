@@ -86,13 +86,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       width: 34,
                       height: 34,
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.10),
+                        color: AppTheme.accentColor(context).withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.person_outline_rounded,
                         size: 18,
-                        color: AppColors.primary,
+                        color: AppTheme.accentColor(context),
                       ),
                     ),
                     title: const Text(
@@ -137,10 +137,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               : settings.vaultPath,
                           style: const TextStyle(fontSize: 12),
                         ),
-                        trailing: const Icon(
+                        trailing: Icon(
                           Icons.folder_open_rounded,
                           size: 20,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                         ),
                         onTap: () async {
                           String? result = await FilePicker.platform
@@ -195,10 +195,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           'Seleciona uma pasta existente e indexa os arquivos compatíveis.',
                           style: TextStyle(fontSize: 12),
                         ),
-                        trailing: const Icon(
+                        trailing: Icon(
                           Icons.drive_folder_upload_rounded,
                           size: 20,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                         ),
                         onTap: () => Navigator.push(
                           context,
@@ -220,10 +220,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           'Importa posts sociais a partir de uma lista de links.',
                           style: TextStyle(fontSize: 12),
                         ),
-                        trailing: const Icon(
+                        trailing: Icon(
                           Icons.playlist_add_rounded,
                           size: 20,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                         ),
                         onTap: () => Navigator.push(
                           context,
@@ -249,10 +249,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        trailing: const Icon(
+                        trailing: Icon(
                           Icons.video_settings_rounded,
                           size: 20,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                         ),
                         onTap: () => _showTikTokResolverDialog(
                           context,
@@ -410,10 +410,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           : 'Configured',
                       style: const TextStyle(fontSize: 12),
                     ),
-                    trailing: const Icon(
+                    trailing: Icon(
                       Icons.key_rounded,
                       size: 20,
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                     ),
                     onTap: () => _showGoogleBooksApiKeyDialog(
                       context,
@@ -439,7 +439,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     trailing: Icon(
                       Icons.movie_outlined,
                       size: 20,
-                      color: settings.omdbApiKey.isEmpty ? AppColors.warning : AppColors.primary,
+                      color: settings.omdbApiKey.isEmpty ? AppColors.warning : AppTheme.accentColor(context),
                     ),
                     onTap: () => _showOmdbApiKeyDialog(context, settings, notifier),
                   ),
@@ -558,7 +558,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               );
                             }
                           },
-                          activeThumbColor: AppColors.primary,
+                          activeThumbColor: AppTheme.accentColor(context),
                         ),
                       ),
                       if (settings.sleepInTomorrow) ...[
@@ -573,14 +573,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                           subtitle: Text(
                             settings.sleepInUntil,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.primary,
+                              color: AppTheme.accentColor(context),
                             ),
                           ),
-                          trailing: const Icon(
+                          trailing: Icon(
                             Icons.access_time_rounded,
-                            color: AppColors.primary,
+                            color: AppTheme.accentColor(context),
                           ),
                           onTap: () async {
                             final parts = settings.sleepInUntil.split(':');
@@ -737,10 +737,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               : 'By Priority',
                           style: const TextStyle(fontSize: 12),
                         ),
-                        trailing: const Icon(
+                        trailing: Icon(
                           Icons.palette_outlined,
                           size: 20,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                         ),
                         onTap: () => _showColorModeDialog(
                           context,
@@ -789,7 +789,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           value: settings.nlpTaskParsingEnabled,
                           onChanged: (v) =>
                               notifier.updateNlpTaskParsingEnabled(v),
-                          activeThumbColor: AppColors.primary,
+                          activeThumbColor: AppTheme.accentColor(context),
                         ),
                       ),
                       const Divider(height: 1, indent: 16),
@@ -801,7 +801,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         value: settings.showOverdueSection,
                         onChanged: (val) =>
                             notifier.updateShowOverdueSection(val),
-                        activeThumbColor: AppColors.primary,
+                        activeThumbColor: AppTheme.accentColor(context),
                       ),
                     ],
                   ),
@@ -923,9 +923,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: Column(
                     children: [
                       ListTile(
-                        leading: const Icon(
+                        leading: Icon(
                           Icons.auto_fix_high_rounded,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                         ),
                         title: const Text(
                           'Regenerar queries Dataview',
@@ -943,9 +943,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       const Divider(height: 1, indent: 16),
                       ListTile(
-                        leading: const Icon(
+                        leading: Icon(
                           Icons.today_rounded,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                         ),
                         title: const Text(
                           'Formato da daily note',
@@ -1000,9 +1000,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: Column(
                     children: [
                       ListTile(
-                        leading: const Icon(
+                        leading: Icon(
                           Icons.backup_rounded,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                         ),
                         title: const Text(
                           'Backup Now',
@@ -1098,9 +1098,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       const Divider(height: 1, indent: 16),
                       ListTile(
-                        leading: const Icon(
+                        leading: Icon(
                           Icons.bug_report_outlined,
-                          color: AppColors.primary,
+                          color: AppTheme.accentColor(context),
                         ),
                         title: const Text(
                           'Diagnostic Reports',
@@ -1155,7 +1155,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.accentColor(context)),
             child: const Text('Salvar'),
           ),
         ],
@@ -1238,7 +1238,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 leading: Icon(
                   item.icon,
                   color: item.inBottomBar
-                      ? AppColors.primary
+                      ? AppTheme.accentColor(context)
                       : AppColors.textMuted,
                 ),
                 title: Text(
@@ -1271,7 +1271,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         onChanged: (_) => notifier.toggleInBottomBar(
                           item.isCustom ? item.id : item.section,
                         ),
-                        activeThumbColor: AppColors.primary,
+                        activeThumbColor: AppTheme.accentColor(context),
                       ),
                     ReorderableDragStartListener(
                       index: index,
@@ -1318,7 +1318,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         trailing: Switch.adaptive(
           value: value,
           onChanged: onChanged,
-          activeThumbColor: AppColors.primary,
+          activeThumbColor: AppTheme.accentColor(context),
         ),
       ),
     );
@@ -1334,7 +1334,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       trailing: Switch.adaptive(
         value: value,
         onChanged: onChanged,
-        activeThumbColor: AppColors.primary,
+        activeThumbColor: AppTheme.accentColor(context),
       ),
     );
   }
@@ -1364,10 +1364,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             : 'Nenhum template selecionado',
         style: const TextStyle(fontSize: 12),
       ),
-      trailing: const Icon(
+      trailing: Icon(
         Icons.rate_review_outlined,
         size: 20,
-        color: AppColors.primary,
+        color: AppTheme.accentColor(context),
       ),
       onTap: () => _showDailyReviewTemplatePicker(
         context,
@@ -1440,9 +1440,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   style: TextStyle(fontWeight: FontWeight.w500),
                                 ),
                                 trailing: isSelected
-                                    ? const Icon(
+                                    ? Icon(
                                         Icons.check_circle,
-                                        color: AppColors.primary,
+                                        color: AppTheme.accentColor(context),
                                       )
                                     : null,
                                 onTap: () {
@@ -1470,9 +1470,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 ),
                               ),
                               trailing: isSelected
-                                  ? const Icon(
+                                  ? Icon(
                                       Icons.check_circle,
-                                      color: AppColors.primary,
+                                      color: AppTheme.accentColor(context),
                                     )
                                   : null,
                               onTap: () {
@@ -1975,7 +1975,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ? Icons.radio_button_checked_rounded
                     : Icons.radio_button_unchecked_rounded,
                 color: currentMode == 'category'
-                    ? AppColors.primary
+                    ? AppTheme.accentColor(context)
                     : AppColors.textMuted,
               ),
               title: const Text('By Category'),
@@ -1990,7 +1990,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ? Icons.radio_button_checked_rounded
                     : Icons.radio_button_unchecked_rounded,
                 color: currentMode == 'priority'
-                    ? AppColors.primary
+                    ? AppTheme.accentColor(context)
                     : AppColors.textMuted,
               ),
               title: const Text('By Priority'),
@@ -2022,7 +2022,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 current == 1
                     ? Icons.radio_button_checked_rounded
                     : Icons.radio_button_unchecked_rounded,
-                color: current == 1 ? AppColors.primary : AppColors.textMuted,
+                color: current == 1 ? AppTheme.accentColor(context) : AppColors.textMuted,
               ),
               title: const Text('Monday'),
               onTap: () {
@@ -2035,7 +2035,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 current == 7
                     ? Icons.radio_button_checked_rounded
                     : Icons.radio_button_unchecked_rounded,
-                color: current == 7 ? AppColors.primary : AppColors.textMuted,
+                color: current == 7 ? AppTheme.accentColor(context) : AppColors.textMuted,
               ),
               title: const Text('Sunday'),
               onTap: () {
@@ -2171,7 +2171,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       buffer.write(hexString.replaceFirst('#', ''));
       return Color(int.parse(buffer.toString(), radix: 16));
     } catch (_) {
-      return AppColors.primary;
+      return AppTheme.accentColor(context);
     }
   }
 
@@ -2359,9 +2359,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       child: Column(
         children: [
           ListTile(
-            leading: const Icon(
+            leading: Icon(
               Icons.calendar_month_rounded,
-              color: AppColors.primary,
+              color: AppTheme.accentColor(context),
             ),
             title: const Text(
               'Google Calendar',
@@ -2383,9 +2383,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   )
                 : TextButton(
                     onPressed: () => authNotifier.signIn(),
-                    child: const Text(
+                    child: Text(
                       'CONECTAR',
-                      style: TextStyle(fontSize: 11, color: AppColors.primary),
+                      style: TextStyle(fontSize: 11, color: AppTheme.accentColor(context)),
                     ),
                   ),
           ),
@@ -2427,7 +2427,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                         value: enabled.contains(id),
-                        activeThumbColor: AppColors.primary,
+                        activeThumbColor: AppTheme.accentColor(context),
                         title: Text(
                           title,
                           maxLines: 1,

@@ -21,6 +21,8 @@ enum NavSection {
   statistics,
   inbox,
   social,
+  dayThemes,
+  timeBlocks,
 }
 
 class NavigationItem {
@@ -31,6 +33,7 @@ class NavigationItem {
   final bool isCustom;
   final String? id; // For shortcuts (objectId or organizerId)
   final String? type; // For shortcuts (e.g., 'task', 'goal', 'area')
+  final Map<String, String>? queryParams; // For filters, searches, etc.
 
   NavigationItem({
     required this.section,
@@ -40,6 +43,7 @@ class NavigationItem {
     this.isCustom = false,
     this.id,
     this.type,
+    this.queryParams,
   });
 
   IconData get icon {
@@ -131,6 +135,10 @@ class NavigationItem {
         return active ? Icons.inbox_rounded : Icons.inbox_outlined;
       case NavSection.social:
         return active ? Icons.bookmarks_rounded : Icons.bookmarks_outlined;
+      case NavSection.dayThemes:
+        return active ? Icons.wb_sunny_rounded : Icons.wb_sunny_outlined;
+      case NavSection.timeBlocks:
+        return active ? Icons.access_time_rounded : Icons.access_time_outlined;
     }
   }
 
@@ -143,10 +151,19 @@ class NavigationItem {
       'isCustom': isCustom,
       'id': id,
       'type': type,
+      'queryParams': queryParams,
     };
   }
 
   factory NavigationItem.fromMap(Map<String, dynamic> map) {
+    final queryParamsMap = map['queryParams'];
+    Map<String, String>? queryParams;
+    if (queryParamsMap != null && queryParamsMap is Map<String, dynamic>) {
+      queryParams = queryParamsMap.map(
+        (key, value) => MapEntry(key, value.toString()),
+      );
+    }
+
     return NavigationItem(
       section: NavSection.values.firstWhere(
         (e) => e.name == map['section'],
@@ -158,6 +175,7 @@ class NavigationItem {
       isCustom: map['isCustom'] ?? false,
       id: map['id'],
       type: map['type'],
+      queryParams: queryParams,
     );
   }
 }

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/pomodoro_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="18dp">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:id="@+id/pomodoro_total" android:layout_width="match_parent" android:layout_height="wrap_content" android:ellipsize="end" android:maxLines="1" android:text="0h" android:textSize="30sp" android:textStyle="bold" />
+            <TextView android:id="@+id/pomodoro_details" android:layout_width="match_parent" android:layout_height="wrap_content" android:ellipsize="end" android:maxLines="1" android:text="this week" android:textSize="15sp" />
+            <TextView android:id="@+id/pomodoro_average" android:layout_width="match_parent" android:layout_height="wrap_content" android:ellipsize="end" android:maxLines="1" android:text="~0h per day" android:textSize="15sp" />
+        </LinearLayout>
+        <TextView android:id="@+id/pomodoro_start" android:layout_width="118dp" android:layout_height="54dp" android:gravity="center" android:text="▶  Start" android:textSize="18sp" android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_marginTop="18dp" android:layout_weight="1" android:gravity="bottom" android:orientation="horizontal">
+        <LinearLayout style="@style/QuartzoPomoColumn"><TextView android:id="@+id/pomo_bar_0" style="@style/QuartzoPomoBar" /><TextView android:id="@+id/pomo_label_0" style="@style/QuartzoPomoLabel" /></LinearLayout>
+        <LinearLayout style="@style/QuartzoPomoColumn"><TextView android:id="@+id/pomo_bar_1" style="@style/QuartzoPomoBar" /><TextView android:id="@+id/pomo_label_1" style="@style/QuartzoPomoLabel" /></LinearLayout>
+        <LinearLayout style="@style/QuartzoPomoColumn"><TextView android:id="@+id/pomo_bar_2" style="@style/QuartzoPomoBar" /><TextView android:id="@+id/pomo_label_2" style="@style/QuartzoPomoLabel" /></LinearLayout>
+        <LinearLayout style="@style/QuartzoPomoColumn"><TextView android:id="@+id/pomo_bar_3" style="@style/QuartzoPomoBar" /><TextView android:id="@+id/pomo_label_3" style="@style/QuartzoPomoLabel" /></LinearLayout>
+        <LinearLayout style="@style/QuartzoPomoColumn"><TextView android:id="@+id/pomo_bar_4" style="@style/QuartzoPomoBar" /><TextView android:id="@+id/pomo_label_4" style="@style/QuartzoPomoLabel" /></LinearLayout>
+        <LinearLayout style="@style/QuartzoPomoColumn"><TextView android:id="@+id/pomo_bar_5" style="@style/QuartzoPomoBar" /><TextView android:id="@+id/pomo_label_5" style="@style/QuartzoPomoLabel" /></LinearLayout>
+        <LinearLayout style="@style/QuartzoPomoColumn"><TextView android:id="@+id/pomo_bar_6" style="@style/QuartzoPomoBar" /><TextView android:id="@+id/pomo_label_6" style="@style/QuartzoPomoLabel" /></LinearLayout>
+    </LinearLayout>
+</LinearLayout>

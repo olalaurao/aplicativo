@@ -1,4 +1,6 @@
 // lib/models/day_theme_model.dart
+// DEPRECATED: Use Organizer with organizerType.dayTheme instead
+// See agents.md section 5.1 for migration guide
 import 'content_object.dart';
 
 class TimeRange {

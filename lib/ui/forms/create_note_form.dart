@@ -146,9 +146,9 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
               centerTitle: true,
               actions: [
                 IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.copy_all_rounded,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
                   tooltip: 'Usar Template',
                   onPressed: _showTemplatePicker,
@@ -158,7 +158,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
                   child: Text(
                     'Save',
                     style: TextStyle(
-                      color: hasTitle ? AppColors.primary : AppColors.textMuted,
+                      color: hasTitle ? AppTheme.accentColor(context) : AppColors.textMuted,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -330,7 +330,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
               Icon(
                 icon,
                 size: 16,
-                color: selected ? AppColors.primary : AppColors.textSecondary,
+                color: selected ? AppTheme.accentColor(context) : AppColors.textSecondary,
               ),
               const SizedBox(width: 6),
               Text(

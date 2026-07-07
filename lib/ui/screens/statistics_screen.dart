@@ -66,8 +66,8 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
         backgroundColor: Colors.transparent,
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: AppColors.primary,
-          labelColor: AppColors.primary,
+          indicatorColor: AppTheme.accentColor(context),
+          labelColor: AppTheme.accentColor(context),
           unselectedLabelColor: AppColors.textMuted,
           indicatorSize: TabBarIndicatorSize.tab,
           tabs: const [
@@ -170,7 +170,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
             width: 4,
             height: 16,
             decoration: BoxDecoration(
-              color: AppColors.primary,
+              color: AppTheme.accentColor(context),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -209,7 +209,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
 
       Color cellColor = AppColors.textMuted.withValues(alpha: 0.1);
       if (count > 0) {
-        cellColor = AppColors.primary.withValues(
+        cellColor = AppTheme.accentColor(context).withValues(
           alpha: math.min(1.0, 0.2 + (count * 0.25)),
         );
       }
@@ -223,7 +223,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
               color: cellColor,
               borderRadius: BorderRadius.circular(4),
               border: Border.all(
-                color: date == today ? AppColors.accent : Colors.transparent,
+                color: date == today ? AppTheme.accentColor(context) : Colors.transparent,
                 width: 1.5,
               ),
             ),
@@ -281,7 +281,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
       height: 10,
       margin: const EdgeInsets.symmetric(horizontal: 1.5),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: opacity),
+        color: AppTheme.accentColor(context).withValues(alpha: opacity),
         borderRadius: BorderRadius.circular(2),
       ),
     );
@@ -390,18 +390,18 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
                   children: [
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.local_fire_department_rounded,
-                          color: AppColors.accent,
+                          color: AppTheme.accentColor(context),
                           size: 16,
                         ),
                         const SizedBox(width: 2),
                         Text(
                           '$currentStreak',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
-                            color: AppColors.accent,
+                            color: AppTheme.accentColor(context),
                           ),
                         ),
                         Text(
@@ -466,8 +466,8 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
                       backgroundColor: AppColors.textMuted.withValues(
                         alpha: 0.1,
                       ),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        AppColors.primary,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppTheme.accentColor(context),
                       ),
                     ),
                   ),
@@ -504,7 +504,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _buildTaskLegend(AppColors.primary, 'Concluídas'),
+                    _buildTaskLegend(AppTheme.accentColor(context), 'Concluídas'),
                     const SizedBox(width: 16),
                     _buildTaskLegend(
                       AppColors.textMuted.withValues(alpha: 0.2),
@@ -575,7 +575,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
           barRods: [
             BarChartRodData(
               toY: hours,
-              color: AppColors.accent,
+              color: AppTheme.accentColor(context),
               width: 16,
               borderRadius: BorderRadius.circular(4),
             ),
@@ -691,7 +691,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
     for (final mood in moods) {
       final hex = mood.color.replaceAll('#', '0xFF');
       final val = int.tryParse(hex);
-      colorMap[mood.id] = val != null ? Color(val) : AppColors.primary;
+      colorMap[mood.id] = val != null ? Color(val) : AppTheme.accentColor(context);
     }
 
     moodCounts.forEach((moodId, count) {
@@ -702,7 +702,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
       final percentage = (count / relevantEntries.length) * 100;
       sections.add(
         PieChartSectionData(
-          color: colorMap[moodId] ?? AppColors.primary,
+          color: colorMap[moodId] ?? AppTheme.accentColor(context),
           value: count.toDouble(),
           title: '${moodDef.emoji} ${percentage.toStringAsFixed(0)}%',
           radius: 40,
@@ -748,7 +748,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
                         width: 10,
                         height: 10,
                         decoration: BoxDecoration(
-                          color: colorMap[e.key] ?? AppColors.primary,
+                          color: colorMap[e.key] ?? AppTheme.accentColor(context),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -809,13 +809,13 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
             Icons.edit_note_rounded,
             '${entries.length}',
             'Registros Totais',
-            AppColors.primary,
+            AppTheme.accentColor(context),
           ),
           _buildStatIndicator(
             Icons.text_fields_rounded,
             '$totalWords',
             'Palavras Escritas',
-            AppColors.accent,
+            AppTheme.accentColor(context),
           ),
           _buildStatIndicator(
             Icons.analytics_outlined,
@@ -997,12 +997,12 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
                   LineChartBarData(
                     spots: spots,
                     isCurved: true,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                     barWidth: 3.5,
                     dotData: const FlDotData(show: true),
                     belowBarData: BarAreaData(
                       show: true,
-                      color: AppColors.primary.withValues(alpha: 0.15),
+                      color: AppTheme.accentColor(context).withValues(alpha: 0.15),
                     ),
                   ),
                 ],
@@ -1204,10 +1204,10 @@ ${goalsSummary.isEmpty ? '- Nenhuma meta ativa monitorada nesta semana.' : goals
                 children: [
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.copy_all_rounded,
                         size: 20,
-                        color: AppColors.primary,
+                        color: AppTheme.accentColor(context),
                       ),
                       const SizedBox(width: 8),
                       Text(
@@ -1251,7 +1251,7 @@ ${goalsSummary.isEmpty ? '- Nenhuma meta ativa monitorada nesta semana.' : goals
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: AppTheme.accentColor(context),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(

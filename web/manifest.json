@@ -1,6 +1,6 @@
 {
-    "name": "journal_it",
-    "short_name": "journal_it",
+    "name": "quartzo",
+    "short_name": "quartzo",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

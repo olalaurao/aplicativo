@@ -86,7 +86,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
     try {
       return Color(int.parse(hex.replaceAll('#', '0xFF')));
     } catch (_) {
-      return AppColors.primary;
+      return AppTheme.accentColor(context);
     }
   }
 
@@ -142,9 +142,9 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
               centerTitle: true,
               actions: [
                 IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.copy_all_rounded,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
                   tooltip: 'Usar Template',
                   onPressed: _showTemplatePicker,
@@ -331,7 +331,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
                               style: TextStyle(
                                 fontSize: 14,
                                 color: _deadline != null
-                                    ? AppColors.primary
+                                    ? AppTheme.accentColor(context)
                                     : AppColors.textMuted,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -428,15 +428,15 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: AppColors.primary.withValues(
+                                  color: AppTheme.accentColor(context).withValues(
                                     alpha: 0.3,
                                   ),
                                 ),
                               ),
-                              child: const Text(
+                              child: Text(
                                 '+ Add KPI',
                                 style: TextStyle(
-                                  color: AppColors.primary,
+                                  color: AppTheme.accentColor(context),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -540,11 +540,11 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: selected ? AppColors.primary : AppColors.surfaceVariant,
+            color: selected ? AppTheme.accentColor(context) : AppColors.surfaceVariant,
             borderRadius: BorderRadius.circular(12),
             border: selected
                 ? Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.2),
+                    color: AppTheme.accentColor(context).withValues(alpha: 0.2),
                     width: 1,
                   )
                 : null,
@@ -717,7 +717,7 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
     try {
       return Color(int.parse(hex.replaceAll('#', '0xFF')));
     } catch (_) {
-      return AppColors.primary;
+      return AppTheme.accentColor(context);
     }
   }
 

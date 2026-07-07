@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
-import 'citrine_chart.dart';
+import 'quartzo_chart.dart';
 
 class MoodEmojiTimeline extends StatelessWidget {
   final List<ChartDataPoint> points;

@@ -1,12 +1,9 @@
 // lib/ui/widgets/week_time_grid.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../../models/task_model.dart';
 import '../../models/habit_model.dart';
 import '../theme.dart';
-import 'object_action_wrapper.dart';
-import '../screens/universal_detail_view.dart';
 
 class WeekTimeGrid extends ConsumerWidget {
   final List<Task> tasks;
@@ -55,7 +52,7 @@ class WeekTimeGrid extends ConsumerWidget {
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                               color: isToday 
-                                  ? AppColors.primary 
+                                  ? AppTheme.accentColor(context) 
                                   : AppTheme.textSecondaryColor(context),
                             ),
                           ),
@@ -65,7 +62,7 @@ class WeekTimeGrid extends ConsumerWidget {
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
                               color: isToday 
-                                  ? AppColors.primary 
+                                  ? AppTheme.accentColor(context) 
                                   : AppTheme.textPrimaryColor(context),
                             ),
                           ),
@@ -174,7 +171,7 @@ class WeekTimeGrid extends ConsumerWidget {
     return Container(
       margin: const EdgeInsets.all(1),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.1),
+        color: AppTheme.accentColor(context).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Stack(
@@ -194,7 +191,7 @@ class WeekTimeGrid extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         decoration: BoxDecoration(
-          color: AppColors.primary,
+          color: AppTheme.accentColor(context),
           borderRadius: BorderRadius.circular(3),
         ),
         child: Text(

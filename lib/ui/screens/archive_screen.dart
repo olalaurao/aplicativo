@@ -73,7 +73,7 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
                   ),
                   selected: _filterType == t,
                   onSelected: (selected) => setState(() => _filterType = t),
-                  selectedColor: AppColors.primary,
+                  selectedColor: AppTheme.accentColor(context),
                   labelStyle: TextStyle(
                     color: _filterType == t
                         ? Colors.white
@@ -103,10 +103,10 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
             style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
           ),
           trailing: IconButton(
-            icon: const Icon(
+            icon: Icon(
               Icons.unarchive_rounded,
               size: 20,
-              color: AppColors.primary,
+              color: AppTheme.accentColor(context),
             ),
             onPressed: () {
               // Restore logic

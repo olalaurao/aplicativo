@@ -80,6 +80,10 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
           return 'Hábito';
         case OrganizerType.tracker:
           return 'Rastreador';
+      case OrganizerType.dayTheme:
+        return 'Tema do Dia';
+      case OrganizerType.timeBlock:
+        return 'Bloco de Tempo';
       }
     }
     switch (obj.type) {
@@ -114,14 +118,14 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
       child: ChoiceChip(
         label: Text(label),
         selected: isSelected,
-        selectedColor: AppColors.primary.withValues(alpha: 0.1),
+        selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.1),
         labelStyle: TextStyle(
-          color: isSelected ? AppColors.primary : AppColors.textSecondary,
+          color: isSelected ? AppTheme.accentColor(context) : AppColors.textSecondary,
           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
           fontSize: 12,
         ),
         side: isSelected
-            ? const BorderSide(color: AppColors.primary)
+            ? BorderSide(color: AppTheme.accentColor(context))
             : BorderSide(color: AppColors.textMuted.withValues(alpha: 0.3)),
         onSelected: (val) {
           if (val) onSelected(filter);
@@ -201,7 +205,7 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
                   return ListTile(
                     leading: Icon(
                       t['icon'] as IconData,
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                     ),
                     title: Text(t['label'] as String),
                     onTap: () async {
@@ -471,13 +475,13 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
                             );
                             return ListTile(
                               leading: CircleAvatar(
-                                backgroundColor: AppColors.primary.withValues(
+                                backgroundColor: AppTheme.accentColor(context).withValues(
                                   alpha: 0.1,
                                 ),
                                 child: Icon(
                                   getIconForType(obj.type),
                                   size: 18,
-                                  color: AppColors.primary,
+                                  color: AppTheme.accentColor(context),
                                 ),
                               ),
                               title: Text(
@@ -495,9 +499,9 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
                                 ),
                               ),
                               trailing: isSelected
-                                  ? const Icon(
+                                  ? Icon(
                                       Icons.check_circle_rounded,
-                                      color: AppColors.primary,
+                                      color: AppTheme.accentColor(context),
                                     )
                                   : null,
                               onTap: () {
@@ -552,7 +556,7 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
                       icon: const Icon(Icons.add_rounded),
                       label: Text('Criar "${searchQuery.trim()}" como...'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: AppTheme.accentColor(context),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),

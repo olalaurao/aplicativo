@@ -1,4 +1,4 @@
-# App Guidelines V5.2 — Complete and Authoritative Specification
+# App Guidelines V5.3 — Complete and Authoritative Specification
 
 > **How to use this document**
 > This is the single source of truth. When any previous version (V1–V4, screenshots, chat messages) conflicts with this document, this document wins.
@@ -41,6 +41,22 @@ Sourced from a batch of real usage notes (WhatsApp messages, late June 2026). Pu
 ## CHANGELOG — V5.1 → V5.2
 
 - **Mood System Overhaul:** complete 2-axis mood model (energy × pleasantness, 0–10 scale) replacing the old 1D numeric value; 80 proprietary mood catalog entries (20 per quadrant: Yellow, Red, Green, Blue); lazy file creation for system moods; one-time migration service for existing user moods; mood picker UI reworked to 2-step quadrant selection → word grid with emoji, label, and description; mood settings screen updated with quadrant grouping, System badge, "Edit coordinates" unlock flow for system moods, custom mood cap raised from 15 to 20, sliders updated to 0–10 scale; mood_entries daily-note generator reads pleasantness/energy directly from MoodDefinition at generation time.
+
+---
+
+## CHANGELOG — V5.2 → V5.3
+
+- **Rotation System (new):** Projects now support rotation-based zone cycling with `rotationGroups` (array of RotationGroup objects with name, emoji, colorHex, periodDays, order), `rotationStartDate`, and computed `rotationCycleLengthDays`. RotationService computes active status, day of period, occurrence number, and upcoming groups. New screens: RotationOverviewScreen (shows current zone and upcoming schedule) and RotationZoneDetailScreen (zone-specific task list). Tasks can be assigned to rotation groups via `rotationGroupId`, `rotationFrequencyType` (none/daily/oncePerPeriod/everyNRotations), `rotationEveryN`, `rotationLastCompletedAtOccurrence`, and `rotationDailyCompletions` map.
+- **Alignment Tracking (new):** Tasks and Habits now support alignment tracking (planned vs actual timing). Task gains `flexibilityWindowMinutes` (null = off) and `isAlignmentTrackable` getter. HabitSlot gains `isAlignmentTrackable` via parent Habit. AlignmentService logs `AlignmentLogEntry` records with itemId, date, plannedTime, actualTime, deltaMinutes, and computed state (early/aligned/drifting/missed). Alignment states are stored in daily notes as ```alignment``` blocks and surfaced via AlignmentInsightsPanel.
+- **Focus Relay (new):** Tasks support Focus Relay mode via `relaySteps` (List<RelayStep>), replacing flat Pomodoro for structured work sessions. RelayStep defines step name, duration, type (work/break), and optional transition actions. When `hasRelaySteps` is true, Pomodoro uses relay sequence instead of single work/break cycle.
+- **Day Dial Widget (new):** Circular day visualization widget showing hour-by-hour activity state. DayDialHourState tracks hour (0-23), DialHourKind (idle/sleep/pomodoroCompleted/pomodoroPlanned/event), fillFraction, and optional habit/reminder associations. DayDialAggregatorService computes state from vault objects. Rendered via DayDialWidget with configurable size and theme integration.
+- **Week Time Grid (new):** Weekly calendar grid view (WeekTimeGrid) showing Tasks and Habits across 7 days with time-based layout. Displays day names and dates, highlights current day, shows time column, color-coded items by type/priority, interactive tap navigation to UniversalDetailView.
+- **Windows Dial Companion App (new):** Standalone Windows desktop application (windows_dial_main.dart) displaying DayDialWidget with real-time updates. Auto-refreshes every minute, includes date navigation, vault integration, Google Calendar integration, Pomodoro provider integration.
+- **HabitSlot Actions (enhanced):** HabitSlot now supports per-slot `actions` (List<ActionDef>) triggered on slot completion, in addition to habit-level day-complete actions. AutomationService executes both slot-level and habit-level actions.
+- **Overdue Detail Screen (new):** Dedicated screen (OverdueDetailScreen) for viewing and managing overdue Tasks, Habits, and Goals. Surfaces items past their due date with quick "Reschedule" actions. Integrated with OverdueProvider for reactive state.
+- **OCR Service (implemented):** OcrService using Google ML Kit for text recognition from images. Returns OcrResult with text, hasText flag, and blockCount. Integrated with scan document flow and photo attachments.
+- **Collection Row Service (new):** CollectionRowService parses Collection Note body into structured rows (CollectionRow) with noteSlug, blockId, lineIndex, rawText, displayTitle, and subtitle. Supports emoji stripping and pipe (::) delimiter parsing. Each row represents a real Obsidian note file when using Obsidian Bases plugin.
+- **Automation Service (enhanced):** Expanded AutomationService with additional action types and improved execution logic. Supports add_entry, create_task, create_note, update_kpi, send_notification, open_url, and custom_script actions. Executes habit slot actions, habit day actions, and tracker actions.
 
 ---
 
@@ -127,6 +143,429 @@ Whenever you (a developer, or an AI working from this document) find a reference
 **Standing rule:** any time a future audit finds a leftover reference to something in this table, treat it as a bug, not a design choice — remove it, don't work around it.
 
 **Privacy default, new in V5.1:** any photo saved through the app (Entry photos, Resource covers, attachments, etc.) has its **geolocation EXIF metadata stripped automatically on save**, with no user action required and no setting to turn this back on — this is consistent with removing Places/maps entirely from the app; the app never retains or displays photo geolocation.
+
+---
+
+## PART 19 — DESIGN SYSTEM CONSISTENCY (new in V5.2)
+
+### 19.1 Design System Constants — MANDATORY
+
+**NEVER use hardcoded values for spacing, border radius, font sizes, or border width.** ALWAYS use the constants defined in `lib/ui/theme.dart`:
+
+```dart
+// ✅ CORRECT
+padding: const EdgeInsets.all(AppSpacing.lg),
+borderRadius: BorderRadius.circular(AppBorderRadius.md),
+fontSize: AppTextSize.md,
+borderWidth: AppBorder.normal,
+
+// ❌ WRONG
+padding: const EdgeInsets.all(16),
+borderRadius: BorderRadius.circular(12),
+fontSize: 14,
+borderWidth: 1.5,
+```
+
+**Available constants:**
+
+#### AppBorderRadius
+- `xs` = 4.0 (very small elements)
+- `sm` = 8.0 (badges, small chips)
+- `md` = 12.0 (inputs, buttons)
+- `lg` = 16.0 (standard cards)
+- `xl` = 20.0 (highlighted cards, chips)
+- `xxl` = 24.0 (sheets, modals)
+- `xxxl` = 32.0 (large elements)
+
+#### AppSpacing
+- `xs` = 4.0 (minimum spacing)
+- `sm` = 8.0 (compact spacing)
+- `md` = 12.0 (standard spacing)
+- `lg` = 16.0 (comfortable spacing)
+- `xl` = 20.0 (generous spacing)
+- `xxl` = 24.0 (large spacing)
+- `xxxl` = 32.0 (very large spacing)
+
+#### AppTextSize
+- `xs` = 10.0 (small labels, captions)
+- `sm` = 12.0 (auxiliary text, metadata)
+- `md` = 14.0 (standard body text)
+- `lg` = 16.0 (item titles, large body)
+- `xl` = 18.0 (section titles)
+- `xxl` = 20.0 (large titles)
+- `display` = 28.0 (screen titles)
+
+#### AppBorder
+- `thin` = 1.0 (subtle borders)
+- `normal` = 1.5 (standard borders)
+- `thick` = 2.0 (highlighted borders)
+- `extraThick` = 3.0 (very highlighted borders)
+
+#### AppIconSize
+- `xs` = 12.0 (very small icons)
+- `sm` = 16.0 (small icons)
+- `md` = 20.0 (standard icons)
+- `lg` = 24.0 (large icons)
+- `xl` = 32.0 (very large icons)
+- `xxl` = 48.0 (highlighted icons)
+- `display` = 56.0 (hero icons)
+
+### 19.2 Reusable Components — MANDATORY
+
+**ALWAYS use the reusable components available in `lib/ui/widgets/` instead of reimplementing duplicated patterns:**
+
+#### StandardSheet (`lib/ui/widgets/standard_sheet.dart`)
+Use for ALL bottom sheets and modals:
+
+```dart
+// ✅ CORRECT
+StandardSheet(
+  radius: SheetRadius.large,
+  showHandle: true,
+  child: YourContent(),
+)
+
+// ❌ WRONG
+Container(
+  decoration: BoxDecoration(
+    color: Theme.of(context).scaffoldBackgroundColor,
+    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+  ),
+  child: YourContent(),
+)
+```
+
+#### AppChip (`lib/ui/widgets/app_chip.dart`)
+Use for ALL chips (choice, filter, action):
+
+```dart
+// ✅ CORRECT
+AppChip(
+  label: 'Label',
+  selected: isSelected,
+  onTap: () => {},
+  variant: ChipVariant.choice,
+  size: ChipSize.medium,
+)
+
+// ❌ WRONG
+ChoiceChip(
+  label: Text('Label'),
+  selected: isSelected,
+  onSelected: (_) => {},
+  // ... reimplementing styles manually
+)
+```
+
+#### StatusBadge (`lib/ui/widgets/status_badge.dart`)
+Use for ALL status badges:
+
+```dart
+// ✅ CORRECT
+StatusBadge(
+  label: 'Completed',
+  variant: BadgeVariant.success,
+  size: BadgeSize.medium,
+)
+
+// ❌ WRONG
+Container(
+  decoration: BoxDecoration(
+    color: AppColors.success.withValues(alpha: 0.1),
+    borderRadius: BorderRadius.circular(6),
+  ),
+  child: Text('Completed'),
+)
+```
+
+#### DatePickerField (`lib/ui/widgets/date_picker_field.dart`)
+Use for ALL date pickers:
+
+```dart
+// ✅ CORRECT
+DatePickerField(
+  selectedDate: _date,
+  onDateChanged: (date) => setState(() => _date = date),
+  label: 'Due Date',
+)
+
+// ❌ WRONG
+GestureDetector(
+  onTap: () async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _date ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (date != null) setState(() => _date = date);
+  },
+  child: TextField(...),
+)
+```
+
+#### TimePickerField (`lib/ui/widgets/time_picker_field.dart`)
+Use for ALL time pickers:
+
+```dart
+// ✅ CORRECT
+TimePickerField(
+  selectedTime: _time,
+  onTimeChanged: (time) => setState(() => _time = time),
+  label: 'Start Time',
+)
+
+// ❌ WRONG
+GestureDetector(
+  onTap: () async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _time ?? TimeOfDay.now(),
+    );
+    if (time != null) setState(() => _time = time);
+  },
+  child: TextField(...),
+)
+```
+
+#### AppDropdown (`lib/ui/widgets/app_dropdown.dart`)
+Use for ALL dropdowns:
+
+```dart
+// ✅ CORRECT
+AppDropdown<String>(
+  value: _selectedValue,
+  items: [
+    DropdownMenuItem(value: 'option1', child: Text('Option 1')),
+    DropdownMenuItem(value: 'option2', child: Text('Option 2')),
+  ],
+  onChanged: (value) => setState(() => _selectedValue = value),
+  label: 'Select Option',
+)
+
+// ❌ WRONG
+DropdownButtonFormField<String>(
+  value: _selectedValue,
+  items: [...],
+  onChanged: (value) => setState(() => _selectedValue = value),
+  decoration: InputDecoration(...),
+)
+```
+
+#### AppSwitchTile (`lib/ui/widgets/app_switch_tile.dart`)
+Use for ALL switches in lists:
+
+```dart
+// ✅ CORRECT
+AppSwitchTile(
+  value: _isEnabled,
+  onChanged: (value) => setState(() => _isEnabled = value),
+  title: 'Enable Feature',
+  subtitle: 'Description of the feature',
+)
+
+// ❌ WRONG
+SwitchListTile.adaptive(
+  contentPadding: EdgeInsets.zero,
+  title: Text('Enable Feature'),
+  subtitle: Text('Description'),
+  value: _isEnabled,
+  onChanged: (value) => setState(() => _isEnabled = value),
+)
+```
+
+#### ConfirmDialog (`lib/ui/widgets/confirm_dialog.dart`)
+Use for ALL confirmation dialogs:
+
+```dart
+// ✅ CORRECT
+final confirmed = await ConfirmDialog.show(
+  context,
+  title: 'Delete item?',
+  content: 'This action can be undone for 30 days.',
+  confirmText: 'Delete',
+  cancelText: 'Cancel',
+  isDestructive: true,
+);
+
+// ❌ WRONG
+final confirmed = await showDialog<bool>(
+  context: context,
+  builder: (_) => AlertDialog(
+    title: const Text('Delete item?'),
+    content: const Text('This action can be undone for 30 days.'),
+    actions: [
+      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+      TextButton(
+        onPressed: () => Navigator.pop(context, true),
+        style: TextButton.styleFrom(foregroundColor: AppColors.error),
+        child: const Text('Delete'),
+      ),
+    ],
+  ),
+);
+```
+
+#### FormSection (`lib/ui/widgets/form_section.dart`)
+Use for ALL form sections:
+
+```dart
+// ✅ CORRECT
+FormSection(
+  title: 'Basic Information',
+  description: 'Enter the basic details',
+  children: [
+    TextFormField(...),
+    TextFormField(...),
+  ],
+)
+
+// ❌ WRONG
+Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Text('Basic Information', style: ...),
+    Text('Description', style: ...),
+    const SizedBox(height: 12),
+    TextFormField(...),
+    TextFormField(...),
+    const SizedBox(height: 16),
+  ],
+)
+```
+
+#### ListItem (`lib/ui/widgets/list_item.dart`)
+Use for ALL interactive list items:
+
+```dart
+// ✅ CORRECT
+ListItem(
+  leading: Icon(Icons.task),
+  title: Text('Task Title'),
+  subtitle: Text('Task description'),
+  trailing: Icon(Icons.chevron_right),
+  onTap: () => navigateToDetail(),
+)
+
+// ❌ WRONG
+InkWell(
+  onTap: () => navigateToDetail(),
+  borderRadius: BorderRadius.circular(12),
+  child: Container(
+    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    decoration: BoxDecoration(
+      color: AppColors.surfaceVariant,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(...),
+  ),
+)
+```
+
+#### UniversalSearchPickerSheet (`lib/ui/widgets/universal_search_picker.dart`)
+Use for ALL vault object search pickers:
+
+```dart
+// ✅ CORRECT
+final selected = await showModalBottomSheet<ContentObject>(
+  context: context,
+  isScrollControlled: true,
+  backgroundColor: Colors.transparent,
+  builder: (_) => UniversalSearchPickerSheet(
+    title: 'Link object',
+    initialFilter: 'task',
+    onSelected: (obj) => Navigator.pop(context, obj),
+  ),
+);
+
+// ❌ WRONG
+// Do not implement your own search picker
+```
+
+#### WikiLinkPicker (`lib/ui/widgets/wiki_link_picker.dart`)
+Use for ALL WikiLink pickers in rich text editors:
+
+```dart
+// ✅ CORRECT
+showModalBottomSheet(
+  context: context,
+  isScrollControlled: true,
+  backgroundColor: Colors.transparent,
+  builder: (context) => WikiLinkPicker(
+    onSelected: (obj) {
+      // Insert link [[obj.title]]
+    },
+  ),
+);
+
+// ❌ WRONG
+// Do not implement your own wiki link picker
+```
+
+#### showOrganizerPickerModal (`lib/ui/widgets/organizer_picker_modal.dart`)
+Use for ALL multi-select organizer pickers:
+
+```dart
+// ✅ CORRECT
+final selected = await showOrganizerPickerModal(
+  context,
+  ref,
+  initialSelected,
+);
+if (selected != null) {
+  setState(() => _organizers = selected);
+}
+
+// ❌ WRONG
+// Do not implement your own organizer selection modal
+```
+
+#### OrganizerSelectorField (`lib/ui/widgets/organizer_selector_field.dart`)
+Use for ALL organizer selection fields in forms:
+
+```dart
+// ✅ CORRECT
+OrganizerSelectorField(
+  label: 'Collections',
+  selectedOrganizers: _organizers,
+  onChanged: (value) => setState(() => _organizers = value),
+)
+
+// ❌ WRONG
+// Do not implement your own organizer selection field
+```
+
+### 19.3 Themeable Properties
+
+The `AppThemeConfig` now supports the following themeable properties:
+
+- `borderRadius` (default: 16.0) - Global UI roundness
+- `spacingScale` (default: 1.0) - Spacing scale (0.8 = compact, 1.2 = spacious)
+- `fontScale` (default: 1.0) - Font scale (0.9 = smaller, 1.1 = larger)
+- `cardElevation` (default: 0.0) - Card elevation
+- `useShadows` (default: true) - Shadow usage
+- `habitColors` - Customizable habit color palette
+- `statusColors` - Customizable status color palette
+- `priorityColors` - Customizable priority color palette
+
+**When updating the theme via `AppearanceScreen`, preserve ALL existing properties:**
+
+```dart
+final updatedTheme = AppThemeConfig(
+  id: activeTheme.id,
+  label: activeTheme.label,
+  accentColor: activeTheme.accentColor,
+  backgroundColor: backgroundColor,
+  icon: activeTheme.icon,
+  description: activeTheme.description,
+  fontFamily: activeTheme.fontFamily,
+  borderRadius: activeTheme.borderRadius,           // ← Preserve
+  spacingScale: activeTheme.spacingScale,           // ← Preserve
+  fontScale: activeTheme.fontScale,                 // ← Preserve
+  cardElevation: activeTheme.cardElevation,         // ← Preserve
+  useShadows: activeTheme.useShadows,               // ← Preserve
+);
+```
 
 ---
 
@@ -359,6 +798,29 @@ This is purely a rendering distinction — it reads `created_at` vs. the object'
 **Properties** (unchanged from V4 except as noted):
 `id`, `type: task`, `title`, `stage` (`idea | backlog | todo | in_progress | pending | finalized`), `priority`, `start_date`, `end_date`, `date_range`, `until_done`, `duration`, `all_day`, `scheduled_time`, `notes`, `subtasks` (array of full Task files, each with `parent_task`), `organizers`, `tags`, `links` (universal — replaces old ad hoc `links` semantics with the Part 1.4 mechanism), `scheduler`, `reminders`, `color`, `participants` (kept separate, see above), `timer_sessions`, `comments`, `reflection`, `archived`, `parent_task`, `linked_system`, `triple_check`, `depends_on` (kept separate), `estimated_minutes`.
 
+**Alignment Tracking (new in V5.3):** Tasks can track alignment between planned and actual execution time:
+- `flexibilityWindowMinutes` — optional integer (null = alignment tracking off for this task). Defines the acceptable deviation window in minutes from the scheduled time.
+- `isAlignmentTrackable` — computed getter, true if both `flexibilityWindowMinutes` and `scheduledTime` are set.
+- When a task with alignment tracking is completed, `AlignmentService` logs an `AlignmentLogEntry` with:
+  - `itemId` — task ID
+  - `date` — completion date (yyyy-mm-dd)
+  - `plannedTime` — scheduled time (HH:mm)
+  - `actualTime` — actual completion time (HH:mm)
+  - `deltaMinutes` — signed difference (actual - planned)
+  - `state` — computed alignment state: `early`, `aligned`, `drifting`, or `missed`
+- Alignment states are stored in daily notes as ```alignment``` code blocks and surfaced via `AlignmentInsightsPanel`.
+
+**Focus Relay (new in V5.3):** Tasks support structured multi-step work sessions via Focus Relay mode:
+- `relaySteps` — optional `List<RelayStep>`, replacing flat Pomodoro for structured sessions
+- Each `RelayStep` defines:
+  - `name` — step name (e.g., "Deep Work", "Review", "Break")
+  - `duration` — step duration in minutes
+  - `type` — step type: `work` or `break`
+  - `actions` — optional transition actions to execute when this step completes
+- `hasRelaySteps` — computed getter, true if relaySteps is non-empty
+- When `hasRelaySteps` is true, the Pomodoro timer uses the relay sequence instead of the standard single work/break cycle
+- Relay mode supports complex workflows like: 25min work → 5min break → 25min work → 15min break → repeat
+
 *(`places` removed — Places no longer exist. `social_refs` removed — folded into `links`.)*
 
 **`date_range` and `until_done` are mutually exclusive.** The create/edit form disables `until_done` when `date_range` is on, and vice versa. If a bad import somehow sets both, `date_range` wins and `until_done` is ignored (logged as a data-cleanliness warning, not silently dropped).
@@ -422,6 +884,35 @@ Project is documented fully as an Organizer in Part 10, but note here the proper
 - `strategy` — the how
 - `phases` — array of Phase objects, each grouping Tasks by stage
 
+**Rotation System (new in V5.3):** Projects now support rotation-based zone cycling for structured work periods:
+- `rotationGroups` — array of `RotationGroup` objects, each defining a zone with:
+  - `id` — unique identifier
+  - `name` — zone name (e.g., "Deep Work", "Learning", "Health")
+  - `emoji` — optional emoji for visual identification
+  - `colorHex` — optional hex color for zone theming
+  - `periodDays` — duration of this zone in days
+  - `order` — sequence order in the rotation cycle
+- `rotationStartDate` — start date of the first rotation cycle
+- `rotationCycleLengthDays` — computed total days for one full cycle (sum of all `periodDays`)
+- `hasRotation` — computed getter, true if rotationGroups is non-empty and rotationStartDate is set
+- `methodLabel` — optional custom label for the rotation method
+
+**RotationService** computes:
+- Active rotation status (current group, day of period, occurrence number)
+- Upcoming groups with their start/end dates
+- Daily completion tracking for rotation-assigned tasks
+
+**New screens:**
+- `RotationOverviewScreen` — shows current active zone, day of period, and upcoming schedule
+- `RotationZoneDetailScreen` — zone-specific task list and completion tracking
+
+**Task integration:** Tasks can be assigned to rotation groups via:
+- `rotationGroupId` — reference to the parent RotationGroup
+- `rotationFrequencyType` — enum: `none`, `daily`, `oncePerPeriod`, `everyNRotations`
+- `rotationEveryN` — for `everyNRotations` frequency, how many cycles between occurrences
+- `rotationLastCompletedAtOccurrence` — tracks last completed occurrence number
+- `rotationDailyCompletions` — map of date strings to completion status for daily tasks
+
 Everything else about Project (state, priority, dates, primary/secondary KPI, tasks, scheduler, total Pomodoro time, quick access) is unchanged from V4 — see Part 10.
 
 **Project "restart on schedule" (fixes V4's undefined behavior):** when a Project's `scheduler` fires and the Project is due to recur, the app **creates a brand-new Project file** (new `id`, fresh `progress`, fresh dates derived from the schedule), and the old Project is archived with a `superseded_by: "[[new-project-slug]]"` link. This preserves full history of every cycle instead of resetting one file in place — consistent with how Pact cycles are preserved in `previous_cycles`.
@@ -435,6 +926,14 @@ Everything else about Project (state, priority, dates, primary/secondary KPI, ta
 **Core properties** (unchanged from V4 except as noted): `id`, `type: habit`, `title`, `description`, `color`, `icon`, `habit_mode` (`habit | pact`), `completion_unit`, `daily_goal`, `slots`, `organizers`, `status`, `habitStartDate`, `priority`, `isNegative`, `inputType`, `linkedTrackerSlug`, `actions`, `archived`.
 
 **Habit slot reminders (resolves V4's parallel-reminder-schema bug):** each `HabitSlot` no longer has its own bespoke `reminderEnabled`/`reminderTime`/`notificationType` fields. Instead, each slot carries a **`reminders: List<ReminderConfig>`** — the exact same universal Reminder Configuration schema (Part 13) used everywhere else in the app. This is already how the base `ContentObject` model works in code; V5 simply extends that same list down to the per-slot level. A slot can have zero, one, or multiple Reminder Configurations, each independently push/popup/alarm.
+
+**HabitSlot Actions (new in V5.3):** In addition to habit-level day-complete actions, individual HabitSlots now support per-slot `actions` (List<ActionDef>) triggered on slot completion:
+- `actions` field on `HabitSlot` — array of ActionDef objects
+- Trigger: `slot_complete` — fires when the individual slot is checked
+- Supports slot-specific automation (e.g., different actions for morning vs evening slots)
+- Executed by `AutomationService.executeHabitSlotActions()`
+- Complements habit-level `day_complete` actions (both can coexist)
+- Use cases: slot-specific notifications, KPI updates, task creation, etc.
 
 **Negative habits (`isNegative`) — fully specified (was an orphaned field in V4):**
 - A negative habit tracks something the user wants to **stop** doing (e.g., "Smoking," "Doomscrolling").
@@ -943,6 +1442,291 @@ Everything else in V4's Part 18 (type colors, color picker rules) is unchanged.
 **No-overflow principle (new in V5.1):** no text, button, card, or input may overflow its container at any supported screen size. This is a binding design principle, not a per-screen bug list — every text element uses adaptive sizing (ellipsis/truncation with a way to see the full value, e.g. tap-to-expand or a tooltip, rather than clipping silently), every row/card uses flexible width constraints instead of fixed pixel widths, and long unbroken strings (URLs, long titles) wrap or truncate rather than forcing horizontal scroll. Any screen found overflowing (e.g. the Pomodoro screen, the Planner's date header while scrolling the timeline — both flagged as real, current instances) should be treated as violating this principle, not as an isolated cosmetic bug.
 
 Unchanged from V4 in substance — every `pt` value in the original document should be read as `dp`. The old platform-specific top/bottom-inset distinction (iOS 44dp vs Android ~24–28dp status bar) still applies as a genuine platform difference (that one *is* real — status bar height differs by OS), but is now expressed using `dp` consistently rather than mixing `pt` and `dp` terminology.
+
+---
+
+## PART 19.5 — DAY DIAL WIDGET (new in V5.3)
+
+**Purpose:** Circular visualization of daily activity distribution, showing hour-by-hour state across a 24-hour dial.
+
+**Data Model:**
+- `DayDialHourState` — represents the state of a single hour (0-23):
+  - `hour` — hour index (0-23)
+  - `kind` — `DialHourKind` enum: `idle`, `sleep`, `pomodoroCompleted`, `pomodoroPlanned`, `event`
+  - `fillFraction` — 0.0-1.0, how much of this hour is covered by activity
+  - `habitIconName` — optional, set if a habit is scheduled at this hour
+  - `habitId` — optional, reference to the habit
+  - `reminderIconName` — optional, set if a reminder is scheduled at this hour
+  - `reminderId` — optional, reference to the reminder
+
+**Service:**
+- `DayDialAggregatorService` — computes hour states from vault objects:
+  - Aggregates completed Pomodoro sessions
+  - Includes planned Pomodoro Events
+  - Includes scheduled Events
+  - Includes Habit slots with times
+  - Includes Reminders with times
+  - Respects sleep schedule (if configured)
+
+**Widget:**
+- `DayDialWidget` — renders the circular dial:
+  - Configurable size (small/medium/large)
+  - Theme integration (uses AppColors)
+  - Interactive tap on hours to show details
+  - Legend for color coding
+  - Current time indicator
+  - Optional summary stats (total productive hours, etc.)
+
+**Use Cases:**
+- Dashboard panel showing daily activity distribution
+- Planner day view integration
+- Statistics screen daily breakdown
+- Home screen widget (Android/iOS)
+- Windows companion app (see PART 19.11)
+
+---
+
+## PART 19.11 — WEEK TIME GRID (new in V5.3)
+
+**Purpose:** Weekly calendar grid view showing Tasks and Habits across 7 days with time-based layout.
+
+**Widget:** `WeekTimeGrid`
+- Displays 7-day week starting from `startOfWeek`
+- Shows day names (Mon-Sun) and dates in header
+- Highlights current day with primary color
+- Time column on the left (hourly slots)
+- Grid cells show:
+  - Tasks with scheduled times
+  - Habits with scheduled slots
+  - Color-coded by type/priority
+- Interactive tap on items:
+  - `onTaskTap` — callback for Task selection
+  - `onHabitTap` — callback for Habit selection
+- Navigates to `UniversalDetailView` on tap
+
+**Data:**
+- `tasks` — List of Tasks to display
+- `habits` — List of Habits to display
+- `startOfWeek` — DateTime for Monday of the week
+
+**Styling:**
+- Uses `AppTheme.surfaceVariantColor` for background
+- 16dp border radius
+- Primary color for today's date
+- Responsive layout with expanded columns
+
+**Use Cases:**
+- Planner week view
+- Statistics weekly breakdown
+- Project timeline visualization
+- Habit weekly schedule overview
+
+---
+
+## PART 19.12 — WINDOWS DIAL COMPANION APP (new in V5.3)
+
+**Purpose:** Standalone Windows desktop application displaying DayDialWidget with real-time updates.
+
+**Entry Point:** `windows_dial_main.dart`
+- Initializes Flutter app with Riverpod
+- Loads vault data on startup
+- Sets up ProviderContainer with vault and settings providers
+
+**App Structure:**
+- `WindowsDialApp` — MaterialApp with Quartzo theme
+- `WindowsDialHome` — main screen with DayDialWidget
+- Auto-refresh timer — updates every minute to show current time
+- Date selector — user can change selected date
+
+**Features:**
+- Real-time current time indicator
+- Date navigation (previous/next day)
+- Vault integration (loads Tasks, Habits, Pomodoro sessions)
+- Google Calendar integration (via googleapis package)
+- Pomodoro provider integration
+- Settings provider integration
+
+**UI Components:**
+- `DayDialWidget` — circular dial visualization
+- Date picker for selecting different days
+- Refresh timer (1-minute interval)
+- Theme integration with AppColors
+
+**Use Cases:**
+- Desktop companion for productivity tracking
+- Always-on daily activity monitor
+- Secondary screen dashboard
+- Windows-specific widget implementation
+
+---
+
+## PART 19.6 — ALIGNMENT TRACKING (new in V5.3)
+
+**Purpose:** Track how closely actual execution matches planned timing for Tasks and Habits.
+
+**Data Model:**
+- `AlignmentLogEntry` — records a single alignment measurement:
+  - `itemId` — ID of the Task or Habit
+  - `date` — date of completion (yyyy-mm-dd)
+  - `plannedTime` — scheduled time (HH:mm)
+  - `actualTime` — actual completion time (HH:mm)
+  - `deltaMinutes` — signed difference (actual - planned)
+  - `state` — `AlignmentState` enum: `early`, `aligned`, `drifting`, `missed`
+
+**Alignment States:**
+- `early` — completed before planned time, within 3× flexibility window
+- `aligned` — completed within flexibility window (default ±15 minutes)
+- `drifting` — completed after planned time, within 3× flexibility window
+- `missed` — completed outside 3× flexibility window
+
+**Service:**
+- `AlignmentService` — logs and computes alignment:
+  - `logTaskAlignment()` — logs alignment when a Task is completed
+  - `logHabitAlignment()` — logs alignment when a Habit slot is completed
+  - `calculateState()` — computes state from delta and flexibility window
+
+**Storage:**
+- Alignment entries stored in daily notes as ```alignment``` code blocks
+- Format: key-value pairs in markdown code block
+- Parsed back into AlignmentLogEntry objects on load
+
+**UI:**
+- `AlignmentInsightsPanel` — shows alignment statistics:
+  - Overall alignment rate (percentage of "aligned" entries)
+  - Distribution by state (early/aligned/drifting/missed)
+  - Average delta minutes
+  - Trend over time (chart)
+  - Per-item breakdown
+
+**Integration:**
+- Task: `flexibilityWindowMinutes` field (null = off)
+- HabitSlot: inherits from parent Habit's `flexibilityWindowMinutes`
+- Both require `scheduledTime` to be alignment-trackable
+
+---
+
+## PART 19.7 — OVERDUE DETAIL SCREEN (new in V5.3)
+
+**Purpose:** Dedicated screen for viewing and managing overdue Tasks, Habits, and Goals.
+
+**Screen:** `OverdueDetailScreen`
+- Shows all overdue items grouped by type (Tasks, Habits, Goals)
+- Each item shows:
+  - Title and type icon
+  - Due date (how many days overdue)
+  - Priority badge
+  - Quick actions: "Reschedule", "Mark complete", "Snooze"
+- Empty state: "No overdue items" with checkmark icon
+- Integrated with `OverdueProvider` for reactive state updates
+
+**Provider:** `OverdueProvider`
+- Computes overdue items from vault
+- Filters by due date < today
+- Groups by object type
+- Reactive to vault changes
+
+**Navigation:**
+- Accessible from:
+  - More menu → "Overdue"
+  - Dashboard overdue panel (if configured)
+  - Notification tap on overdue reminder
+
+**Actions:**
+- "Reschedule" — opens date picker to set new due date
+- "Mark complete" — marks item as completed
+- "Snooze" — defers reminder by configurable duration (default 1 day)
+
+---
+
+## PART 19.8 — OCR SERVICE (new in V5.3)
+
+**Purpose:** Extract text from images using Google ML Kit.
+
+**Service:** `OcrService`
+- `extractText(File imageFile)` — extracts text from image
+- Returns `OcrResult`:
+  - `text` — extracted text string
+  - `hasText` — boolean, true if text found
+  - `blockCount` — number of text blocks detected
+- Uses `TextRecognizer` with Latin script
+- `dispose()` — cleans up recognizer resources
+
+**Integration:**
+- Scan document flow — OCR on captured photos
+- Photo attachments — optional OCR on upload
+- Resource covers — OCR for book/movie text extraction
+- Social Post images — OCR for text content extraction
+
+**UI:**
+- `OcrTextSection` — displays OCR results:
+  - Editable text field with extracted content
+  - "Retry OCR" button
+  - Confidence indicator (if available)
+  - Copy to clipboard action
+
+---
+
+## PART 19.9 — COLLECTION ROW SERVICE (new in V5.3)
+
+**Purpose:** Parse Collection Note body into structured rows for Obsidian Bases integration.
+
+**Data Model:**
+- `CollectionRow` — represents a single table row:
+  - `noteSlug` — parent Collection Note slug
+  - `blockId` — optional Obsidian block reference
+  - `lineIndex` — line number in the note body
+  - `rawText` — raw line text
+  - `displayTitle` — parsed title (emoji stripped)
+  - `subtitle` — optional parsed subtitle (after pipe delimiter)
+
+**Service:** `CollectionRowService`
+- `parseRows(Note note)` — parses note body into rows
+- Supports emoji stripping (leading emoji removed from title)
+- Supports pipe (::) delimiter for subtitle
+- Supports block references (^block-id)
+- Skips empty lines and headers (lines starting with #)
+
+**Helper:** `slugify(String value)`
+- Converts display title to kebab-case slug
+- Removes accents (é → e, ç → c, etc.)
+- Replaces spaces with hyphens
+- Removes non-alphanumeric characters (except hyphens)
+
+**Integration:**
+- Collection Notes using Obsidian Bases plugin
+- Each row represents a real Obsidian note file
+- "Add row" creates new note in Collection's folder
+- Row edits update the underlying note file
+
+---
+
+## PART 19.10 — AUTOMATION SERVICE ENHANCEMENTS (new in V5.3)
+
+**Enhanced Service:** `AutomationService`
+- Expanded action types:
+  - `add_entry` — creates Journal Entry
+  - `create_task` — creates Task
+  - `create_note` — creates Note
+  - `update_kpi` — updates KPI value
+  - `send_notification` — sends push/popup notification
+  - `open_url` — opens URL in browser
+  - `custom_script` — executes custom script (future)
+
+**Execution Triggers:**
+- Habit slot completion (`slot_complete`)
+- Habit day completion (`day_complete`)
+- Tracker record save (`tracking_record_saved`)
+
+**HabitSlot Actions (new):**
+- Per-slot `actions` field in addition to habit-level actions
+- Executes when individual slot is completed
+- Supports slot-specific automation (e.g., different actions for morning vs evening slots)
+
+**Service Methods:**
+- `executeHabitSlotActions()` — executes slot-level actions
+- `executeHabitActions()` — executes habit-level day actions
+- `executeTrackerActions()` — executes tracker record actions
+- `_executeActionDef()` — core action execution logic
 
 ---
 

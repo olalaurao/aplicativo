@@ -59,13 +59,13 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
+                            color: AppTheme.accentColor(context).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.add_rounded,
                             size: 20,
-                            color: AppColors.primary,
+                            color: AppTheme.accentColor(context),
                           ),
                         ),
                         onPressed: () {
@@ -136,7 +136,7 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
       _OrganizerSection(
         'Areas',
         Icons.layers_outlined,
-        AppColors.primary,
+        AppTheme.accentColor(context),
         organizers.where((o) => o.organizerType == OrganizerType.area).toList(),
       ),
       _OrganizerSection(
@@ -162,7 +162,7 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
       _OrganizerSection(
         'Trackers',
         Icons.analytics_outlined,
-        AppColors.primary,
+        AppTheme.accentColor(context),
         trackers,
       ),
       _OrganizerSection(
@@ -208,7 +208,7 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
         return _OrganizerSection(
           root.title,
           _typeIcon(root.organizerType),
-          root.color != null ? _parseColor(root.color!) : AppColors.primary,
+          root.color != null ? _parseColor(root.color!) : AppTheme.accentColor(context),
           [root, ...organizers.where((o) => o.parentId == root.id)],
         );
       }).toList();
@@ -279,7 +279,7 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
                 Icon(
                   Icons.category_outlined,
                   size: 56,
-                  color: AppColors.primary.withValues(alpha: 0.3),
+                  color: AppTheme.accentColor(context).withValues(alpha: 0.3),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -472,21 +472,21 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
                   selected: _activeFilter == f,
                   onSelected: (val) => setState(() => _activeFilter = f),
                   backgroundColor: Colors.transparent,
-                  selectedColor: AppColors.primary.withValues(alpha: 0.1),
+                  selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.1),
                   labelStyle: TextStyle(
                     fontSize: 12,
                     fontWeight: _activeFilter == f
                         ? FontWeight.w700
                         : FontWeight.w500,
                     color: _activeFilter == f
-                        ? AppColors.primary
+                        ? AppTheme.accentColor(context)
                         : AppColors.textSecondary,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                     side: BorderSide(
                       color: _activeFilter == f
-                          ? AppColors.primary
+                          ? AppTheme.accentColor(context)
                           : AppColors.divider,
                     ),
                   ),
@@ -503,7 +503,7 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
     try {
       return Color(int.parse(hex.replaceAll('#', '0xFF')));
     } catch (_) {
-      return AppColors.primary;
+      return AppTheme.accentColor(context);
     }
   }
 
@@ -527,6 +527,10 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
         return Icons.loop_rounded;
       case OrganizerType.tracker:
         return Icons.analytics_outlined;
+      case OrganizerType.dayTheme:
+        return Icons.wb_sunny_outlined;
+      case OrganizerType.timeBlock:
+        return Icons.timer_outlined;
     }
   }
 }

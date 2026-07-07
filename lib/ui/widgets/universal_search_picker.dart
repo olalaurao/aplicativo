@@ -246,7 +246,7 @@ class _UniversalSearchPickerSheetState
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: AppTheme.accentColor(context),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -282,14 +282,14 @@ class _UniversalSearchPickerSheetState
       child: ChoiceChip(
         label: Text(label),
         selected: isSelected,
-        selectedColor: AppColors.primary.withValues(alpha: 0.1),
+        selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.1),
         labelStyle: TextStyle(
-          color: isSelected ? AppColors.primary : AppColors.textSecondary,
+          color: isSelected ? AppTheme.accentColor(context) : AppColors.textSecondary,
           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
           fontSize: 12,
         ),
         side: isSelected
-            ? const BorderSide(color: AppColors.primary)
+            ? BorderSide(color: AppTheme.accentColor(context))
             : BorderSide(color: AppColors.textMuted.withValues(alpha: 0.3)),
         onSelected: (val) {
           if (!val) return;
@@ -405,11 +405,11 @@ class _UniversalSearchPickerSheetState
       switch (obj.organizerType) {
         case OrganizerType.area:
           icon = Icons.layers_outlined;
-          color = AppColors.primary;
+          color = AppTheme.accentColor(context);
           break;
         case OrganizerType.project:
           icon = Icons.folder_outlined;
-          color = AppColors.primary;
+          color = AppTheme.accentColor(context);
           break;
         case OrganizerType.label:
           icon = Icons.label_outline_rounded;
@@ -439,7 +439,7 @@ class _UniversalSearchPickerSheetState
           break;
         case 'note':
           icon = Icons.article_outlined;
-          color = AppColors.primary;
+          color = AppTheme.accentColor(context);
           break;
         case 'idea':
           icon = Icons.lightbulb_outline_rounded;
@@ -447,15 +447,15 @@ class _UniversalSearchPickerSheetState
           break;
         case 'resource':
           icon = Icons.menu_book_outlined;
-          color = AppColors.primary;
+          color = AppTheme.accentColor(context);
           break;
         case 'social_post':
           icon = Icons.bookmarks_outlined;
-          color = AppColors.primary;
+          color = AppTheme.accentColor(context);
           break;
         case 'person':
           icon = Icons.person_outline_rounded;
-          color = AppColors.primary;
+          color = AppTheme.accentColor(context);
           break;
         default:
           icon = Icons.radio_button_unchecked_rounded;
@@ -486,6 +486,10 @@ class _UniversalSearchPickerSheetState
           return 'Hábito';
         case OrganizerType.tracker:
           return 'Rastreador';
+      case OrganizerType.dayTheme:
+        return 'Tema do Dia';
+      case OrganizerType.timeBlock:
+        return 'Bloco de Tempo';
       }
     }
     switch (obj.type) {
@@ -576,7 +580,7 @@ class _UniversalSearchPickerSheetState
                   return ListTile(
                     leading: Icon(
                       t['icon'] as IconData,
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                     ),
                     title: Text(t['label'] as String),
                     onTap: () async {

@@ -11,8 +11,6 @@ import '../../providers/history_provider.dart';
 import '../../providers/systems_provider.dart';
 import '../../models/content_object.dart';
 import '../../models/note_model.dart';
-import '../../models/journal_entry.dart';
-import '../../models/task_model.dart';
 import '../../models/organizer_model.dart';
 import '../../models/system_model.dart';
 import '../../models/event_model.dart';
@@ -84,7 +82,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
       case 'note':
         return AppColors.habitPink;
       case 'entry':
-        return AppColors.primary;
+        return AppTheme.accentColor(context);
       case 'goal':
         return AppColors.habitGreen;
       case 'habit':
@@ -94,7 +92,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
       case 'tracker':
         return AppColors.error;
       case 'system':
-        return AppColors.primary;
+        return AppTheme.accentColor(context);
       case 'event':
         return AppColors.info;
       default:
@@ -331,16 +329,16 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                               controller: _searchController,
                               focusNode: _searchFocus,
                               onChanged: (_) => setState(() {}),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w500,
                               ),
                               decoration: InputDecoration(
                                 hintText: 'O que você precisa?',
                                 border: InputBorder.none,
-                                prefixIcon: const Icon(
+                                prefixIcon: Icon(
                                   Icons.search_rounded,
-                                  color: AppColors.primary,
+                                  color: AppTheme.accentColor(context),
                                 ),
                                 suffixIcon: isSearching
                                     ? IconButton(
@@ -494,7 +492,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 16, color: AppColors.primary),
+                Icon(icon, size: 16, color: AppTheme.accentColor(context)),
                 const SizedBox(width: 8),
                 Text(
                   label,
@@ -621,7 +619,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
         action: entry != null
             ? SnackBarAction(
                 label: 'Desfazer',
-                textColor: AppColors.primary,
+                textColor: AppTheme.accentColor(context),
                 onPressed: () {
                   ref.read(historyProvider.notifier).push(obj);
                 },
@@ -669,7 +667,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
 
   Widget _buildSystemChip(SystemDefinition system) {
     return Material(
-      color: AppColors.primary.withValues(alpha: 0.07),
+      color: AppTheme.accentColor(context).withValues(alpha: 0.07),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: () => _quickRunSystem(system),
@@ -681,7 +679,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.18),
+              color: AppTheme.accentColor(context).withValues(alpha: 0.18),
             ),
           ),
           child: Column(
@@ -689,18 +687,18 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
             children: [
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.play_circle_outline_rounded,
                     size: 16,
-                    color: AppColors.primary,
+                    color: AppTheme.accentColor(context),
                   ),
-                  const SizedBox(width: 4),
+                  SizedBox(width: 4),
                   Text(
                     '${system.runCount}x',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
+                      color: AppTheme.accentColor(context),
                     ),
                   ),
                 ],
@@ -758,7 +756,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
   }
 
   Widget _buildEventTile(Event event) {
-    final dotColor = AppColors.info;
+    const dotColor = AppColors.info;
     final isToday =
         event.date.day == DateTime.now().day &&
         event.date.month == DateTime.now().month &&
@@ -778,7 +776,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
             Container(
               width: 8,
               height: 8,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: dotColor,
                 shape: BoxShape.circle,
               ),

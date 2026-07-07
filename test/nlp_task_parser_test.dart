@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:citrine/services/nlp_task_parser.dart';
-import 'package:citrine/models/task_model.dart';
-import 'package:citrine/models/scheduler.dart';
+import 'package:quartzo/services/nlp_task_parser.dart';
+import 'package:quartzo/models/task_model.dart';
+import 'package:quartzo/models/scheduler.dart';
 
 void main() {
   group('NLP Task Parser Tests', () {

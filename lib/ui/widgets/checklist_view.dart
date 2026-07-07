@@ -101,7 +101,7 @@ class _ChecklistViewState extends ConsumerState<ChecklistView> {
           ),
           controlAffinity: ListTileControlAffinity.leading,
           dense: true,
-          activeColor: AppColors.primary,
+          activeColor: AppTheme.accentColor(context),
         );
       },
     );

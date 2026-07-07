@@ -39,7 +39,7 @@ class AlignmentInsightsPanel extends StatelessWidget {
                 width: 4,
                 height: 24,
                 decoration: BoxDecoration(
-                  color: AppColors.accent,
+                  color: AppTheme.accentColor(context),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -77,7 +77,7 @@ class AlignmentInsightsPanel extends StatelessWidget {
                 width: 4,
                 height: 24,
                 decoration: BoxDecoration(
-                  color: AppColors.accent,
+                  color: AppTheme.accentColor(context),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -136,7 +136,7 @@ class AlignmentInsightsPanel extends StatelessWidget {
                 return FlSpot(index.toDouble(), yValue);
               }),
               isCurved: true,
-              color: AppColors.accent,
+              color: AppTheme.accentColor(context),
               barWidth: 2,
               isStrokeCapRound: true,
               dotData: FlDotData(
@@ -182,7 +182,7 @@ class AlignmentInsightsPanel extends StatelessWidget {
       children: [
         _buildStatChip('On Time', '$aligned/$total', AppColors.success),
         const SizedBox(width: 8),
-        _buildStatChip('Rate', '${alignmentRate.toStringAsFixed(0)}%', AppColors.accent),
+        _buildStatChip('Rate', '${alignmentRate.toStringAsFixed(0)}%', AppColors.primary),
         const SizedBox(width: 8),
         _buildStatChip('Avg Drift', '${averageDelta.toStringAsFixed(0)}m', AppColors.textSecondary),
       ],
@@ -202,7 +202,7 @@ class AlignmentInsightsPanel extends StatelessWidget {
         children: [
           Text(
             '$label: ',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 12,
               color: AppColors.textSecondary,
               fontWeight: FontWeight.w500,
@@ -225,19 +225,19 @@ class AlignmentInsightsPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.accent.withValues(alpha: 0.05),
+        color: AppColors.primary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.2),
+          color: AppColors.primary.withValues(alpha: 0.2),
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
+          const Icon(
             Icons.lightbulb_outline,
             size: 18,
-            color: AppColors.accent,
+            color: AppColors.primary,
           ),
           const SizedBox(width: 8),
           Expanded(

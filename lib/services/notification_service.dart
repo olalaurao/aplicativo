@@ -618,7 +618,7 @@ class NotificationService with WidgetsBindingObserver {
       await _notifications.zonedSchedule(
         id,
         title,
-        config.notificationBody ?? 'Citrine Reminder',
+        config.notificationBody ?? 'Quartzo Reminder',
         tz.TZDateTime.from(time, tz.local),
         details,
         androidScheduleMode: isAlarm
@@ -634,7 +634,7 @@ class NotificationService with WidgetsBindingObserver {
         await _notifications.zonedSchedule(
           id,
           title,
-          config.notificationBody ?? 'Citrine Reminder',
+          config.notificationBody ?? 'Quartzo Reminder',
           tz.TZDateTime.from(time, tz.local),
           details,
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
@@ -974,7 +974,7 @@ class NotificationService with WidgetsBindingObserver {
 
   Future<void> _checkPendingPayloadFromNative() async {
     try {
-      const channel = MethodChannel('com.productivity.citrine/settings');
+      const channel = MethodChannel('com.productivity.Quartzo/settings');
       final payload = await channel.invokeMethod<String>(
         'getAndClearPendingPayload',
       );
@@ -1000,7 +1000,7 @@ class NotificationService with WidgetsBindingObserver {
   Future<void> _bringAppToForeground() async {
     if (!Platform.isAndroid) return;
     try {
-      const channel = MethodChannel('com.productivity.citrine/settings');
+      const channel = MethodChannel('com.productivity.Quartzo/settings');
       await channel.invokeMethod('bringAppToForeground');
     } catch (e) {
       debugPrint('NotificationService: bringAppToForeground failed: $e');

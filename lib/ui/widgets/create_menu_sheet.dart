@@ -68,7 +68,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
       'energia' => AppColors.info,
       'humor' => AppColors.success,
       'encontro' => AppColors.habitPink,
-      _ => AppColors.primary,
+      _ => AppTheme.accentColor(context),
     };
   }
 
@@ -137,13 +137,13 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? AppColors.primary : AppColors.textMuted,
+                color: isSelected ? AppTheme.accentColor(context) : AppColors.textMuted,
               ),
             ),
             const SizedBox(height: 6),
             Container(
               height: 2,
-              color: isSelected ? AppColors.primary : Colors.transparent,
+              color: isSelected ? AppTheme.accentColor(context) : Colors.transparent,
             ),
           ],
         ),
@@ -264,7 +264,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: AppTheme.accentColor(context),
               foregroundColor: Colors.white,
               minimumSize: const Size(double.infinity, 48),
               shape: RoundedRectangleBorder(
@@ -287,8 +287,8 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
               );
             },
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              side: const BorderSide(color: AppColors.primary),
+              foregroundColor: AppTheme.accentColor(context),
+              side: BorderSide(color: AppTheme.accentColor(context)),
               minimumSize: const Size(double.infinity, 48),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -355,7 +355,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
             ElevatedButton(
               onPressed: _quickTextController.text.trim().isNotEmpty ? _saveQuickObservation : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: AppTheme.accentColor(context),
                 foregroundColor: Colors.white,
                 minimumSize: const Size(double.infinity, 48),
                 shape: RoundedRectangleBorder(
@@ -424,7 +424,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         const Divider(),
         _buildOptionRow(
           icon: Icons.event_note_rounded,
-          color: AppColors.primary,
+          color: AppTheme.accentColor(context),
           label: '📅 Novo evento',
           onTap: () {
             Navigator.pop(context);
@@ -531,7 +531,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
             separatorBuilder: (context, index) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final t = trackers[index];
-              final tColor = Color(int.tryParse(t.color.replaceAll('#', '0xFF')) ?? AppColors.primary.toARGB32());
+              final tColor = Color(int.tryParse(t.color.replaceAll('#', '0xFF')) ?? AppTheme.accentColor(context).toARGB32());
               return ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                 leading: Icon(Icons.show_chart_rounded, color: tColor),
@@ -609,7 +609,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         // Note types
         _buildOptionRow(
           icon: Icons.description_outlined,
-          color: AppColors.primary,
+          color: AppTheme.accentColor(context),
           label: '📝 Nota de texto',
           onTap: () {
             Navigator.pop(context);
@@ -692,7 +692,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         // Organizer types (from former Organize tab)
         _buildOptionRow(
           icon: Icons.layers_outlined,
-          color: AppColors.primary,
+          color: AppTheme.accentColor(context),
           label: '🗂 Organizer',
           onTap: () {
             Navigator.pop(context);

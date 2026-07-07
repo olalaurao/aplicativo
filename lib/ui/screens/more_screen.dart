@@ -61,9 +61,9 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
         actions: [
           if (_isEditingNav)
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.add_link_rounded,
-                color: AppColors.primary,
+                color: AppTheme.accentColor(context),
               ),
               onPressed: () => _showAddShortcut(context),
             ),
@@ -71,7 +71,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
             icon: Icon(
               _isEditingNav ? Icons.check_rounded : Icons.tune_rounded,
               color: _isEditingNav
-                  ? AppColors.primary
+                  ? AppTheme.accentColor(context)
                   : AppColors.textSecondary,
             ),
             onPressed: () => setState(() => _isEditingNav = !_isEditingNav),
@@ -96,13 +96,13 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               delegate: SliverChildListDelegate([
                 _buildSectionHeader('Navigation & Content'),
                 if (_isEditingNav) ...[
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(bottom: 16),
                     child: Text(
                       'Drag to reorder. Eye icon pins to footer. Shortcuts can be deleted.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.primary,
+                        color: AppTheme.accentColor(context),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -305,9 +305,9 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
       context: context,
       applicationName: 'Citrine',
       applicationVersion: '1.0.0',
-      applicationIcon: const Icon(
+      applicationIcon: Icon(
         Icons.auto_awesome_rounded,
-        color: AppColors.primary,
+        color: AppTheme.accentColor(context),
         size: 48,
       ),
       children: [const Text('Your personal vault and productivity assistant.')],
@@ -406,14 +406,14 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                   height: 36,
                   decoration: BoxDecoration(
                     color:
-                        (item.isCustom ? AppColors.accent : AppColors.primary)
+                        (item.isCustom ? AppTheme.accentColor(context) : AppTheme.accentColor(context))
                             .withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     item.icon,
                     size: 20,
-                    color: item.isCustom ? AppColors.accent : AppColors.primary,
+                    color: item.isCustom ? AppTheme.accentColor(context) : AppTheme.accentColor(context),
                   ),
                 );
 
@@ -465,7 +465,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                           ? Icons.visibility_rounded
                           : Icons.visibility_off_rounded,
                       color: item.inBottomBar
-                          ? AppColors.primary
+                          ? AppTheme.accentColor(context)
                           : AppColors.textMuted,
                       size: 20,
                     ),

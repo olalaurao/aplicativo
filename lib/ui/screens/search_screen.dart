@@ -73,7 +73,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       SearchAction(
         label: 'New Task',
         icon: Icons.add_task_rounded,
-        color: AppColors.primary,
+        color: AppTheme.accentColor(context),
         onExecute: (ctx) => Navigator.push(
           ctx,
           MaterialPageRoute(builder: (_) => const CreateTaskForm()),
@@ -214,15 +214,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     );
                   },
                   backgroundColor: AppColors.surface,
-                  selectedColor: AppColors.primary.withValues(alpha: 0.2),
-                  checkmarkColor: AppColors.primary,
+                  selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.2),
+                  checkmarkColor: AppTheme.accentColor(context),
                   labelStyle: TextStyle(
                     fontSize: 12,
                     fontWeight: _selectedType == null
                         ? FontWeight.w700
                         : FontWeight.w500,
                     color: _selectedType == null
-                        ? AppColors.primary
+                        ? AppTheme.accentColor(context)
                         : AppColors.textSecondary,
                   ),
                 ),
@@ -241,15 +241,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         );
                       },
                       backgroundColor: AppColors.surface,
-                      selectedColor: AppColors.primary.withValues(alpha: 0.2),
-                      checkmarkColor: AppColors.primary,
+                      selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.2),
+                      checkmarkColor: AppTheme.accentColor(context),
                       labelStyle: TextStyle(
                         fontSize: 12,
                         fontWeight: _selectedType == entry.key
                             ? FontWeight.w700
                             : FontWeight.w500,
                         color: _selectedType == entry.key
-                            ? AppColors.primary
+                            ? AppTheme.accentColor(context)
                             : AppColors.textSecondary,
                       ),
                     ),
@@ -350,7 +350,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                   vertical: 5,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(
+                                  color: AppTheme.accentColor(context).withValues(
                                     alpha: 0.12,
                                   ),
                                   borderRadius: BorderRadius.circular(20),
@@ -361,9 +361,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                     Text(
                                       _typeLabels[_selectedType] ??
                                           _selectedType!,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 12,
-                                        color: AppColors.primary,
+                                        color: AppTheme.accentColor(context),
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -381,10 +381,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                           objects,
                                         );
                                       },
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.close_rounded,
                                         size: 14,
-                                        color: AppColors.primary,
+                                        color: AppTheme.accentColor(context),
                                       ),
                                     ),
                                   ],
@@ -528,7 +528,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       {
         'label': 'Projects',
         'icon': Icons.folder_copy_rounded,
-        'color': AppColors.primary,
+        'color': AppTheme.accentColor(context),
       },
       {
         'label': 'People',
@@ -724,6 +724,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           return 'Hábito';
         case OrganizerType.tracker:
           return 'Tracker';
+      case OrganizerType.dayTheme:
+        return 'Tema do Dia';
+      case OrganizerType.timeBlock:
+        return 'Bloco de Tempo';
       }
     }
     switch (obj.type) {
@@ -755,7 +759,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       case 'goal':
         return AppColors.habitOrange;
       case 'project':
-        return AppColors.primary;
+        return AppTheme.accentColor(context);
       case 'idea':
         return AppColors.warning;
       case 'person':
@@ -765,7 +769,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       case 'entry':
         return AppColors.habitPurple;
       case 'note':
-        return AppColors.primary;
+        return AppTheme.accentColor(context);
       default:
         return AppColors.textSecondary;
     }
