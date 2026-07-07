@@ -6,15 +6,16 @@ import '../../providers/vault_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../models/task_model.dart';
+import '../../models/kpi_model.dart';
+import '../../models/mood_model.dart';
 import '../../models/note_model.dart';
-import '../../models/habit_model.dart';
-import '../../services/undo_service.dart';
+import '../../models/organizer_model.dart';
 import '../theme.dart';
 import '../../models/journal_entry.dart';
 import '../../models/tracker_model.dart';
 import '../../models/reminder_model.dart';
 import '../../models/reminder_config.dart';
+import '../../models/task_model.dart';
 import '../widgets/timeline_day_view.dart';
 import '../widgets/week_time_grid.dart';
 import '../widgets/day_dial_widget.dart';
@@ -24,7 +25,8 @@ import '../../providers/google_calendar_provider.dart';
 import 'package:googleapis/calendar/v3.dart' as google_calendar;
 import '../../providers/pomodoro_provider.dart';
 import '../../models/people_model.dart';
-import '../../models/day_theme_model.dart';
+import '../../models/habit_model.dart';
+import '../../services/undo_service.dart';
 import '../../models/project_model.dart';
 import '../../services/rotation_service.dart';
 import '../widgets/object_action_wrapper.dart';
@@ -183,15 +185,15 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       'Sat',
       'Sun',
     ][_selectedDate.weekday - 1];
-    final activeTheme = dayThemes.cast<DayTheme?>().firstWhere(
+    final activeTheme = dayThemes.cast<Organizer?>().firstWhere(
       (theme) => theme != null && theme.daysOfWeek.contains(dayName),
       orElse: () => null,
     );
     final activeTimeBlocks =
         activeTheme == null
-              ? <TimeBlock>[]
+              ? <Organizer>[]
               : timeBlocks
-                    .where((block) => activeTheme.blockIds.contains(block.id))
+                    .where((block) => activeTheme.organizers.any((ref) => ref.matches(block.id, block.slug, block.title)))
                     .toList()
           ..sort((a, b) {
             final aStart = a.timeRanges.isEmpty
@@ -217,7 +219,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       return timeBlocks.any((block) {
         if (block.id != blockId) return false;
         return dayThemes.any((theme) {
-          if (!theme.blockIds.contains(blockId)) return false;
+          if (!theme.organizers.any((ref) => ref.matches(block.id, block.slug, block.title))) return false;
           return isThemeActive(theme.id, date);
         });
       });
@@ -1374,7 +1376,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   Widget _buildTimeBlockSection(
-    TimeBlock block,
+    Organizer block,
     List<Task> tasks,
     List<Habit> habits,
   ) {
@@ -2494,16 +2496,16 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       final dayName = weekDayNames[date.weekday - 1];
       return dayThemes.any(
-        (theme) => theme.id == themeId && theme.daysOfWeek.contains(dayName),
+        (theme) => theme?.id != null && theme!.id == themeId && theme.daysOfWeek.contains(dayName),
       );
     }
 
     bool isBlockActive(String blockId, DateTime date) {
       return timeBlocks.any((block) {
-        if (block.id != blockId) return false;
+        if (block?.id == null || block!.id != blockId) return false;
         return dayThemes.any((theme) {
-          if (!theme.blockIds.contains(blockId)) return false;
-          return isThemeActive(theme.id, date);
+          if (theme == null || !theme.organizers.any((ref) => ref.matches(block.id!, block.slug, block.title))) return false;
+          return isThemeActive(theme.id!, date);
         });
       });
     }

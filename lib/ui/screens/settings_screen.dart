@@ -1588,14 +1588,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             TextButton(
               onPressed: () async {
+                final id = identifier;
+                final dateFmt = dateFormat;
+                final folder = folderController.text.trim().isEmpty
+                    ? 'daily'
+                    : folderController.text.trim();
+                Navigator.pop(ctx);
                 await notifier.updateDailyNoteSettings(
-                  identifier: identifier,
-                  dateFormat: dateFormat,
-                  folder: folderController.text.trim().isEmpty
-                      ? 'daily'
-                      : folderController.text.trim(),
+                  identifier: id,
+                  dateFormat: dateFmt,
+                  folder: folder,
                 );
-                if (ctx.mounted) Navigator.pop(ctx);
               },
               child: const Text('SALVAR'),
             ),
@@ -1657,20 +1660,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           TextButton(
             onPressed: () async {
+              final endpoint = endpointController.text;
+              final apiKey = apiKeyController.text;
+              Navigator.pop(ctx);
               await notifier.updateTikTokResolverSettings(
-                endpoint: endpointController.text,
-                apiKey: apiKeyController.text,
+                endpoint: endpoint,
+                apiKey: apiKey,
               );
-              if (ctx.mounted) Navigator.pop(ctx);
             },
             child: const Text('SALVAR'),
           ),
         ],
       ),
-    ).whenComplete(() {
-      endpointController.dispose();
-      apiKeyController.dispose();
-    });
+    );
   }
 
   void _showIdeaSettingsDialog(
@@ -1757,22 +1759,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             TextButton(
               onPressed: () async {
+                final strategy = currentStrategy;
+                final tag = tagController.text.trim();
+                final folder = folderController.text.trim();
+                Navigator.pop(ctx);
                 await notifier.setIdeaStrategy(
-                  strategy: currentStrategy,
-                  tag: tagController.text.trim(),
-                  folder: folderController.text.trim(),
+                  strategy: strategy,
+                  tag: tag,
+                  folder: folder,
                 );
-                if (ctx.mounted) Navigator.pop(ctx);
               },
               child: const Text('SALVAR'),
             ),
           ],
         ),
       ),
-    ).whenComplete(() {
-      tagController.dispose();
-      folderController.dispose();
-    });
+    );
   }
 
   void _showVaultDialog(BuildContext context, SettingsNotifier notifier) {
@@ -1857,9 +1859,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           FilledButton(
             onPressed: () async {
               final value = controller.text.trim();
+              Navigator.pop(context);
               await notifier.updateGoogleBooksApiKey(value);
               ref.read(googleBooksApiKeyProvider.notifier).state = value;
-              if (context.mounted) Navigator.pop(context);
             },
             child: const Text('Save'),
           ),
@@ -1893,8 +1895,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           FilledButton(
             onPressed: () async {
               final value = controller.text.trim();
+              Navigator.pop(context);
               await notifier.updateOmdbApiKey(value);
-              if (context.mounted) Navigator.pop(context);
             },
             child: const Text('Save'),
           ),

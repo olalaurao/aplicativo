@@ -22,7 +22,7 @@ import '../models/people_model.dart';
 import '../models/project_model.dart';
 import '../models/snapshot_model.dart';
 import '../models/system_model.dart';
-import '../models/day_theme_model.dart';
+
 import '../models/template_model.dart';
 import '../models/idea_model.dart';
 import '../models/event_model.dart';
@@ -345,6 +345,8 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                   type == 'activity' ||
                   type == 'place' ||
                   type == 'label' ||
+                  type == 'day_theme' ||
+                  type == 'time_block' ||
                   (type == 'task' && relativePath.startsWith('organizers/')) ||
                   (type == 'goal' && relativePath.startsWith('organizers/')) ||
                   (type == 'habit' && relativePath.startsWith('organizers/')) ||
@@ -352,7 +354,21 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                       relativePath.startsWith('organizers/'))) {
                 if (frontmatter['organizer_type'] == null &&
                     type != 'organizer') {
-                  frontmatter['organizer_type'] = type;
+                  if (type == 'day_theme') {
+                    frontmatter['organizer_type'] = 'dayTheme';
+                  } else if (type == 'time_block') {
+                    frontmatter['organizer_type'] = 'timeBlock';
+                  } else {
+                    frontmatter['organizer_type'] = type;
+                  }
+                }
+                
+                // Map day_theme block_ids to organizers
+                if (frontmatter['organizer_type'] == 'dayTheme' && frontmatter['block_ids'] != null) {
+                  final blocks = frontmatter['block_ids'] as List;
+                  final mapped = blocks.map((b) => '[[time_block/$b]]').toList();
+                  final existing = frontmatter['organizers'] as List? ?? [];
+                  frontmatter['organizers'] = [...existing, ...mapped];
                 }
                 obj = organizer_model.Organizer.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
@@ -408,12 +424,6 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                   body,
                   relativePath,
                 );
-              } else if (type == 'time_block') {
-                obj = TimeBlock.fromMap(frontmatter, body: body)
-                  ..obsidianPath = relativePath;
-              } else if (type == 'day_theme') {
-                obj = DayTheme.fromMap(frontmatter, body: body)
-                  ..obsidianPath = relativePath;
               } else if (type == 'template') {
                 obj = TemplateDefinition.fromMap(
                   frontmatter,

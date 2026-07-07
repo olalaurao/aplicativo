@@ -5,12 +5,12 @@ import 'package:intl/intl.dart';
 import '../../providers/vault_provider.dart';
 import '../../models/task_model.dart';
 import '../../models/habit_model.dart';
-import '../../models/day_theme_model.dart';
+import '../../models/organizer_model.dart';
 import '../../services/scheduler_service.dart';
 import '../theme.dart';
 
 class _ThemeForecast {
-  final DayTheme theme;
+  final Organizer theme;
   final List<DateTime> activeDates;
   final List<Task> tasks;
   final List<Habit> habits;
@@ -51,16 +51,16 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
       const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       final dayName = weekDayNames[date.weekday - 1];
       return dayThemes.any(
-        (theme) => theme.id == themeId && theme.daysOfWeek.contains(dayName),
+        (theme) => theme?.id != null && theme!.id == themeId && theme.daysOfWeek.contains(dayName),
       );
     }
 
     bool isBlockActive(String blockId, DateTime date) {
       return timeBlocks.any((block) {
-        if (block.id != blockId) return false;
+        if (block?.id == null || block!.id != blockId) return false;
         return dayThemes.any((theme) {
-          if (!theme.blockIds.contains(blockId)) return false;
-          return isThemeActive(theme.id, date);
+          if (theme == null || !theme.organizers.any((ref) => ref.matches(block.id!, block.slug, block.title))) return false;
+          return isThemeActive(theme.id!, date);
         });
       });
     }
@@ -413,7 +413,7 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
   }
 
   Widget _buildThemeForecastView(
-    List<DayTheme> dayThemes,
+    List<Organizer> dayThemes,
     List<Task> tasks,
     List<Habit> habits,
     bool Function(String, DateTime) isThemeActive,
@@ -437,7 +437,7 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
 
     final forecasts = dayThemes.map((theme) {
       final activeDates = dates
-          .where((d) => isThemeActive(theme.id, d))
+          .where((d) => theme.id != null && isThemeActive(theme.id!, d))
           .toList();
 
       final themeTasks = tasks.where((t) {

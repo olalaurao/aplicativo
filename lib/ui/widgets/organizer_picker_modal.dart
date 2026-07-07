@@ -18,8 +18,9 @@ import '../theme.dart';
 Future<List<OrganizerReference>?> showOrganizerPickerModal(
   BuildContext context,
   WidgetRef ref,
-  List<OrganizerReference> initialSelected,
-) async {
+  List<OrganizerReference> initialSelected, {
+  String initialFilter = 'all',
+}) async {
   final allObjects = await ref.read(allObjectsProvider.future);
   final List<ContentObject> mutableObjects = List.from(
     allObjects.where((o) => o.title.isNotEmpty),
@@ -29,7 +30,7 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
 
   final SearchService searchService = SearchService();
   String searchQuery = '';
-  String selectedFilter = 'all';
+  String selectedFilter = initialFilter;
   List<OrganizerReference> selected = List.from(initialSelected);
 
   IconData getIconForType(String type) {
@@ -169,6 +170,11 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
         'label': 'Recurso',
         'icon': Icons.menu_book_outlined,
       },
+      {
+        'type': 'label',
+        'label': 'Etiqueta (Label)',
+        'icon': Icons.label_outlined,
+      },
     ];
 
     showModalBottomSheet<void>(
@@ -257,6 +263,13 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
                           organizerType: OrganizerType.area,
                           createdAt: DateTime.now(),
                         );
+                      } else if (t['type'] == 'label') {
+                        newObj = Organizer(
+                          id: id,
+                          title: title,
+                          organizerType: OrganizerType.label,
+                          createdAt: DateTime.now(),
+                        );
                       } else if (t['type'] == 'person') {
                         newObj = Person(
                           id: id,
@@ -320,6 +333,11 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
               if (selectedFilter == 'area') {
                 if (obj is! Organizer ||
                     (obj).organizerType != OrganizerType.area) {
+                  return false;
+                }
+              } else if (selectedFilter == 'label') {
+                if (obj is! Organizer ||
+                    (obj).organizerType != OrganizerType.label) {
                   return false;
                 }
               } else if (selectedFilter == 'project') {
@@ -423,6 +441,9 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
                         setModalState(() => selectedFilter = val);
                       }),
                       buildFilterChip('note', 'Notas', selectedFilter, (val) {
+                        setModalState(() => selectedFilter = val);
+                      }),
+                      buildFilterChip('label', 'Labels', selectedFilter, (val) {
                         setModalState(() => selectedFilter = val);
                       }),
                       buildFilterChip('resource', 'Recursos', selectedFilter, (

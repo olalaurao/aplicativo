@@ -84,8 +84,8 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
               actions: _isMultiSelectMode
                   ? [
                       IconButton(
-                        tooltip: 'Adicionar a coleção',
-                        icon: const Icon(Icons.collections_bookmark_outlined),
+                        tooltip: 'Adicionar a label',
+                        icon: const Icon(Icons.label_outlined),
                         onPressed: _selectedIds.isEmpty
                             ? null
                             : () => _addSelectedToCollection(posts),
@@ -107,8 +107,8 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
                     ]
                   : [
                       IconButton(
-                        tooltip: 'Coleções',
-                        icon: const Icon(Icons.folder_outlined),
+                        tooltip: 'Labels',
+                        icon: const Icon(Icons.label_outlined),
                         onPressed: () =>
                             _scaffoldKey.currentState?.openDrawer(),
                       ),
@@ -486,6 +486,7 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
       context,
       ref,
       const [],
+      initialFilter: 'label',
     );
     if (!mounted || selectedOrganizers == null || selectedOrganizers.isEmpty) {
       return;
@@ -567,8 +568,8 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
       child: Align(
         alignment: Alignment.centerLeft,
         child: InputChip(
-          label: Text(_selectedOrganizerLabel ?? 'Coleção'),
-          avatar: const Icon(Icons.folder_outlined, size: 16),
+          label: Text(_selectedOrganizerLabel ?? 'Label'),
+          avatar: const Icon(Icons.label_outlined, size: 16),
           onDeleted: () => setState(() {
             _selectedOrganizerFilter = null;
             _selectedOrganizerLabel = null;
@@ -582,11 +583,12 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
     final counts = <String, ({OrganizerReference organizer, int count})>{};
     var uncategorized = 0;
     for (final post in posts) {
-      if (post.organizers.isEmpty) {
+      final labels = post.organizers.where((o) => o.type == 'label').toList();
+      if (labels.isEmpty) {
         uncategorized++;
         continue;
       }
-      for (final organizer in post.organizers) {
+      for (final organizer in labels) {
         final key = organizer.toWikiLink();
         final current = counts[key];
         counts[key] = (organizer: organizer, count: (current?.count ?? 0) + 1);
@@ -605,7 +607,7 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 8, 20, 12),
               child: Text(
-                'Coleções',
+                'Labels',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
               ),
             ),
@@ -618,15 +620,15 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
             ),
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.folder_off_outlined),
-              title: const Text('Sem coleção'),
+              leading: const Icon(Icons.label_off_outlined),
+              title: const Text('Sem label'),
               trailing: Text('$uncategorized'),
               selected: _selectedOrganizerFilter == '_none',
-              onTap: () => _selectOrganizerFilter('_none', 'Sem coleção'),
+              onTap: () => _selectOrganizerFilter('_none', 'Sem label'),
             ),
             for (final entry in entries)
               ListTile(
-                leading: const Icon(Icons.folder_outlined),
+                leading: const Icon(Icons.label_outlined),
                 title: Text(
                   entry.value.organizer.title,
                   maxLines: 1,
@@ -642,7 +644,7 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
             const Divider(),
             ListTile(
               leading: const Icon(Icons.add_rounded),
-              title: const Text('Nova coleção'),
+              title: const Text('Novo label'),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(

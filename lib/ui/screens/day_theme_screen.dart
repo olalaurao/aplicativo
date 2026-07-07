@@ -1,7 +1,7 @@
 // lib/ui/screens/day_theme_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../models/day_theme_model.dart';
+import '../../models/organizer_model.dart';
 import '../../providers/day_theme_provider.dart';
 import '../theme.dart';
 import '../widgets/app_color_picker.dart';
@@ -141,7 +141,7 @@ class DayThemeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildBlockTile(BuildContext context, WidgetRef ref, TimeBlock block, int reorderIndex) {
+  Widget _buildBlockTile(BuildContext context, WidgetRef ref, Organizer block, int reorderIndex) {
     final color = AppColorPicker.parseHex(
       block.color ?? '#FFB000',
       fallback: AppTheme.accentColor(context),
@@ -194,7 +194,7 @@ class DayThemeScreen extends ConsumerWidget {
         onTap: () => _showBlockDialog(context, ref, block: block)));
   }
 
-  Widget _buildTimeBar(TimeBlock block, Color color) {
+  Widget _buildTimeBar(Organizer block, Color color) {
     if (block.timeRanges.isEmpty) return const SizedBox();
     
     final range = block.timeRanges.first;
@@ -216,8 +216,8 @@ class DayThemeScreen extends ConsumerWidget {
   Widget _buildThemeTile(
     BuildContext context,
     WidgetRef ref,
-    DayTheme theme,
-    List<TimeBlock> blocks,
+    Organizer theme,
+    List<Organizer> blocks,
   ) {
     final themeColor = AppColorPicker.parseHex(
       theme.color ?? '#FFB000',
@@ -270,7 +270,7 @@ class DayThemeScreen extends ConsumerWidget {
   void _showBlockDialog(
     BuildContext context,
     WidgetRef ref, {
-    TimeBlock? block,
+    Organizer? block,
   }) {
     final nameController = TextEditingController(text: block?.title ?? '');
     String selectedColor = AppColorPicker.normalizeHex(
@@ -422,9 +422,10 @@ class DayThemeScreen extends ConsumerWidget {
                     )
                     .toList();
                 if (normalizedRanges.isEmpty) return;
-                final updated = TimeBlock(
+                final updated = Organizer(
                   id: block?.id,
                   title: name,
+                  organizerType: OrganizerType.timeBlock,
                   color: selectedColor,
                   timeRanges: normalizedRanges,
                   order: block?.order ?? ref.read(timeBlocksProvider).length,
@@ -452,7 +453,7 @@ class DayThemeScreen extends ConsumerWidget {
   void _showThemeDialog(
     BuildContext context,
     WidgetRef ref, {
-    DayTheme? theme,
+    Organizer? theme,
   }) {
     final nameController = TextEditingController(text: theme?.title ?? '');
     String selectedColor = AppColorPicker.normalizeHex(
@@ -460,7 +461,7 @@ class DayThemeScreen extends ConsumerWidget {
     );
     final selectedDays = {...?theme?.daysOfWeek};
     final blocks = ref.read(timeBlocksProvider);
-    final selectedBlocks = {...?theme?.blockIds};
+    final selectedBlocks = {...?theme?.organizers.map((o) => o.slug)};
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     showDialog(
@@ -538,12 +539,13 @@ class DayThemeScreen extends ConsumerWidget {
               onPressed: () async {
                 final name = nameController.text.trim();
                 if (name.isEmpty) return;
-                final updated = DayTheme(
+                final updated = Organizer(
                   id: theme?.id,
                   title: name,
+                  organizerType: OrganizerType.dayTheme,
                   color: selectedColor,
                   daysOfWeek: selectedDays.toList(),
-                  blockIds: selectedBlocks.toList(),
+                  organizers: selectedBlocks.map((id) => OrganizerReference(type: 'timeBlock', slug: id, title: '')).toList(),
                 );
                 if (theme != null) updated.obsidianPath = theme.obsidianPath;
                 if (theme == null) {

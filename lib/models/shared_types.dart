@@ -47,6 +47,38 @@ abstract final class ObjectTypes {
   static bool isKnown(String type) => all.contains(type);
 }
 
+class TimeRange {
+  final int startHour;
+  final int startMinute;
+  final int endHour;
+  final int endMinute;
+
+  TimeRange({
+    required this.startHour,
+    required this.startMinute,
+    required this.endHour,
+    required this.endMinute,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'start_hour': startHour,
+      'start_minute': startMinute,
+      'end_hour': endHour,
+      'end_minute': endMinute,
+    };
+  }
+
+  factory TimeRange.fromMap(Map<String, dynamic> map) {
+    return TimeRange(
+      startHour: map['start_hour'] as int? ?? 0,
+      startMinute: map['start_minute'] as int? ?? 0,
+      endHour: map['end_hour'] as int? ?? 0,
+      endMinute: map['end_minute'] as int? ?? 0,
+    );
+  }
+}
+
 enum MarkerType { tag, property, folder }
 
 

@@ -26,6 +26,9 @@ class Organizer extends ContentObject {
   String? icon;
   String? state; // active | paused | completed (for project type)
   String? priority; // none | low | medium | high (for project type)
+  List<TimeRange> timeRanges; // For timeBlock
+  int? energyLevel; // For timeBlock
+  List<String> daysOfWeek; // For dayTheme
 
   Organizer({
     super.id,
@@ -38,6 +41,9 @@ class Organizer extends ContentObject {
     this.icon,
     this.state,
     this.priority,
+    this.timeRanges = const [],
+    this.energyLevel,
+    this.daysOfWeek = const [],
     super.organizers,
     super.categories,
     super.createdAt,
@@ -67,6 +73,11 @@ class Organizer extends ContentObject {
     if (icon != null) frontmatter['icon'] = icon;
     if (state != null) frontmatter['state'] = state;
     if (priority != null) frontmatter['priority'] = priority;
+    if (timeRanges.isNotEmpty) {
+      frontmatter['time_ranges'] = timeRanges.map((tr) => tr.toMap()).toList();
+    }
+    if (energyLevel != null) frontmatter['energy_level'] = energyLevel;
+    if (daysOfWeek.isNotEmpty) frontmatter['days_of_week'] = daysOfWeek;
 
     return generateMarkdown(frontmatter, '');
   }
@@ -99,6 +110,13 @@ class Organizer extends ContentObject {
     organizer.icon = frontmatter['icon'] as String?;
     organizer.state = frontmatter['state'] as String?;
     organizer.priority = frontmatter['priority'] as String?;
+    
+    organizer.timeRanges = (frontmatter['time_ranges'] as List?)
+            ?.map((e) => TimeRange.fromMap(Map<String, dynamic>.from(e as Map)))
+            .toList() ??
+        [];
+    organizer.energyLevel = frontmatter['energy_level'] as int?;
+    organizer.daysOfWeek = List<String>.from(frontmatter['days_of_week'] as List? ?? []);
 
     return organizer;
   }
@@ -113,6 +131,9 @@ class Organizer extends ContentObject {
     String? icon,
     String? state,
     String? priority,
+    List<TimeRange>? timeRanges,
+    int? energyLevel,
+    List<String>? daysOfWeek,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     DateTime? createdAt,
@@ -130,6 +151,9 @@ class Organizer extends ContentObject {
       icon: icon ?? this.icon,
       state: state ?? this.state,
       priority: priority ?? this.priority,
+      timeRanges: timeRanges ?? this.timeRanges,
+      energyLevel: energyLevel ?? this.energyLevel,
+      daysOfWeek: daysOfWeek ?? this.daysOfWeek,
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       createdAt: createdAt ?? this.createdAt,

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../models/task_model.dart';
-import '../../models/day_theme_model.dart';
+import '../../models/organizer_model.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/pomodoro_provider.dart';
 import '../../providers/settings_provider.dart';
@@ -22,7 +22,7 @@ class TimeLineDayView extends ConsumerStatefulWidget {
   final List<Task> tasks;
   final List<google_calendar.Event> googleEvents;
   final List<dynamic> allDayEvents; // Can be tasks, habits, etc.
-  final List<TimeBlock> timeBlocks;
+  final List<Organizer> timeBlocks;
   final DateTime selectedDate;
   final Function(Task, DateTime)? onTaskDrop;
   final Function(Habit, DateTime)? onHabitDrop;

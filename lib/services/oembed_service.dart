@@ -123,9 +123,7 @@ class OEmbedService {
 
     try {
       final result = await switch (platform) {
-        SocialPlatform.tiktok => _fetchOEmbed(
-          'https://www.tiktok.com/oembed?url=${Uri.encodeComponent(normalizedUrl)}',
-        ),
+        SocialPlatform.tiktok => _fetchTikTok(normalizedUrl),
         SocialPlatform.pinterest => _fetchOEmbed(
           'https://www.pinterest.com/oembed/?url=${Uri.encodeComponent(normalizedUrl)}',
         ),
@@ -159,18 +157,7 @@ class OEmbedService {
         }
       }
 
-      if (platform == SocialPlatform.tiktok &&
-          (thumbnailUrl == null || caption == null)) {
-        final og = await _fetchOpenGraph(normalizedUrl);
-        if (og != null) {
-          title = _stringValue(og['title']) ?? title;
-          caption ??=
-              _stringValue(og['description']) ??
-              _stringValue(og['og:description']);
-          thumbnailUrl ??= _stringValue(og['image']);
-          authorName ??= _stringValue(og['site_name']);
-        }
-      }
+      // TikTok fallback already handled inside _fetchTikTok
 
       if (platform == SocialPlatform.pinterest &&
           (thumbnailUrl == null || caption == null)) {
@@ -250,6 +237,64 @@ class OEmbedService {
       debugPrint('OpenGraph request failed: $error');
       return null;
     }
+  }
+
+  /// Tries multiple strategies to get TikTok metadata + thumbnail:
+  /// 1. noembed.com (public oEmbed proxy, more reliable)
+  /// 2. Official tiktok.com/oembed
+  /// 3. Scrape og:image from the TikTok embed page
+  Future<Map<String, dynamic>?> _fetchTikTok(String url) async {
+    // Strategy 1: noembed.com proxy
+    try {
+      final noembedUrl =
+          'https://noembed.com/embed?url=${Uri.encodeComponent(url)}';
+      final result = await _fetchOEmbed(noembedUrl);
+      if (result != null &&
+          (result['thumbnail_url'] != null || result['title'] != null)) {
+        return result;
+      }
+    } catch (_) {}
+
+    // Strategy 2: Official TikTok oEmbed
+    try {
+      final officialUrl =
+          'https://www.tiktok.com/oembed?url=${Uri.encodeComponent(url)}';
+      final result = await _fetchOEmbed(officialUrl);
+      if (result != null && result['thumbnail_url'] != null) {
+        return result;
+      }
+    } catch (_) {}
+
+    // Strategy 3: Scrape og:image from embed page
+    final videoId = RegExp(
+      r'/(?:video|photo)/(\d+)',
+    ).firstMatch(url)?.group(1);
+    if (videoId != null) {
+      try {
+        final embedPage = 'https://www.tiktok.com/embed/v2/$videoId';
+        final response = await http
+            .get(Uri.parse(embedPage), headers: _browserHeaders)
+            .timeout(const Duration(seconds: 10));
+        if (response.statusCode == 200) {
+          final html = response.body;
+          final image =
+              _metaContent(html, 'og:image') ?? _extractJsonLdImage(html);
+          final title = _metaContent(html, 'og:title') ?? _titleTag(html);
+          final description = _metaContent(html, 'og:description');
+          if (image != null) {
+            return {
+              'thumbnail_url': image,
+              if (title != null) 'title': title,
+              if (description != null) 'description': description,
+              'site_name': 'TikTok',
+            };
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Strategy 4: OpenGraph on original URL as last resort
+    return _fetchOpenGraph(url);
   }
 
   Future<Map<String, dynamic>?> _fetchInstagram(String url) async {

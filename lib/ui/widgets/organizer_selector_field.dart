@@ -106,6 +106,11 @@ class OrganizerSelectorField extends ConsumerWidget {
                       (obj).organizerType != OrganizerType.area) {
                     return false;
                   }
+                } else if (selectedFilter == 'label') {
+                  if (obj is! Organizer ||
+                      (obj).organizerType != OrganizerType.label) {
+                    return false;
+                  }
                 } else if (selectedFilter == 'project') {
                   if (obj.type != 'project' &&
                       (obj is! Organizer ||
@@ -216,6 +221,11 @@ class OrganizerSelectorField extends ConsumerWidget {
                           setModalState(() => selectedFilter = val);
                         }),
                         _buildFilterChip('note', 'Notas', selectedFilter, (
+                          val,
+                        ) {
+                          setModalState(() => selectedFilter = val);
+                        }),
+                        _buildFilterChip('label', 'Labels', selectedFilter, (
                           val,
                         ) {
                           setModalState(() => selectedFilter = val);
@@ -431,6 +441,11 @@ class OrganizerSelectorField extends ConsumerWidget {
         'label': 'Recurso',
         'icon': Icons.menu_book_outlined,
       },
+      {
+        'type': 'label',
+        'label': 'Etiqueta (Label)',
+        'icon': Icons.label_outlined,
+      },
     ];
 
     showModalBottomSheet<void>(
@@ -517,6 +532,13 @@ class OrganizerSelectorField extends ConsumerWidget {
                           id: id,
                           title: title,
                           organizerType: OrganizerType.area,
+                          createdAt: DateTime.now(),
+                        );
+                      } else if (t['type'] == 'label') {
+                        newObj = Organizer(
+                          id: id,
+                          title: title,
+                          organizerType: OrganizerType.label,
                           createdAt: DateTime.now(),
                         );
                       } else if (t['type'] == 'person') {

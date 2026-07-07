@@ -24,7 +24,7 @@ import '../models/people_model.dart';
 import '../models/project_model.dart';
 import '../models/snapshot_model.dart';
 import '../models/scheduler.dart';
-import '../models/day_theme_model.dart';
+
 import '../models/template_model.dart';
 import '../models/idea_model.dart';
 import '../models/inbox_model.dart';
@@ -56,13 +56,13 @@ final obsidianServiceProvider = Provider<ObsidianService>((ref) {
 
 String getDailyNoteTemplate(
   String dateStr,
-  List<DayTheme> dayThemes, {
+  List<Organizer> dayThemes, {
   List<Habit> activeHabits = const [],
 }) {
   const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   final parsedDate = DateTime.tryParse(dateStr) ?? DateTime.now();
   final dayName = weekDayNames[parsedDate.weekday - 1];
-  final activeTheme = dayThemes.cast<DayTheme?>().firstWhere(
+  final activeTheme = dayThemes.cast<Organizer?>().firstWhere(
     (theme) => theme?.daysOfWeek.contains(dayName) ?? false,
     orElse: () => null,
   );
@@ -1408,18 +1408,18 @@ final combinedAnalysisProvider =
 
 final analysesProvider = combinedAnalysisProvider;
 
-class TimeBlocksNotifier extends Notifier<List<TimeBlock>> {
+class TimeBlocksNotifier extends Notifier<List<Organizer>> {
   @override
-  List<TimeBlock> build() {
-    return ref.watch(objectsByTypeProvider('time_block')).cast<TimeBlock>();
+  List<Organizer> build() {
+    return ref.watch(objectsByTypeProvider('timeBlock')).cast<Organizer>();
   }
 
-  Future<void> addTimeBlock(TimeBlock timeBlock) async {
+  Future<void> addTimeBlock(Organizer timeBlock) async {
     state = [...state, timeBlock];
     await ref.read(vaultProvider.notifier).createObject(timeBlock);
   }
 
-  Future<void> updateTimeBlock(TimeBlock timeBlock) async {
+  Future<void> updateTimeBlock(Organizer timeBlock) async {
     state = [
       for (final t in state)
         if (t.id == timeBlock.id) timeBlock else t,
@@ -1427,29 +1427,29 @@ class TimeBlocksNotifier extends Notifier<List<TimeBlock>> {
     await ref.read(vaultProvider.notifier).updateObject(timeBlock);
   }
 
-  Future<void> deleteTimeBlock(TimeBlock timeBlock) async {
+  Future<void> deleteTimeBlock(Organizer timeBlock) async {
     state = state.where((t) => t.id != timeBlock.id).toList();
     await ref.read(vaultProvider.notifier).deleteObject(timeBlock);
   }
 }
 
 final timeBlocksProvider =
-    NotifierProvider<TimeBlocksNotifier, List<TimeBlock>>(() {
+    NotifierProvider<TimeBlocksNotifier, List<Organizer>>(() {
       return TimeBlocksNotifier();
     });
 
-class DayThemesNotifier extends Notifier<List<DayTheme>> {
+class DayThemesNotifier extends Notifier<List<Organizer>> {
   @override
-  List<DayTheme> build() {
-    return ref.watch(objectsByTypeProvider('day_theme')).cast<DayTheme>();
+  List<Organizer> build() {
+    return ref.watch(objectsByTypeProvider('dayTheme')).cast<Organizer>();
   }
 
-  Future<void> addDayTheme(DayTheme dayTheme) async {
+  Future<void> addDayTheme(Organizer dayTheme) async {
     state = [...state, dayTheme];
     await ref.read(vaultProvider.notifier).createObject(dayTheme);
   }
 
-  Future<void> updateDayTheme(DayTheme dayTheme) async {
+  Future<void> updateDayTheme(Organizer dayTheme) async {
     state = [
       for (final d in state)
         if (d.id == dayTheme.id) dayTheme else d,
@@ -1457,13 +1457,13 @@ class DayThemesNotifier extends Notifier<List<DayTheme>> {
     await ref.read(vaultProvider.notifier).updateObject(dayTheme);
   }
 
-  Future<void> deleteDayTheme(DayTheme dayTheme) async {
+  Future<void> deleteDayTheme(Organizer dayTheme) async {
     state = state.where((d) => d.id != dayTheme.id).toList();
     await ref.read(vaultProvider.notifier).deleteObject(dayTheme);
   }
 }
 
-final dayThemesProvider = NotifierProvider<DayThemesNotifier, List<DayTheme>>(
+final dayThemesProvider = NotifierProvider<DayThemesNotifier, List<Organizer>>(
   () {
     return DayThemesNotifier();
   },
@@ -2237,8 +2237,7 @@ class VaultNotifier extends Notifier<void> {
     if (object is MoodDefinition) return 'mood_definition';
     if (object is CombinedAnalysis) return 'combined_analysis';
     if (object is WellbeingIndicator) return 'wellbeing_indicator';
-    if (object is TimeBlock) return 'time_block';
-    if (object is DayTheme) return 'day_theme';
+    // TimeBlock and DayTheme are now Organizer.
     if (object is TemplateDefinition) return 'template';
     if (object is organizer_model.Organizer) {
       return object.organizerType.name;

@@ -20,7 +20,7 @@ import '../widgets/universal_search_picker.dart';
 
 enum _DuplicateAction { edit, doNothing, saveAnyway }
 
-enum _LinkAction { createTask, createProject, linkExisting, skip }
+enum _LinkAction { createTask, createProject, linkExisting, addLabel, skip }
 
 class CreateSocialPostForm extends ConsumerStatefulWidget {
   final String? initialUrl;
@@ -671,6 +671,8 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
       await _createAndLinkProject(post);
     } else if (linkAction == _LinkAction.linkExisting) {
       await _linkExistingObject(post);
+    } else if (linkAction == _LinkAction.addLabel) {
+      await _addLabel(post);
     }
 
     if (!mounted) return;
@@ -800,6 +802,12 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
                 title: const Text('Vincular a existente'),
                 onTap: () => Navigator.pop(ctx, _LinkAction.linkExisting),
               ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.label_outlined),
+                title: const Text('Adicionar Label'),
+                onTap: () => Navigator.pop(ctx, _LinkAction.addLabel),
+              ),
               SizedBox(
                 width: double.infinity,
                 child: TextButton(
@@ -881,6 +889,21 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
       object.updatedAt = DateTime.now();
       await ref.read(projectsProvider.notifier).updateProject(object);
     }
+  }
+
+  Future<void> _addLabel(SocialPost post) async {
+    final selectedOrganizers = await showOrganizerPickerModal(
+      context,
+      ref,
+      post.organizers,
+      initialFilter: 'label',
+    );
+    if (selectedOrganizers == null) return;
+    final updatedPost = post.copyWith(
+      organizers: selectedOrganizers,
+      updatedAt: DateTime.now(),
+    );
+    await ref.read(socialPostsProvider.notifier).updatePost(updatedPost);
   }
 
   Future<void> _appendLink(SocialPost post, String refLink) async {

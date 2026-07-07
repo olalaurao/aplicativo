@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/organizer_model.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
 
@@ -47,7 +48,9 @@ class TimeBlockPicker extends ConsumerWidget {
                 onTap: () => onBlockSelected(null),
               ),
               const SizedBox(width: 8),
-              ...blocks.map((block) {
+              ...blocks.asMap().entries.map((entry) {
+                final int index = entry.key;
+                final Organizer block = blocks[index];
                 final isSelected = block.id == selectedBlockId;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
