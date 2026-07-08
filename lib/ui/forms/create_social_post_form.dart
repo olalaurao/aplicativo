@@ -529,6 +529,16 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
         _urlLocked = true;
         _titleController.text = post.title;
         _captionController.text = post.caption ?? '';
+        // Only update the URL field if the post has a proper canonical URL
+        // (contains /video/ or /photo/). Never replace the user's input with
+        // a failed expansion like https://www.tiktok.com/?# or /?_r=1.
+        final resolvedUrl = post.url;
+        final isCanonical = resolvedUrl.contains('/video/') ||
+            resolvedUrl.contains('/photo/');
+        if (isCanonical && resolvedUrl.isNotEmpty &&
+            resolvedUrl != _urlController.text.trim()) {
+          _urlController.text = resolvedUrl;
+        }
       });
     } catch (error) {
       if (!mounted) return;
@@ -708,14 +718,21 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
   }
 
   SocialPost _fallbackDraft() {
-    final url = _normalizeUrl(_urlController.text.trim());
-    final platform = OEmbedService.detectPlatform(url);
+    final originalUrl = _urlController.text.trim();
+    final normalizedUrl = _normalizeUrl(originalUrl);
+    final platform = OEmbedService.detectPlatform(normalizedUrl);
+    
+    // Use originalUrl when our expansion only landed on the TikTok homepage
+    final savedUrl = (normalizedUrl.contains('/video/') || normalizedUrl.contains('/photo/'))
+        ? normalizedUrl
+        : originalUrl;
+
     return SocialPost(
-      title: url.isEmpty ? 'Post social' : url,
-      url: url,
+      title: 'Post social',
+      url: savedUrl,
       platform: platform,
-      mediaType: OEmbedService.detectMediaType(platform, url),
-      embedUrl: OEmbedService.buildEmbedUrl(platform, url),
+      mediaType: OEmbedService.detectMediaType(platform, savedUrl),
+      embedUrl: OEmbedService.buildEmbedUrl(platform, savedUrl),
     );
   }
 
@@ -964,7 +981,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
   }
 
   String _normalizeUrl(String url) {
-    var normalized = url.trim().toLowerCase();
+    var normalized = url.trim();
     // Remove trailing slash
     if (normalized.endsWith('/')) {
       normalized = normalized.substring(0, normalized.length - 1);

@@ -929,6 +929,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const DayThemeScreen(),
           ),
           GoRoute(
+            path: '/time-blocks',
+            builder: (context, state) => const DayThemeScreen(),
+          ),
+          GoRoute(
             path: '/overdue',
             builder: (context, state) => const OverdueDetailScreen(),
           ),

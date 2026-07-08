@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/organizer_model.dart';
 import '../../models/shared_types.dart';
+import '../../models/scheduler.dart';
+import '../../models/reminder_config.dart';
 import '../../providers/vault_provider.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../theme.dart';
+import 'scheduler_picker.dart';
 
 class CreateOrganizerForm extends ConsumerStatefulWidget {
   final OrganizerType? initialType;
@@ -27,6 +30,8 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
   List<String> _daysOfWeek = [];
   List<TimeRange> _timeRanges = [];
   int? _energyLevel;
+  Scheduler? _scheduler;
+  List<ReminderConfig> _reminders = [];
 
   static const _colors = [
     '#DC2626',
@@ -55,6 +60,8 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
       _daysOfWeek = List.from(organizer.daysOfWeek);
       _timeRanges = List.from(organizer.timeRanges);
       _energyLevel = organizer.energyLevel;
+      _scheduler = organizer.scheduler;
+      _reminders = List.from(organizer.reminders);
     }
   }
 
@@ -304,6 +311,65 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
                         );
                       }).toList(),
                     ),
+
+                    const SizedBox(height: 24),
+                    // Scheduler for DayTheme
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.repeat_rounded, size: 20),
+                      title: const Text(
+                        'Scheduler',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        _scheduler != null ? 'Configured' : 'None',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _scheduler != null ? AppTheme.accentColor(context) : AppColors.textMuted,
+                        ),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: _pickScheduler,
+                    ),
+
+                    const SizedBox(height: 24),
+                    // Reminders for DayTheme
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Reminders',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _addReminder,
+                          child: const Text('+ Add Reminder'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    for (var i = 0; i < _reminders.length; i++)
+                      Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.notifications_none, size: 18),
+                          title: Text(
+                            _reminders[i].triggerTime != null
+                                ? '${_reminders[i].triggerTime!.hour.toString().padLeft(2, '0')}:${_reminders[i].triggerTime!.minute.toString().padLeft(2, '0')}'
+                                : 'No time set',
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                            onPressed: () => setState(() => _reminders.removeAt(i)),
+                          ),
+                          onTap: () => _editReminder(i),
+                        ),
+                      ),
                   ],
 
                   if (_type == OrganizerType.timeBlock) ...[
@@ -402,6 +468,65 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
                         ),
                       );
                     }),
+
+                    const SizedBox(height: 24),
+                    // Scheduler for TimeBlock
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.repeat_rounded, size: 20),
+                      title: const Text(
+                        'Scheduler',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        _scheduler != null ? 'Configured' : 'None',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _scheduler != null ? AppTheme.accentColor(context) : AppColors.textMuted,
+                        ),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: _pickScheduler,
+                    ),
+
+                    const SizedBox(height: 24),
+                    // Reminders for TimeBlock
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Reminders',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _addReminder,
+                          child: const Text('+ Add Reminder'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    for (var i = 0; i < _reminders.length; i++)
+                      Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.notifications_none, size: 18),
+                          title: Text(
+                            _reminders[i].triggerTime != null
+                                ? '${_reminders[i].triggerTime!.hour.toString().padLeft(2, '0')}:${_reminders[i].triggerTime!.minute.toString().padLeft(2, '0')}'
+                                : 'No time set',
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                            onPressed: () => setState(() => _reminders.removeAt(i)),
+                          ),
+                          onTap: () => _editReminder(i),
+                        ),
+                      ),
                   ],
 
                   const SizedBox(height: 24),
@@ -449,6 +574,8 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
       daysOfWeek: _daysOfWeek,
       timeRanges: _timeRanges,
       energyLevel: _energyLevel,
+      scheduler: _scheduler,
+      reminders: _reminders,
       categories: existing?.categories,
       createdAt: existing?.createdAt,
       obsidianPath: existing?.obsidianPath ?? '',
@@ -472,6 +599,60 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
       return Color(int.parse(hex.replaceAll('#', '0xFF')));
     } catch (_) {
       return AppTheme.accentColor(context);
+    }
+  }
+
+  void _pickScheduler() async {
+    final result = await showModalBottomSheet<Scheduler>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      builder: (context) => SizedBox(
+        height: MediaQuery.of(context).size.height * 0.85,
+        child: SchedulerPicker(initialScheduler: _scheduler),
+      ),
+    );
+    if (result != null) {
+      setState(() => _scheduler = result);
+    }
+  }
+
+  void _addReminder() async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (time != null) {
+      final now = DateTime.now();
+      final triggerTime = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+      setState(() {
+        _reminders.add(
+          ReminderConfig(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            triggerTime: triggerTime,
+            type: NotificationType.push,
+          ),
+        );
+      });
+    }
+  }
+
+  void _editReminder(int index) async {
+    final existing = _reminders[index];
+    final initialTime = existing.triggerTime != null
+        ? TimeOfDay(hour: existing.triggerTime!.hour, minute: existing.triggerTime!.minute)
+        : TimeOfDay.now();
+    final time = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+    );
+    if (time != null) {
+      final now = DateTime.now();
+      final triggerTime = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+      setState(() {
+        _reminders[index] = existing.copyWith(triggerTime: triggerTime);
+      });
     }
   }
 }

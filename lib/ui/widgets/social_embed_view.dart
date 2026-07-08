@@ -2,18 +2,20 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../../models/social_post.dart';
+import '../../providers/vault_provider.dart';
 import '../../services/oembed_service.dart';
 import '../../services/tiktok_video_resolver.dart';
 import 'social_native_video_player.dart';
 import 'social_post_grid_card.dart';
 
-class SocialEmbedView extends StatefulWidget {
+class SocialEmbedView extends ConsumerStatefulWidget {
   const SocialEmbedView({super.key, required this.post});
 
   final SocialPost post;
@@ -22,15 +24,16 @@ class SocialEmbedView extends StatefulWidget {
   static final Map<String, (String url, DateTime resolvedAt)> _videoCache = {};
 
   @override
-  State<SocialEmbedView> createState() => _SocialEmbedViewState();
+  _SocialEmbedViewState createState() => _SocialEmbedViewState();
 }
 
-class _SocialEmbedViewState extends State<SocialEmbedView> {
+class _SocialEmbedViewState extends ConsumerState<SocialEmbedView> {
   late final WebViewController _controller;
   Timer? _timeout;
   bool _isLoaded = false;
   bool _hasError = false;
   bool _resolvingVideo = false;
+  bool _forceResolve = false;
   String? _resolvedVideoUrl;
   String? _resolvedThumbnailUrl;
   SocialPost? _resolvedPost;
@@ -114,13 +117,11 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
       if (mounted && !_isLoaded) setState(() => _hasError = true);
     });
 
-    if (_resolvedVideoUrl != null && _resolvedVideoUrl!.isNotEmpty) {
-      _timeout?.cancel();
-      return;
-    }
+    // Removed early-return for existing videoUrl to allow re-resolution of stale URLs
+    // Old posts may have expired video URLs that need refreshing
 
     if (widget.post.platform == SocialPlatform.tiktok &&
-        widget.post.mediaType == SocialMediaType.video) {
+        widget.post.mediaType != SocialMediaType.carousel) {
       _startTikTokPlayback();
       return;
     }
@@ -170,7 +171,11 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
   @override
   Widget build(BuildContext context) {
     final videoUrl = _resolvedVideoUrl;
+    debugPrint('[TikTok Embed] build() - videoUrl=$videoUrl, _resolvingVideo=$_resolvingVideo, _hasError=$_hasError, _isLoaded=$_isLoaded');
+    debugPrint('[TikTok Embed] build() - post.thumbnailUrl=${widget.post.thumbnailUrl}, _resolvedThumbnailUrl=$_resolvedThumbnailUrl');
+    
     if (videoUrl != null && videoUrl.isNotEmpty) {
+      debugPrint('[TikTok Embed] Using native video player with URL: $videoUrl');
       return SocialNativeVideoPlayer(
         videoUrl: videoUrl,
         thumbnailUrl: _resolvedThumbnailUrl ?? widget.post.thumbnailUrl,
@@ -180,10 +185,15 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
     if (_resolvingVideo) return _buildResolvingVideo();
     if (widget.post.platform == SocialPlatform.tiktok &&
         widget.post.mediaType == SocialMediaType.carousel) {
+      debugPrint('[TikTok Embed] Rendering photo carousel');
       return _buildTikTokPhotoCarousel(context);
     }
-    if (_hasError) return _buildFallback(context);
+    if (_hasError) {
+      debugPrint('[TikTok Embed] Rendering fallback view');
+      return _buildFallback(context);
+    }
 
+    debugPrint('[TikTok Embed] Rendering WebView');
     return SizedBox(
       height: _height,
       child: ClipRRect(
@@ -228,6 +238,7 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
     final color = socialPlatformColor(widget.post.platform);
     final hasImage =
         post.thumbnailUrl?.isNotEmpty == true || post.mediaUrls.isNotEmpty;
+    debugPrint('[TikTok Embed] _buildFallback - hasImage=$hasImage, thumbnailUrl=${post.thumbnailUrl}, mediaUrls=${post.mediaUrls}');
     return Container(
       height: hasImage ? 360 : 220,
       decoration: BoxDecoration(
@@ -245,10 +256,65 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
               iconSize: 48,
               borderRadius: BorderRadius.zero,
             ),
+            if (widget.post.platform == SocialPlatform.tiktok &&
+                widget.post.mediaType == SocialMediaType.video)
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: _buildReloadButton(),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildReloadButton() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _forceReloadVideo,
+          borderRadius: BorderRadius.circular(20),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.refresh_rounded,
+                  color: Colors.white,
+                  size: 14,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  'Recarregar vídeo',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _forceReloadVideo() {
+    setState(() {
+      _forceResolve = true;
+      _resolvedVideoUrl = null;
+      _hasError = false;
+      _isLoaded = false;
+    });
+    _startTikTokPlayback();
   }
 
   Widget _buildTikTokPhotoCarousel(BuildContext context) {
@@ -323,45 +389,78 @@ class _SocialEmbedViewState extends State<SocialEmbedView> {
 
   Future<bool> _resolveTikTokVideoIfPossible() async {
     if (widget.post.platform != SocialPlatform.tiktok ||
-        widget.post.mediaType != SocialMediaType.video) {
+        widget.post.mediaType == SocialMediaType.carousel) {
+      debugPrint('[TikTok Embed] Not a TikTok video - skipping resolution');
       return false;
     }
 
-    // Verificar cache em memória (TTL: 2h)
+    debugPrint('[TikTok Embed] Starting resolution for: ${widget.post.url}');
+
+    // Verificar cache em memória (TTL: 2h) - skip if force resolve
     final postId = widget.post.id;
-    final cached = SocialEmbedView._videoCache[postId];
-    if (cached != null && DateTime.now().difference(cached.$2).inHours < 2) {
-      if (mounted) setState(() => _resolvedVideoUrl = cached.$1);
-      return true;
+    if (!_forceResolve) {
+      final cached = SocialEmbedView._videoCache[postId];
+      if (cached != null && DateTime.now().difference(cached.$2).inHours < 2) {
+        debugPrint('[TikTok Embed] Using cached video URL');
+        if (mounted) setState(() => _resolvedVideoUrl = cached.$1);
+        return true;
+      }
     }
 
     final prefs = await SharedPreferences.getInstance();
     final endpoint = prefs.getString('tiktokResolverEndpoint') ?? '';
-    if (endpoint.trim().isEmpty) return false;
+    debugPrint('[TikTok Embed] Resolver endpoint configured: ${endpoint.isNotEmpty}');
+    if (endpoint.trim().isEmpty) {
+      debugPrint('[TikTok Embed] No resolver endpoint configured - falling back to WebView');
+      return false;
+    }
     final apiKey = prefs.getString('tiktokResolverApiKey') ?? '';
+    debugPrint('[TikTok Embed] API key configured: ${apiKey.isNotEmpty}');
 
     if (mounted) setState(() => _resolvingVideo = true);
+    debugPrint('[TikTok Embed] Calling TikTokVideoResolver...');
     final resolvedData = await TikTokVideoResolver(
       endpoint: endpoint,
       apiKey: apiKey,
     ).resolveAll(widget.post.url);
     if (!mounted) return false;
 
+    debugPrint('[TikTok Embed] Resolver returned: ${resolvedData != null ? "SUCCESS" : "NULL"}');
+    if (resolvedData != null) {
+      debugPrint('[TikTok Embed] - videoUrl: ${resolvedData.videoUrl}');
+      debugPrint('[TikTok Embed] - thumbnailUrl: ${resolvedData.thumbnailUrl}');
+      debugPrint('[TikTok Embed] - title: ${resolvedData.title}');
+    }
+
     final resolved = resolvedData?.videoUrl;
     if (resolved != null) {
       SocialEmbedView._videoCache[postId] = (resolved, DateTime.now());
+      debugPrint('[TikTok Embed] Cached video URL for post $postId');
+      
+      // Persist resolved video URL back to the vault
+      final updatedPost = widget.post.copyWith(
+        videoUrl: resolved,
+        thumbnailUrl: resolvedData?.thumbnailUrl ?? widget.post.thumbnailUrl,
+      );
+      debugPrint('[TikTok Embed] Updating post in vault with new video URL and thumbnail');
+      await ref.read(vaultProvider.notifier).updateObject(updatedPost);
     }
 
     setState(() {
       _resolvingVideo = false;
+      _forceResolve = false;
       _resolvedVideoUrl = resolved;
       if (resolved != null) {
         _timeout?.cancel();
         _hasError = false;
+        debugPrint('[TikTok Embed] Resolution successful - will use native video player');
+      } else {
+        debugPrint('[TikTok Embed] Resolution failed - will fall back to WebView');
       }
       // Also update thumbnail if we got one from tikwm
       if (resolvedData?.thumbnailUrl != null) {
         _resolvedThumbnailUrl = resolvedData!.thumbnailUrl;
+        debugPrint('[TikTok Embed] Updated thumbnail URL: $_resolvedThumbnailUrl');
       }
     });
     return resolved != null;

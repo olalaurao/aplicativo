@@ -13,6 +13,7 @@ import 'overdue_provider.dart';
 import '../models/content_object.dart';
 import '../models/goal_model.dart';
 import '../models/habit_model.dart';
+import '../models/mood_model.dart';
 import '../models/dashboard_block.dart';
 import '../models/organizer_model.dart';
 import '../models/pomodoro_session.dart';
@@ -904,6 +905,8 @@ Future<void> _updateDayDialWidget(
     final tasks = allObjects.whereType<Task>().toList();
     final habits = allObjects.whereType<Habit>().toList();
     final reminders = allObjects.whereType<Reminder>().toList();
+    final journalEntries = allObjects.whereType<JournalEntry>().toList();
+    final moodDefinitions = allObjects.whereType<MoodDefinition>().toList();
     
     final hourStates = DayDialAggregator.aggregateForDate(
       date: today,
@@ -912,6 +915,9 @@ Future<void> _updateDayDialWidget(
       pomodoroSessions: pomodoroHistory,
       googleEvents: googleEvents,
       reminders: reminders,
+      activeTimeBlocks: const [],
+      journalEntries: journalEntries,
+      moodDefinitions: moodDefinitions,
     );
     
     // Count activities for summary

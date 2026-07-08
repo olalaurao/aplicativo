@@ -9,6 +9,8 @@ import 'ui/widgets/day_dial_widget.dart';
 import 'ui/theme.dart';
 import 'providers/vault_provider.dart';
 import 'providers/pomodoro_provider.dart';
+import 'models/journal_entry.dart';
+import 'models/mood_model.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -78,6 +80,11 @@ class _WindowsDialHomeState extends ConsumerState<WindowsDialHome> {
     final tasks = ref.watch(tasksProvider);
     final habits = ref.watch(habitsProvider);
     final pomodoroSessions = ref.watch(pomodoroProvider).history;
+    final allObjects = ref.watch(allObjectsProvider);
+    
+    // Get journal entries and mood definitions
+    final journalEntries = allObjects.whereType<JournalEntry>().toList();
+    final moodDefinitions = allObjects.whereType<MoodDefinition>().toList();
     
     // Filter tasks for the selected date
     final dayTasks = tasks.where((task) {
@@ -99,6 +106,9 @@ class _WindowsDialHomeState extends ConsumerState<WindowsDialHome> {
       pomodoroSessions: pomodoroSessions,
       googleEvents: [], // No Google Calendar in Windows companion
       reminders: [], // No reminders in Windows companion
+      activeTimeBlocks: [], // No time blocks in Windows companion
+      journalEntries: journalEntries,
+      moodDefinitions: moodDefinitions,
     );
 
     return Scaffold(

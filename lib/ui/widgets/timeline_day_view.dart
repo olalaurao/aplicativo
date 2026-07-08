@@ -33,6 +33,7 @@ class TimeLineDayView extends ConsumerStatefulWidget {
   final String colorMode;
   final int gridGranularity; // 15, 30, or 60 minutes
   final List<PomodoroSession> pomodoroSessions;
+  final Organizer? activeTheme; // Active day theme for the selected date
 
   const TimeLineDayView({
     super.key,
@@ -50,10 +51,11 @@ class TimeLineDayView extends ConsumerStatefulWidget {
     this.colorMode = 'category',
     this.gridGranularity = 30,
     this.pomodoroSessions = const [],
+    this.activeTheme,
   });
 
   @override
-  ConsumerState<TimeLineDayView> createState() => _TimeLineDayViewState();
+  _TimeLineDayViewState createState() => _TimeLineDayViewState();
 }
 
 class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
@@ -88,6 +90,8 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
       color: AppTheme.backgroundColor(context),
       child: Column(
         children: [
+          // ─── Active Day Theme Banner ───
+          if (widget.activeTheme != null) _buildActiveThemeBanner(context),
           // ─── All-Day Strip ───
           if (widget.allDayEvents.isNotEmpty) _buildAllDayStrip(context),
 
@@ -1271,6 +1275,60 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
       return record.successful;
     }
     return slotIndex < record.completions;
+  }
+
+  Widget _buildActiveThemeBanner(BuildContext context) {
+    final theme = widget.activeTheme!;
+    final themeColor = _parseOptionalColor(theme.color) ?? AppTheme.accentColor(context);
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        color: themeColor.withValues(alpha: 0.1),
+        border: const Border(
+          bottom: BorderSide(color: AppColors.divider, width: 0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: themeColor.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  theme.icon ?? '🌅',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  theme.title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: themeColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '${widget.timeBlocks.length} time blocks',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.textSecondaryColor(context),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildAllDayStrip(BuildContext context) {

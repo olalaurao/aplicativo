@@ -1,6 +1,8 @@
 // lib/models/organizer_model.dart
 import 'content_object.dart';
 import 'shared_types.dart';
+import 'scheduler.dart';
+import 'reminder_config.dart';
 
 enum OrganizerType {
   area,
@@ -28,6 +30,8 @@ class Organizer extends ContentObject {
   List<TimeRange> timeRanges; // For timeBlock
   int? energyLevel; // For timeBlock
   List<String> daysOfWeek; // For dayTheme
+  Scheduler? scheduler; // For dayTheme and timeBlock
+  @override List<ReminderConfig> reminders; // For dayTheme and timeBlock
 
   Organizer({
     super.id,
@@ -43,6 +47,8 @@ class Organizer extends ContentObject {
     this.timeRanges = const [],
     this.energyLevel,
     this.daysOfWeek = const [],
+    this.scheduler,
+    this.reminders = const [],
     super.organizers,
     super.categories,
     super.createdAt,
@@ -77,6 +83,10 @@ class Organizer extends ContentObject {
     }
     if (energyLevel != null) frontmatter['energy_level'] = energyLevel;
     if (daysOfWeek.isNotEmpty) frontmatter['days_of_week'] = daysOfWeek;
+    if (scheduler != null) frontmatter['scheduler'] = scheduler!.toMap();
+    if (reminders.isNotEmpty) {
+      frontmatter['reminders'] = reminders.map((r) => r.toMap()).toList();
+    }
 
     return generateMarkdown(frontmatter, '');
   }
@@ -124,6 +134,16 @@ class Organizer extends ContentObject {
     organizer.daysOfWeek = List<String>.from(
       frontmatter['days_of_week'] as List? ?? [],
     );
+    if (frontmatter['scheduler'] is Map) {
+      organizer.scheduler = Scheduler.fromMap(
+        Map<String, dynamic>.from(frontmatter['scheduler'] as Map),
+      );
+    }
+    if (frontmatter['reminders'] is List) {
+      organizer.reminders = (frontmatter['reminders'] as List)
+          .map((e) => ReminderConfig.fromMap(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    }
 
     return organizer;
   }
@@ -141,6 +161,8 @@ class Organizer extends ContentObject {
     List<TimeRange>? timeRanges,
     int? energyLevel,
     List<String>? daysOfWeek,
+    Scheduler? scheduler,
+    List<ReminderConfig>? reminders,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     DateTime? createdAt,
@@ -161,6 +183,8 @@ class Organizer extends ContentObject {
       timeRanges: timeRanges ?? this.timeRanges,
       energyLevel: energyLevel ?? this.energyLevel,
       daysOfWeek: daysOfWeek ?? this.daysOfWeek,
+      scheduler: scheduler ?? this.scheduler,
+      reminders: reminders ?? this.reminders,
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       createdAt: createdAt ?? this.createdAt,

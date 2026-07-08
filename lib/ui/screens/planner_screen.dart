@@ -16,9 +16,11 @@ import '../../models/tracker_model.dart';
 import '../../models/reminder_model.dart';
 import '../../models/reminder_config.dart';
 import '../../models/task_model.dart';
+import '../../models/day_dial_model.dart';
 import '../widgets/timeline_day_view.dart';
 import '../widgets/week_time_grid.dart';
 import '../widgets/day_dial_widget.dart';
+import '../widgets/activity_detail_sheet.dart';
 import '../../services/day_dial_aggregator.dart';
 import '../../services/scheduler_service.dart';
 import '../../providers/google_calendar_provider.dart';
@@ -451,6 +453,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                           orElse: () => [],
                         ),
                         timeBlocks: activeTimeBlocks,
+                        activeTheme: activeTheme,
                         gridGranularity: _gridGranularity,
                         pomodoroSessions: ref.watch(pomodoroProvider).history,
                         onTaskDrop: (task, time) {
@@ -2192,13 +2195,68 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       orElse: () => <google_calendar.Event>[],
     );
 
+    // Calculate active day theme and time blocks (same logic as timeline view)
+    final allOrganizers = ref.watch(organizersProvider);
+    final dayThemes = allOrganizers.where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final timeBlocks = allOrganizers.where((o) => o.organizerType == OrganizerType.timeBlock).toList();
+    final allObjectsAsync = ref.watch(allObjectsProvider);
+    
+    // Get reminders for the selected date
+    final reminders = allObjectsAsync.valueOrNull?.whereType<Reminder>().where((r) => 
+      !r.isCompleted && 
+      _isSameDay(r.time, _selectedDate)
+    ).toList() ?? [];
+    
+    // Get journal entries and mood definitions for the selected date
+    final journalEntries = allObjectsAsync.valueOrNull?.whereType<JournalEntry>().where((j) =>
+      _isSameDay(j.date, _selectedDate)
+    ).toList() ?? [];
+    
+    final moodDefinitions = ref.watch(moodsProvider);
+    
+    const weekDayNames = [
+      'Mon',
+      'Tue',
+      'Wed',
+      'Thu',
+      'Fri',
+      'Sat',
+      'Sun',
+    ];
+    final dayName = weekDayNames[_selectedDate.weekday - 1];
+    final activeTheme = dayThemes.cast<Organizer?>().firstWhere(
+      (theme) => theme != null && theme.daysOfWeek.contains(dayName),
+      orElse: () => null,
+    );
+    final activeTimeBlocks =
+        activeTheme == null
+              ? <Organizer>[]
+              : timeBlocks
+                    .where((block) => activeTheme.organizers.any((ref) => ref.matches(block.id, block.slug, block.title)))
+                    .cast<Organizer>()
+                    .toList()
+          ..sort((a, b) {
+            final aStart = a.timeRanges.isEmpty
+                ? 24 * 60
+                : (a.timeRanges.first.startHour * 60) +
+                      a.timeRanges.first.startMinute;
+            final bStart = b.timeRanges.isEmpty
+                ? 24 * 60
+                : (b.timeRanges.first.startHour * 60) +
+                      b.timeRanges.first.startMinute;
+            return aStart.compareTo(bStart);
+          });
+
     final hourStates = DayDialAggregator.aggregateForDate(
       date: _selectedDate,
       tasks: tasks,
       habits: habits,
       pomodoroSessions: pomodoroSessions,
       googleEvents: events,
-      reminders: const [],
+      reminders: reminders,
+      activeTimeBlocks: activeTimeBlocks,
+      journalEntries: journalEntries,
+      moodDefinitions: moodDefinitions,
     );
 
     return SliverPadding(
@@ -2228,6 +2286,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                     curve: Curves.easeInOut,
                   );
                 });
+              },
+              onActivityTap: (activity) {
+                _showActivityDetailSheet(activity);
               },
             ),
             const SizedBox(height: 24),
@@ -2767,6 +2828,15 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         if (mounted) _showReflectionPrompt(task);
       });
     }
+  }
+
+  void _showActivityDetailSheet(DialActivity activity) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ActivityDetailSheet(activity: activity),
+    );
   }
 
   void _showReflectionPrompt(Task task) {

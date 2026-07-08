@@ -1,6 +1,7 @@
 import 'content_object.dart';
 import 'organizer_model.dart';
 import 'scheduler.dart';
+import 'reminder_config.dart';
 import 'shared_types.dart';
 import 'task_model.dart';
 import 'kpi_model.dart' as kpi;
@@ -103,7 +104,7 @@ class Project extends Organizer {
   String? linkedGoogleEventTitle;
   String? linkedGoogleEventDate;
   String? linkedGoogleEventUrl;
-  Scheduler? scheduler;
+  @override Scheduler? scheduler;
   List<RotationGroup> rotationGroups = [];
   DateTime? rotationStartDate;
   /// V5: absorbed from Goal's plan_mode
@@ -148,6 +149,7 @@ class Project extends Organizer {
     this.linkedGoogleEventDate,
     this.linkedGoogleEventUrl,
     this.scheduler,
+    super.reminders,
     List<RotationGroup>? rotationGroups,
     this.rotationStartDate,
     this.methodLabel,
@@ -347,14 +349,16 @@ class Project extends Organizer {
     String? icon,
     String? state,
     String? priority,
+    List<TimeRange>? timeRanges,
+    int? energyLevel,
+    List<String>? daysOfWeek,
+    Scheduler? scheduler,
+    List<ReminderConfig>? reminders,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     DateTime? createdAt,
     DateTime? updatedAt,
     String? obsidianPath,
-    List<TimeRange>? timeRanges,
-    List<String>? daysOfWeek,
-    int? energyLevel,
   }) {
     return Project(
       id: id,

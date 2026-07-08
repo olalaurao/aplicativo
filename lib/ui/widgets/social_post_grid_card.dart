@@ -169,22 +169,34 @@ class SocialPostImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final imageSource = source?.trim();
-    if (imageSource == null || imageSource.isEmpty) return fallback;
+    debugPrint('[SocialPostImage] build() - source=$imageSource, fit=$fit');
+    if (imageSource == null || imageSource.isEmpty) {
+      debugPrint('[SocialPostImage] No image source, returning fallback');
+      return fallback;
+    }
     final uri = Uri.tryParse(imageSource);
     final isRemote =
         uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
     if (isRemote) {
+      debugPrint('[SocialPostImage] Loading remote image: $imageSource');
       return Image.network(
         imageSource,
         fit: fit,
-        errorBuilder: (context, error, stackTrace) => fallback,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('[SocialPostImage] Failed to load remote image: $error');
+          return fallback;
+        },
       );
     }
     final filePath = uri?.scheme == 'file' ? uri!.toFilePath() : imageSource;
+    debugPrint('[SocialPostImage] Loading local file: $filePath');
     return Image.file(
       File(filePath),
       fit: fit,
-      errorBuilder: (context, error, stackTrace) => fallback,
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint('[SocialPostImage] Failed to load local file: $error');
+        return fallback;
+      },
     );
   }
 }
@@ -195,10 +207,14 @@ String? socialPostImageSource(SocialPost post) {
       .where((url) => url.isNotEmpty)
       .toList();
   final thumbnail = post.thumbnailUrl?.trim();
+  debugPrint('[Thumbnail] socialPostImageSource for ${post.platform} - thumbnailUrl=$thumbnail, mediaUrls=$media');
   final candidates = post.platform == SocialPlatform.pinterest
       ? [...media, if (thumbnail != null && thumbnail.isNotEmpty) thumbnail]
       : [if (thumbnail != null && thumbnail.isNotEmpty) thumbnail, ...media];
-  return candidates.firstOrNull;
+  debugPrint('[Thumbnail] Candidates: $candidates');
+  final result = candidates.firstOrNull;
+  debugPrint('[Thumbnail] Selected: $result');
+  return result;
 }
 
 class SocialPlatformBadge extends StatelessWidget {

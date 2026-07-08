@@ -4,7 +4,11 @@ import '../models/task_model.dart';
 import '../models/habit_model.dart';
 import '../models/pomodoro_session.dart';
 import '../models/reminder_model.dart';
+import '../models/organizer_model.dart';
+import '../models/mood_model.dart';
+import '../models/journal_entry.dart';
 import 'package:googleapis/calendar/v3.dart' as google_calendar;
+import 'package:flutter/material.dart';
 
 /// Aggregates data from multiple sources to produce a per-hour summary for the day dial
 class DayDialAggregator {
@@ -16,6 +20,9 @@ class DayDialAggregator {
     required List<PomodoroSession> pomodoroSessions,
     required List<google_calendar.Event> googleEvents,
     required List<Reminder> reminders,
+    required List<Organizer> activeTimeBlocks,
+    required List<JournalEntry> journalEntries,
+    required List<MoodDefinition> moodDefinitions,
   }) {
     // Initialize 24 hours with idle state
     final hourStates = List.generate(
@@ -30,7 +37,6 @@ class DayDialAggregator {
 
       final effectiveDate = session.occurredAt ?? session.date;
       final startHour = effectiveDate.hour;
-      final startMinute = effectiveDate.minute;
       
       // Calculate fill fraction based on minutes worked
       final fillFraction = (session.minutesWorked / 60.0).clamp(0.0, 1.0);
@@ -140,7 +146,64 @@ class DayDialAggregator {
       }
     }
 
+    // Process time blocks
+    for (final block in activeTimeBlocks) {
+      for (final range in block.timeRanges) {
+        final startMinutes = (range.startHour.clamp(0, 23) * 60) + range.startMinute.clamp(0, 59);
+        final rawEndMinutes = (range.endHour.clamp(0, 24) * 60) + range.endMinute.clamp(0, 59);
+        final endMinutes = rawEndMinutes.clamp(startMinutes + 1, 24 * 60);
+        
+        // Mark all hours covered by this time block
+        for (int minutes = startMinutes; minutes < endMinutes; minutes += 15) {
+          final hour = (minutes ~/ 60).clamp(0, 23);
+          final fillFraction = (endMinutes - startMinutes) / 60.0;
+          
+          if (hour >= 0 && hour < 24) {
+            hourStates[hour] = hourStates[hour].copyWith(
+              kind: DialHourKind.timeBlock,
+              fillFraction: fillFraction.clamp(0.0, 1.0),
+            );
+          }
+        }
+      }
+    }
+
+    // Process mood entries from journal entries
+    for (final entry in journalEntries) {
+      if (!_isSameDay(entry.date, date)) continue;
+      
+      for (final moodEntry in entry.moodEntries) {
+        final hour = moodEntry.timestamp.hour;
+        final moodDef = moodDefinitions.firstWhere(
+          (m) => m.id == moodEntry.moodSlug,
+          orElse: () => MoodDefinition.systemMoods.first,
+        );
+        
+        if (hour >= 0 && hour < 24) {
+          final activity = DialActivity(
+            id: 'mood_${entry.id}_${moodEntry.moodSlug}',
+            type: DialActivityType.mood,
+            title: moodDef.label,
+            emoji: moodDef.emoji,
+            color: _parseColor(moodDef.color),
+            startTime: moodEntry.timestamp,
+            endTime: moodEntry.timestamp.add(const Duration(minutes: 30)),
+            fillFraction: 0.5,
+            zIndex: 0, // Moods at bottom layer
+          );
+          hourStates[hour] = hourStates[hour].addActivity(activity);
+        }
+      }
+    }
+
     return hourStates;
+  }
+
+  static Color _parseColor(String colorString) {
+    if (colorString.startsWith('#')) {
+      return Color(int.parse(colorString.replaceFirst('#', '0xFF')));
+    }
+    return Colors.grey;
   }
 
   static bool _isSameDay(DateTime a, DateTime b) {

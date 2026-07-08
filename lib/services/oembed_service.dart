@@ -109,10 +109,34 @@ class OEmbedService {
     String? tiktokResolverEndpoint,
     String? tiktokResolverApiKey,
   }) async {
-    final normalizedUrl = url.trim();
+    // ── Step 0: try to expand shortened TikTok links ──────────────────────
+    // vt.tiktok.com/xxx and similar short links don't contain the video ID.
+    // We keep the ORIGINAL url around so tikwm can fall back to it if our
+    // own expansion only gives us the homepage (which tikwm can't parse).
+    final originalUrl = url.trim();
+    String normalizedUrl = originalUrl;
+    if (normalizedUrl.toLowerCase().contains('tiktok.com') &&
+        !normalizedUrl.contains('/video/') &&
+        !normalizedUrl.contains('/photo/')) {
+      debugPrint('[OEmbed fetchMetadata] Expanding TikTok short link: $normalizedUrl');
+      final expanded = await TikTokVideoResolver.expandShortUrl(normalizedUrl);
+      final expandedIsCanonical = expanded.contains('/video/') || expanded.contains('/photo/');
+      if (expandedIsCanonical) {
+        debugPrint('[OEmbed fetchMetadata] Expanded to canonical: $expanded');
+        normalizedUrl = expanded;
+      } else {
+        // Expansion failed (ended up on homepage) – keep the original short link
+        // so tikwm can attempt resolution with it directly.
+        debugPrint('[OEmbed fetchMetadata] Expansion gave non-canonical URL ($expanded) – keeping original');
+      }
+    }
+
     final platform = detectPlatform(normalizedUrl);
     final mediaType = detectMediaType(platform, normalizedUrl);
     var embedUrl = buildEmbedUrl(platform, normalizedUrl);
+
+    debugPrint('[OEmbed fetchMetadata] URL: $normalizedUrl');
+    debugPrint('[OEmbed fetchMetadata] Platform: $platform, MediaType: $mediaType');
 
     var title = normalizedUrl;
     String? caption;
@@ -140,6 +164,8 @@ class OEmbedService {
         SocialPlatform.other => _fetchOpenGraph(normalizedUrl),
       };
 
+      debugPrint('[OEmbed fetchMetadata] Result: ${result != null ? "SUCCESS" : "NULL"}');
+
       if (result != null) {
         title = _stringValue(result['title']) ?? title;
         caption =
@@ -155,6 +181,7 @@ class OEmbedService {
         if (platform == SocialPlatform.tiktok) {
           embedUrl ??= _tiktokEmbedUrlFromOEmbed(result);
         }
+        debugPrint('[OEmbed fetchMetadata] Extracted - title=$title, thumbnailUrl=$thumbnailUrl, authorName=$authorName');
       }
 
       // TikTok fallback already handled inside _fetchTikTok
@@ -175,10 +202,21 @@ class OEmbedService {
       if (platform == SocialPlatform.tiktok &&
           mediaType == SocialMediaType.video &&
           tiktokResolverEndpoint?.trim().isNotEmpty == true) {
-        final tikwmData = await TikTokVideoResolver(
+        debugPrint('[OEmbed fetchMetadata] Calling TikTokVideoResolver with endpoint: $tiktokResolverEndpoint');
+        // Try with the (possibly expanded) normalizedUrl first; if that fails,
+        // fall back to the original short link — tikwm handles vt/vm.tiktok.com.
+        TikTokResolvedData? tikwmData = await TikTokVideoResolver(
           endpoint: tiktokResolverEndpoint!,
           apiKey: tiktokResolverApiKey,
         ).resolveAll(normalizedUrl);
+        if (tikwmData == null && normalizedUrl != originalUrl) {
+          debugPrint('[OEmbed fetchMetadata] Tikwm failed with expanded URL, retrying with original: $originalUrl');
+          tikwmData = await TikTokVideoResolver(
+            endpoint: tiktokResolverEndpoint,
+            apiKey: tiktokResolverApiKey,
+          ).resolveAll(originalUrl);
+        }
+        debugPrint('[OEmbed fetchMetadata] TikTokVideoResolver returned: ${tikwmData != null ? "SUCCESS" : "NULL"}');
         if (tikwmData != null) {
           videoUrl = tikwmData.videoUrl;
           thumbnailUrl ??= tikwmData.thumbnailUrl;
@@ -188,11 +226,18 @@ class OEmbedService {
           }
           authorHandle ??= tikwmData.authorHandle;
           authorName ??= tikwmData.authorName;
+          // If tikwm resolved via the original URL, use that as canonical URL
+          if (normalizedUrl != originalUrl && videoUrl != null) {
+            // tikwm gave us the real video URL; normalizedUrl may be homepage
+          }
+          debugPrint('[OEmbed fetchMetadata] Updated from TikTokVideoResolver - videoUrl=$videoUrl, thumbnailUrl=$thumbnailUrl');
         }
       }
     } catch (error) {
       debugPrint('OEmbedService.fetchMetadata failed: $error');
     }
+
+    debugPrint('[OEmbed fetchMetadata] Final SocialPost - title=$title, thumbnailUrl=$thumbnailUrl, videoUrl=$videoUrl, mediaUrls=[${thumbnailUrl ?? ""}]');
 
     return SocialPost(
       title: _truncateTitle(title),
@@ -254,26 +299,39 @@ class OEmbedService {
   /// 2. Official tiktok.com/oembed
   /// 3. Scrape og:image from the TikTok embed page
   Future<Map<String, dynamic>?> _fetchTikTok(String url) async {
+    debugPrint('[OEmbed TikTok] Starting metadata fetch for: $url');
+
     // Strategy 1: noembed.com proxy
     try {
+      debugPrint('[OEmbed TikTok] Strategy 1: Trying noembed.com');
       final noembedUrl =
           'https://noembed.com/embed?url=${Uri.encodeComponent(url)}';
       final result = await _fetchOEmbed(noembedUrl);
-      if (result != null &&
-          (result['thumbnail_url'] != null || result['title'] != null)) {
-        return result;
+      if (result != null) {
+        debugPrint('[OEmbed TikTok] noembed.com returned: thumbnail=${result['thumbnail_url'] != null}, title=${result['title'] != null}');
+        if (result['thumbnail_url'] != null || result['title'] != null) {
+          return result;
+        }
       }
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[OEmbed TikTok] noembed.com failed: $error');
+    }
 
     // Strategy 2: Official TikTok oEmbed
     try {
+      debugPrint('[OEmbed TikTok] Strategy 2: Trying official TikTok oEmbed');
       final officialUrl =
           'https://www.tiktok.com/oembed?url=${Uri.encodeComponent(url)}';
       final result = await _fetchOEmbed(officialUrl);
-      if (result != null && result['thumbnail_url'] != null) {
-        return result;
+      if (result != null) {
+        debugPrint('[OEmbed TikTok] Official oEmbed returned: thumbnail=${result['thumbnail_url'] != null}');
+        if (result['thumbnail_url'] != null) {
+          return result;
+        }
       }
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[OEmbed TikTok] Official oEmbed failed: $error');
+    }
 
     // Strategy 3: Scrape og:image from embed page
     final videoId = RegExp(
@@ -281,6 +339,7 @@ class OEmbedService {
     ).firstMatch(url)?.group(1);
     if (videoId != null) {
       try {
+        debugPrint('[OEmbed TikTok] Strategy 3: Scraping embed page for video ID: $videoId');
         final embedPage = 'https://www.tiktok.com/embed/v2/$videoId';
         final response = await http
             .get(Uri.parse(embedPage), headers: _browserHeaders)
@@ -291,19 +350,23 @@ class OEmbedService {
               _metaContent(html, 'og:image') ?? _extractJsonLdImage(html);
           final title = _metaContent(html, 'og:title') ?? _titleTag(html);
           final description = _metaContent(html, 'og:description');
+          debugPrint('[OEmbed TikTok] Embed page scrape: image=$image, title=$title');
           if (image != null) {
             return {
               'thumbnail_url': image,
-              if (title != null) 'title': title,
-              if (description != null) 'description': description,
+              'title': title,
+              'description': description,
               'site_name': 'TikTok',
             };
           }
         }
-      } catch (_) {}
+      } catch (error) {
+        debugPrint('[OEmbed TikTok] Embed page scrape failed: $error');
+      }
     }
 
     // Strategy 4: OpenGraph on original URL as last resort
+    debugPrint('[OEmbed TikTok] Strategy 4: Trying OpenGraph on original URL');
     return _fetchOpenGraph(url);
   }
 

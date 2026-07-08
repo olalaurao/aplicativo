@@ -2,10 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/organizer_model.dart';
-import '../../models/shared_types.dart';
 import '../../providers/day_theme_provider.dart';
 import '../theme.dart';
 import '../widgets/app_color_picker.dart';
+import '../forms/create_organizer_form.dart';
 
 class DayThemeScreen extends ConsumerWidget {
   const DayThemeScreen({super.key});
@@ -30,8 +30,20 @@ class DayThemeScreen extends ConsumerWidget {
             PopupMenuButton<String>(
               icon: const Icon(Icons.add_rounded),
               onSelected: (value) {
-                if (value == 'block') _showBlockDialog(context, ref);
-                if (value == 'theme') _showThemeDialog(context, ref);
+                if (value == 'block') {
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (context) => CreateOrganizerForm(
+                      initialType: OrganizerType.timeBlock,
+                    ),
+                  ));
+                }
+                if (value == 'theme') {
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (context) => CreateOrganizerForm(
+                      initialType: OrganizerType.dayTheme,
+                    ),
+                  ));
+                }
               },
               itemBuilder: (context) => const [
                 PopupMenuItem(value: 'block', child: Text('Novo bloco')),
@@ -71,7 +83,13 @@ class DayThemeScreen extends ConsumerWidget {
                       side: BorderSide(color: AppTheme.accentColor(context).withValues(alpha: 0.4)),
                       foregroundColor: AppTheme.accentColor(context),
                     ),
-                    onPressed: () => _showThemeDialog(context, ref),
+                    onPressed: () {
+                      Navigator.push(context, MaterialPageRoute(
+                        builder: (context) => CreateOrganizerForm(
+                          initialType: OrganizerType.dayTheme,
+                        ),
+                      ));
+                    },
                   ),
                 ),
               ],
@@ -119,7 +137,13 @@ class DayThemeScreen extends ConsumerWidget {
                       side: BorderSide(color: AppTheme.accentColor(context).withValues(alpha: 0.4)),
                       foregroundColor: AppTheme.accentColor(context),
                     ),
-                    onPressed: () => _showBlockDialog(context, ref),
+                    onPressed: () {
+                      Navigator.push(context, MaterialPageRoute(
+                        builder: (context) => CreateOrganizerForm(
+                          initialType: OrganizerType.timeBlock,
+                        ),
+                      ));
+                    },
                   ),
                 ),
               ],
@@ -177,7 +201,14 @@ class DayThemeScreen extends ConsumerWidget {
           const SizedBox(width: 8),
           PopupMenuButton<String>(
             onSelected: (value) async {
-              if (value == 'edit') _showBlockDialog(context, ref, block: block);
+              if (value == 'edit') {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (context) => CreateOrganizerForm(
+                    initialType: OrganizerType.timeBlock,
+                    organizer: block,
+                  ),
+                ));
+              }
               if (value == 'delete') {
                 final confirmed = await _confirmDelete(context, 'Excluir bloco?');
                 if (confirmed) {
@@ -196,7 +227,16 @@ class DayThemeScreen extends ConsumerWidget {
           ReorderableDragStartListener(index: reorderIndex,
             child: const Icon(Icons.drag_handle_rounded, color: AppColors.textMuted)),
         ]),
-        onTap: () => _showBlockDialog(context, ref, block: block)));
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(
+            builder: (context) => CreateOrganizerForm(
+              initialType: OrganizerType.timeBlock,
+              organizer: block,
+            ),
+          ));
+        }
+      ),
+    );
   }
 
   Widget _buildTimeBar(Organizer block, Color color) {
@@ -237,7 +277,14 @@ class DayThemeScreen extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: AppTheme.cardDecoration(context),
       child: ListTile(
-        onTap: () => _showThemeDialog(context, ref, theme: theme),
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(
+            builder: (context) => CreateOrganizerForm(
+              initialType: OrganizerType.dayTheme,
+              organizer: theme,
+            ),
+          ));
+        },
         leading: CircleAvatar(
           radius: 18,
           backgroundColor: themeColor.withValues(alpha: 0.16),
@@ -254,7 +301,14 @@ class DayThemeScreen extends ConsumerWidget {
         ),
         trailing: PopupMenuButton<String>(
           onSelected: (value) async {
-            if (value == 'edit') _showThemeDialog(context, ref, theme: theme);
+            if (value == 'edit') {
+              Navigator.push(context, MaterialPageRoute(
+                builder: (context) => CreateOrganizerForm(
+                  initialType: OrganizerType.dayTheme,
+                  organizer: theme,
+                ),
+              ));
+            }
             if (value == 'delete') {
               final confirmed = await _confirmDelete(context, 'Excluir tema?');
               if (confirmed) {
@@ -267,305 +321,6 @@ class DayThemeScreen extends ConsumerWidget {
           itemBuilder: (context) => const [
             PopupMenuItem(value: 'edit', child: Text('Editar')),
             PopupMenuItem(value: 'delete', child: Text('Excluir')),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showBlockDialog(
-    BuildContext context,
-    WidgetRef ref, {
-    Organizer? block,
-  }) {
-    final nameController = TextEditingController(text: block?.title ?? '');
-    String selectedColor = AppColorPicker.normalizeHex(
-      block?.color ?? '#FFB000',
-    );
-    final ranges =
-        block?.timeRanges
-            .map(
-              (range) => TimeRange(
-                startHour: range.startHour,
-                startMinute: range.startMinute,
-                endHour: range.endHour,
-                endMinute: range.endMinute,
-              ),
-            )
-            .toList() ??
-        [TimeRange(startHour: 9, startMinute: 0, endHour: 10, endMinute: 0)];
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(block == null ? 'Novo bloco' : 'Editar bloco'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Nome'),
-                ),
-                const SizedBox(height: 16),
-                AppColorPicker(
-                  value: selectedColor,
-                  onChanged: (color) =>
-                      setDialogState(() => selectedColor = color),
-                ),
-                const SizedBox(height: 16),
-                ...ranges.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final range = entry.value;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () async {
-                              final picked = await showTimePicker(
-                                context: context,
-                                initialTime: TimeOfDay(
-                                  hour: range.startHour.clamp(0, 23),
-                                  minute: range.startMinute.clamp(0, 59),
-                                ),
-                              );
-                              if (picked != null) {
-                                setDialogState(() {
-                                  ranges[index] = TimeRange(
-                                    startHour: picked.hour,
-                                    startMinute: picked.minute,
-                                    endHour: range.endHour,
-                                    endMinute: range.endMinute,
-                                  );
-                                });
-                              }
-                            },
-                            child: Text(
-                              'Início ${_formatRangeTime(range.startHour, range.startMinute)}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () async {
-                              final picked = await showTimePicker(
-                                context: context,
-                                initialTime: TimeOfDay(
-                                  hour: range.endHour.clamp(0, 23),
-                                  minute: range.endMinute.clamp(0, 59),
-                                ),
-                              );
-                              if (picked != null) {
-                                setDialogState(() {
-                                  ranges[index] = TimeRange(
-                                    startHour: range.startHour,
-                                    startMinute: range.startMinute,
-                                    endHour: picked.hour,
-                                    endMinute: picked.minute,
-                                  );
-                                });
-                              }
-                            },
-                            child: Text(
-                              'Fim ${_formatRangeTime(range.endHour, range.endMinute)}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Remover intervalo',
-                          onPressed: ranges.length == 1
-                              ? null
-                              : () => setDialogState(
-                                  () => ranges.removeAt(index),
-                                ),
-                          icon: const Icon(Icons.remove_circle_outline_rounded),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: () => setDialogState(
-                      () => ranges.add(
-                        TimeRange(
-                          startHour: 9,
-                          startMinute: 0,
-                          endHour: 10,
-                          endMinute: 0,
-                        ),
-                      ),
-                    ),
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('Adicionar intervalo'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final name = nameController.text.trim();
-                if (name.isEmpty) return;
-                final normalizedRanges = ranges
-                    .where(
-                      (range) =>
-                          _rangeEndMinutes(range) > _rangeStartMinutes(range),
-                    )
-                    .toList();
-                if (normalizedRanges.isEmpty) return;
-                final updated = Organizer(
-                  id: block?.id,
-                  title: name,
-                  organizerType: OrganizerType.timeBlock,
-                  color: selectedColor,
-                  timeRanges: normalizedRanges,
-                );
-                if (block != null) updated.obsidianPath = block.obsidianPath;
-                if (block == null) {
-                  await ref
-                      .read(timeBlocksProvider.notifier)
-                      .addTimeBlock(updated);
-                } else {
-                  await ref
-                      .read(timeBlocksProvider.notifier)
-                      .updateTimeBlock(updated);
-                }
-                if (context.mounted) Navigator.pop(context);
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showThemeDialog(
-    BuildContext context,
-    WidgetRef ref, {
-    Organizer? theme,
-  }) {
-    final nameController = TextEditingController(text: theme?.title ?? '');
-    String selectedColor = AppColorPicker.normalizeHex(
-      theme?.color ?? '#FFB000',
-    );
-    final selectedDays = {...?theme?.daysOfWeek};
-    final blocks = ref.read(timeBlocksProvider);
-    final selectedBlocks = {...?theme?.organizers.map((o) => o.slug)};
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(theme == null ? 'Novo tema' : 'Editar tema'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Nome'),
-                ),
-                const SizedBox(height: 16),
-                AppColorPicker(
-                  value: selectedColor,
-                  onChanged: (color) =>
-                      setDialogState(() => selectedColor = color),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Dias',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                Wrap(
-                  spacing: 8,
-                  children: days
-                      .map(
-                        (day) => FilterChip(
-                          label: Text(day),
-                          selected: selectedDays.contains(day),
-                          onSelected: (selected) => setDialogState(() {
-                            if (selected) {
-                              selectedDays.add(day);
-                            } else {
-                              selectedDays.remove(day);
-                            }
-                          }),
-                        ),
-                      )
-                      .toList(),
-                ),
-                if (blocks.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Blocos',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  ...blocks.map(
-                    (block) => CheckboxListTile(
-                      value: selectedBlocks.contains(block.id),
-                      title: Text(block.title),
-                      onChanged: (selected) => setDialogState(() {
-                        if (selected == true) {
-                          selectedBlocks.add(block.id);
-                        } else {
-                          selectedBlocks.remove(block.id);
-                        }
-                      }),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final name = nameController.text.trim();
-                if (name.isEmpty) return;
-                final updated = Organizer(
-                  id: theme?.id,
-                  title: name,
-                  organizerType: OrganizerType.dayTheme,
-                  color: selectedColor,
-                  daysOfWeek: selectedDays.toList(),
-                  organizers: selectedBlocks.map((id) => OrganizerReference(type: 'timeBlock', slug: id, title: '')).toList(),
-                );
-                if (theme != null) updated.obsidianPath = theme.obsidianPath;
-                if (theme == null) {
-                  await ref
-                      .read(dayThemesProvider.notifier)
-                      .addDayTheme(updated);
-                } else {
-                  await ref
-                      .read(dayThemesProvider.notifier)
-                      .updateDayTheme(updated);
-                }
-                if (context.mounted) Navigator.pop(context);
-              },
-              child: const Text('Salvar'),
-            ),
           ],
         ),
       ),
@@ -598,13 +353,5 @@ class DayThemeScreen extends ConsumerWidget {
 
   String _formatRangeTime(int hour, int minute) {
     return '${hour.clamp(0, 23).toString().padLeft(2, '0')}:${minute.clamp(0, 59).toString().padLeft(2, '0')}';
-  }
-
-  int _rangeStartMinutes(TimeRange range) {
-    return (range.startHour.clamp(0, 23) * 60) + range.startMinute.clamp(0, 59);
-  }
-
-  int _rangeEndMinutes(TimeRange range) {
-    return (range.endHour.clamp(0, 24) * 60) + range.endMinute.clamp(0, 59);
   }
 }

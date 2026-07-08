@@ -42,14 +42,22 @@ class TikTokVideoResolver {
 
     try {
       debugPrint('[TikTok] Resolving: $tiktokUrl');
-      // Expand shortened URLs so tikwm can parse the video ID
+      // Try to expand shortened URLs so tikwm can parse the video ID.
+      // But only use the expanded URL if it actually contains the video ID —
+      // if expansion lands on the TikTok homepage (/?# etc.), fall back to
+      // the original short link because tikwm handles vt/vm.tiktok.com directly.
       final expandedUrl = await _expandShortUrl(tiktokUrl);
-      if (expandedUrl != tiktokUrl) {
-        debugPrint('[TikTok] Expanded to: $expandedUrl');
+      final expandedIsCanonical = expandedUrl.contains('/video/') ||
+          expandedUrl.contains('/photo/');
+      final urlForApi = expandedIsCanonical ? expandedUrl : tiktokUrl;
+      if (expandedIsCanonical && expandedUrl != tiktokUrl) {
+        debugPrint('[TikTok] Expanded to canonical: $expandedUrl');
+      } else if (!expandedIsCanonical && expandedUrl != tiktokUrl) {
+        debugPrint('[TikTok] Expansion non-canonical ($expandedUrl) – using original: $tiktokUrl');
       }
-      final uri = _buildUri(configured, expandedUrl);
+      final uri = _buildUri(configured, urlForApi);
       debugPrint('[TikTok] API URI: $uri');
-      final response = await _send(uri, expandedUrl)
+      final response = await _send(uri, urlForApi)
           .timeout(const Duration(seconds: 18));
       debugPrint('[TikTok] Response ${response.statusCode}: ${response.body.length > 300 ? response.body.substring(0, 300) : response.body}');
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -67,41 +75,100 @@ class TikTokVideoResolver {
     }
   }
 
-  /// Expands shortened TikTok URLs (vt.tiktok.com, vm.tiktok.com) to their
-  /// full form so tikwm can extract the video ID.
-  Future<String> _expandShortUrl(String url) async {
+
+  /// Expands shortened TikTok URLs (vt.tiktok.com, vm.tiktok.com, tiktok.com/t/)
+  /// to their full canonical form so the video ID can be extracted.
+  ///
+  /// Manually follows redirects hop-by-hop and stops the moment a URL
+  /// containing /video/ or /photo/ is found, preventing TikTok's secondary
+  /// meta-redirect from overwriting the canonical URL with the homepage.
+  static Future<String> expandShortUrl(String url) async {
     final uri = Uri.tryParse(url);
     if (uri == null) return url;
     final host = uri.host.toLowerCase();
-    // Only expand known short-link domains
+    // Only bother for known TikTok short-link patterns
     if (!host.contains('vt.tiktok.com') &&
         !host.contains('vm.tiktok.com') &&
-        !host.contains('tiktok.com/t/')) {
+        !host.contains('tiktok.com/t/') &&
+        !_looksLikeTikTokShortLink(uri)) {
       return url;
     }
     try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 8);
-      final request = await client.getUrl(uri);
-      request.followRedirects = false;
-      request.headers.set('User-Agent', 'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36');
-      final response = await request.close().timeout(const Duration(seconds: 8));
-      client.close();
-      
-      if (response.statusCode >= 300 && response.statusCode < 400) {
+      const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) '
+          'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 '
+          'Mobile/15E148 Safari/604.1';
+
+      Uri current = uri;
+      // Follow up to 6 hops manually so we can inspect each Location header
+      for (int hop = 0; hop < 6; hop++) {
+        final client = HttpClient();
+        client.connectionTimeout = const Duration(seconds: 10);
+
+        final request = await client
+            .getUrl(current)
+            .timeout(const Duration(seconds: 12));
+        request.followRedirects = false; // <-- manual hop-by-hop
+        request.headers.set('User-Agent', ua);
+
+        final response = await request.close();
+        client.close();
+
         final location = response.headers.value('location');
-        if (location != null && location.contains('tiktok.com')) {
-          final clean = Uri.tryParse(location);
-          if (clean != null) {
-            // Strip query params
-            return clean.replace(query: '', fragment: '').toString();
-          }
-          return location;
+
+        // If TikTok already gave us a canonical video URL, return it now
+        // before any further redirect can clobber it.
+        final isVideoUrl = current.path.contains('/video/') ||
+            current.path.contains('/photo/');
+        if (isVideoUrl && current.host.contains('tiktok.com')) {
+          return current.replace(query: '', fragment: '').toString();
         }
+
+        if (location == null ||
+            response.statusCode < 300 ||
+            response.statusCode >= 400) {
+          // No further redirect – use the current URL if it's a TikTok page
+          if (current.host.contains('tiktok.com')) {
+            final clean = current.replace(query: '', fragment: '');
+            return clean.toString();
+          }
+          break;
+        }
+
+        // Resolve relative URLs (e.g. "/path?x=1" → absolute)
+        final next = current.resolve(location);
+
+        // Check the Location header URL directly before following
+        final nextPath = next.path;
+        if (next.host.contains('tiktok.com') &&
+            (nextPath.contains('/video/') || nextPath.contains('/photo/'))) {
+          // Found the video URL — return it without following further
+          debugPrint('[TikTok] Short-link resolved to: ${next.replace(query: '', fragment: '')}');
+          return next.replace(query: '', fragment: '').toString();
+        }
+
+        current = next;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[TikTok] URL expansion failed: $e');
+    }
     return url;
   }
+
+  /// Returns true if this looks like a TikTok short link that needs expansion.
+  static bool _looksLikeTikTokShortLink(Uri uri) {
+    // A full TikTok video URL has /@username/video/ID in the path
+    // If the path is very short (like /zscwxklqx), it's a short link
+    final path = uri.path;
+    return uri.host.contains('tiktok.com') &&
+        !path.contains('/video/') &&
+        !path.contains('/photo/') &&
+        !path.contains('/@') &&
+        path.length < 20 &&
+        path.length > 1;
+  }
+
+  /// Instance wrapper kept for backwards-compat inside resolveAll.
+  Future<String> _expandShortUrl(String url) => expandShortUrl(url);
 
   /// Convenience: returns only the video URL (backwards-compat).
   Future<String?> resolve(String tiktokUrl) async {

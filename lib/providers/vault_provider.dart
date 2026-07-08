@@ -849,8 +849,14 @@ class OrganizersNotifier extends Notifier<List<Organizer>> {
     final labels = ref
         .watch(objectsByTypeProvider('label'))
         .cast<Organizer>();
+    final dayThemes = ref
+        .watch(objectsByTypeProvider('dayTheme'))
+        .cast<Organizer>();
+    final timeBlocks = ref
+        .watch(objectsByTypeProvider('timeBlock'))
+        .cast<Organizer>();
 
-    return [...areas, ...projects, ...activities, ...people, ...labels];
+    return [...areas, ...projects, ...activities, ...people, ...labels, ...dayThemes, ...timeBlocks];
   }
 
   Future<void> addOrganizer(Organizer organizer) async {

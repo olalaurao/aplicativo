@@ -4,6 +4,7 @@ import 'organizer_model.dart';
 import 'task_model.dart'; // For TaskPriority
 import 'shared_types.dart';
 import 'scheduler.dart';
+import 'reminder_config.dart';
 import '../services/scheduler_service.dart';
 
 class Person extends Organizer {
@@ -15,7 +16,7 @@ class Person extends Organizer {
   Duration? contactFrequency;
   TaskPriority contactPriority;
   /// F2.13: Scheduler for automatic contact reminders using days_after_reference_field
-  Scheduler? scheduler;
+  @override Scheduler? scheduler;
 
   Person({
     super.id,
@@ -28,6 +29,7 @@ class Person extends Organizer {
     this.contactFrequency,
     this.contactPriority = TaskPriority.none,
     this.scheduler,
+    super.reminders,
     super.parentId,
     super.startDate,
     super.endDate,
@@ -147,14 +149,16 @@ class Person extends Organizer {
     String? icon,
     String? state,
     String? priority,
+    List<TimeRange>? timeRanges,
+    int? energyLevel,
+    List<String>? daysOfWeek,
+    Scheduler? scheduler,
+    List<ReminderConfig>? reminders,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     DateTime? createdAt,
     DateTime? updatedAt,
     String? obsidianPath,
-    List<TimeRange>? timeRanges,
-    List<String>? daysOfWeek,
-    int? energyLevel,
     String? photo,
     String? phone,
     String? email,
@@ -162,7 +166,6 @@ class Person extends Organizer {
     DateTime? lastContactDate,
     Duration? contactFrequency,
     TaskPriority? contactPriority,
-    Scheduler? scheduler,
   }) {
     final p = Person(
       id: id,
@@ -175,6 +178,7 @@ class Person extends Organizer {
       contactFrequency: contactFrequency ?? this.contactFrequency,
       contactPriority: contactPriority ?? this.contactPriority,
       scheduler: scheduler ?? this.scheduler,
+      reminders: reminders ?? this.reminders,
       parentId: parentId ?? this.parentId,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
