@@ -30,7 +30,7 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     
-    final maxChipsPerCell = widget.block.metadata['maxChipsPerCell'] as int? ?? 2;
+    final maxChipsPerCell = widget.block.metadata['maxChipsPerCell'] as int? ?? 4;
 
     // Build grid data
     final firstDayOfMonth = DateTime(_currentMonth.year, _currentMonth.month, 1);
@@ -116,7 +116,7 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 7,
-                    childAspectRatio: 1.0,
+                    childAspectRatio: 1.2,
                     crossAxisSpacing: 2,
                     mainAxisSpacing: 2,
                   ),

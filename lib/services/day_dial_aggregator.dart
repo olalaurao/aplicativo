@@ -214,6 +214,9 @@ class DayDialAggregator {
 
     _assignLayers(segments);
 
+    // Sort segments chronologically by start time
+    segments.sort((a, b) => a.start.compareTo(b.start));
+
     final moodMarkers = _buildMoodMarkers(journalEntries, moodCatalog, date);
     final next = _findNextUpcoming(segments, date);
 

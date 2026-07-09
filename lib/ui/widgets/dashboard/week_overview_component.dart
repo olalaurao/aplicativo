@@ -7,17 +7,35 @@ import '../../../providers/today_provider.dart';
 import '../../theme.dart';
 import '../../navigation/object_navigation.dart';
 
-class WeekOverviewComponent extends ConsumerWidget {
+class WeekOverviewComponent extends ConsumerStatefulWidget {
   final DashboardBlock block;
 
   const WeekOverviewComponent({super.key, required this.block});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WeekOverviewComponent> createState() => _WeekOverviewComponentState();
+}
+
+class _WeekOverviewComponentState extends ConsumerState<WeekOverviewComponent> {
+  late DateTime _currentWeekStart;
+
+  @override
+  void initState() {
+    super.initState();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final weekStartsMonday = block.metadata['weekStartsMonday'] as bool? ?? true;
-    final maxItemsPerDay = block.metadata['maxItemsPerDay'] as int? ?? 3;
+    final weekStartsMonday = widget.block.metadata['weekStartsMonday'] as bool? ?? true;
+    int daysToSubtract = today.weekday - (weekStartsMonday ? DateTime.monday : DateTime.sunday);
+    if (daysToSubtract < 0) daysToSubtract += 7;
+    _currentWeekStart = today.subtract(Duration(days: daysToSubtract));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final weekStartsMonday = widget.block.metadata['weekStartsMonday'] as bool? ?? true;
+    final maxItemsPerDay = widget.block.metadata['maxItemsPerDay'] as int? ?? 3;
 
     // Calculate start of week
     int daysToSubtract = today.weekday - (weekStartsMonday ? DateTime.monday : DateTime.sunday);
@@ -39,8 +57,30 @@ class WeekOverviewComponent extends ConsumerWidget {
                 Icon(Icons.view_week_rounded, color: AppColors.textMuted, size: 20),
                 const SizedBox(width: 8),
                 Text(
-                  block.title.isNotEmpty ? block.title : 'This Week',
+                  widget.block.title.isNotEmpty ? widget.block.title : 'This Week',
                   style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16),
+                ),
+                const Spacer(),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left_rounded),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      onPressed: () => setState(() {
+                        _currentWeekStart = _currentWeekStart.subtract(const Duration(days: 7));
+                      }),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right_rounded),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      onPressed: () => setState(() {
+                        _currentWeekStart = _currentWeekStart.add(const Duration(days: 7));
+                      }),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -91,52 +131,56 @@ class WeekOverviewComponent extends ConsumerWidget {
                           if (items.isEmpty)
                             const Text('-', style: TextStyle(color: AppColors.textMuted))
                           else
-                            Column(
-                              children: [
-                                ...visibleItems.map((item) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: InkWell(
-                                    onTap: () => navigateToObject(context, item.source),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: item.color.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(item.emoji, style: const TextStyle(fontSize: 10)),
-                                          const SizedBox(width: 2),
-                                          Expanded(
-                                            child: Text(
-                                              item.title,
-                                              style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                                                fontSize: 10,
-                                                color: item.color,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  children: [
+                                    ...visibleItems.map((item) => Padding(
+                                      padding: const EdgeInsets.only(bottom: 4),
+                                      child: InkWell(
+                                        onTap: () => navigateToObject(context, item.source),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: item.color.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(4),
                                           ),
-                                        ],
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(item.emoji, style: const TextStyle(fontSize: 10)),
+                                              const SizedBox(width: 2),
+                                              Expanded(
+                                                child: Text(
+                                                  item.title,
+                                                  style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                                                    fontSize: 10,
+                                                    color: item.color,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                )),
-                                if (hasMore)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.surfaceVariant,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      '+${items.length - maxItemsPerDay}',
-                                      style: Theme.of(context).textTheme.bodySmall!.copyWith(fontSize: 10),
-                                    ),
-                                  ),
-                              ],
+                                    )),
+                                    if (hasMore)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.surfaceVariant,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          '+${items.length - maxItemsPerDay}',
+                                          style: Theme.of(context).textTheme.bodySmall!.copyWith(fontSize: 10),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
                             ),
                         ],
                       ),

@@ -99,6 +99,9 @@ class AppSettings {
   // ── Timeline settings (RA-P2-2) ──
   final int dayStartHour; // Hour when the day starts (0-23), default 0 (midnight)
 
+  // ── Day Dial settings ──
+  final bool showDayDialLegend; // Show/hide legend in Day Dial component
+
   AppSettings({
     required this.vaultName,
     this.vaultPath = '',
@@ -161,6 +164,7 @@ class AppSettings {
     this.suppressedConflicts = const {},
     this.recentSearches = const [],
     this.dayStartHour = 0,
+    this.showDayDialLegend = true,
   });
 
   /// All saved filters deserialized.
@@ -255,6 +259,7 @@ class AppSettings {
     Map<String, DateTime>? suppressedConflicts,
     List<String>? recentSearches,
     int? dayStartHour,
+    bool? showDayDialLegend,
   }) {
     return AppSettings(
       vaultName: vaultName ?? this.vaultName,
@@ -332,6 +337,7 @@ class AppSettings {
       suppressedConflicts: suppressedConflicts ?? this.suppressedConflicts,
       recentSearches: recentSearches ?? this.recentSearches,
       dayStartHour: dayStartHour ?? this.dayStartHour,
+      showDayDialLegend: showDayDialLegend ?? this.showDayDialLegend,
     );
   }
 }
@@ -473,6 +479,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       }(),
       recentSearches: prefs.getStringList('recentSearches') ?? const [],
       dayStartHour: prefs.getInt('dayStartHour') ?? 0,
+      showDayDialLegend: prefs.getBool('showDayDialLegend') ?? true,
     );
   }
 
@@ -989,6 +996,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       tiktokResolverEndpoint: endpoint,
       tiktokResolverApiKey: apiKey,
     );
+  }
+
+  Future<void> updateDayDialLegend(bool value) async {
+    await _prefs.setBool('showDayDialLegend', value);
+    state = state.copyWith(showDayDialLegend: value);
   }
 
   Future<void> updateGoogleBooksApiKey(String apiKey) async {

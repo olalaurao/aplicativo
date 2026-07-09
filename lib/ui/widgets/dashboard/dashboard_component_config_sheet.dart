@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../models/dashboard_block.dart';
 import '../../../providers/dashboard_provider.dart';
+import '../../../providers/settings_provider.dart';
 import '../../../services/component_registry.dart';
 import '../../theme.dart';
 import '../standard_sheet.dart';
@@ -107,7 +108,22 @@ class _DashboardComponentConfigSheetState extends ConsumerState<DashboardCompone
               value: _metadata['showLegend'] ?? true,
               onChanged: (v) => _updateMeta('showLegend', v),
               title: 'Show Legend',
-              subtitle: 'Display duration of each time block below the dial.',
+              subtitle: 'Display schedule below the dial.',
+            ),
+            const SizedBox(height: 16),
+            AppDropdown<String>(
+              value: ref.watch(settingsProvider).plannerColorMode,
+              items: const [
+                DropdownMenuItem(value: 'category', child: Text('Category Colors')),
+                DropdownMenuItem(value: 'type', child: Text('Type Colors')),
+                DropdownMenuItem(value: 'default', child: Text('Default Colors')),
+              ],
+              onChanged: (v) {
+                if (v != null) {
+                  ref.read(settingsProvider.notifier).updatePlannerColorMode(v);
+                }
+              },
+              label: 'Color Mode',
             ),
           ],
         );

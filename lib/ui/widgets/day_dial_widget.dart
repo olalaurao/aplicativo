@@ -282,21 +282,6 @@ class _DayDialWidgetState extends State<DayDialWidget> {
             color: AppTheme.textSecondaryColor(context),
           ),
         ),
-        if (isToday && widget.snapshot.nextUpcoming != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 4.0),
-            child: Text(
-              _formatCountdown(widget.snapshot.nextUpcoming!, now),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.accentColor(context),
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
       ],
     );
   }
@@ -427,7 +412,7 @@ class _DayDialPainter extends CustomPainter {
     final paint = Paint()
       ..color = _parseColor(s.colorHex).withValues(alpha: isDragging ? 0.9 : (s.layer == -1 ? 0.3 : 0.8))
       ..style = PaintingStyle.stroke
-      ..strokeWidth = ringWidth * 0.8
+      ..strokeWidth = ringWidth * 0.5
       ..strokeCap = StrokeCap.butt;
       
     if (isDragging) {
