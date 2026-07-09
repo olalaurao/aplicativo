@@ -88,7 +88,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: SizedBox(
-                height: 220,
+                height: 280,
                 child: DayDialWidget(
                   snapshot: snapshot,
                   selectedDate: today,
@@ -109,7 +109,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
                 ),
               ),
             ),
-            if (showLegendSetting && snapshot.segments.isNotEmpty)
+            if (snapshot.segments.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 child: Column(
