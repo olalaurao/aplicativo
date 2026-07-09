@@ -674,6 +674,12 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
     }
     if (!mounted) return;
 
+    if (post.organizers.isNotEmpty) {
+      navigator.pop();
+      messenger.showSnackBar(const SnackBar(content: Text('Post salvo e vinculado')));
+      return;
+    }
+
     final linkAction = await _showLinkOfferSheet(post);
     if (!mounted) return;
     if (linkAction == _LinkAction.createTask) {

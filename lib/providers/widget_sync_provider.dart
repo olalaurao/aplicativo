@@ -24,6 +24,7 @@ import '../models/journal_entry.dart';
 import '../models/note_model.dart';
 import '../models/resource_model.dart';
 import '../models/day_dial_model.dart';
+import '../models/event_model.dart';
 import '../services/scheduler_service.dart';
 import '../services/widget_service.dart';
 import '../services/day_dial_aggregator.dart';
@@ -907,17 +908,20 @@ Future<void> _updateDayDialWidget(
     final reminders = allObjects.whereType<Reminder>().toList();
     final journalEntries = allObjects.whereType<JournalEntry>().toList();
     final moodDefinitions = allObjects.whereType<MoodDefinition>().toList();
+    final localEvents = allObjects.whereType<Event>().toList();
+    final timeBlocks = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.timeBlock).toList();
     
-    final hourStates = DayDialAggregator.aggregateForDate(
+    final snapshot = DayDialAggregator.aggregateForDate(
       date: today,
       tasks: tasks,
       habits: habits,
       pomodoroSessions: pomodoroHistory,
       googleEvents: googleEvents,
+      localEvents: localEvents,
       reminders: reminders,
-      activeTimeBlocks: const [],
+      timeBlocks: timeBlocks,
       journalEntries: journalEntries,
-      moodDefinitions: moodDefinitions,
+      moodCatalog: moodDefinitions,
     );
     
     // Count activities for summary
@@ -925,22 +929,34 @@ Future<void> _updateDayDialWidget(
     int eventCount = 0;
     int pomodoroCount = 0;
     
-    for (final state in hourStates) {
-      if (state.kind == DialHourKind.pomodoroCompleted) {
+    for (final segment in snapshot.segments) {
+      if (segment.kind == DialSegmentKind.pomodoroCompleted) {
         pomodoroCount++;
-      } else if (state.kind == DialHourKind.pomodoroPlanned) {
+      } else if (segment.kind == DialSegmentKind.taskPlanned) {
         taskCount++;
-      } else if (state.kind == DialHourKind.event) {
+      } else if (segment.kind == DialSegmentKind.event) {
         eventCount++;
       }
     }
     
     final summary = '$taskCount tasks • $eventCount events • $pomodoroCount pomodoros';
 
+    final widgetHours = List.generate(24, (i) {
+      final hStart = DateTime(today.year, today.month, today.day, i);
+      final hEnd = DateTime(today.year, today.month, today.day, i + 1);
+      final hourSegments = snapshot.segments.where((s) => s.start.isBefore(hEnd) && s.end.isAfter(hStart));
+      if (hourSegments.isEmpty) return {'active': false, 'color': '#000000', 'icon': ''};
+      return {
+        'active': true,
+        'color': hourSegments.first.colorHex,
+        'icon': hourSegments.first.emoji,
+      };
+    });
+
     await WidgetService.updateDayDial(
       currentTime: DateFormat('HH:mm').format(now),
       dateLabel: 'Today',
-      hours: DayDialAggregator.hourStatesToWidgetFormat(hourStates),
+      hours: widgetHours,
       currentHour: now.hour,
       summary: summary,
     );

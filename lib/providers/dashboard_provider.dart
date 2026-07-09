@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/dashboard_block.dart';
+import 'package:uuid/uuid.dart';
 
 class DashboardNotifier extends AsyncNotifier<List<DashboardBlock>> {
   static const _prefKey = 'dashboard_blocks_v3';
@@ -16,7 +17,27 @@ class DashboardNotifier extends AsyncNotifier<List<DashboardBlock>> {
     if (jsonStr != null) {
       try {
         final List<dynamic> decoded = jsonDecode(jsonStr);
-        return decoded.map((item) => DashboardBlock.fromMap(item)).toList();
+        var blocks = decoded.map((item) => DashboardBlock.fromMap(item)).toList();
+        
+        // Migration: todayHabits -> todayCompletables
+        bool migrated = false;
+        blocks = blocks.map((block) {
+          if (block.type == BlockType.todayHabits) {
+            migrated = true;
+            return block.copyWith(
+              type: BlockType.todayCompletables,
+              metadata: {...block.metadata, 'migratedFromTodayHabits': true},
+            );
+          }
+          return block;
+        }).toList();
+
+        if (migrated) {
+          // Fire-and-forget save of the migrated list
+          _saveMigrated(blocks);
+        }
+
+        return blocks;
       } catch (e) {
         return [];
       }
@@ -24,7 +45,15 @@ class DashboardNotifier extends AsyncNotifier<List<DashboardBlock>> {
     return [];
   }
 
-  static const List<DashboardBlock> availableWidgetBlocks = [];
+  Future<void> _saveMigrated(List<DashboardBlock> blocks) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _prefKey,
+      jsonEncode(blocks.map((e) => e.toMap()).toList()),
+    );
+  }
+
+
 
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
@@ -94,7 +123,16 @@ class DashboardNotifier extends AsyncNotifier<List<DashboardBlock>> {
     String title, {
     Map<String, dynamic> metadata = const {},
   }) async {
-    debugPrint('Dashboard blocks are disabled; ignoring addBlock($type).');
+    final current = state.valueOrNull ?? [];
+    final block = DashboardBlock(
+      id: const Uuid().v4(),
+      type: type,
+      title: title,
+      order: current.length,
+      metadata: metadata,
+    );
+    state = AsyncData([...current, block]);
+    await _save();
   }
 
   Future<void> removeBlock(String id) async {

@@ -9,8 +9,15 @@ import 'ui/widgets/day_dial_widget.dart';
 import 'ui/theme.dart';
 import 'providers/vault_provider.dart';
 import 'providers/pomodoro_provider.dart';
+import 'models/content_object.dart';
+import 'models/event_model.dart';
+import 'models/habit_model.dart';
 import 'models/journal_entry.dart';
 import 'models/mood_model.dart';
+import 'models/organizer_model.dart';
+import 'models/reminder_model.dart';
+import 'models/task_model.dart';
+import 'models/pomodoro_session.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -79,36 +86,35 @@ class _WindowsDialHomeState extends ConsumerState<WindowsDialHome> {
   Widget build(BuildContext context) {
     final tasks = ref.watch(tasksProvider);
     final habits = ref.watch(habitsProvider);
-    final pomodoroSessions = ref.watch(pomodoroProvider).history;
-    final allObjects = ref.watch(allObjectsProvider);
+    final pomodoroHistory = ref.watch(pomodoroProvider).history;
+    final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? <ContentObject>[];
     
-    // Get journal entries and mood definitions
     final journalEntries = allObjects.whereType<JournalEntry>().toList();
     final moodDefinitions = allObjects.whereType<MoodDefinition>().toList();
+    final reminders = allObjects.whereType<Reminder>().toList();
+    final localEvents = allObjects.whereType<Event>().toList();
+    final timeBlocks = allObjects.whereType<Organizer>()
+        .where((o) => o.organizerType == OrganizerType.timeBlock)
+        .toList();
     
-    // Filter tasks for the selected date
     final dayTasks = tasks.where((task) {
       if (task.startDate == null) return false;
       return _isSameDay(task.startDate!, _selectedDate);
     }).toList();
 
-    // Filter habits for the selected date
-    final dayHabits = habits.where((habit) {
-      // Simple check - in production use SchedulerService
-      return true;
-    }).toList();
+    final dayHabits = habits.where((habit) => true).toList();
 
-    // Aggregate hour states
-    final hourStates = DayDialAggregator.aggregateForDate(
+    final snapshot = DayDialAggregator.aggregateForDate(
       date: _selectedDate,
       tasks: dayTasks,
       habits: dayHabits,
-      pomodoroSessions: pomodoroSessions,
-      googleEvents: [], // No Google Calendar in Windows companion
-      reminders: [], // No reminders in Windows companion
-      activeTimeBlocks: [], // No time blocks in Windows companion
+      pomodoroSessions: pomodoroHistory,
+      googleEvents: const [],
+      localEvents: localEvents,
+      reminders: reminders,
+      timeBlocks: timeBlocks,
       journalEntries: journalEntries,
-      moodDefinitions: moodDefinitions,
+      moodCatalog: moodDefinitions,
     );
 
     return Scaffold(
@@ -161,12 +167,8 @@ class _WindowsDialHomeState extends ConsumerState<WindowsDialHome> {
               width: 350,
               height: 350,
               child: DayDialWidget(
-                hourStates: hourStates,
+                snapshot: snapshot,
                 selectedDate: _selectedDate,
-                onHourTap: (hour) {
-                  // Could open a detail view or navigate to main app
-                  print('Tapped hour: $hour');
-                },
               ),
             ),
             const SizedBox(height: 24),

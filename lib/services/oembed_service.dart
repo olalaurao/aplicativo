@@ -144,6 +144,7 @@ class OEmbedService {
     String? authorName;
     String? thumbnailUrl;
     String? videoUrl;
+    List<String>? images;
 
     try {
       final result = await switch (platform) {
@@ -226,11 +227,12 @@ class OEmbedService {
           }
           authorHandle ??= tikwmData.authorHandle;
           authorName ??= tikwmData.authorName;
+          images ??= tikwmData.images;
           // If tikwm resolved via the original URL, use that as canonical URL
           if (normalizedUrl != originalUrl && videoUrl != null) {
             // tikwm gave us the real video URL; normalizedUrl may be homepage
           }
-          debugPrint('[OEmbed fetchMetadata] Updated from TikTokVideoResolver - videoUrl=$videoUrl, thumbnailUrl=$thumbnailUrl');
+          debugPrint('[OEmbed fetchMetadata] Updated from TikTokVideoResolver - videoUrl=$videoUrl, thumbnailUrl=$thumbnailUrl, imagesCount=${images?.length}');
         }
       }
     } catch (error) {
@@ -250,7 +252,9 @@ class OEmbedService {
       thumbnailUrl: thumbnailUrl,
       embedUrl: embedUrl,
       videoUrl: videoUrl,
-      mediaUrls: thumbnailUrl == null ? const [] : [thumbnailUrl],
+      mediaUrls: images != null && images.isNotEmpty
+          ? images
+          : (thumbnailUrl == null ? const [] : [thumbnailUrl]),
     );
   }
 

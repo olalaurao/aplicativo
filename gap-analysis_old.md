@@ -1,3 +1,665 @@
+# Day Dial v2 — Full Redesign Spec 08/07/26
+
+**Status:** Ready for implementation
+**Author:** Claude (technical collaborator), for Laura / Citrine
+**Depends on:** `guidelines_v5.4`, existing `day_dial_model.dart` / `day_dial_aggregator.dart` / `day_dial_widget.dart` (all superseded by this spec)
+**Repo:** `github.com/olalaurao/aplicativo`, branch `main`
+
+---
+
+## 0. Purpose
+
+Replace the current Day Dial (circular 24h view under Planner → Dial tab) with a complete rebuild that can:
+
+1. Show **everything** happening in a day on one 24h dial — habits (with emoji), past mood entries, events, time blocks, Pomodoro sessions, tasks with a scheduled time.
+2. Handle **overlap** correctly (a meeting inside a focus time block, a habit reminder during an event, etc.) via **concentric rings**, not overwrite.
+3. Support **click-and-drag to move** an item and **edge-drag to resize** it, writing changes back to the vault.
+4. Show a **time-remaining readout** for the next upcoming item.
+5. Fix the current data-loss and rendering-artifact bugs (documented below).
+
+Reference apps inspected for interaction/visual patterns: `taskdial.app` (color-coded time blocks on a clock face with Pomodoro), and — found during research because it implements the overlap case explicitly — an app called Dialed, whose recent changelog describes a **multi-layer ring system for overlapping segments**, drag-to-reposition via long-press with live visual feedback, and a **progress ring + time-remaining display** for the currently active item. These three ideas (layered rings for overlap, live drag feedback, and a countdown for the "current/next" item) map directly onto Laura's requirements and are used as the structural basis for §5–§7 below. No code or assets from these apps are used — only the general interaction concepts, which are common across this whole app category (Sectograph, Arcadia, CircleTime all converge on the same "segments around a clock face" pattern).
+
+---
+
+## 1. Audit of current implementation
+
+### 1.1 Files involved today
+
+| File | Role |
+|---|---|
+| `lib/models/day_dial_model.dart` | `DialHourKind` enum + `DayDialHourState` (one struct per hour, 0–23) |
+| `lib/services/day_dial_aggregator.dart` | Builds the 24 `DayDialHourState` from tasks/habits/pomodoro/events/reminders |
+| `lib/ui/widgets/day_dial_widget.dart` | `CustomPainter` that draws the ring from `hourStates` |
+| `lib/ui/screens/planner_screen.dart` (`_buildDialView`, ~L2184–2230) | Wires the aggregator + widget into the Planner "Dial" tab |
+
+### 1.2 Root cause of the two orphan dots in the current screenshot
+
+This is a **data model problem**, not a rendering glitch, and it explains both of Laura's known open bugs ("aggregator uses an hourly-bucket map where later writes overwrite earlier ones" and "near-zero-degree sweep angles with round stroke caps create orphaned dot artifacts"):
+
+- `DayDialHourState` holds **exactly one `kind` and one `fillFraction` per hour** (`day_dial_model.dart` L13–L18). There is no list of items per hour — there's one slot.
+- `DayDialAggregator.aggregateForDate` (L20–143) processes Pomodoro sessions, then planned tasks, then Google events, then habits, then reminders, **each pass calling `hourStates[startHour] = hourStates[startHour].copyWith(...)`**. Every later pass silently discards whatever the earlier pass wrote for that hour. Two things scheduled in the same hour → only the last one aggregated survives on the arc. Habit icon and reminder icon fields do independently coexist with `kind`, but multiple habits/reminders in the same hour still collide with each other (only one `habitIconName` per hour, L116–121).
+- Fill fraction is computed as `duration / 60.0` clamped to `[0,1]` and always drawn starting exactly at `_hourToAngle(state.hour)` (`day_dial_widget.dart` L122–138) — i.e. **every item snaps to the top of its hour**, regardless of actual minute. A 10-minute item and a 55-minute item both live inside "their" hour slot with no minute-level positioning.
+- `_DayDialPainter` draws every non-zero arc with `strokeCap: StrokeCap.round` (L130). When `fillFraction` is small (e.g. a 5–10 minute Pomodoro block that only fills a sliver of the hour), the sweep angle is near zero, and a round stroke cap on a near-zero-length arc renders as a filled disc — exactly the two floating dots in the screenshot, positioned wherever those short items landed.
+- There is no `id`/`slug`/`title` carried on `DayDialHourState` at all — the dial cannot support tap-to-open-detail, drag-to-move, or drag-to-resize because it doesn't know *what* is occupying a given arc, only *that something* is.
+
+**Conclusion:** the fix is not a patch to the painter — it requires an hour-bucket-free data model where every scheduled thing is its own timed segment, and a real overlap-layering algorithm. That is what this spec builds.
+
+### 1.3 Other pre-existing gaps this spec must also close (from Laura's backlog)
+
+- Day Themes and Time Blocks have **no dial support at all**: no `DialHourKind` value, no aggregator handling, no call-site parameters passed into `_buildDialView`. This rebuild adds first-class time-block rendering (§5.4).
+- `reminders: const []` is hardcoded in `_buildDialView` (planner_screen.dart L2201) — reminders are never actually passed in from the real provider. Fixed in §9.4.
+
+---
+
+## 2. Requirements (restated precisely from Laura's request)
+
+1. Single 24-hour circular dial, showing **all** day items simultaneously.
+2. **Habits** → shown with their emoji.
+3. **Past mood entries** → shown on the dial (read-only, point-in-time).
+4. **Colors** for events, time blocks, Pomodoro sessions (and tasks/reminders).
+5. **Overlap must work** — concentric rings, not overwrite. This is explicitly the common case for Laura (a meeting inside a dedicated focus block), so it is a P0 requirement, not an edge case.
+6. **Click-and-drag to reposition** an item (change its start time).
+7. **Edge-drag to resize** (change its duration).
+8. **Time-remaining readout** for the next upcoming item, shown in the center.
+9. Spec must be grounded in the actual current codebase and be directly implementable by an AI coding agent.
+
+---
+
+## 3. New data model
+
+New file: **`lib/models/day_dial_model.dart`** (replaces current contents entirely).
+
+```dart
+/// The category of a dial segment — drives color, icon fallback, and
+/// whether the segment is user-editable (draggable/resizable).
+enum DialSegmentKind {
+  event,            // Event / Google Calendar event
+  timeBlock,        // Organizer of type time-block, spanning its configured hours
+  taskPlanned,      // Task with scheduledTime, not yet completed via Pomodoro
+  pomodoroPlanned,  // Scheduled/upcoming Pomodoro session
+  pomodoroCompleted,// Completed Pomodoro session (historical, read-only)
+  habitSlot,        // A habit's scheduled slot for the day (from HabitSlot.primaryReminderTime)
+  reminder,         // Standalone reminder (not a habit reminder)
+  dayTheme,         // Day Theme background band (P2 — see §5.4)
+  sleep,            // Derived idle/sleep band (optional, see §8.5)
+}
+
+/// One continuous arc segment on the dial: has a real start+end DateTime,
+/// not an hour bucket. This is the core fix over the current model.
+class DialSegment {
+  final String id;              // stable id: '<kind>:<sourceId>[:<slotIndex>]'
+  final DialSegmentKind kind;
+  final DateTime start;
+  final DateTime end;           // always > start; midnight-spanning allowed (see §8.1)
+  final String title;
+  final String colorHex;        // resolved concrete color (see §6)
+  final String? emoji;          // habit icon, mood emoji, etc. — null for events/blocks
+  final String? sourceSlug;     // the underlying object's slug/id, for tap-to-open
+  final bool isEditable;        // true only for taskPlanned, pomodoroPlanned, reminder,
+                                 // event (if not Google-synced — see §7.5), habitSlot (time only)
+  final bool isResizable;       // subset of isEditable (see §7)
+  int layer;                    // 0 = innermost ring, assigned by the layering algorithm
+
+  DialSegment({...});
+}
+
+/// A point-in-time marker (no duration): mood entries.
+class DialPointMarker {
+  final String id;
+  final DateTime timestamp;
+  final String emoji;
+  final String label;           // mood label, for tooltip/detail sheet
+  final String? sourceSlug;     // JournalEntry slug, for tap-to-open
+
+  DialPointMarker({...});
+}
+
+/// Full snapshot the widget renders. Produced fresh by the aggregator
+/// on every relevant provider change.
+class DayDialSnapshot {
+  final DateTime date;
+  final List<DialSegment> segments;      // already layer-assigned
+  final List<DialPointMarker> moodMarkers;
+  final int maxLayer;                    // segments.map((s)=>s.layer).max, for ring sizing
+  final DialSegment? nextUpcoming;       // first segment with start > now (today only)
+
+  DayDialSnapshot({...});
+}
+```
+
+Design notes:
+
+- No more `DayDialHourState.copyWith` overwrite pattern. Every item is its own object in a `List<DialSegment>`, so nothing is ever silently dropped.
+- `layer` is mutable and assigned by the aggregator (§5.2), not by the widget — the widget only draws what it's given, per the existing app-wide separation of aggregation (service) vs. rendering (widget/painter).
+- `isEditable` / `isResizable` are computed once by the aggregator so the widget/gesture layer never needs to re-derive "can I drag this" business rules — mirrors how `Task.isAlignmentTrackable` etc. are computed getters on the model rather than re-checked ad hoc in UI (existing pattern in `task_model.dart` L139).
+
+---
+
+## 4. Source → segment mapping rules
+
+This is the per-source-type ingestion contract for the new aggregator. Each rule replaces the corresponding block in the current `DayDialAggregator.aggregateForDate`.
+
+| Source | Start | End | Color | Editable? | Notes |
+|---|---|---|---|---|---|
+| `PomodoroSession` (completed) | `occurredAt ?? date` | `start + minutesWorked` | `AppColors.success` | No | Historical log — never draggable/resizable. Matches "done = tested on device" spirit: a completed session is a record, not a plan. |
+| `PomodoroSession` (scheduled/planned) | `date` | `date + workDuration` | `AppColors.primary` (lighter) | Yes (move+resize) | Only sessions with no completed counterpart for that linked item on that date (same de-dup check as current code, `day_dial_aggregator.dart` L58–64). |
+| `Task` with `scheduledTime` != null, `stage != finalized` | parsed from `scheduledTime` (HH:MM) on `date` | `start + (estimatedMinutes ?? duration)` minutes | `task.color` if set, else `AppColors.primary` | Yes (move+resize) | Skip if it already produced a `pomodoroPlanned`/`pomodoroCompleted` segment for the same linked item+date (avoid double-rendering the same work twice — mirrors existing de-dup logic). |
+| `Event` (local, not Google) | `event.startDatetime` | `event.endDatetime ?? start + 30min` | resolved via linked time block/organizer color if any, else `AppColors.info` | Yes (move+resize) | |
+| Google Calendar `Event` | `start.toLocal()` | `end.toLocal()` | `AppColors.info` | **No** (see §7.5) | All-day events (`event.start?.date != null`) are excluded from the ring exactly as today (L84–85) — they belong in a header strip, not the dial, since they have no time-of-day. |
+| Time Block (`Organizer` with block semantics, referenced by `Task.timeBlock` / `Habit.timeBlock`) | block's configured start hour | block's configured end hour | `organizer.color` | No (time blocks are edited from Settings → Time Blocks, not from the dial) | Renders as a **background band on its own dedicated inner ring** (ring −1, between the center hole and ring 0) so it visually "contains" whatever tasks/events happen to fall inside it — this directly implements Laura's "meeting inside my focus block" case without needing the meeting and the block to compete for the same ring. See §5.4. |
+| `Habit` slot (`HabitSlot.primaryReminderTime`) | slot time | **point-in-time**, rendered as a short fixed-width tick (12 min visual width) not a true duration, since habits have no stored duration | `habit.color` | Yes, **move only, not resize** (habits have no duration field to resize) | Rendered with `habit.icon` as the glyph instead of a plain color arc. See §8.2 for the completion-time caveat. |
+| `Reminder` (`habitReminder == false`, `isCompleted == false`) | `reminder.time` | point-in-time, same fixed visual width as habits | `AppColors.warning` | Yes (move only) | Fixes the `reminders: const []` hardcoding bug (§9.4). |
+| `MoodEntry` (from `JournalEntry.moodEntries`, resolved date == dial date) | `entry.timestamp` | n/a — `DialPointMarker`, not a segment | n/a (emoji only) | No | See §8.3 for resolution against the mood catalog. |
+
+---
+
+## 5. Aggregation algorithm — `DayDialAggregatorV2`
+
+New file: **`lib/services/day_dial_aggregator.dart`** (rewrite in place, same path, same class name so call sites in `planner_screen.dart` need only a signature change, not a rename).
+
+### 5.1 Top-level shape
+
+```dart
+class DayDialAggregator {
+  static DayDialSnapshot aggregateForDate({
+    required DateTime date,
+    required List<Task> tasks,
+    required List<Habit> habits,
+    required List<PomodoroSession> pomodoroSessions,
+    required List<google_calendar.Event> googleEvents,
+    required List<Event> localEvents,
+    required List<Reminder> reminders,
+    required List<Organizer> timeBlocks,       // NEW — was missing entirely before
+    required List<JournalEntry> journalEntries,// NEW — source for mood markers
+    required List<MoodDefinition> moodCatalog, // NEW — to resolve moodSlug -> emoji
+  }) {
+    final segments = <DialSegment>[];
+    // ... one _ingestX(...) helper per row of the table in §4, each *appending*
+    // to `segments`, never writing into a shared bucket. This alone fixes the
+    // overwrite bug, independent of the layering step below.
+
+    _assignLayers(segments);              // §5.2
+    final moodMarkers = _buildMoodMarkers(journalEntries, moodCatalog, date); // §8.3
+    final next = _findNextUpcoming(segments, date);
+
+    return DayDialSnapshot(
+      date: date,
+      segments: segments,
+      moodMarkers: moodMarkers,
+      maxLayer: segments.isEmpty ? 0 : segments.map((s) => s.layer).reduce(max),
+      nextUpcoming: next,
+    );
+  }
+}
+```
+
+### 5.2 Overlap-layering algorithm (the concentric-rings requirement)
+
+This is a standard **interval partitioning / greedy layer assignment**, applied per `DialSegmentKind` group separately from time blocks (time blocks always live on their own dedicated background ring, per §4, so they never compete for a layer with everything else):
+
+```
+1. Sort all non-timeBlock segments by `start` ascending, ties broken by
+   longer duration first (so long items claim the inner ring, matching
+   the visual convention in the reference apps where the "main" activity
+   sits closest to the center and short interruptions sit outside it).
+
+2. Maintain a list `layerEndTimes: List<DateTime>` — layerEndTimes[i] is
+   the end time of the last segment placed in layer i.
+
+3. For each segment s in sorted order:
+     for i in 0..layerEndTimes.length:
+       if s.start >= layerEndTimes[i]:
+         s.layer = i
+         layerEndTimes[i] = s.end
+         continue to next segment
+     // no existing layer is free:
+     s.layer = layerEndTimes.length
+     layerEndTimes.add(s.end)
+
+3a. Point-in-time items (habit slots, reminders) are laid out AFTER duration
+    segments, and are allowed to share a layer with a duration segment
+    (they render as a small tick/emoji on top of whatever arc is
+    underneath, not as competing arcs) — so they never force a new ring
+    by themselves. Only two point-in-time items whose visual width
+    (§4, 12-minute fixed width) would overlap each other get bumped to
+    the next layer using the same algorithm.
+```
+
+This is the same class of algorithm Google Calendar and every side-by-side week view uses for overlapping events — applying it radially instead of column-wise is the only twist, and the widget (§6) just needs `layer` to pick a ring radius.
+
+### 5.3 Layer cap & overflow (edge case, see §8.4)
+
+Cap rendering at **4 rings** (ring 0 = innermost, ring 3 = outermost, before the tick-label ring). If `_assignLayers` produces `layer >= 4` for any segment, those segments are **not dropped** — they're kept in the snapshot with `layer = 3` (all overflow stacks visually on the outer ring, semi-transparent, and the outermost ring shows a small "+N" badge at the relevant angle instead of trying to render every one individually). Rationale: Laura's stated need is "let me see when I've overbooked myself," not "render 9 perfectly legible concurrent rings" — that many concurrent items genuinely can't be legible on a phone-sized dial, so past 4 the honest signal is "this window is overloaded," not more line detail.
+
+### 5.4 Time blocks and Day Themes (closing two of Laura's documented gaps)
+
+- **Time blocks**: rendered as filled background arcs on a dedicated ring between the center hole and ring 0 (call it ring `−1`), using the block's configured start/end hour and `organizer.color` at low opacity (~25%), so segments drawn on ring 0+ visually sit "inside" their time block. This single change gives time blocks dial support in both the Planner day view and here — closes the "Time Blocks not appearing in ... Dial view" bug by giving it an actual implementation rather than partial plumbing.
+- **Day Themes**: rendered as a **thin colored ring outside the hour-label ring** (the outermost element), one continuous arc per theme spanning its configured hours (if Day Themes in this app are whole-day rather than hour-ranged, render as a single colored ring segment covering the full circle, or a colored dot cluster at 12 o'clock — confirm which against the actual `DayTheme` object once `day_theme_model.dart` is available; it returned an empty file when fetched for this spec, so pin down its real shape before implementing this part specifically). This is explicitly lower priority (P2) than the overlap/drag core of this spec — build §5–§7 first, then this.
+
+---
+
+## 6. Rendering spec — `DayDialWidget` v2
+
+New file content for **`lib/ui/widgets/day_dial_widget.dart`** (rewrite in place).
+
+### 6.1 Ring layout, center-out
+
+| Ring | Content |
+|---|---|
+| Center hole | Current time (`HH:mm`), date, and **time-until-next** readout (§6.4) |
+| Ring `−1` | Time-block background bands (§5.4), low opacity |
+| Ring 0..3 | `DialSegment`s per their assigned `layer`, each ring a fixed stroke width, rings 1+ slightly thinner so the dial doesn't outgrow the screen |
+| Point markers | Habit emoji / reminder ticks / mood emoji drawn as small circular glyph badges positioned at their `layer`'s radius (habits/reminders) or on a dedicated thin **mood ring** just inside the hour-label ring (moods — always visually distinct from schedule items since they're not "time you spent," they're a snapshot) |
+| Outer ring | Hour tick marks + `12/1/2…11` labels (unchanged from current, this part isn't broken) |
+| Current-time marker | Small dot on the outer edge at the live angle for `DateTime.now()`, only when `selectedDate` is today (unchanged behavior from current code, L152–166, keep as-is) |
+
+### 6.2 Angle math
+
+Reuse the existing, correct helpers unchanged:
+
+```dart
+double _hourToAngle(int hour) => (hour / 24) * 2 * pi - (pi / 2);
+double _timeToAngle(DateTime time) {
+  final totalMinutes = time.hour * 60 + time.minute;
+  return (totalMinutes / (24 * 60)) * 2 * pi - (pi / 2);
+}
+```
+
+Extend with a **minute-precise** version used for segment start/end (this is the actual fix for "everything snaps to the top of the hour"):
+
+```dart
+double _dateTimeToAngle(DateTime dt) {
+  final minutesFromMidnight = dt.hour * 60 + dt.minute + dt.second / 60.0;
+  return (minutesFromMidnight / (24 * 60)) * 2 * pi - (pi / 2);
+}
+
+double _sweepAngle(DialSegment s) {
+  var minutes = s.end.difference(s.start).inMinutes.toDouble();
+  if (minutes <= 0) minutes += 24 * 60; // midnight-spanning, see §8.1
+  return (minutes / (24 * 60)) * 2 * pi;
+}
+```
+
+### 6.3 No more round-cap dot artifacts
+
+- Use `StrokeCap.butt` (flat end) for all segment arcs, not `StrokeCap.round`. Round caps only make sense for genuinely circular point markers (habit/reminder/mood glyphs), which are drawn as actual `canvas.drawCircle` badges, not as degenerate arcs. This directly removes the failure mode in §1.2 — a flat-capped arc of near-zero sweep just renders as a hairline, which is honest (barely-there segment), not a floating disc.
+- Enforce a **minimum visual sweep** of ~3° for any segment under ~12 minutes purely for tap-target legibility (this is a rendering-only floor, it does not change the underlying `start`/`end` used for layering, drag, or persistence).
+
+### 6.4 Time-until-next readout (center)
+
+```dart
+String _formatCountdown(DialSegment next, DateTime now) {
+  final diff = next.start.difference(now);
+  if (diff.inMinutes < 60) return 'in ${diff.inMinutes}m — ${next.title}';
+  final h = diff.inHours;
+  final m = diff.inMinutes % 60;
+  return 'in ${h}h ${m}m — ${next.title}';
+}
+```
+
+Shown as a third line under the `HH:mm` / date pair already in `_buildCenterReadout` (current code L62–89) — only when `snapshot.nextUpcoming != null` and `selectedDate` is today. If nothing is upcoming today, fall back to the existing today/date-only display (no layout change needed for the "nothing left today" case, just omit the third line).
+
+---
+
+## 7. Interaction spec — drag-to-move & edge-drag-to-resize
+
+This is new: the current widget only supports `onTapUp` → `onHourTap` (planner_screen.dart L2212). Everything below is additive to `DayDialWidget`.
+
+### 7.1 Gesture surface
+
+Wrap the dial in a `GestureDetector` using **pan gestures**, not the existing single `onTapUp`, since we now need to distinguish tap vs. drag vs. edge-drag on a circular geometry:
+
+```dart
+class DayDialWidget extends StatefulWidget {
+  final DayDialSnapshot snapshot;
+  final DateTime selectedDate;
+  final void Function(DialSegment segment)? onSegmentTap;
+  final void Function(int hour)? onHourTap; // tapping empty space, unchanged behavior
+  final void Function(DialSegment segment, DateTime newStart)? onSegmentMove;
+  final void Function(DialSegment segment, DateTime newEnd)? onSegmentResize;
+}
+```
+
+### 7.2 Hit-testing a drag start
+
+On `onPanStart`, convert `details.localPosition` to (angle, radius) relative to center, exactly like the existing `onTapUp` handler does for angle (L36–45) plus a radius check to pick the ring, then find the `DialSegment` whose `[start,end)` contains that angle on that ring:
+
+- If the touch lands within the **inner 15%** of a segment's angular span → **resize-start handle** (drag adjusts `start`, pushing the segment's earlier edge).
+- If within the **outer 15%** → **resize-end handle** (drag adjusts `end` / duration). This is the direct radial-geometry equivalent of the existing linear-timeline "drag bottom edge to resize" handle (`timeline_day_view.dart` L999–1039) — same interaction, translated from a vertical handle to an angular one.
+- If in the middle 70% → **move handle** (drag shifts the whole segment, preserving duration).
+- If `segment.isEditable == false` → no drag starts at all; the segment is inert to pan gestures (still tappable).
+
+### 7.3 Live feedback during drag (`onPanUpdate`)
+
+Maintain local `_dragPreviewStart` / `_dragPreviewEnd` state on the segment being dragged (mirrors the existing `_localDurations` map pattern in `timeline_day_view.dart` L60, L1006–1018 — don't write to the model on every pixel of movement, only on `onPanEnd`):
+
+- Convert the new pointer angle to a `DateTime` via the inverse of `_dateTimeToAngle`.
+- **Snap to 5-minute increments** for move, **5-minute increments** for resize (configurable constant `_snapMinutes = 5`), matching typical calendar-app affordance and avoiding "I dragged it to 14:07" noise.
+- Enforce a **minimum duration** of 5 minutes when resizing (clamp, don't reject).
+- Render the segment being dragged with a highlighted stroke + a small tooltip bubble showing the live `HH:mm` (or `HH:mm–HH:mm` while resizing) near the pointer, so the person gets the "live visual feedback while dragging" affordance from the reference apps.
+
+### 7.4 Commit on `onPanEnd`
+
+Call `widget.onSegmentMove` / `widget.onSegmentResize` with the final snapped value. The **caller** (planner_screen.dart) is responsible for persistence per source type (§9), keeping the widget itself free of vault-write logic — same separation of concerns as the existing `onDurationChange` callback pattern in `timeline_day_view.dart`.
+
+### 7.5 Google Calendar events are not draggable from the dial
+
+Google-synced events (`googleEvents` source in §4) are rendered but `isEditable = false`. Editing a Google event's time from inside Citrine and then reconciling that back through `google_calendar_service.dart`'s sync direction is a materially different (and riskier) problem than editing a local `Task`/`Event`/`Reminder`, and is out of scope for this spec. Tapping a Google event still opens its detail (read-only) via `onSegmentTap`.
+
+### 7.6 Habits: move-only
+
+Because `HabitSlot` has no duration field, habit segments render `isResizable = false` — dragging the body moves `HabitSlot.time`/reminder time (writes to `ReminderConfig.timeOfDay` via the existing `HabitSlot.setPrimaryReminderTime`, already present at `habit_model.dart` L202–218), but there's no edge-resize handle at all for these — the hit-test in §7.2 should skip the inner/outer 15% zones for point-in-time segments and treat the whole glyph as a single move handle.
+
+---
+
+## 8. Habits, moods, and edge cases
+
+### 8.1 Midnight-spanning segments
+
+A segment where `end` < `start` (e.g. a Pomodoro that starts at 23:40 and runs 40 minutes, ending 00:20 the next day) must still render as a single visual arc that crosses the 12-o'clock seam. `_sweepAngle` already handles this (§6.2, `if (minutes <= 0) minutes += 24*60`). No special-casing needed elsewhere as long as every consumer computes sweep via that helper rather than `end.difference(start)` directly.
+
+### 8.2 Habit dial position reflects the *scheduled* slot time, not actual completion time — flag this to Laura
+
+Per the existing standing principle ("Habit reminder time ≠ completion time"), and confirmed by re-reading `habit_model.dart` while building this spec: `CompletionRecord.date` is parsed from the daily-note checklist line as a **date-only** string (`habit_model.dart` L820–823, `dateStr = line.substring(6,16)` → `YYYY-MM-DD`, no time component at all). There is currently no way to know *when* during the day a habit was actually completed — only that it was completed *that day*. So habit segments on the dial necessarily show where the habit was *supposed to* happen (`HabitSlot.primaryReminderTime`), not where it *actually* happened, exactly like the linear Planner day view already does elsewhere.
+
+**Cross-reference for Laura:** this is the same gap that would need to close to support "log a completion after the fact at the time it really happened." Since the aromatheropy/`CatalogItem` spec already proposes extending `CompletionRecord` (adding a `linkedRef` field for the oil), this would be a natural moment to *also* add an optional `completedAt: DateTime?` to `CompletionRecord` if Laura wants the dial (and any future stats) to eventually reflect real completion time instead of slot time. Not required for this spec to ship — noted as a dependency-adjacent decision, not a blocker.
+
+### 8.3 Mood marker resolution
+
+```dart
+static List<DialPointMarker> _buildMoodMarkers(
+  List<JournalEntry> entries,
+  List<MoodDefinition> catalog,
+  DateTime date,
+) {
+  final markers = <DialPointMarker>[];
+  final allDefs = [...MoodDefinition.systemMoods, ...catalog]; // catalog = user-defined custom moods, from allObjectsProvider (existing pattern in mood_chart_widget.dart)
+  for (final entry in entries) {
+    for (final moodEntry in entry.moodEntries) {
+      if (!_isSameDay(moodEntry.timestamp, date)) continue;
+      final def = allDefs.firstWhere(
+        (d) => d.id == moodEntry.moodSlug,
+        orElse: () => /* fallback neutral def */,
+      );
+      markers.add(DialPointMarker(
+        id: '${entry.slug}:${moodEntry.timestamp.toIso8601String()}',
+        timestamp: moodEntry.timestamp,
+        emoji: def.emoji,
+        label: def.label,
+        sourceSlug: entry.slug,
+      ));
+    }
+  }
+  return markers;
+}
+```
+
+Legacy single `moodSlug` (non-array, pre-F2.14) entries are intentionally **not** shown on the dial — they carry no timestamp, only a date, so there's no angle to place them at. This matches the existing "derived surfaces never invent data" architectural rule.
+
+### 8.4 Too many overlapping items ("+N" overflow badge)
+
+Covered in §5.3. Tapping the "+N" badge opens a simple bottom sheet listing the overflowed items by title/time (reusing whatever list-row component `UniversalDetailView`/`linked_objects_section.dart` already uses for compact object rows), each row tappable through to the normal detail sheet.
+
+### 8.5 Idle/sleep band (optional, P3)
+
+The old model had a `DialHourKind.sleep` value that nothing in the aggregator ever actually set (dead code — grep confirms no assignment site in `day_dial_aggregator.dart`). Not reintroducing this in v2 unless Laura wants a "typical sleep window" setting to render as a dimmed background band; if desired later, model it the same way as time blocks (§5.4), as a background ring rather than a competing foreground segment. Left out of the initial build.
+
+---
+
+## 9. Persistence write-back (`planner_screen.dart` call site)
+
+`_buildDialView` (currently L2184–2230) needs to:
+
+1. Pass the additional data sources into the aggregator (`localEvents`, `timeBlocks`, `journalEntries`, `moodCatalog` — all should already be available via existing providers used elsewhere in this same file/screen; wire, don't re-fetch).
+2. Implement the four new callbacks:
+
+```dart
+DayDialWidget(
+  snapshot: snapshot,
+  selectedDate: _selectedDate,
+  onHourTap: (hour) { /* unchanged existing behavior, L2212-2230 */ },
+  onSegmentTap: (segment) => _openDetailFor(segment), // route by segment.kind + sourceSlug
+  onSegmentMove: (segment, newStart) => _persistMove(segment, newStart),
+  onSegmentResize: (segment, newEnd) => _persistResize(segment, newEnd),
+)
+```
+
+### 9.1 `_persistMove` / `_persistResize` — per-kind write targets
+
+| `segment.kind` | Move writes | Resize writes |
+|---|---|---|
+| `taskPlanned` | `task.scheduledTime = 'HH:mm'` of `newStart`, via existing `Task.copyWith`/vault save path | `task.duration = newEnd.difference(task's start).inMinutes` (or `estimatedMinutes` if that's the field actually driving the aggregator for this task — keep both in sync per whichever the app already treats as canonical; check `create_task_form.dart` for which field the UI edits today) |
+| `pomodoroPlanned` | `session.date` (or `occurredAt`) updated | `session.workDuration` updated |
+| `event` (local) | `event.startDatetime = newStart` (setter already exists, `event_model.dart` L78–81) | `event.endDatetime = newEnd` (setter already exists, L91–96) |
+| `reminder` | `reminder.time = newStart` | n/a — not resizable |
+| `habitSlot` | `slot.setPrimaryReminderTime(TimeOfDay.fromDateTime(newStart))` (method already exists, `habit_model.dart` L202) | n/a — not resizable |
+
+All writes go through the same vault-save path already used by each object's respective edit screen (`create_task_form.dart`, `create_event_form.dart`, `create_reminder_form.dart`, habit edit flow) — this spec does not introduce a new persistence mechanism, it only triggers the existing one from a new UI surface.
+
+### 9.2 Optimistic UI
+
+Since Riverpod providers already drive `tasks`/`habits`/etc. into this screen reactively, no special optimistic-update logic should be needed beyond what `onPanEnd` → vault write → provider refresh already gives for every other edit surface in the app. Confirm this holds; if there's a perceptible lag between drop and re-render, keep the dragged segment's `_dragPreviewStart/_dragPreviewEnd` visually pinned until the provider emits the updated object, then release local state.
+
+### 9.3 Undo
+
+Route these writes through the existing `undo_service.dart` the same way other in-place edits do, so a drag that overshoots is a normal Ctrl/Cmd-Z-able action rather than a special case.
+
+### 9.4 Fix the hardcoded empty reminders list
+
+Current bug: `reminders: const []` (planner_screen.dart L2201). Replace with the real reminders provider already used elsewhere in this screen (check `reminders_screen.dart` / whatever provider backs it, e.g. a `remindersProvider`) so reminders actually reach the aggregator.
+
+---
+
+## 10. File-by-file implementation plan
+
+| # | File | Action |
+|---|---|---|
+| 1 | `lib/models/day_dial_model.dart` | Rewrite: `DialSegmentKind`, `DialSegment`, `DialPointMarker`, `DayDialSnapshot` (§3) |
+| 2 | `lib/services/day_dial_aggregator.dart` | Rewrite: `DayDialAggregator.aggregateForDate` returns `DayDialSnapshot`; per-source `_ingestX` helpers (§4); `_assignLayers` (§5.2); `_buildMoodMarkers` (§8.3) |
+| 3 | `lib/ui/widgets/day_dial_widget.dart` | Rewrite: multi-ring `CustomPainter`, minute-precise angle math (§6.2), flat stroke caps (§6.3), countdown readout (§6.4), pan-gesture drag/resize (§7) |
+| 4 | `lib/ui/screens/planner_screen.dart` | Update `_buildDialView` (§9): new provider wiring, new callbacks, fix `reminders: const []` |
+| 5 | `lib/models/day_theme_model.dart` | **Read this file first** (it returned empty/404 during this spec's research — confirm its real path/shape) before implementing §5.4's Day Theme ring |
+| 6 | *(new, optional)* `lib/models/habit_model.dart` | If Laura confirms the §8.2 cross-reference, add `DateTime? completedAt` to `CompletionRecord` in the same PR as the aromatheropy `CompletionRecord` extension — not required for this spec alone |
+
+Suggested build order: #1 → #2 → #3 (core rebuild, ships overlap + drag + countdown) → #4 (wiring) → #5 (time blocks/day themes, P2) → #6 (only if Laura opts in).
+
+---
+
+## 11. Open questions for Laura
+
+1. **Day Theme shape** — `day_theme_model.dart` came back empty when fetched for this spec (404 or genuinely 0 bytes at that path). Please confirm the real path/fields before §5.4's Day Theme ring is built, or point me at the right file.
+2. **Task duration vs. `estimatedMinutes`** — which field should edge-drag-resize actually write for a `Task`? Both exist; need to confirm which one the rest of the app already treats as the source of truth for a task's on-dial length, to avoid writing to a field nothing else reads.
+3. **`completedAt` on `CompletionRecord`** (§8.2) — worth bundling into the aromatherapy PR, or keep habit segments showing scheduled-slot time indefinitely?
+4. **Layer cap of 4** (§5.3) — acceptable, or would you rather the dial scroll/zoom into a busy window instead of showing a "+N" overflow badge? (Zoom is a materially bigger feature — flagging so it's a conscious choice, not a default.)
+5. **Sleep/idle band** (§8.5) — wanted now, or fine to leave out until there's a concrete "typical sleep window" setting elsewhere in the app?
+
+---
+
+## 12. Acceptance criteria
+
+- [ ] Two items in the same hour (e.g. a habit reminder and a 15-minute Pomodoro block) both render as distinct, correctly-positioned segments — no overwrite, no orphan dots.
+- [ ] A meeting scheduled inside a time block renders as two separate rings (block background + meeting arc), both visible simultaneously.
+- [ ] Five or more overlapping items in the same window render across the 4-ring cap plus a tappable "+N" badge, not off-screen or dropped.
+- [ ] Dragging the body of an editable segment changes its start time in 5-minute snapped increments and persists on release; dragging its outer edge changes its duration the same way.
+- [ ] Google Calendar events and completed Pomodoro sessions are visible but inert to drag gestures.
+- [ ] Habit segments show their emoji and can be moved but not resized.
+- [ ] Mood entries from today render as emoji point-markers at their actual timestamp, are tappable, but not draggable.
+- [ ] Center readout shows current time + date, and — when something is scheduled later today — a third line with time-remaining + title of the next item.
+- [ ] A segment crossing midnight renders as one continuous arc across the 12 o'clock seam, not two disconnected pieces.
+- [ ] `reminders` reaching the aggregator are the real provider data, not an empty list.
+
+# Citrine — New Feature Spec: Routine Alignment & Focus Relay
+**Source inspiration:** Aligned Schedule Tracker (prismtree.com) + ToDoD: ToDo List + Focus Timer (App Store)
+**Status:** Draft for product decision → ready for AI-implementation once approved
+**Date:** 2026-07-05
+
+---
+
+## 0. How to read this document
+
+Sections 1–2 are pure competitive analysis (what the two apps actually do, UI/UX-level).
+Section 3 checks each idea against what Citrine already has, so we don't rebuild things that exist.
+Section 4 is the actual new spec: two features worth building, written as canonical product decisions, data model changes, and UI flows — the same format as `guidelines_v5.md`.
+Section 5 is a prioritized backlog with effort estimates.
+
+---
+
+## 1. Aligned Schedule Tracker — what it actually is
+
+**Core concept:** not a to-do app, not a habit tracker. It tracks the *gap between planned time and real time* for recurring daily activities (sleep, meals, work blocks, workouts). The entire product is built around one metric: **drift**.
+
+**UI/UX flow (3 steps):**
+1. **Plan your ideal routine** — user defines activities with a target time + a *flexibility window* (e.g. ±10–15 min). No rigid templates; user picks their own day-start hour.
+2. **Log what actually happens** — one tap to record the real time an activity occurred, logged live rather than reconstructed from memory.
+3. **See your patterns** — weekly trend view, monthly "drift map," quarterly insights. Surfaces things like "Wednesdays are your worst day" or "drift always follows a late meeting."
+
+**Key mechanics worth stealing:**
+- **Flexibility window per activity**: a buffer (e.g. 10–15 min) inside which "late" still counts as "on time." This is explicitly designed so small delays don't punish honest logging — an anti-shame design choice.
+- **Custom day start**: user chooses what hour their day begins (5am, 9am, noon), so activity ordering respects that instead of a hard midnight cutoff. Explicitly framed as helping night owls / shift workers.
+- **Alignment states**: each activity/day gets a qualitative state, not just a number — "aligned," "drifting," "getting closer," "holding steady." This is a deliberate framing choice: state language over raw minutes, to avoid a punitive score.
+- **Planned vs. Real, always paired**: every screen shows both values side by side — this is the actual value proposition, distinct from both habit trackers (yes/no only) and to-do apps (plan only, no reality check).
+- **Weekday vs weekend drift pattern** and "hardest activity to keep on time" are explicitly called out.
+- **Free tier**: 5 activities, 7-day insights, 3 CSV exports. Paid tier: unlimited activities/insights, iCloud sync, unlimited export. (Not relevant to Citrine — no monetization — but confirms this app treats logging as its central value, with insights as the upsell.)
+
+**What it deliberately is NOT:** no AI, no natural language input, no gamification, no social features, no account. Positioned as privacy-first, fully offline, minimal.
+
+---
+
+## 2. ToDoD (ToDo List + Focus Timer) — what it actually is
+
+**Core concept:** a task manager wrapped around an "AI Mate" persona. Two pillars: (a) low-friction capture via AI, (b) a step-sequenced focus timer called "Relay."
+
+**UI/UX flow:**
+- **Smart capture**: voice or text input → AI extracts time, reminder, and category automatically ("Just say it. I'll take care of it."). No manual field-filling for the common case. **Note:** in ToDoD this runs on an LLM API call per capture — a recurring per-use cost. This mechanic is **explicitly excluded** from this spec for that reason; see Section 3 for why Citrine's existing regex-based parser already covers the same use case at zero marginal cost.
+- **Focus Relay**: not a single Pomodoro block, but a *chain* of timed steps for one task — e.g. "research (10m) → draft (20m) → review (5m)" run back-to-back without the user having to restart a timer for each sub-step.
+- **Calendar view & schedule management**, task insights/activity reports, smart alerts/timers, Lock Screen task view, home-screen widgets for both the task list and the Relay timer.
+- **"Emotional companion" framing**: AI Mate "characters" with personalities — explicitly marketed as a motivation coach, not just a tool. (This is a monetized gimmick — Lifetime/Pro IAP — not a mechanic Citrine needs to copy.)
+
+**Key mechanics worth stealing:**
+- **Relay = chained timers**, each step pre-defined with its own duration, auto-advancing to the next step, one running total for the parent task. This is meaningfully different from Citrine's current flat Pomodoro loop (work → break → work).
+- **Task insights/activity reports** — retrospective view of where time actually went, similar spirit to Aligned's drift maps but scoped to tasks/focus time rather than routine timing.
+- Everything else (AI voice capture, calendar sync, widgets, Lock Screen view) **already exists in Citrine** in some form (see Section 3) — the "AI Mate" personality layer is the only genuinely new UX idea, and it's a tone/branding choice rather than a technical feature; it's flagged in Section 5 as optional/low-priority rather than spec'd in detail.
+
+---
+
+## 3. Cross-check against what Citrine already has
+
+Before proposing anything new, confirming actual current state from source (not assumptions):
+
+| Idea | Already in Citrine? | Evidence |
+|---|---|---|
+| Natural-language task capture (time/priority/recurrence from free text) | **Yes — and it's free** | `nlp_task_parser.dart` already parses priority, dates, scheduled time, and recurrence rules from raw text (PT + EN patterns) using plain regex, entirely on-device. No LLM call, no API key, no per-use cost — unlike ToDoD's voice/AI capture. **This is the reason voice/AI capture is not proposed anywhere in this spec: it would add a recurring cost for a capability Citrine already has for free.** |
+| Recurring schedules with rich repeat types | **Yes, and richer than Aligned's** | `scheduler.dart` supports 14 repeat types including `daysAfterReferenceField`, `linkedItemAppears`, `firstBusinessDayOfMonth` — well beyond Aligned's simple daily-time model |
+| Reminders with custom timing, sound, snooze, popup/alarm type | **Yes** | `reminder_config.dart` — `minutesBefore`, `daysBefore`, `timeOfDay`, snooze, alarm type |
+| Pomodoro / focus timer with work-break cycling, history logging | **Yes** | `pomodoro_provider.dart`, `pomodoro_session.dart` — includes retroactive logging (`occurredAt` vs `date`, per V5 F2.18) |
+| Home-screen widgets (tasks, calendar, pomodoro, quick-add, checklist) | **Yes** | `widget_service.dart` — 7 distinct Android widget providers already wired |
+| Habit tracking with boolean/numeric/mood/duration inputs, Pact mode | **Yes, and richer than a yes/no habit tracker** | `habit_model.dart` — `HabitInputType`, `HabitMode.pact` with `PactOutcome` (persist/pause/pivot) is already more sophisticated than Aligned's binary logging |
+| Mood tracking | **Yes, mid-redesign** | Current 1D scalar model being replaced by the 2-axis Yale RULER model per `mood_system_v5.2_implementation_plan.md` |
+
+**What is genuinely absent:**
+1. **Planned-time vs. real-time drift tracking** for recurring daily activities, with a flexibility window and qualitative alignment states. Citrine's Scheduler answers "when should this repeat," and Habit answers "did you do it," but nothing currently answers "*how close to your intended time* did you actually do it, and is that gap trending in one direction." This is Aligned's entire product and it does not overlap with Habit, Task, or Scheduler as they exist today.
+2. **Custom day-start hour** as a global setting affecting how a day's timeline is ordered/displayed. Citrine's daily notes are calendar-day-based; there's no user-configurable "day starts at X" concept in the settings/vault provider layer reviewed.
+3. **Chained multi-step focus timer ("Relay")**. Citrine's Pomodoro is a single work/break loop; there is no concept of a task-defined sequence of differently-labeled, differently-timed steps that auto-advance.
+4. **Weekly/monthly/quarterly pattern surfacing phrased as *insight sentences*** (e.g. "Wednesdays are your worst day," "drift always follows a late meeting") rather than raw charts. Citrine has `statistics_screen.dart`, `analysis_calendar.dart`, and the Combined Analysis system, which likely already produce charts — worth auditing before building new UI, but the *insight-sentence* framing itself (plain-language pattern callouts, not just charts) is worth adding regardless of what chart infra exists.
+
+Everything else in both apps (AI capture, calendar sync, widgets, lock screen, personality-driven copy) is either already present or is a branding/tone choice rather than a mechanic — not worth spec'ing as a feature.
+
+---
+
+## 4. Proposed new features
+
+### 4.1 Feature: Routine Alignment (Planned vs. Real drift tracking)
+
+**Product decision:** This is a **new lens on existing Habits and Tasks with a scheduled time**, not a new top-level object type. Any Habit or Task that has a specific planned time of day (not just a date) becomes "alignment-trackable." This avoids creating a fifth overlapping recurrence/tracking concept alongside Scheduler, Habit, and Task.
+
+**Data model changes:**
+
+- **`HabitModel` / `Task`**: add optional fields
+  - `plannedTimeOfDay` (`TimeOfDay?`) — when the activity is meant to happen. Already conceptually adjacent to `scheduledTime` produced by `NlpTaskParser`; reuse that field on Task rather than duplicating it.
+  - `flexibilityWindowMinutes` (`int?`, default `null` = alignment tracking off for this item). Explicit opt-in per item — most tasks/habits should NOT show drift UI; this is only for the subset the user cares about timing-wise (sleep, meals, work-start, etc.).
+- **New lightweight record, not a new ContentObject**: `AlignmentLogEntry`
+  ```
+  {
+    itemId: string,           // Task or Habit id
+    date: string (yyyy-mm-dd),
+    plannedTime: string (HH:mm),
+    actualTime: string (HH:mm),   // logged at tap-time, never reconstructed
+    deltaMinutes: int,             // actual - planned, signed
+    state: enum { early, aligned, drifting, missed }
+  }
+  ```
+  Stored as a snapshot on the daily note, same pattern as `mood_entries` and `PomodoroSession` — **never parsed back as a source of truth for the plan itself**, consistent with Citrine's firm rule that daily-note bodies are derived, not re-parsed. The plan (planned time + flexibility window) lives on the Habit/Task object; only the log entries live on the daily note.
+
+**Alignment state calculation** (per entry):
+- `|deltaMinutes| <= flexibilityWindowMinutes` → `aligned`
+- `flexibilityWindowMinutes < delta <= flexibilityWindowMinutes * 3` (late) or symmetric early → `drifting`
+- Beyond that, or no log at all by end of day → `missed`
+- Open sub-question carried over from the mood-system plan's pattern of surfacing open questions: exact multiplier for `drifting` vs `missed` threshold needs Laura's product decision — 3x is a starting proposal, not final.
+
+**UI/UX (directly adapted from Aligned's 3-step flow, fitted into Citrine's existing screens rather than a new tab):**
+1. **Setup**: in the existing Create Task / Create Habit forms, an optional "Track timing" toggle reveals `plannedTimeOfDay` + a flexibility-window stepper (5/10/15/30 min presets + custom). No new screen needed — this is a form section, not a new object type.
+2. **Logging**: a single tap action already exists conceptually wherever tasks/habits are marked done (`habit_row.dart`, task completion actions) — add a lightweight "Log now" affordance that also stamps `actualTime` when the item has timing tracking enabled. No separate logging screen.
+3. **Insights**: new section inside the existing **Statistics** screen (`statistics_screen.dart`) or Combined Analysis, not a new top-level tab: a "Routine Alignment" panel showing:
+   - Per-item weekly drift trend (small sparkline, planned line vs. actual dots)
+   - Plain-language insight sentences (e.g. "Você costuma atrasar o café da manhã às quartas" surfaced in English per the UI-text rule, since these are UI strings) generated from the delta data via a small set of **hardcoded rule templates** (e.g. "worst day of week by average delta," "most-missed item," "trend direction vs. last week") — plugged with the computed numbers. **No LLM call involved**, same zero-cost philosophy as the existing NLP parser. This satisfies the "insight sentence" pattern noted in Section 3.4 without requiring new chart infrastructure if Combined Analysis already has charting primitives (needs a source audit before implementation, flagged as a P0 verification task in the backlog below).
+
+**Custom day-start hour** (global setting, separately useful beyond this feature):
+- New setting in `settings_provider.dart` / Settings screen: `dayStartHour` (int, default 0 = midnight, matching current behavior exactly for anyone who doesn't touch it).
+- Affects only **ordering/display** of same-day timeline views (Timeline screen, alignment insight panel) — does **not** change which calendar date a daily note belongs to, to avoid touching the vault's date-keyed file naming, which is out of scope and risky. This keeps the change purely presentational.
+
+**Explicit non-goals (to prevent scope creep into a 5th tracking system):**
+- No separate "Alignment" object type, no separate CRUD screens, no separate navigation entry.
+- No CSV export tier / no monetization framing (not applicable to a personal single-user app).
+- Does not replace or change existing Habit streak logic — alignment state is additive metadata, streaks still fire the same way they do today.
+
+---
+
+### 4.2 Feature: Focus Relay (chained multi-step timer)
+
+**Product decision:** extend the existing Pomodoro system rather than building a parallel timer. `PomodoroSession` already models one work/break unit; Relay is a **named sequence of PomodoroSession-like steps** attached to a Task.
+
+**Data model changes:**
+- New field on `Task`: `relaySteps: List<RelayStep>?` (nullable — absent means the task uses today's flat Pomodoro behavior unchanged).
+  ```
+  class RelayStep {
+    String id;
+    String label;        // e.g. "Research", "Draft", "Review"
+    int durationMinutes;
+    bool isBreak;         // lets a step be a deliberate rest without being a full long-break cycle
+  }
+  ```
+- `PomodoroProvider` gains a **Relay mode**: instead of the fixed work/short-break/long-break loop, when a Task with `relaySteps` is started, the provider walks the list in order, auto-advancing on completion of each step's timer, and logs one `PomodoroSession` per step (reusing the existing `toDailyNoteBlock()` / `fromDailyNoteBlock()` round-trip — no serialization format changes needed, since each Relay step is just a normally-shaped session with the step label as its title).
+
+**UI/UX:**
+- In the Task detail view / create-task form, an optional "Break into steps" action converts the single planned duration into an editable ordered list of `RelayStep`s (add/remove/reorder/rename, each with its own duration).
+- Pomodoro screen (`pomodoro_screen.dart`) and floating clock (`pomodoro_floating_clock.dart`) gain a **step progress indicator** (e.g. "Step 2 of 4 — Draft") when running a Relay, otherwise unchanged from today's single-timer UI. This is additive UI, not a redesign of the existing pomodoro screen.
+- Widget: existing `_pomodoroProvider` Android widget shows the current step label instead of just "Focus Session" when in Relay mode — no new widget provider needed.
+
+**Explicit non-goals:**
+- No AI-generated step breakdowns and no "AI Mate" personality layer. In ToDoD, the AI Mate persona and any AI-suggested step breakdown would run on LLM API calls — a recurring cost with no functional benefit here, on top of being a branding/monetization device Citrine's single-user, non-monetized context doesn't need. All `RelayStep`s are created manually by the user in the form UI; if Laura later wants lighter/friendlier copy in notifications, that's a static copy change, not a spec item.
+- Relay does not replace the flat Pomodoro flow for tasks that don't opt in; zero behavior change for existing sessions.
+
+---
+
+## 5. Prioritized backlog
+
+| ID | Item | Priority | Why |
+|---|---|---|---|
+| RA-P0-1 | Audit `statistics_screen.dart` / `combined_analysis_screen.dart` / `analysis_model.dart` to confirm what charting primitives already exist before building the Alignment insights panel | P0 | Avoid duplicating existing chart infra; this is a verification task per Citrine's "done means verified against source" principle |
+| RA-P1-1 | `plannedTimeOfDay` + `flexibilityWindowMinutes` fields on Task/Habit + form UI toggle | P1 | Core of the feature, low risk (additive nullable fields) |
+| RA-P1-2 | `AlignmentLogEntry` snapshot-on-daily-note + state calculation | P1 | Depends on RA-P1-1 |
+| RA-P2-1 | Alignment insights panel (sparkline + insight sentences) | P2 | Depends on RA-P0-1 audit result |
+| RA-P2-2 | `dayStartHour` setting + timeline display reordering | P2 | Independently useful even without Alignment; low complexity |
+| RA-P1-3 | `RelayStep` model + Task form "break into steps" UI | P1 | Additive, reuses existing PomodoroSession serialization |
+| RA-P1-4 | `PomodoroProvider` Relay-mode auto-advance logic | P1 | Depends on RA-P1-3 |
+| RA-P2-3 | Step progress indicator on Pomodoro screen + floating clock + widget | P2 | Depends on RA-P1-4 |
+| RA-P3-1 | Distress/nudge-style copy for missed alignment (tone only) | P3 | Optional polish, needs product-voice decision, not a mechanic |
+
+**Open questions requiring Laura's decision before implementation tickets are written** (following the project's pattern of surfacing ambiguity rather than guessing):
+1. Drift threshold multiplier for `drifting` vs `missed` (proposed 3x flexibility window — needs confirmation).
+2. Whether Alignment tracking is exposed for both Habits and Tasks at launch, or Habits only first (Tasks have more heterogeneous scheduling and may need a narrower first cut).
+3. Whether `dayStartHour` should eventually affect anything beyond display ordering (explicitly scoped OUT above, but flagging in case there's a use case already in mind, e.g. night-shift daily-note boundaries).
+
 # Time-Blocking UX Improvements & Circular Day Dial — Implementation Spec
 
 **Status:** Draft for review

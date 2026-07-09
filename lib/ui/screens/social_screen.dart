@@ -98,8 +98,15 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
                             : () => _markSelectedWatched(posts),
                       ),
                       IconButton(
+                        tooltip: 'Recarregar metadados',
+                        icon: const Icon(Icons.refresh_rounded),
+                        onPressed: _selectedIds.isEmpty
+                            ? null
+                            : () => _refetchSelected(posts),
+                      ),
+                      IconButton(
                         tooltip: 'Deletar',
-                        icon: const Icon(Icons.delete_outline_rounded),
+                        icon: const Icon(Icons.delete_outline, color: AppColors.error),
                         onPressed: _selectedIds.isEmpty
                             ? null
                             : () => _deleteSelected(posts),
@@ -530,6 +537,54 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
     }
   }
 
+  Future<void> _refetchSelected(List<SocialPost> posts) async {
+    final selected = _selectedPosts(posts);
+    if (selected.isEmpty) return;
+
+    final vault = ref.read(vaultProvider.notifier);
+    final oembedService = OEmbedService();
+    final settings = ref.read(settingsProvider);
+
+    _clearSelection();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Recarregando metadados de ${selected.length} posts...')),
+    );
+
+    int successCount = 0;
+    for (final post in selected) {
+      try {
+        final updatedData = await oembedService.fetchMetadata(
+          post.url,
+          tiktokResolverEndpoint: settings.tiktokResolverEndpoint,
+          tiktokResolverApiKey: settings.tiktokResolverApiKey,
+        );
+        if (updatedData.thumbnailUrl != null || updatedData.videoUrl != null || updatedData.mediaUrls.isNotEmpty) {
+          final updatedPost = post.copyWith(
+            title: updatedData.title != post.url ? updatedData.title : post.title,
+            thumbnailUrl: updatedData.thumbnailUrl ?? post.thumbnailUrl,
+            videoUrl: updatedData.videoUrl ?? post.videoUrl,
+            mediaUrls: updatedData.mediaUrls.isNotEmpty ? updatedData.mediaUrls : post.mediaUrls,
+            authorName: updatedData.authorName ?? post.authorName,
+            authorHandle: updatedData.authorHandle ?? post.authorHandle,
+            embedUrl: updatedData.embedUrl ?? post.embedUrl,
+          );
+          
+          await vault.updateObject(updatedPost);
+          successCount++;
+        }
+      } catch (e) {
+        debugPrint('Failed to refetch ${post.url}: $e');
+      }
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Metadados recarregados para $successCount posts.')),
+      );
+    }
+  }
+
   Future<void> _deleteSelected(List<SocialPost> posts) async {
     final selected = _selectedPosts(posts);
     final confirmed = await showDialog<bool>(
@@ -582,13 +637,15 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
   Widget _buildCollectionsDrawer(List<SocialPost> posts) {
     final counts = <String, ({OrganizerReference organizer, int count})>{};
     var uncategorized = 0;
+    final validTypes = {'label', 'area', 'project', 'goal', 'activity', 'tracker'};
+    
     for (final post in posts) {
-      final labels = post.organizers.where((o) => o.type == 'label').toList();
-      if (labels.isEmpty) {
+      final itemOrganizers = post.organizers.where((o) => validTypes.contains(o.type)).toList();
+      if (itemOrganizers.isEmpty) {
         uncategorized++;
         continue;
       }
-      for (final organizer in labels) {
+      for (final organizer in itemOrganizers) {
         final key = organizer.toWikiLink();
         final current = counts[key];
         counts[key] = (organizer: organizer, count: (current?.count ?? 0) + 1);
@@ -607,7 +664,7 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 8, 20, 12),
               child: Text(
-                'Labels',
+                'Coleções',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
               ),
             ),

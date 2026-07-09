@@ -16,11 +16,13 @@ import '../../models/tracker_model.dart';
 import '../../models/reminder_model.dart';
 import '../../models/reminder_config.dart';
 import '../../models/task_model.dart';
+import '../../models/pomodoro_session.dart';
 import '../../models/day_dial_model.dart';
+import '../../models/event_model.dart';
 import '../widgets/timeline_day_view.dart';
 import '../widgets/week_time_grid.dart';
 import '../widgets/day_dial_widget.dart';
-import '../widgets/activity_detail_sheet.dart';
+
 import '../../services/day_dial_aggregator.dart';
 import '../../services/scheduler_service.dart';
 import '../../providers/google_calendar_provider.dart';
@@ -2195,68 +2197,36 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       orElse: () => <google_calendar.Event>[],
     );
 
-    // Calculate active day theme and time blocks (same logic as timeline view)
     final allOrganizers = ref.watch(organizersProvider);
-    final dayThemes = allOrganizers.where((o) => o.organizerType == OrganizerType.dayTheme).toList();
     final timeBlocks = allOrganizers.where((o) => o.organizerType == OrganizerType.timeBlock).toList();
-    final allObjectsAsync = ref.watch(allObjectsProvider);
     
-    // Get reminders for the selected date
-    final reminders = allObjectsAsync.valueOrNull?.whereType<Reminder>().where((r) => 
+    final allObjectsAsync = ref.watch(allObjectsProvider);
+    final allObjects = allObjectsAsync.valueOrNull ?? [];
+    
+    final localEvents = allObjects.whereType<Event>().toList();
+    
+    final reminders = allObjects.whereType<Reminder>().where((r) => 
       !r.isCompleted && 
       _isSameDay(r.time, _selectedDate)
-    ).toList() ?? [];
+    ).toList();
     
-    // Get journal entries and mood definitions for the selected date
-    final journalEntries = allObjectsAsync.valueOrNull?.whereType<JournalEntry>().where((j) =>
+    final journalEntries = allObjects.whereType<JournalEntry>().where((j) =>
       _isSameDay(j.date, _selectedDate)
-    ).toList() ?? [];
+    ).toList();
     
     final moodDefinitions = ref.watch(moodsProvider);
     
-    const weekDayNames = [
-      'Mon',
-      'Tue',
-      'Wed',
-      'Thu',
-      'Fri',
-      'Sat',
-      'Sun',
-    ];
-    final dayName = weekDayNames[_selectedDate.weekday - 1];
-    final activeTheme = dayThemes.cast<Organizer?>().firstWhere(
-      (theme) => theme != null && theme.daysOfWeek.contains(dayName),
-      orElse: () => null,
-    );
-    final activeTimeBlocks =
-        activeTheme == null
-              ? <Organizer>[]
-              : timeBlocks
-                    .where((block) => activeTheme.organizers.any((ref) => ref.matches(block.id, block.slug, block.title)))
-                    .cast<Organizer>()
-                    .toList()
-          ..sort((a, b) {
-            final aStart = a.timeRanges.isEmpty
-                ? 24 * 60
-                : (a.timeRanges.first.startHour * 60) +
-                      a.timeRanges.first.startMinute;
-            final bStart = b.timeRanges.isEmpty
-                ? 24 * 60
-                : (b.timeRanges.first.startHour * 60) +
-                      b.timeRanges.first.startMinute;
-            return aStart.compareTo(bStart);
-          });
-
-    final hourStates = DayDialAggregator.aggregateForDate(
+    final snapshot = DayDialAggregator.aggregateForDate(
       date: _selectedDate,
       tasks: tasks,
       habits: habits,
       pomodoroSessions: pomodoroSessions,
       googleEvents: events,
+      localEvents: localEvents,
       reminders: reminders,
-      activeTimeBlocks: activeTimeBlocks,
+      timeBlocks: timeBlocks,
       journalEntries: journalEntries,
-      moodDefinitions: moodDefinitions,
+      moodCatalog: moodDefinitions,
     );
 
     return SliverPadding(
@@ -2265,10 +2235,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         child: Column(
           children: [
             DayDialWidget(
-              hourStates: hourStates,
+              snapshot: snapshot,
               selectedDate: _selectedDate,
               onHourTap: (hour) {
-                // Switch to timeline view and scroll to that hour
                 setState(() {
                   _viewMode = 0;
                   _isTimeline = true;
@@ -2280,16 +2249,27 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                   final targetOffset = sliverHeaderEstimate +
                       (hour * hourHeight) -
                       (viewport / 3);
-                  _scrollController.animateTo(
-                    targetOffset,
-                    duration: const Duration(milliseconds: 500),
-                    curve: Curves.easeInOut,
-                  );
+                  if (_scrollController.hasClients) {
+                    _scrollController.animateTo(
+                      targetOffset,
+                      duration: const Duration(milliseconds: 500),
+                      curve: Curves.easeInOut,
+                    );
+                  }
                 });
               },
-              onActivityTap: (activity) {
-                _showActivityDetailSheet(activity);
+              onSegmentTap: (segment) {
+                if (segment.sourceSlug == null) return;
+                final objIndex = allObjects.indexWhere((o) => o.id == segment.sourceSlug || o.slug == segment.sourceSlug);
+                if (objIndex != -1) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => UniversalDetailView(object: allObjects[objIndex])),
+                  );
+                }
               },
+              onSegmentMove: (segment, newStart) => _persistMove(segment, newStart),
+              onSegmentResize: (segment, newEnd) => _persistResize(segment, newEnd),
             ),
             const SizedBox(height: 24),
             Text(
@@ -2304,6 +2284,101 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         ),
       ),
     );
+  }
+
+  void _persistMove(DialSegment segment, DateTime newStart) {
+    final vault = ref.read(vaultProvider.notifier);
+    final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+    
+    if (segment.kind == DialSegmentKind.taskPlanned) {
+      final idx = allObjects.indexWhere((o) => o is Task && (o.id == segment.sourceSlug || o.slug == segment.sourceSlug));
+      if (idx != -1) {
+        final task = allObjects[idx] as Task;
+        final formattedTime = DateFormat('HH:mm').format(newStart);
+        vault.updateObject(task.copyWith(scheduledTime: formattedTime));
+      }
+    } else if (segment.kind == DialSegmentKind.pomodoroPlanned) {
+      final sessionParts = segment.id.split(':');
+      if (sessionParts.length >= 2) {
+        final sessionId = sessionParts[1];
+        final idx = allObjects.indexWhere((o) => o is PomodoroSession && o.id == sessionId);
+        if (idx != -1) {
+          final session = allObjects[idx] as PomodoroSession;
+          session.date = newStart;
+          vault.updateObject(session);
+        }
+      }
+    } else if (segment.kind == DialSegmentKind.event) {
+      final idx = allObjects.indexWhere((o) => o is Event && (o.id == segment.sourceSlug || o.slug == segment.sourceSlug));
+      if (idx != -1) {
+        final ev = allObjects[idx] as Event;
+        vault.updateObject(ev.copyWith(
+          date: newStart, 
+          timeOfDay: '${newStart.hour.toString().padLeft(2, '0')}:${newStart.minute.toString().padLeft(2, '0')}'
+        ));
+      }
+    } else if (segment.kind == DialSegmentKind.reminder) {
+      final idx = allObjects.indexWhere((o) => o is Reminder && (o.id == segment.sourceSlug || o.slug == segment.sourceSlug));
+      if (idx != -1) {
+        final rem = allObjects[idx] as Reminder;
+        vault.updateObject(rem.copyWith(time: newStart));
+      }
+    } else if (segment.kind == DialSegmentKind.habitSlot) {
+      final idx = allObjects.indexWhere((o) => o is Habit && (o.id == segment.sourceSlug || o.slug == segment.sourceSlug));
+      if (idx != -1) {
+        final habit = allObjects[idx] as Habit;
+        final parts = segment.id.split(':');
+        if (parts.length >= 3) {
+          final slotIdx = int.tryParse(parts[2]);
+          if (slotIdx != null && slotIdx < habit.slots.length) {
+            final slot = habit.slots[slotIdx];
+            final updatedSlots = List<HabitSlot>.from(habit.slots);
+            final timeStr = '${newStart.hour.toString().padLeft(2, '0')}:${newStart.minute.toString().padLeft(2, '0')}';
+            if (slot.reminders.isNotEmpty) {
+              slot.reminders.first.timeOfDay = timeStr;
+            } else {
+              slot.reminders = [ReminderConfig(id: 'primary', timeOfDay: timeStr, type: NotificationType.push)];
+            }
+            updatedSlots[slotIdx] = slot;
+            vault.updateObject(habit.copyWith(slots: updatedSlots));
+          }
+        }
+      }
+    }
+  }
+
+  void _persistResize(DialSegment segment, DateTime newEnd) {
+    final vault = ref.read(vaultProvider.notifier);
+    final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+    
+    if (segment.kind == DialSegmentKind.taskPlanned) {
+      final idx = allObjects.indexWhere((o) => o is Task && (o.id == segment.sourceSlug || o.slug == segment.sourceSlug));
+      if (idx != -1) {
+        final task = allObjects[idx] as Task;
+        int durationMins = newEnd.difference(segment.start).inMinutes;
+        if (durationMins <= 0) durationMins += 24 * 60;
+        vault.updateObject(task.copyWith(duration: durationMins));
+      }
+    } else if (segment.kind == DialSegmentKind.pomodoroPlanned) {
+      final sessionParts = segment.id.split(':');
+      if (sessionParts.length >= 2) {
+        final sessionId = sessionParts[1];
+        final idx = allObjects.indexWhere((o) => o is PomodoroSession && o.id == sessionId);
+        if (idx != -1) {
+          final session = allObjects[idx] as PomodoroSession;
+          int durationMins = newEnd.difference(segment.start).inMinutes;
+          if (durationMins <= 0) durationMins += 24 * 60;
+          session.workDuration = durationMins;
+          vault.updateObject(session);
+        }
+      }
+    } else if (segment.kind == DialSegmentKind.event) {
+      final idx = allObjects.indexWhere((o) => o is Event && (o.id == segment.sourceSlug || o.slug == segment.sourceSlug));
+      if (idx != -1) {
+        final ev = allObjects[idx] as Event;
+        vault.updateObject(ev.copyWith(endTime: '${newEnd.hour.toString().padLeft(2, '0')}:${newEnd.minute.toString().padLeft(2, '0')}'));
+      }
+    }
   }
 
   Widget _buildCompactItem(String title, Color color, VoidCallback onTap) {
@@ -2830,14 +2905,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     }
   }
 
-  void _showActivityDetailSheet(DialActivity activity) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ActivityDetailSheet(activity: activity),
-    );
-  }
 
   void _showReflectionPrompt(Task task) {
     final reflectionController = TextEditingController();

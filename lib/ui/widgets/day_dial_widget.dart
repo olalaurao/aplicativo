@@ -6,21 +6,22 @@ import '../../models/day_dial_model.dart';
 import '../theme.dart';
 import 'package:intl/intl.dart';
 
-/// A circular day dial widget showing 24-hour activity overview
 class DayDialWidget extends StatefulWidget {
-  final List<DayDialHourState> hourStates;
+  final DayDialSnapshot snapshot;
   final DateTime selectedDate;
-  final Function(int)? onHourTap;
-  final Function(DialActivity)? onActivityTap;
-  final Function(DialActivity, DateTime)? onActivityDrag;
+  final void Function(DialSegment segment)? onSegmentTap;
+  final void Function(int hour)? onHourTap;
+  final void Function(DialSegment segment, DateTime newStart)? onSegmentMove;
+  final void Function(DialSegment segment, DateTime newEnd)? onSegmentResize;
 
   const DayDialWidget({
     super.key,
-    required this.hourStates,
+    required this.snapshot,
     required this.selectedDate,
+    this.onSegmentTap,
     this.onHourTap,
-    this.onActivityTap,
-    this.onActivityDrag,
+    this.onSegmentMove,
+    this.onSegmentResize,
   });
 
   @override
@@ -28,8 +29,12 @@ class DayDialWidget extends StatefulWidget {
 }
 
 class _DayDialWidgetState extends State<DayDialWidget> {
-  DialActivity? _draggedActivity;
-  DateTime? _dragStartTime;
+  DialSegment? _draggedSegment;
+  bool _isResizingEnd = false;
+  bool _isResizingStart = false;
+  DateTime? _dragPreviewStart;
+  DateTime? _dragPreviewEnd;
+  Offset? _dragPreviewTooltipPos;
 
   @override
   Widget build(BuildContext context) {
@@ -42,13 +47,34 @@ class _DayDialWidgetState extends State<DayDialWidget> {
         onPanEnd: (details) => _handlePanEnd(details),
         child: CustomPaint(
           painter: _DayDialPainter(
-            hourStates: widget.hourStates,
+            snapshot: widget.snapshot,
             selectedDate: widget.selectedDate,
-            draggedActivity: _draggedActivity,
-            dragStartTime: _dragStartTime,
+            draggedSegment: _draggedSegment,
+            dragPreviewStart: _dragPreviewStart,
+            dragPreviewEnd: _dragPreviewEnd,
           ),
-          child: Center(
-            child: _buildCenterReadout(context),
+          child: Stack(
+            children: [
+              Center(child: _buildCenterReadout(context)),
+              if (_draggedSegment != null && _dragPreviewStart != null && _dragPreviewEnd != null && _dragPreviewTooltipPos != null)
+                Positioned(
+                  left: _dragPreviewTooltipPos!.dx - 40,
+                  top: _dragPreviewTooltipPos!.dy - 30,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black87,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      _isResizingEnd || _isResizingStart
+                          ? '${DateFormat('HH:mm').format(_dragPreviewStart!)}–${DateFormat('HH:mm').format(_dragPreviewEnd!)}'
+                          : DateFormat('HH:mm').format(_dragPreviewStart!),
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -56,28 +82,24 @@ class _DayDialWidgetState extends State<DayDialWidget> {
   }
 
   void _handleTap(TapUpDetails details, BuildContext context) {
-    if (widget.onHourTap == null && widget.onActivityTap == null) return;
+    if (widget.onSegmentTap == null && widget.onHourTap == null) return;
     
     final RenderBox box = context.findRenderObject() as RenderBox;
     final localPosition = box.globalToLocal(details.globalPosition);
     final size = box.size;
     final center = Offset(size.width / 2, size.height / 2);
     
-    // Calculate angle from center to tap position
-    final dx = localPosition.dx - center.dx;
-    final dy = localPosition.dy - center.dy;
-    final angle = atan2(dy, dx);
+    bool isResizeStart = false;
+    bool isResizeEnd = false;
+    final tapped = _hitTestSegment(localPosition, size, center, (rs) => isResizeStart = rs, (re) => isResizeEnd = re);
     
-    // Convert angle to hour (0 at top, clockwise)
-    final adjustedAngle = angle + (pi / 2);
-    final normalizedAngle = (adjustedAngle + 2 * pi) % (2 * pi);
-    final hour = ((normalizedAngle / (2 * pi)) * 24).round() % 24;
-    
-    // Check if an activity was tapped
-    final tappedActivity = _findActivityAtPosition(localPosition, size, center);
-    if (tappedActivity != null && widget.onActivityTap != null) {
-      widget.onActivityTap!(tappedActivity);
+    if (tapped != null && widget.onSegmentTap != null) {
+      widget.onSegmentTap!(tapped);
     } else if (widget.onHourTap != null) {
+      final angle = atan2(localPosition.dy - center.dy, localPosition.dx - center.dx);
+      final adjusted = angle + (pi / 2);
+      final normalized = (adjusted + 2 * pi) % (2 * pi);
+      final hour = ((normalized / (2 * pi)) * 24).round() % 24;
       widget.onHourTap!(hour);
     }
   }
@@ -88,17 +110,24 @@ class _DayDialWidgetState extends State<DayDialWidget> {
     final size = box.size;
     final center = Offset(size.width / 2, size.height / 2);
     
-    final tappedActivity = _findActivityAtPosition(localPosition, size, center);
-    if (tappedActivity != null && widget.onActivityDrag != null) {
+    bool isResizeStart = false;
+    bool isResizeEnd = false;
+    final tapped = _hitTestSegment(localPosition, size, center, (rs) => isResizeStart = rs, (re) => isResizeEnd = re);
+    
+    if (tapped != null && tapped.isEditable) {
       setState(() {
-        _draggedActivity = tappedActivity;
-        _dragStartTime = tappedActivity.startTime;
+        _draggedSegment = tapped;
+        _isResizingStart = isResizeStart;
+        _isResizingEnd = isResizeEnd;
+        _dragPreviewStart = tapped.start;
+        _dragPreviewEnd = tapped.end;
+        _dragPreviewTooltipPos = localPosition;
       });
     }
   }
 
   void _handlePanUpdate(DragUpdateDetails details, BuildContext context) {
-    if (_draggedActivity == null) return;
+    if (_draggedSegment == null) return;
     
     final RenderBox box = context.findRenderObject() as RenderBox;
     final localPosition = box.globalToLocal(details.globalPosition);
@@ -106,45 +135,109 @@ class _DayDialWidgetState extends State<DayDialWidget> {
     final center = Offset(size.width / 2, size.height / 2);
     
     final newTime = _positionToTime(localPosition, size, center, widget.selectedDate);
+    
+    // Snap to 5 minutes
+    final snappedMinute = (newTime.minute / 5).round() * 5;
+    var snappedTime = DateTime(newTime.year, newTime.month, newTime.day, newTime.hour, snappedMinute);
+    
     setState(() {
-      _dragStartTime = newTime;
+      _dragPreviewTooltipPos = localPosition;
+      
+      final dur = _draggedSegment!.end.difference(_draggedSegment!.start);
+      if (_isResizingStart) {
+        if (_draggedSegment!.end.difference(snappedTime).inMinutes >= 5) {
+          _dragPreviewStart = snappedTime;
+        }
+      } else if (_isResizingEnd) {
+        if (snappedTime.difference(_draggedSegment!.start).inMinutes >= 5) {
+          _dragPreviewEnd = snappedTime;
+        }
+      } else {
+        _dragPreviewStart = snappedTime;
+        _dragPreviewEnd = snappedTime.add(dur);
+      }
     });
   }
 
   void _handlePanEnd(DragEndDetails details) {
-    if (_draggedActivity != null && _dragStartTime != null && widget.onActivityDrag != null) {
-      widget.onActivityDrag!(_draggedActivity!, _dragStartTime!);
+    if (_draggedSegment != null && _dragPreviewStart != null) {
+      if (_isResizingEnd && widget.onSegmentResize != null) {
+        widget.onSegmentResize!(_draggedSegment!, _dragPreviewEnd!);
+      } else if (_isResizingStart && widget.onSegmentResize != null) {
+        widget.onSegmentResize!(_draggedSegment!, _dragPreviewEnd!);
+        if (widget.onSegmentMove != null) {
+          widget.onSegmentMove!(_draggedSegment!, _dragPreviewStart!);
+        }
+      } else if (widget.onSegmentMove != null) {
+        widget.onSegmentMove!(_draggedSegment!, _dragPreviewStart!);
+      }
     }
     setState(() {
-      _draggedActivity = null;
-      _dragStartTime = null;
+      _draggedSegment = null;
+      _dragPreviewStart = null;
+      _dragPreviewEnd = null;
+      _dragPreviewTooltipPos = null;
     });
   }
 
-  DialActivity? _findActivityAtPosition(Offset position, Size size, Offset center) {
-    // Calculate distance from center to determine ring
+  DialSegment? _hitTestSegment(Offset position, Size size, Offset center, void Function(bool) setResizeStart, void Function(bool) setResizeEnd) {
     final dx = position.dx - center.dx;
     final dy = position.dy - center.dy;
     final distance = sqrt(dx * dx + dy * dy);
     final radius = size.width / 2 - 16;
-    
-    // Determine which ring was tapped
     final innerRadius = radius * 0.4;
-    final outerRadius = radius * 0.85;
+    final ringWidth = (radius - innerRadius) / 5;
     
-    if (distance < innerRadius || distance > outerRadius) return null;
-    
-    // Calculate angle to find hour
     final angle = atan2(dy, dx);
     final adjustedAngle = angle + (pi / 2);
     final normalizedAngle = (adjustedAngle + 2 * pi) % (2 * pi);
-    final hour = ((normalizedAngle / (2 * pi)) * 24).round() % 24;
     
-    // Return first activity from that hour
-    if (hour >= 0 && hour < widget.hourStates.length) {
-      final activities = widget.hourStates[hour].activities;
-      if (activities.isNotEmpty) {
-        return activities.first;
+    for (final s in widget.snapshot.segments.reversed) {
+      double sRingStart = innerRadius + (s.layer + 1) * ringWidth;
+      double sRingEnd = sRingStart + ringWidth;
+      if (s.layer == -1) {
+        sRingStart = innerRadius;
+        sRingEnd = innerRadius + ringWidth;
+      }
+      
+      if (distance >= sRingStart && distance <= sRingEnd) {
+        double startAngle = _dateTimeToAngle(s.start);
+        double endAngle = startAngle + _sweepAngle(s);
+        
+        startAngle = (startAngle + 2*pi) % (2*pi);
+        endAngle = (endAngle + 2*pi) % (2*pi);
+        
+        bool inAngle = false;
+        if (startAngle <= endAngle) {
+          inAngle = normalizedAngle >= startAngle && normalizedAngle <= endAngle;
+        } else {
+          inAngle = normalizedAngle >= startAngle || normalizedAngle <= endAngle;
+        }
+        
+        if (inAngle) {
+          double dur = s.end.difference(s.start).inMinutes.toDouble();
+          if (dur <= 0) dur += 24*60;
+          
+          double minDiff = 0;
+          if (startAngle <= endAngle) {
+            minDiff = (normalizedAngle - startAngle) / (2*pi) * 24 * 60;
+          } else {
+            if (normalizedAngle >= startAngle) {
+              minDiff = (normalizedAngle - startAngle) / (2*pi) * 24 * 60;
+            } else {
+              minDiff = ((normalizedAngle + 2*pi) - startAngle) / (2*pi) * 24 * 60;
+            }
+          }
+          
+          if (s.isResizable && s.kind != DialSegmentKind.habitSlot && s.kind != DialSegmentKind.reminder) {
+            if (minDiff < dur * 0.15) {
+              setResizeStart(true);
+            } else if (minDiff > dur * 0.85) {
+              setResizeEnd(true);
+            }
+          }
+          return s;
+        }
       }
     }
     return null;
@@ -154,7 +247,6 @@ class _DayDialWidgetState extends State<DayDialWidget> {
     final dx = position.dx - center.dx;
     final dy = position.dy - center.dy;
     final angle = atan2(dy, dx);
-    
     final adjustedAngle = angle + (pi / 2);
     final normalizedAngle = (adjustedAngle + 2 * pi) % (2 * pi);
     
@@ -169,10 +261,6 @@ class _DayDialWidgetState extends State<DayDialWidget> {
     final now = DateTime.now();
     final isToday = _isSameDay(widget.selectedDate, now);
     
-    // Calculate next activity
-    final nextActivity = _findNextActivity(now);
-    final timeUntilNext = nextActivity?.startTime.difference(now);
-    
     return Column(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -185,15 +273,6 @@ class _DayDialWidgetState extends State<DayDialWidget> {
             color: AppTheme.textPrimaryColor(context),
           ),
         ),
-        if (isToday && timeUntilNext != null)
-          Text(
-            _formatTimeUntil(timeUntilNext),
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textSecondaryColor(context),
-            ),
-          ),
         const SizedBox(height: 2),
         Text(
           isToday ? 'Today' : DateFormat('MMM d').format(widget.selectedDate),
@@ -203,30 +282,32 @@ class _DayDialWidgetState extends State<DayDialWidget> {
             color: AppTheme.textSecondaryColor(context),
           ),
         ),
+        if (isToday && widget.snapshot.nextUpcoming != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4.0),
+            child: Text(
+              _formatCountdown(widget.snapshot.nextUpcoming!, now),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.accentColor(context),
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
       ],
     );
   }
 
-  DialActivity? _findNextActivity(DateTime now) {
-    final allActivities = widget.hourStates
-        .expand((state) => state.activities)
-        .where((a) => a.startTime.isAfter(now))
-        .toList();
-    
-    if (allActivities.isEmpty) return null;
-    
-    allActivities.sort((a, b) => a.startTime.compareTo(b.startTime));
-    return allActivities.first;
-  }
-
-  String _formatTimeUntil(Duration duration) {
-    if (duration.inMinutes < 60) {
-      return '${duration.inMinutes}m';
-    } else if (duration.inHours < 24) {
-      return '${duration.inHours}h ${duration.inMinutes % 60}m';
-    } else {
-      return '${duration.inDays}d';
-    }
+  String _formatCountdown(DialSegment next, DateTime now) {
+    final diff = next.start.difference(now);
+    if (diff.isNegative) return 'Now — ${next.title}';
+    if (diff.inMinutes < 60) return 'in ${diff.inMinutes}m — ${next.title}';
+    final h = diff.inHours;
+    final m = diff.inMinutes % 60;
+    return 'in ${h}h ${m}m — ${next.title}';
   }
 
   bool _isSameDay(DateTime a, DateTime b) {
@@ -235,106 +316,86 @@ class _DayDialWidgetState extends State<DayDialWidget> {
 }
 
 class _DayDialPainter extends CustomPainter {
-  final List<DayDialHourState> hourStates;
+  final DayDialSnapshot snapshot;
   final DateTime selectedDate;
-  final DialActivity? draggedActivity;
-  final DateTime? dragStartTime;
+  final DialSegment? draggedSegment;
+  final DateTime? dragPreviewStart;
+  final DateTime? dragPreviewEnd;
 
   _DayDialPainter({
-    required this.hourStates,
+    required this.snapshot,
     required this.selectedDate,
-    this.draggedActivity,
-    this.dragStartTime,
+    this.draggedSegment,
+    this.dragPreviewStart,
+    this.dragPreviewEnd,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 16; // Padding
-    final innerRadius = radius * 0.4; // Center hole
+    final radius = size.width / 2 - 16;
+    final innerRadius = radius * 0.4;
+    final ringWidth = (radius - innerRadius) / 5;
     
-    // Ring radii for multi-ring rendering
-    final outerRingRadius = radius * 0.85; // Habits, reminders, moods
-    
-    // Draw background circle
+    // Background
     final backgroundPaint = Paint()
-      ..color = const Color(0xFFF1F3F5) // surfaceVariant color
+      ..color = const Color(0xFFF1F3F5)
       ..style = PaintingStyle.fill;
     canvas.drawCircle(center, radius, backgroundPaint);
 
-    // Draw activities using multi-ring rendering
-    for (final state in hourStates) {
-      // Draw legacy habit icons (for backward compatibility)
-      if (state.habitIconName != null) {
-        final angle = _hourToAngle(state.hour) + (pi / 24);
-        final iconX = center.dx + outerRingRadius * cos(angle);
-        final iconY = center.dy + outerRingRadius * sin(angle);
-        _drawIcon(canvas, state.habitIconName!, iconX, iconY, 14);
-      }
-      
-      // Draw new activity-based rendering
-      for (final activity in state.activities) {
-        _drawActivitySegment(canvas, activity, center, innerRadius, radius);
-      }
-      
-      // Draw legacy hour-based arcs (for backward compatibility)
-      if (state.fillFraction > 0) {
-        final startAngle = _hourToAngle(state.hour);
-        final sweepAngle = (2 * pi / 24) * state.fillFraction;
-        final arcRadius = innerRadius + (radius - innerRadius) * 0.5;
-
-        final paint = Paint()
-          ..color = _getColorForKind(state.kind).withValues(alpha: 0.8)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = (radius - innerRadius) * 0.5
-          ..strokeCap = StrokeCap.round;
-
-        canvas.drawArc(
-          Rect.fromCircle(center: center, radius: arcRadius),
-          startAngle,
-          sweepAngle,
-          false,
-          paint,
-        );
-      }
+    // Draw Segments
+    for (final s in snapshot.segments) {
+      if (s == draggedSegment) continue;
+      _drawSegment(canvas, s, center, innerRadius, ringWidth);
     }
     
-    // Draw drag preview
-    if (draggedActivity != null && dragStartTime != null) {
-      final previewAngle = _timeToAngle(dragStartTime!);
-      _drawDragPreview(canvas, previewAngle, center, radius);
+    // Draw Drag Preview
+    if (draggedSegment != null && dragPreviewStart != null && dragPreviewEnd != null) {
+      final previewSegment = DialSegment(
+        id: draggedSegment!.id,
+        kind: draggedSegment!.kind,
+        start: dragPreviewStart!,
+        end: dragPreviewEnd!,
+        title: draggedSegment!.title,
+        colorHex: draggedSegment!.colorHex,
+        emoji: draggedSegment!.emoji,
+        isEditable: draggedSegment!.isEditable,
+        isResizable: draggedSegment!.isResizable,
+        layer: draggedSegment!.layer,
+      );
+      _drawSegment(canvas, previewSegment, center, innerRadius, ringWidth, isDragging: true);
+    }
+    
+    // Draw Mood Markers
+    for (final m in snapshot.moodMarkers) {
+      final angle = _dateTimeToAngle(m.timestamp);
+      final mRadius = radius - 8;
+      final x = center.dx + mRadius * cos(angle);
+      final y = center.dy + mRadius * sin(angle);
+      _drawIcon(canvas, m.emoji, x, y, 12);
     }
 
-    // Draw current time indicator if today
+    // Current time indicator
     final now = DateTime.now();
     if (_isSameDay(selectedDate, now)) {
       final currentAngle = _timeToAngle(now);
       final markerRadius = radius + 8;
-      
       final markerX = center.dx + markerRadius * cos(currentAngle);
       final markerY = center.dy + markerRadius * sin(currentAngle);
 
       final markerPaint = Paint()
-        ..color = AppColors.primary
+        ..color = const Color(0xFFFF3B30) // AppColors.error / bright red
         ..style = PaintingStyle.fill;
-      
-      canvas.drawCircle(Offset(markerX, markerY), 6, markerPaint);
+      canvas.drawCircle(Offset(markerX, markerY), 4, markerPaint);
     }
 
-    // Draw hour labels (12, 3, 6, 9)
+    // Labels
     final labelRadius = radius + 24;
     final labelPaint = TextPainter(
       textAlign: TextAlign.center,
       textDirection: ui.TextDirection.ltr,
     );
-
-    final labels = {
-      0: '12',
-      6: '3',
-      12: '6',
-      18: '9',
-    };
-
+    final labels = {0: '12', 6: '3', 12: '6', 18: '9'};
     for (final entry in labels.entries) {
       final angle = _hourToAngle(entry.key);
       final labelX = center.dx + labelRadius * cos(angle);
@@ -342,132 +403,59 @@ class _DayDialPainter extends CustomPainter {
 
       labelPaint.text = TextSpan(
         text: entry.value,
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textMuted,
-        ),
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey),
       );
       labelPaint.layout();
       labelPaint.paint(canvas, Offset(labelX - labelPaint.width / 2, labelY - labelPaint.height / 2));
     }
   }
 
-  double _hourToAngle(int hour) {
-    // Convert hour to angle (0 at top, clockwise)
-    // 0 hours = -pi/2 (top)
-    // 6 hours = 0 (right)
-    // 12 hours = pi/2 (bottom)
-    // 18 hours = pi (left)
-    return (hour / 24) * 2 * pi - (pi / 2);
-  }
-
-  double _timeToAngle(DateTime time) {
-    final totalMinutes = time.hour * 60 + time.minute;
-    return (totalMinutes / (24 * 60)) * 2 * pi - (pi / 2);
-  }
-
-  void _drawActivitySegment(Canvas canvas, DialActivity activity, Offset center, double innerRadius, double outerRadius) {
-    final startAngle = _timeToAngle(activity.startTime);
-    final endAngle = _timeToAngle(activity.endTime);
-    final sweepAngle = endAngle - startAngle;
+  void _drawSegment(Canvas canvas, DialSegment s, Offset center, double innerRadius, double ringWidth, {bool isDragging = false}) {
+    double ringRadius = innerRadius + (s.layer + 1) * ringWidth + ringWidth/2;
+    if (s.layer == -1) {
+      ringRadius = innerRadius + ringWidth/2;
+    }
     
-    // Determine ring based on activity type
-    double ringRadius;
-    double ringWidth;
+    final startAngle = _dateTimeToAngle(s.start);
+    var sweep = _sweepAngle(s);
     
-    switch (activity.type) {
-      case DialActivityType.timeBlock:
-        ringRadius = innerRadius + (outerRadius - innerRadius) * 0.35;
-        ringWidth = (outerRadius - innerRadius) * 0.15;
-        break;
-      case DialActivityType.event:
-      case DialActivityType.pomodoroCompleted:
-      case DialActivityType.pomodoroPlanned:
-      case DialActivityType.task:
-        ringRadius = innerRadius + (outerRadius - innerRadius) * 0.55;
-        ringWidth = (outerRadius - innerRadius) * 0.12;
-        break;
-      case DialActivityType.habit:
-      case DialActivityType.reminder:
-      case DialActivityType.mood:
-        ringRadius = innerRadius + (outerRadius - innerRadius) * 0.75;
-        ringWidth = (outerRadius - innerRadius) * 0.10;
-        break;
+    // Min 3 degrees for visibility
+    if (sweep < 3 * pi / 180 && s.kind != DialSegmentKind.habitSlot && s.kind != DialSegmentKind.reminder) {
+      sweep = 3 * pi / 180;
     }
     
     final paint = Paint()
-      ..color = activity.color.withValues(alpha: 0.8)
+      ..color = _parseColor(s.colorHex).withValues(alpha: isDragging ? 0.9 : (s.layer == -1 ? 0.3 : 0.8))
       ..style = PaintingStyle.stroke
-      ..strokeWidth = ringWidth
-      ..strokeCap = StrokeCap.round;
-    
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: ringRadius),
-      startAngle,
-      sweepAngle,
-      false,
-      paint,
-    );
-    
-    // Draw emoji for activities that have one
-    if (activity.emoji != null) {
-      _drawEmojiForActivity(canvas, activity, center, ringRadius);
+      ..strokeWidth = ringWidth * 0.8
+      ..strokeCap = StrokeCap.butt;
+      
+    if (isDragging) {
+      paint.color = paint.color.withValues(alpha: 1.0);
+      paint.strokeWidth = ringWidth * 0.9;
     }
-  }
-  
-  void _drawEmojiForActivity(Canvas canvas, DialActivity activity, Offset center, double ringRadius) {
-    if (activity.emoji == null) return;
-    
-    final midAngle = (_timeToAngle(activity.startTime) + _timeToAngle(activity.endTime)) / 2;
-    final emojiX = center.dx + ringRadius * cos(midAngle);
-    final emojiY = center.dy + ringRadius * sin(midAngle);
-    
-    _drawIcon(canvas, activity.emoji!, emojiX, emojiY, 12);
-  }
-  
-  void _drawDragPreview(Canvas canvas, double angle, Offset center, double radius) {
-    final paint = Paint()
-      ..color = AppColors.primary.withValues(alpha: 0.3)
-      ..style = PaintingStyle.fill;
-    
-    canvas.drawCircle(
-      Offset(
-        center.dx + radius * 0.7 * cos(angle),
-        center.dy + radius * 0.7 * sin(angle),
-      ),
-      12,
-      paint,
-    );
-  }
 
-  Color _getColorForKind(DialHourKind kind) {
-    switch (kind) {
-      case DialHourKind.idle:
-        return AppColors.textMuted.withValues(alpha: 0.2);
-      case DialHourKind.sleep:
-        return AppColors.textMuted.withValues(alpha: 0.3);
-      case DialHourKind.pomodoroCompleted:
-        return AppColors.success;
-      case DialHourKind.pomodoroPlanned:
-        return AppColors.primary.withValues(alpha: 0.6);
-      case DialHourKind.event:
-        return AppColors.info;
-      case DialHourKind.timeBlock:
-        return AppColors.warning;
+    if (s.kind == DialSegmentKind.habitSlot || s.kind == DialSegmentKind.reminder) {
+      // Draw as a point
+      if (s.emoji != null) {
+        final x = center.dx + ringRadius * cos(startAngle);
+        final y = center.dy + ringRadius * sin(startAngle);
+        _drawIcon(canvas, s.emoji!, x, y, 14);
+      }
+    } else {
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: ringRadius),
+        startAngle,
+        sweep,
+        false,
+        paint,
+      );
     }
   }
 
   void _drawIcon(Canvas canvas, String iconName, double x, double y, double size) {
-    // Simple emoji/icon rendering
     final textPainter = TextPainter(
-      text: TextSpan(
-        text: iconName,
-        style: TextStyle(
-          fontSize: size,
-          color: AppColors.textPrimary,
-        ),
-      ),
+      text: TextSpan(text: iconName, style: TextStyle(fontSize: size)),
       textDirection: ui.TextDirection.ltr,
     );
     textPainter.layout();
@@ -478,11 +466,39 @@ class _DayDialPainter extends CustomPainter {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  @override
-  bool shouldRepaint(_DayDialPainter oldDelegate) {
-    return oldDelegate.hourStates != hourStates ||
-        !_isSameDay(oldDelegate.selectedDate, selectedDate) ||
-        oldDelegate.draggedActivity != draggedActivity ||
-        oldDelegate.dragStartTime != dragStartTime;
+  Color _parseColor(String colorString) {
+    if (colorString.startsWith('#')) {
+      return Color(int.parse(colorString.replaceFirst('#', '0xFF')));
+    }
+    return Colors.grey;
   }
+
+  double _hourToAngle(int hour) {
+    return (hour / 24) * 2 * pi - (pi / 2);
+  }
+
+  double _timeToAngle(DateTime time) {
+    final totalMinutes = time.hour * 60 + time.minute;
+    return (totalMinutes / (24 * 60)) * 2 * pi - (pi / 2);
+  }
+
+  @override
+  bool shouldRepaint(covariant _DayDialPainter oldDelegate) {
+    return oldDelegate.snapshot != snapshot ||
+        oldDelegate.selectedDate != selectedDate ||
+        oldDelegate.draggedSegment != draggedSegment ||
+        oldDelegate.dragPreviewStart != dragPreviewStart ||
+        oldDelegate.dragPreviewEnd != dragPreviewEnd;
+  }
+}
+
+double _dateTimeToAngle(DateTime dt) {
+  final minutesFromMidnight = dt.hour * 60 + dt.minute + dt.second / 60.0;
+  return (minutesFromMidnight / (24 * 60)) * 2 * pi - (pi / 2);
+}
+
+double _sweepAngle(DialSegment s) {
+  var minutes = s.end.difference(s.start).inMinutes.toDouble();
+  if (minutes <= 0) minutes += 24 * 60;
+  return (minutes / (24 * 60)) * 2 * pi;
 }

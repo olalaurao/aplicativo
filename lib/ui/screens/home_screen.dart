@@ -10,8 +10,24 @@ import '../../providers/pomodoro_provider.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/notification_service.dart';
 import '../../services/pomodoro_bg_service.dart';
+import '../../providers/sync_provider.dart';
+import '../../providers/dashboard_provider.dart';
 import '../../services/sync_manager.dart';
+import '../../models/dashboard_block.dart';
 import '../forms/create_entry_form.dart';
+import '../forms/create_habit_form.dart';
+import '../forms/create_task_form.dart';
+import '../theme.dart';
+import '../widgets/create_menu_sheet.dart';
+import '../widgets/steering_sheet.dart';
+import '../widgets/dashboard/today_timeline_component.dart';
+import '../widgets/dashboard/today_completables_component.dart';
+import '../widgets/dashboard/day_dial_component.dart';
+import '../widgets/dashboard/shopping_quick_add_component.dart';
+import '../widgets/dashboard/week_overview_component.dart';
+import '../widgets/dashboard/month_overview_component.dart';
+import '../widgets/dashboard/goals_projects_overview_component.dart';
+import '../widgets/dashboard/dashboard_component_config_sheet.dart';
 import '../forms/create_habit_form.dart';
 import '../forms/create_task_form.dart';
 import '../theme.dart';
@@ -32,6 +48,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   final TextEditingController _quickEntryController = TextEditingController();
   final TextEditingController _quickTaskController = TextEditingController();
+  bool _editMode = false;
 
   @override
   void initState() {
@@ -221,15 +238,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final tasks = ref.watch(tasksProvider);
-    final habits = ref.watch(habitsProvider);
-    final inboxCount = ref.watch(inboxCountProvider);
-    final pendingTasks = tasks
-        .where((task) => task.stage != TaskStage.finalized && !task.archived)
-        .length;
-    final activeHabits = habits
-        .where((habit) => habit.status == HabitStatus.active && !habit.archived && !habit.isNegative)
-        .length;
+    final blocksState = ref.watch(dashboardProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -238,7 +247,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
+        leading: _buildSyncIcon(),
         actions: [
+          IconButton(
+            icon: Icon(_editMode ? Icons.done_rounded : Icons.tune_rounded),
+            tooltip: _editMode ? 'Done editing' : 'Edit dashboard',
+            onPressed: () => setState(() => _editMode = !_editMode),
+          ),
           IconButton(
             onPressed: () => showCreateMenu(context),
             icon: const Icon(Icons.add_rounded),
@@ -249,87 +264,162 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _refresh,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            children: [
-              _QuickCaptureCard(
-                title: 'Quick entry',
-                hintText: 'What is on your mind?',
-                controller: _quickEntryController,
-                isSubmitting: ref.watch(_quickAddSubmittingProvider),
-                icon: Icons.edit_note_rounded,
-                onSubmit: () => _submitQuickEntry(),
-              ),
-              const SizedBox(height: 12),
-              _QuickCaptureCard(
-                title: 'Quick task',
-                hintText: 'What needs to happen today?',
-                controller: _quickTaskController,
-                isSubmitting: ref.watch(_quickTaskSubmittingProvider),
-                icon: Icons.check_box_outlined,
-                onSubmit: () => _submitQuickTask(),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: _SummaryTile(
-                      label: 'Tasks',
-                      value: '$pendingTasks',
-                      icon: Icons.check_circle_outline_rounded,
-                      onTap: () => context.push('/planner'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _SummaryTile(
-                      label: 'Habits',
-                      value: '$activeHabits',
-                      icon: Icons.repeat_rounded,
-                      onTap: () => context.push('/habits'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _SummaryTile(
-                      label: 'Inbox',
-                      value: '$inboxCount',
-                      icon: Icons.inbox_rounded,
-                      onTap: () => context.push('/inbox'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              _ActionList(
-                actions: [
-                  _HomeAction(
-                    label: 'Planner',
-                    icon: Icons.view_day_rounded,
-                    onTap: () => context.push('/planner'),
-                  ),
-                  _HomeAction(
-                    label: 'Journal',
-                    icon: Icons.auto_stories_rounded,
-                    onTap: () => context.push('/timeline'),
-                  ),
-                  _HomeAction(
-                    label: 'Organizers',
-                    icon: Icons.account_tree_rounded,
-                    onTap: () => context.push('/organize'),
-                  ),
-                  _HomeAction(
-                    label: 'More',
-                    icon: Icons.more_horiz_rounded,
-                    onTap: () => context.push('/more'),
-                  ),
-                ],
-              ),
-            ],
+          child: blocksState.when(
+            data: (blocks) {
+              if (blocks.isEmpty) {
+                // Seed default
+                WidgetsBinding.instance.addPostFrameCallback((_) async {
+                  await ref.read(dashboardProvider.notifier).addBlock(BlockType.todayTimeline, 'Timeline');
+                  await ref.read(dashboardProvider.notifier).addBlock(BlockType.todayDial, 'Day Dial');
+                  await ref.read(dashboardProvider.notifier).addBlock(BlockType.todayCompletables, 'Today\'s Completables');
+                });
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final visibleBlocks = _editMode ? blocks : blocks.where((b) => b.visible).toList();
+
+              return ReorderableListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                itemCount: visibleBlocks.length + (_editMode ? 1 : 0),
+                onReorder: (oldIndex, newIndex) {
+                  if (oldIndex < visibleBlocks.length && newIndex <= visibleBlocks.length) {
+                    ref.read(dashboardProvider.notifier).reorderBlocks(oldIndex, newIndex);
+                  }
+                },
+                itemBuilder: (context, index) {
+                  if (_editMode && index == visibleBlocks.length) {
+                    return Padding(
+                      key: const ValueKey('add_component_button'),
+                      padding: const EdgeInsets.only(top: 16),
+                      child: InkWell(
+                        onTap: () => AddComponentSheet.show(context),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.textMuted.withValues(alpha: 0.3)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_rounded, color: AppTheme.accentColor(context)),
+                              const SizedBox(width: 8),
+                              Text('Add component', style: TextStyle(color: AppTheme.accentColor(context), fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  final block = visibleBlocks[index];
+                  Widget child = _buildComponent(block);
+
+                  if (_editMode) {
+                    child = Container(
+                      key: ValueKey(block.id),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.accent, width: 2),
+                        borderRadius: BorderRadius.circular(16), // to match card padding somewhat
+                      ),
+                      child: Stack(
+                        children: [
+                          Opacity(opacity: block.visible ? 1.0 : 0.5, child: child),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(block.visible ? Icons.visibility_rounded : Icons.visibility_off_rounded, color: AppColors.textPrimary),
+                                  style: IconButton.styleFrom(backgroundColor: AppColors.surface),
+                                  onPressed: () => ref.read(dashboardProvider.notifier).toggleVisibility(block.id),
+                                ),
+                                const SizedBox(width: 4),
+                                IconButton(
+                                  icon: const Icon(Icons.settings_rounded, color: AppColors.textPrimary),
+                                  style: IconButton.styleFrom(backgroundColor: AppColors.surface),
+                                  onPressed: () => DashboardComponentConfigSheet.show(context, block),
+                                ),
+                                const SizedBox(width: 4),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_rounded, color: AppColors.error),
+                                  style: IconButton.styleFrom(backgroundColor: AppColors.surface),
+                                  onPressed: () => ref.read(dashboardProvider.notifier).removeBlock(block.id),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  } else {
+                    child = Padding(
+                      key: ValueKey(block.id),
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: child,
+                    );
+                  }
+
+                  return child;
+                },
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (err, stack) => Center(child: Text('Error: $err')),
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildSyncIcon() {
+    return Consumer(
+      builder: (context, ref, _) {
+        final status = ref.watch(syncStatusProvider);
+        final (icon, color, tooltip) = switch (status) {
+          SyncStatus.synced   => (Icons.cloud_done_rounded,   AppColors.success, 'Synced'),
+          SyncStatus.syncing  => (Icons.cloud_sync_rounded,   AppTheme.accentColor(context), 'Syncing…'),
+          SyncStatus.offline  => (Icons.cloud_off_rounded,    AppColors.textMuted, 'Offline — will sync when back online'),
+          SyncStatus.error    => (Icons.cloud_off_rounded,    AppColors.error, 'Sync error — tap for details'),
+          SyncStatus.conflict => (Icons.warning_amber_rounded, AppColors.warning, 'Sync conflict — tap to resolve'),
+        };
+        return IconButton(
+          icon: status == SyncStatus.syncing
+              ? const SizedBox(
+                  width: AppIconSize.md, height: AppIconSize.md,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(icon, color: color),
+          tooltip: tooltip,
+          onPressed: status == SyncStatus.conflict || status == SyncStatus.error
+              ? () => context.push('/sync-conflicts')
+              : null,
+        );
+      },
+    );
+  }
+
+  Widget _buildComponent(DashboardBlock block) {
+    switch (block.type) {
+      case BlockType.todayTimeline: return TodayTimelineComponent(block: block);
+      case BlockType.todayDial: return DayDialComponent(block: block);
+      case BlockType.shoppingQuickAdd: return ShoppingQuickAddComponent(block: block);
+      case BlockType.weekOverview: return WeekOverviewComponent(block: block);
+      case BlockType.monthOverview: return MonthOverviewComponent(block: block);
+      case BlockType.goalsProjectsOverview: return GoalsProjectsOverviewComponent(block: block);
+      case BlockType.todayCompletables: return TodayCompletablesComponent(block: block);
+      case BlockType.todayHabits: return TodayCompletablesComponent(block: block);
+      default: return Container(
+        height: 100,
+        decoration: AppTheme.cardDecoration(context),
+        alignment: Alignment.center,
+        child: Text('Unknown component: ${block.type.name}'),
+      );
+    }
   }
 }
 

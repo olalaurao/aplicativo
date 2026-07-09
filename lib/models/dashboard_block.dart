@@ -3,12 +3,16 @@
 // F3.8: V5 deduplicated list retired - panel system being redesigned from blank slate
 // Only core mechanics preserved until redesign is complete
 enum BlockType {
-  // Core panel type - Today's Habits (kept explicitly per V5.1 spec)
-  todayHabits,
-  // Generic fallback for custom panels during redesign
+  todayHabits, // Kept for migration only
+  todayCompletables,
+  todayTimeline,
+  todayDial,
+  shoppingQuickAdd,
+  weekOverview,
+  monthOverview,
+  goalsProjectsOverview,
   custom,
   // Legacy types preserved for backward compatibility during migration
-  // These will be re-specified or removed once redesign is finalized
   universal,
   shortcuts,
   timeline,
@@ -16,7 +20,6 @@ enum BlockType {
   goals,
   notes,
   calendar,
-  // ... other legacy types will be removed after redesign
 }
 
 class DashboardBlock {

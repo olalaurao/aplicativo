@@ -11,6 +11,7 @@ class TikTokResolvedData {
   final String? title;
   final String? authorHandle;
   final String? authorName;
+  final List<String>? images;
 
   const TikTokResolvedData({
     this.videoUrl,
@@ -18,6 +19,7 @@ class TikTokResolvedData {
     this.title,
     this.authorHandle,
     this.authorName,
+    this.images,
   });
 }
 
@@ -242,13 +244,23 @@ class TikTokVideoResolver {
             author['uniqueId']?.toString();
         authorName = author['nickname']?.toString();
       }
-      if (videoUrl != null || thumbnailUrl != null) {
+      
+      List<String>? images;
+      if (data['images'] is List) {
+        images = (data['images'] as List)
+            .map((e) => e.toString())
+            .where((url) => url.isNotEmpty)
+            .toList();
+      }
+
+      if (videoUrl != null || thumbnailUrl != null || (images != null && images.isNotEmpty)) {
         return TikTokResolvedData(
           videoUrl: videoUrl,
-          thumbnailUrl: thumbnailUrl,
+          thumbnailUrl: thumbnailUrl ?? (images != null && images.isNotEmpty ? images.first : null),
           title: title,
           authorHandle: authorHandle,
           authorName: authorName,
+          images: images,
         );
       }
     }
