@@ -50,39 +50,47 @@ class _WeekOverviewComponentState extends ConsumerState<WeekOverviewComponent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
-              children: [
-                Icon(Icons.view_week_rounded, color: AppColors.textMuted, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  widget.block.title.isNotEmpty ? widget.block.title : 'This Week',
-                  style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16),
-                ),
-                const Spacer(),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.chevron_left_rounded),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      onPressed: () => setState(() {
-                        _currentWeekStart = _currentWeekStart.subtract(const Duration(days: 7));
-                      }),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.chevron_right_rounded),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      onPressed: () => setState(() {
-                        _currentWeekStart = _currentWeekStart.add(const Duration(days: 7));
-                      }),
-                    ),
-                  ],
-                ),
-              ],
+          InkWell(
+            onTap: () => context.push('/week'),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  Icon(Icons.view_week_rounded, color: AppColors.textMuted, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    widget.block.title.isNotEmpty ? widget.block.title : 'This Week',
+                    style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16),
+                  ),
+                  const Spacer(),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left_rounded),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        onPressed: () => setState(() {
+                          _currentWeekStart = _currentWeekStart.subtract(const Duration(days: 7));
+                        }),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right_rounded),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        onPressed: () => setState(() {
+                          _currentWeekStart = _currentWeekStart.add(const Duration(days: 7));
+                        }),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.textMuted,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
           Padding(

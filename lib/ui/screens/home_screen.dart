@@ -279,7 +279,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               final visibleBlocks = _editMode ? blocks : blocks.where((b) => b.visible).toList();
 
               return ReorderableListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
                 itemCount: visibleBlocks.length + (_editMode ? 1 : 0),
                 onReorder: (oldIndex, newIndex) {
                   if (oldIndex < visibleBlocks.length && newIndex <= visibleBlocks.length) {

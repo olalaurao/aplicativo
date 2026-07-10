@@ -280,7 +280,7 @@ class DayDialAggregator {
     }
 
     for (final s in segments) {
-      if (s.layer >= 4 && s.kind != DialSegmentKind.timeBlock) {
+      if (s.layer >= 4) {
         s.layer = 3;
       }
     }

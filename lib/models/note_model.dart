@@ -13,6 +13,7 @@ class Note extends ContentObject {
   bool isChecklist;
   String? schedulerSlug;
   bool showInPlanner;
+  String? coverImagePath;
 
   Note({
     super.id,
@@ -24,6 +25,7 @@ class Note extends ContentObject {
     this.isChecklist = false,
     this.schedulerSlug,
     this.showInPlanner = false,
+    this.coverImagePath,
     super.organizers,
     super.categories,
     super.tags,
@@ -54,6 +56,7 @@ class Note extends ContentObject {
     if (isChecklist) frontmatter['is_checklist'] = true;
     if (schedulerSlug != null) frontmatter['scheduler_slug'] = schedulerSlug;
     if (showInPlanner) frontmatter['show_in_planner'] = true;
+    if (coverImagePath != null) frontmatter['cover_image_path'] = coverImagePath;
     if (links.isNotEmpty) frontmatter['links'] = links;
 
     final markdownBody = subtype == NoteSubtype.text
@@ -81,6 +84,7 @@ class Note extends ContentObject {
     note.isChecklist = frontmatter['is_checklist'] == true;
     note.schedulerSlug = frontmatter['scheduler_slug']?.toString();
     note.showInPlanner = frontmatter['show_in_planner'] == true;
+    note.coverImagePath = frontmatter['cover_image_path'] as String?;
     return note;
   }
 
@@ -93,6 +97,7 @@ class Note extends ContentObject {
     bool? isChecklist,
     String? schedulerSlug,
     bool? showInPlanner,
+    String? coverImagePath,
     List<String>? links,
     List<OrganizerReference>? organizers,
     List<String>? categories,
@@ -115,6 +120,7 @@ class Note extends ContentObject {
       isChecklist: isChecklist ?? this.isChecklist,
       schedulerSlug: schedulerSlug ?? this.schedulerSlug,
       showInPlanner: showInPlanner ?? this.showInPlanner,
+      coverImagePath: coverImagePath ?? this.coverImagePath,
       links: links ?? List<String>.from(this.links),
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,

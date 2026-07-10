@@ -36,6 +36,7 @@ import '../widgets/tracker_metric_card.dart';
 import '../widgets/rich_text_editor.dart';
 import '../widgets/outline_editor.dart';
 import '../widgets/property_grid.dart';
+import '../widgets/universal_search_picker.dart';
 import '../widgets/collection_view.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../../models/note_model.dart';
@@ -45,8 +46,10 @@ import '../../models/template_model.dart';
 import '../widgets/wiki_text_view.dart';
 import '../widgets/journal_body_view.dart';
 import '../widgets/markdown_body_view.dart';
-import '../widgets/universal_search_picker.dart';
 import '../widgets/conflict_badge.dart';
+import '../widgets/note_page_style_sheet.dart';
+import 'dart:io';
+import 'dart:convert';
 import '../../providers/settings_provider.dart';
 import '../forms/create_task_form.dart';
 import '../forms/create_habit_form.dart';
@@ -179,6 +182,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     color: AppColors.error,
                   ),
                   onPressed: () => _handleAction(context, ref, 'focus'),
+                ),
+              if (object is Note)
+                IconButton(
+                  icon: const Icon(Icons.share_outlined),
+                  onPressed: () => _shareNote(context, object as Note),
+                  tooltip: 'Share',
                 ),
               _buildOverflowMenu(context, ref),
             ],
@@ -673,6 +682,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       ],
       'habit': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
       'note': [
+        'search_in_page',
+        'table_of_contents',
+        'page_style',
         'convert_to_checklist',
         'edit',
         'change_type',
@@ -705,6 +717,39 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       },
       itemBuilder: (ctx) => actions.map((action) {
         switch (action) {
+          case 'search_in_page':
+            return const PopupMenuItem(
+              value: 'search_in_page',
+              child: Row(
+                children: [
+                  Icon(Icons.search_rounded, size: 18),
+                  SizedBox(width: 12),
+                  Text('Search in Page'),
+                ],
+              ),
+            );
+          case 'table_of_contents':
+            return const PopupMenuItem(
+              value: 'table_of_contents',
+              child: Row(
+                children: [
+                  Icon(Icons.list_outlined, size: 18),
+                  SizedBox(width: 12),
+                  Text('Table of Contents'),
+                ],
+              ),
+            );
+          case 'page_style':
+            return const PopupMenuItem(
+              value: 'page_style',
+              child: Row(
+                children: [
+                  Icon(Icons.style_rounded, size: 18),
+                  SizedBox(width: 12),
+                  Text('Page Style'),
+                ],
+              ),
+            );
           case 'edit':
             return const PopupMenuItem(
               value: 'edit',
@@ -1116,25 +1161,11 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       );
     } else if (object is Note) {
       final note = object as Note;
+      final allNotes = ref.watch(notesProvider);
+      
       cards.add(
-        _buildPropertiesCard(
-          context: context,
-          title: 'Config',
-          icon: Icons.tune_rounded,
-          rows: [
-            _PropRow(label: 'Subtipo', value: note.subtype.name),
-            _PropRow(
-              label: 'Categoria',
-              value: note.categories.isNotEmpty
-                  ? note.categories.first
-                  : 'Não definida',
-              isEmpty: note.categories.isEmpty,
-            ),
-            _PropRow(label: 'Fixado', value: note.pinned ? 'Sim 📌' : 'Não'),
-          ],
-        ),
+        _buildNotePropertiesGrid(context, note, allNotes),
       );
-      cards.add(_buildDefaultDatesCard(context));
     } else if (object is Person) {
       final person = object as Person;
       cards.add(
@@ -1224,6 +1255,438 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       ],
     );
   }
+
+  Widget _buildNotePropertiesGrid(BuildContext context, Note note, List<Note> allNotes) {
+    return _CollapsiblePropertiesSection(
+      title: 'PROPERTIES',
+      child: _buildNotePropertiesCardContent(context, note, allNotes),
+    );
+  }
+
+  Widget _buildNotePropertiesCardContent(BuildContext context, Note note, List<Note> allNotes) {
+    // Find parent note title
+    String? parentNoteTitle;
+    if (note.parentNoteId != null) {
+      final parent = allNotes.where((n) => n.id == note.parentNoteId).firstOrNull;
+      parentNoteTitle = parent?.title;
+    }
+
+    final cards = <PropertyCard>[
+      PropertyCard(
+        icon: _getSubtypeIcon(note.subtype),
+        label: 'Subtype',
+        value: note.subtype.name,
+        onTap: () {
+          // TODO: Open subtype picker (N1)
+        },
+      ),
+      PropertyCard(
+        icon: Icons.label_outline_rounded,
+        label: 'Category',
+        value: note.categories.isNotEmpty ? note.categories.first : null,
+        state: note.categories.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
+        onTap: () {
+          // TODO: Open category picker (N1)
+        },
+      ),
+      PropertyCard(
+        icon: Icons.push_pin_outlined,
+        label: 'Pinned',
+        customChild: Switch(
+          value: note.pinned,
+          onChanged: (value) {
+            ref.read(vaultProvider.notifier).updateObject(note.copyWith(pinned: value));
+          },
+        ),
+      ),
+      PropertyCard(
+        icon: Icons.checklist_rtl_rounded,
+        label: 'Checklist',
+        customChild: Switch(
+          value: note.isChecklist,
+          onChanged: (value) {
+            ref.read(vaultProvider.notifier).updateObject(note.copyWith(isChecklist: value));
+          },
+        ),
+      ),
+      PropertyCard(
+        icon: Icons.calendar_view_day_outlined,
+        label: 'Show in Planner',
+        customChild: Switch(
+          value: note.showInPlanner,
+          onChanged: (value) {
+            ref.read(vaultProvider.notifier).updateObject(note.copyWith(showInPlanner: value));
+          },
+        ),
+      ),
+      PropertyCard(
+        icon: Icons.drive_file_move_outline,
+        label: 'Parent Note',
+        value: parentNoteTitle ?? 'None',
+        state: note.parentNoteId == null ? PropertyCardState.empty : PropertyCardState.normal,
+        onTap: () {
+          _showParentNotePicker(context, note);
+        },
+      ),
+      PropertyCard(
+        icon: Icons.calendar_today_outlined,
+        label: 'Created',
+        value: DateFormat('d MMM yyyy').format(note.createdAt),
+      ),
+      PropertyCard(
+        icon: Icons.update_rounded,
+        label: 'Modified',
+        value: DateFormat('d MMM yyyy').format(note.updatedAt),
+      ),
+    ];
+
+    return PropertyGrid(cards: cards);
+  }
+
+  IconData _getSubtypeIcon(NoteSubtype subtype) {
+    switch (subtype) {
+      case NoteSubtype.text:
+        return Icons.notes_rounded;
+      case NoteSubtype.outline:
+        return Icons.account_tree_outlined;
+      case NoteSubtype.collection:
+        return Icons.grid_view_rounded;
+    }
+  }
+
+  void _showParentNotePicker(BuildContext context, Note note) {
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => UniversalSearchPickerSheet(
+        title: 'Select Parent Note',
+        initialFilter: 'note',
+        onSelected: (selectedObj) {
+          if (selectedObj is Note && selectedObj.id != note.id) {
+            ref.read(vaultProvider.notifier).updateObject(
+              note.copyWith(parentNoteId: selectedObj.id),
+            );
+          }
+        },
+      ),
+    );
+  }
+}
+
+class _CollapsiblePropertiesSection extends StatefulWidget {
+  final String title;
+  final Widget child;
+
+  const _CollapsiblePropertiesSection({
+    required this.title,
+    required this.child,
+  });
+
+  @override
+  State<_CollapsiblePropertiesSection> createState() => _CollapsiblePropertiesSectionState();
+}
+
+class _CollapsiblePropertiesSectionState extends State<_CollapsiblePropertiesSection> {
+  bool _isExpanded = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header row
+        InkWell(
+          onTap: () => setState(() => _isExpanded = !_isExpanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.tune_rounded,
+                  size: 16,
+                  color: AppColors.textMuted,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  widget.title,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  _isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                  size: 20,
+                  color: AppColors.textMuted,
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Collapsible content
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          child: _isExpanded
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: widget.child,
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+}
+
+class _Heading {
+  final String text;
+  final int level;
+  final int index;
+
+  _Heading({
+    required this.text,
+    required this.level,
+    required this.index,
+  });
+}
+
+class _TableOfContentsSheet extends StatelessWidget {
+  final List<_Heading> headings;
+  final ValueChanged<int> onHeadingTap;
+
+  const _TableOfContentsSheet({
+    required this.headings,
+    required this.onHeadingTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: AppTheme.sheetDecoration(context),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        top: 24,
+        left: 24,
+        right: 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Table of Contents',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: headings.length,
+              itemBuilder: (context, index) {
+                final heading = headings[index];
+                return InkWell(
+                  onTap: () => onHeadingTap(heading.index),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        SizedBox(width: (heading.level - 1) * 16.0),
+                        Text(
+                          heading.text,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.textPrimaryColor(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InPageSearchSheet extends StatefulWidget {
+  final String content;
+  final NoteSubtype subtype;
+
+  const _InPageSearchSheet({
+    required this.content,
+    required this.subtype,
+  });
+
+  @override
+  State<_InPageSearchSheet> createState() => _InPageSearchSheetState();
+}
+
+class _InPageSearchSheetState extends State<_InPageSearchSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  int _currentMatchIndex = 0;
+  List<int> _matchIndices = [];
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _performSearch(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        _matchIndices = [];
+        _currentMatchIndex = 0;
+      });
+      return;
+    }
+
+    final indices = <int>[];
+    final lowerQuery = query.toLowerCase();
+    final lowerContent = widget.content.toLowerCase();
+
+    int index = 0;
+    while (index < lowerContent.length) {
+      final found = lowerContent.indexOf(lowerQuery, index);
+      if (found == -1) break;
+      indices.add(found);
+      index = found + 1;
+    }
+
+    setState(() {
+      _matchIndices = indices;
+      _currentMatchIndex = indices.isNotEmpty ? 0 : 0;
+    });
+  }
+
+  void _nextMatch() {
+    if (_matchIndices.isEmpty) return;
+    setState(() {
+      _currentMatchIndex = (_currentMatchIndex + 1) % _matchIndices.length;
+    });
+  }
+
+  void _previousMatch() {
+    if (_matchIndices.isEmpty) return;
+    setState(() {
+      _currentMatchIndex = (_currentMatchIndex - 1 + _matchIndices.length) % _matchIndices.length;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: AppTheme.sheetDecoration(context),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        top: 24,
+        left: 24,
+        right: 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Search in Page',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _searchController,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Search...',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              suffixIcon: _matchIndices.isNotEmpty
+                  ? Text(
+                      '${_currentMatchIndex + 1}/${_matchIndices.length}',
+                      style: const TextStyle(fontSize: 14),
+                    )
+                  : null,
+            ),
+            onChanged: _performSearch,
+          ),
+          if (_matchIndices.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _previousMatch,
+                    icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                    label: const Text('Previous'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _nextMatch,
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                    label: const Text('Next'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.accentColor(context).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _getMatchContext(),
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _getMatchContext() {
+    if (_matchIndices.isEmpty) return '';
+    final matchIndex = _matchIndices[_currentMatchIndex];
+    final start = (matchIndex - 30).clamp(0, widget.content.length);
+    final end = (matchIndex + 30).clamp(0, widget.content.length);
+    final context = widget.content.substring(start, end);
+    return '...$context...';
+  }
+}
+
+class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
+  bool _isEditing = false;
+  late ContentObject object;
+  String? _rotationTaskFilter;
 
   List<_PropRow> _buildLinkedGoogleEventPropRows(
     BuildContext context,
@@ -2592,9 +3055,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: Container(
-              decoration: AppTheme.cardDecoration(context),
-              padding: const EdgeInsets.all(16),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 680),
               child: _isEditing
                   ? _buildNoteEditor(context, note)
                   : _buildNoteViewer(context, note),
@@ -2661,25 +3123,60 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   }
 
   Widget _buildNoteViewer(BuildContext context, Note note) {
+    final children = <Widget>[];
+
+    // Cover image
+    if (note.coverImagePath != null) {
+      children.add(_buildCoverImage(context, note.coverImagePath!));
+      children.add(const SizedBox(height: 16));
+    }
+
+    // Note content
     if (note.isChecklist && note.subtype == NoteSubtype.text) {
-      return ChecklistView(note: note);
+      children.add(ChecklistView(note: note));
+    } else {
+      switch (note.subtype) {
+        case NoteSubtype.outline:
+          children.add(OutlineEditor(
+            initialContent: note.body,
+            onWikiLinkTap: (slug) => _navigateToSlug(context, ref, slug),
+            onChanged: (v) {
+              final updated = note.copyWith(body: v);
+              ref.read(vaultProvider.notifier).updateObject(updated);
+              setState(() => object = updated);
+            },
+          ));
+        case NoteSubtype.collection:
+          children.add(CollectionView(content: note.body));
+        case NoteSubtype.text:
+          children.add(MarkdownBodyView(content: note.body));
+      }
     }
-    switch (note.subtype) {
-      case NoteSubtype.outline:
-        return OutlineEditor(
-          initialContent: note.body,
-          onWikiLinkTap: (slug) => _navigateToSlug(context, ref, slug),
-          onChanged: (v) {
-            final updated = note.copyWith(body: v);
-            ref.read(vaultProvider.notifier).updateObject(updated);
-            setState(() => object = updated);
-          },
-        );
-      case NoteSubtype.collection:
-        return CollectionView(content: note.body);
-      case NoteSubtype.text:
-        return MarkdownBodyView(content: note.body);
-    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
+  }
+
+  Widget _buildCoverImage(BuildContext context, String imagePath) {
+    final vaultDir = ref.watch(settingsProvider).vaultPath;
+    if (vaultDir == null) return const SizedBox.shrink();
+
+    final fullPath = '$vaultDir/$imagePath';
+    final imageFile = File(fullPath);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Image.file(
+        imageFile,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return const SizedBox.shrink();
+        },
+      ),
+    );
   }
 
   void _navigateToSlug(BuildContext context, WidgetRef ref, String slug) {
@@ -3762,6 +4259,15 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       case 'edit':
         _editObject(context);
         break;
+      case 'search_in_page':
+        _showInPageSearch(context);
+        break;
+      case 'table_of_contents':
+        _showTableOfContents(context);
+        break;
+      case 'page_style':
+        _showPageStyleSheet(context);
+        break;
       case 'convert_to_checklist':
         _convertToChecklist(context, ref);
         break;
@@ -3798,6 +4304,121 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final updated = note.copyWith(isChecklist: !note.isChecklist);
     ref.read(vaultProvider.notifier).updateObject(updated);
     setState(() => object = updated);
+  }
+
+  void _showPageStyleSheet(BuildContext context) {
+    if (object is! Note) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => NotePageStyleSheet(note: object as Note),
+    );
+  }
+
+  void _showTableOfContents(BuildContext context) {
+    if (object is! Note) return;
+    final note = object as Note;
+    
+    if (note.subtype != NoteSubtype.text && note.subtype != NoteSubtype.outline) {
+      return;
+    }
+
+    final headings = _extractHeadings(note.body, note.subtype);
+    
+    if (headings.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No headings found')),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _TableOfContentsSheet(
+        headings: headings,
+        onHeadingTap: (index) {
+          Navigator.pop(context);
+          // TODO: Scroll to heading position
+        },
+      ),
+    );
+  }
+
+  void _showInPageSearch(BuildContext context) {
+    if (object is! Note) return;
+    final note = object as Note;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _InPageSearchSheet(
+        content: note.body,
+        subtype: note.subtype,
+      ),
+    );
+  }
+
+  List<_Heading> _extractHeadings(String content, NoteSubtype subtype) {
+    final headings = <_Heading>[];
+    
+    if (subtype == NoteSubtype.text) {
+      final lines = content.split('\n');
+      for (int i = 0; i < lines.length; i++) {
+        final line = lines[i].trimLeft();
+        if (line.startsWith('#')) {
+          final level = line.takeWhile((c) => c == '#').length;
+          if (level <= 6) {
+            final text = line.substring(level).trim();
+            if (text.isNotEmpty) {
+              headings.add(_Heading(
+                text: text,
+                level: level,
+                index: i,
+              ));
+            }
+          }
+        }
+      }
+    } else if (subtype == NoteSubtype.outline) {
+      // Parse outline JSON structure
+      try {
+        final outline = jsonDecode(content) as List;
+        _extractOutlineHeadings(outline, headings, 0);
+      } catch (e) {
+        // If parsing fails, return empty
+      }
+    }
+    
+    return headings;
+  }
+
+  void _extractOutlineHeadings(List outline, List<_Heading> headings, int index) {
+    for (final item in outline) {
+      if (item is Map<String, dynamic>) {
+        final text = item['text'] as String?;
+        if (text != null && text.isNotEmpty) {
+          headings.add(_Heading(
+            text: text,
+            level: (item['depth'] as int? ?? 0) + 1,
+            index: index,
+          ));
+        }
+        if (item['children'] is List) {
+          _extractOutlineHeadings(item['children'] as List, headings, index + 1);
+        }
+      }
+    }
+  }
+
+  void _shareNote(BuildContext context, Note note) {
+    final shareText = '# ${note.title}\n\n${note.body}';
+    // TODO: Implement platform-specific sharing
+    // For now, just copy to clipboard
+    Clipboard.setData(ClipboardData(text: shareText));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Note copied to clipboard')),
+    );
   }
 
   Future<void> _showMergeTargetPicker(

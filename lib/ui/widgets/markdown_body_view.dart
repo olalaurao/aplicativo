@@ -102,6 +102,7 @@ class MarkdownBodyView extends ConsumerWidget {
           height: 1.6,
           color: AppTheme.textPrimaryColor(context),
         ),
+        blockSpacing: 16,
         h1: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w800,
@@ -124,12 +125,14 @@ class MarkdownBodyView extends ConsumerWidget {
           fontSize: 13,
         ),
         blockquote: TextStyle(
-          color: AppTheme.textMutedColor(context),
-          fontStyle: FontStyle.italic,
+          color: AppTheme.textPrimaryColor(context),
+          fontStyle: FontStyle.normal,
         ),
         blockquoteDecoration: BoxDecoration(
-          border: Border(left: BorderSide(color: AppTheme.accentColor(context), width: 4)),
+          color: AppTheme.accentColor(context).withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
         ),
+        blockquotePadding: const EdgeInsets.all(16),
         listBullet: TextStyle(color: AppTheme.accentColor(context)),
       ),
     );

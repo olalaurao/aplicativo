@@ -65,6 +65,7 @@ import 'ui/screens/inbox_screen.dart';
 import 'ui/screens/social_screen.dart';
 import 'ui/screens/sync_conflicts_screen.dart';
 import 'ui/screens/day_theme_screen.dart';
+import 'ui/screens/week_timeline_screen.dart';
 import 'ui/screens/universal_detail_view.dart';
 import 'ui/screens/organizer_detail_screen.dart';
 import 'ui/screens/overdue_detail_screen.dart';
@@ -825,6 +826,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                     : DateTime.tryParse(rawDate),
               );
             },
+          ),
+          GoRoute(
+            path: '/week',
+            builder: (context, state) => const WeekTimelineScreen(),
           ),
           GoRoute(
             path: '/create/entry',

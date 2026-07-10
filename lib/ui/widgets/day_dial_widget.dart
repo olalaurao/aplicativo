@@ -40,12 +40,13 @@ class _DayDialWidgetState extends State<DayDialWidget> {
   Widget build(BuildContext context) {
     return AspectRatio(
       aspectRatio: 1.0,
-      child: GestureDetector(
-        onTapUp: (details) => _handleTap(details, context),
-        onPanStart: (details) => _handlePanStart(details, context),
-        onPanUpdate: (details) => _handlePanUpdate(details, context),
-        onPanEnd: (details) => _handlePanEnd(details),
-        child: CustomPaint(
+      child: ClipRect(
+        child: GestureDetector(
+          onTapUp: (details) => _handleTap(details, context),
+          onPanStart: (details) => _handlePanStart(details, context),
+          onPanUpdate: (details) => _handlePanUpdate(details, context),
+          onPanEnd: (details) => _handlePanEnd(details),
+          child: CustomPaint(
           painter: _DayDialPainter(
             snapshot: widget.snapshot,
             selectedDate: widget.selectedDate,
@@ -77,6 +78,7 @@ class _DayDialWidgetState extends State<DayDialWidget> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -318,7 +320,8 @@ class _DayDialPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 16;
+    final basePadding = (size.width * 0.045).clamp(10.0, 16.0);
+    final radius = size.width / 2 - basePadding;
     final innerRadius = radius * 0.4;
     final ringWidth = (radius - innerRadius) / 5;
     
@@ -375,7 +378,8 @@ class _DayDialPainter extends CustomPainter {
     }
 
     // Labels
-    final labelRadius = radius + 24;
+    final labelRadius = radius + (size.width * 0.035).clamp(6.0, 14.0);
+    final labelFontSize = (size.width * 0.032).clamp(9.0, 12.0);
     final labelPaint = TextPainter(
       textAlign: TextAlign.center,
       textDirection: ui.TextDirection.ltr,
@@ -388,7 +392,7 @@ class _DayDialPainter extends CustomPainter {
 
       labelPaint.text = TextSpan(
         text: entry.value,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey),
+        style: TextStyle(fontSize: labelFontSize, fontWeight: FontWeight.w600, color: Colors.grey),
       );
       labelPaint.layout();
       labelPaint.paint(canvas, Offset(labelX - labelPaint.width / 2, labelY - labelPaint.height / 2));
