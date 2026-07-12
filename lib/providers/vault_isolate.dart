@@ -55,11 +55,13 @@ class ParsedVaultResult {
   final List<ContentObject> objects;
   final Map<String, Map<String, dynamic>> dailyMap;
   final List<String> needsRewritePaths;
+  final List<Map<String, String>> yamlErrors;
 
   ParsedVaultResult({
     required this.objects,
     required this.dailyMap,
     required this.needsRewritePaths,
+    this.yamlErrors = const [],
   });
 }
 
@@ -77,6 +79,7 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
     Map<String, List<Map<String, dynamic>>> dailyHabitCompletions = {};
     Map<String, List<Map<String, dynamic>>> dailyTrackerRecords = {};
     final needsRewritePaths = <String>[];
+    final yamlErrors = <Map<String, String>>[];
 
     // 1. Fetch markdown files, prioritizing user-configured object folders.
     final scannedPaths = <String>{};
@@ -111,7 +114,18 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
           try {
             final relativePath = service.getRelativePath(file.path);
             final content = await file.readAsString();
-            final frontmatter = MarkdownParser.parseFrontmatter(content);
+            final frontmatter = MarkdownParser.parseFrontmatter(content, filePath: relativePath);
+            
+            // Check for YAML parsing errors
+            if (frontmatter['__yaml_error__'] == true) {
+              yamlErrors.add({
+                'file': relativePath,
+                'error': frontmatter['__yaml_error_message__']?.toString() ?? 'Unknown YAML error',
+              });
+              // Continue processing with empty frontmatter to avoid crashes
+              frontmatter.clear();
+            }
+            
             final body = MarkdownParser.extractBody(content);
 
             final isDaily = _isDailyNoteIsolate(relativePath, frontmatter, params);
@@ -571,6 +585,7 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
       objects: objects,
       dailyMap: dailyMap,
       needsRewritePaths: needsRewritePaths,
+      yamlErrors: yamlErrors,
     );
   });
 }

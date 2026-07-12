@@ -44,6 +44,25 @@ import 'pomodoro_provider.dart';
 import '../services/google_drive_sync_service.dart';
 import 'vault_isolate.dart';
 
+// Provider for YAML parsing errors
+class YamlErrorNotifier extends StateNotifier<List<Map<String, String>>> {
+  YamlErrorNotifier() : super([]);
+
+  void setErrors(List<Map<String, String>> errors) {
+    state = errors;
+  }
+
+  void clearErrors() {
+    state = [];
+  }
+}
+
+final _yamlErrorsProvider = StateNotifierProvider<YamlErrorNotifier, List<Map<String, String>>>((ref) {
+  return YamlErrorNotifier();
+});
+
+final yamlErrorsProvider = _yamlErrorsProvider;
+
 final obsidianServiceProvider = Provider<ObsidianService>((ref) {
   // 1.2 — Only recreate when vaultName or vaultPath change, not on every
   // settings mutation (accent colour, widget prefs, etc.).
@@ -1654,7 +1673,22 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
       ),
     );
 
-    // 3. Write repaired YAML files on the main thread (asynchronously via microtask)
+    // 3. Display user-friendly error messages for YAML parsing errors
+    if (parsedVault.yamlErrors.isNotEmpty) {
+      // Store errors in a provider for UI display
+      ref.read(_yamlErrorsProvider.notifier).setErrors(parsedVault.yamlErrors);
+      
+      for (final error in parsedVault.yamlErrors) {
+        final filePath = error['file'] ?? 'unknown file';
+        final errorMessage = error['error'] ?? 'Unknown error';
+        debugPrint('[YAML Error] File: $filePath, Error: $errorMessage');
+      }
+    } else {
+      // Clear errors if none
+      ref.read(_yamlErrorsProvider.notifier).clearErrors();
+    }
+
+    // 4. Write repaired YAML files on the main thread (asynchronously via microtask)
     for (final relativePath in parsedVault.needsRewritePaths) {
       final obj = parsedVault.objects.firstWhere(
         (o) => o.obsidianPath == relativePath,

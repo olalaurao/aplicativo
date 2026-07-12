@@ -148,7 +148,7 @@ class MarkdownParser {
     return result;
   }
 
-  static Map<String, dynamic> parseFrontmatter(String content) {
+  static Map<String, dynamic> parseFrontmatter(String content, {String? filePath}) {
     if (!content.startsWith('---')) return {};
     final endIdx = content.indexOf('---', 3);
     if (endIdx == -1) return {};
@@ -200,6 +200,12 @@ class MarkdownParser {
         }
       }
       debugPrint('Error parsing YAML: $e');
+      // Return error information for UI display
+      return {
+        '__yaml_error__': true,
+        '__yaml_error_message__': e.toString(),
+        '__yaml_error_file__': filePath ?? 'unknown',
+      };
     }
     return {};
   }
@@ -239,12 +245,43 @@ class MarkdownParser {
   static String _repairSpecialCharactersInYaml(String yamlStr) {
     // Repair values that start with @ or contain special characters that break YAML parsing
     String quoteProblematicValues(String input) {
-      return input.replaceAllMapped(RegExp(r'^(\w+):\s*(@\S+)$', multiLine: true), (match) {
+      // First handle @ symbols at start of values
+      var result = input.replaceAllMapped(RegExp(r'^(\w+):\s*(@\S+)$', multiLine: true), (match) {
         final key = match.group(1)!;
         final value = match.group(2)!;
         final escaped = value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
         return '$key: "$escaped"';
       });
+
+      // Then handle long text values that contain special characters (colons, dashes, etc.)
+      // This fixes issues with caption, transcription, and other long text fields
+      result = result.replaceAllMapped(RegExp(r'^(\w+):\s*(.+)$', multiLine: true), (match) {
+        final key = match.group(1)!;
+        final value = match.group(2)!.trim();
+        
+        // Skip if already quoted
+        if ((value.startsWith('"') && value.endsWith('"')) || 
+            (value.startsWith("'") && value.endsWith("'"))) {
+          return match.group(0)!;
+        }
+        
+        // Skip if it's a boolean, number, or simple value
+        if (value == 'true' || value == 'false' || value == 'null' ||
+            num.tryParse(value) != null ||
+            RegExp(r'^[\w-]+$').hasMatch(value)) {
+          return match.group(0)!;
+        }
+        
+        // Quote values that contain special characters or are long text
+        if (value.contains(':') && !value.startsWith('http')) {
+          final escaped = value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+          return '$key: "$escaped"';
+        }
+        
+        return match.group(0)!;
+      });
+
+      return result;
     }
 
     var repaired = quoteProblematicValues(yamlStr);
@@ -252,8 +289,9 @@ class MarkdownParser {
   }
 
   static Future<Map<String, dynamic>> asyncParseFrontmatter(
-    String content,
-  ) async {
+    String content, {
+    String? filePath,
+  }) async {
     return compute(parseFrontmatter, content);
   }
 

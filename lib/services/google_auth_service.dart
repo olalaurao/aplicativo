@@ -41,7 +41,11 @@ class GoogleAuthService {
     _authClient = null;
     _authClientExpiresAt = null;
 
-    _currentUser = await _googleSignIn.signInSilently();
+    // When forceRefresh is true, use signIn() to get fresh tokens
+    // signInSilently() may return cached expired tokens
+    _currentUser = forceRefresh
+        ? await _googleSignIn.signIn()
+        : await _googleSignIn.signInSilently();
     if (_currentUser == null) return null;
     final headers = await _currentUser!.authHeaders;
     _authClientExpiresAt = DateTime.now().toUtc().add(

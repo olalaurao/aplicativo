@@ -768,6 +768,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                   borderRadius: 10,
                 ),
                 child: Container(
+                  clipBehavior: Clip.hardEdge,
                   decoration: BoxDecoration(
                     color: baseColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
@@ -790,6 +791,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
                                     task.title,
@@ -889,6 +891,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
           },
           borderRadius: BorderRadius.circular(10),
           child: Container(
+            clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
               color: baseColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
@@ -906,6 +909,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                     mainAxisAlignment: (isShort || isTiny)
                         ? MainAxisAlignment.center
                         : MainAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -1174,6 +1178,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
           },
           borderRadius: BorderRadius.circular(10),
           child: Container(
+            clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
               color: baseColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
@@ -1204,6 +1209,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           habit.displayTitle,

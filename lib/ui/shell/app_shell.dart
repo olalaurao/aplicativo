@@ -33,6 +33,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   double _commandCenterOverscroll = 0;
   bool _commandCenterOpenedThisScroll = false;
   DateTime? _lastBackPressTime;
+  bool _hasShownYamlErrorDialog = false;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +41,15 @@ class _AppShellState extends ConsumerState<AppShell> {
     final navItems = navItemsAsync.valueOrNull ?? [];
     final bottomBarItems = navItems.where((item) => item.inBottomBar).toList();
     ref.watch(widgetSyncProvider);
+    
+    // Watch for YAML parsing errors and show dialog
+    final yamlErrors = ref.watch(yamlErrorsProvider);
+    if (yamlErrors.isNotEmpty && _hasShownYamlErrorDialog != true) {
+      _hasShownYamlErrorDialog = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showYamlErrorDialog(context, yamlErrors);
+      });
+    }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -781,6 +791,73 @@ class _AppShellState extends ConsumerState<AppShell> {
         color = AppColors.textMuted;
     }
     return Icon(icon, color: color, size: 20);
+  }
+
+  void _showYamlErrorDialog(BuildContext context, List<Map<String, String>> errors) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'YAML Parsing Error',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'One or more files have YAML syntax errors. Please fix them in Obsidian:',
+                  style: TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 16),
+                ...errors.map((error) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '📁 File: ${error['file']}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '❌ ${error['error']}',
+                        style: const TextStyle(fontSize: 11, color: Colors.red),
+                      ),
+                    ],
+                  ),
+                )),
+                const SizedBox(height: 8),
+                const Text(
+                  'The app will continue loading, but these files will be skipped.',
+                  style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _hasShownYamlErrorDialog = false;
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _onItemTapped(

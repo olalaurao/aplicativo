@@ -1262,12 +1262,29 @@ Exemplo real encontrado neste projeto:
 - `themeProvider` é a camada responsável por transformar preferências em `ThemeData`.
 - A tela `appearance_screen.dart` deve ser tratada como a interface principal para troca de tema e modo claro/escuro.
 
-### Property grid
+### Property grid (Padrão para todas as propriedades)
 
-- Resumos de propriedades em telas de detalhe devem usar `ui/widgets/property_grid.dart`.
-- Prefira células curtas, com título, valor e ação opcional, em vez de listas longas de `ListTile` com divisórias.
+- **Mandatório**: Resumos de propriedades em TODAS as telas de detalhe devem usar `ui/widgets/property_grid.dart`, seguindo o padrão implementado nas Notas.
+- **Layout**: O grid de propriedades (`PropertyGrid`) deve usar sempre 2 colunas, em cards individuais.
+- **Interação (Pop-ups)**: Ao clicar no card de uma propriedade, o app deve exibir um pop-up de edição (AlertDialog) com os botões "Salvar" e "Descartar", em vez de controles em linha (como Switch). Utilize os métodos `_showStringPropertyPicker`, `_showBoolPropertyPicker` e `_showEnumPropertyPicker` existentes em `universal_detail_view.dart`.
+- **Visibilidade Inicial**: A seção que envolve o grid de propriedades (`_CollapsiblePropertiesSection`) deve sempre iniciar fechada (`_isExpanded = false`).
 
 ### Diagnósticos
 
 - Use a chave persistida `vaultPath` ao sincronizar o destino dos crash reports.
 - A exportação agregada da tela de diagnósticos deve continuar simples e rápida, priorizando cópia consolidada para área de transferência.
+
+---
+
+## Complementos do gap-analysis.md atual (Week Timeline & Notes)
+
+### Week Timeline
+- Uma tela full-screen "Week Timeline" (`lib/ui/screens/week_timeline_screen.dart`), acessada ao tocar no header do componente "This Week" no dashboard.
+- Reutiliza `TodayAggregatorService` e `todayItemsProvider` por dia. Não introduz nova lógica de agregação ou modelo de dados.
+- Scroll: infinito para o futuro (carrega automaticamente os próximos dias), e manual para o passado (controle explícito "Mostrar dias anteriores").
+- O layout do `WeekOverviewComponent` (7 colunas no dashboard) permanece igual e serve como ponto de entrada para o Week Timeline.
+
+### Note page redesign
+- As Notas possuem um layout de "página de leitura" dedicado, diferente do card genérico dos outros objetos. Inclui: imagem de capa opcional, título grande, corpo sem borda (`borderless body`) e blocos de callout coloridos (`tinted callout blocks`).
+- Novo campo opcional em `Note`: `coverImagePath` (chave frontmatter: `cover_image_path`).
+- As propriedades de todos os objetos estão sendo migradas para usar o `PropertyGrid` com o novo comportamento de pop-up ao clicar (botões salvar/descartar) e toggle fechado por padrão.

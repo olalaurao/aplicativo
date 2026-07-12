@@ -169,7 +169,7 @@ Future<void> _handleWidgetToggleUri(
           .whereType<shopping_list_model.ShoppingList>()
           .where((list) => !list.archived)
           .toList();
-      
+
       shopping_list_model.ShoppingList targetList;
       if (shoppingLists.isEmpty) {
         // Create default shopping list
@@ -185,7 +185,7 @@ Future<void> _handleWidgetToggleUri(
       } else {
         targetList = shoppingLists.first;
       }
-      
+
       // Add item to list
       final newItem = shopping_list_model.ShoppingItem(
         id: const Uuid().v4(),
@@ -407,7 +407,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
   Future<void> _checkPendingSharedTextFromNative() async {
     if (!Platform.isAndroid) return;
     try {
-      const channel = MethodChannel('com.productivity.quartzo/settings');
+      const channel = MethodChannel('com.productivity.Quartzo/settings');
       final text = await channel.invokeMethod<String>('getAndClearSharedText');
       if (text == null || text.trim().isEmpty) return;
       if (text == _lastProcessedSharedText) {
@@ -427,7 +427,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
   Future<void> _checkPendingWidgetUriFromNative() async {
     if (!Platform.isAndroid) return;
     try {
-      const channel = MethodChannel('com.productivity.quartzo/settings');
+      const channel = MethodChannel('com.productivity.Quartzo/settings');
       final rawUri = await channel.invokeMethod<String>(
         'getAndClearPendingWidgetUri',
       );
@@ -581,9 +581,7 @@ Future<void> _initApp(ProviderContainer container) async {
         .then((objects) async {
           debugPrint('[Startup] Vault loaded: ${objects.length} objects.');
           Future.delayed(const Duration(seconds: 3), () {
-            container
-                .read(peopleProvider.notifier)
-                .checkPersonContactsNow();
+            container.read(peopleProvider.notifier).checkPersonContactsNow();
           });
         })
         .catchError((Object e, StackTrace st) {
@@ -604,11 +602,17 @@ Future<void> _initApp(ProviderContainer container) async {
   }
 
   // Register foreground task callback (sync only)
-  FlutterForegroundTask.addTaskDataCallback((data) {
-    if (data is Map && data['action'] == 'sync_tick') {
-      container.read(syncManagerProvider).performSync();
+  if (Platform.isAndroid || Platform.isIOS) {
+    try {
+      FlutterForegroundTask.addTaskDataCallback((data) {
+        if (data is Map && data['action'] == 'sync_tick') {
+          container.read(syncManagerProvider).performSync();
+        }
+      });
+    } catch (e) {
+      debugPrint('Startup init failed: foreground_task_callback: $e');
     }
-  });
+  }
 
   // Start Drive/vault sync before non-critical startup work. Otherwise a slow
   // permission prompt or notification task can delay the initial pull and the
@@ -708,43 +712,47 @@ Future<void> _initApp(ProviderContainer container) async {
     }
 
     // Quick Actions shortcuts
-    try {
-      const QuickActions quickActions = QuickActions();
-      quickActions.initialize((shortcutType) {
-        if (shortcutType == 'new_entry') {
-          _rootNavigatorKey.currentState?.pushNamed('/?action=new_entry');
-        } else if (shortcutType == 'new_task') {
-          _rootNavigatorKey.currentState?.pushNamed('/?action=new_task');
-        } else if (shortcutType == 'new_habit') {
-          _rootNavigatorKey.currentState?.pushNamed('/?action=new_habit');
-        }
-      });
-      quickActions.setShortcutItems(<ShortcutItem>[
-        const ShortcutItem(
-          type: 'new_entry',
-          localizedTitle: 'New Journal',
-          icon: 'action_entry',
-        ),
-        const ShortcutItem(
-          type: 'new_task',
-          localizedTitle: 'New Task',
-          icon: 'action_task',
-        ),
-        const ShortcutItem(
-          type: 'new_habit',
-          localizedTitle: 'New Habit',
-          icon: 'action_habit',
-        ),
-      ]);
-    } catch (e) {
-      debugPrint('Startup init failed: quick_actions_init: $e');
+    if (Platform.isAndroid || Platform.isIOS) {
+      try {
+        const QuickActions quickActions = QuickActions();
+        quickActions.initialize((shortcutType) {
+          if (shortcutType == 'new_entry') {
+            _rootNavigatorKey.currentState?.pushNamed('/?action=new_entry');
+          } else if (shortcutType == 'new_task') {
+            _rootNavigatorKey.currentState?.pushNamed('/?action=new_task');
+          } else if (shortcutType == 'new_habit') {
+            _rootNavigatorKey.currentState?.pushNamed('/?action=new_habit');
+          }
+        });
+        quickActions.setShortcutItems(<ShortcutItem>[
+          const ShortcutItem(
+            type: 'new_entry',
+            localizedTitle: 'New Journal',
+            icon: 'action_entry',
+          ),
+          const ShortcutItem(
+            type: 'new_task',
+            localizedTitle: 'New Task',
+            icon: 'action_task',
+          ),
+          const ShortcutItem(
+            type: 'new_habit',
+            localizedTitle: 'New Habit',
+            icon: 'action_habit',
+          ),
+        ]);
+      } catch (e) {
+        debugPrint('Startup init failed: quick_actions_init: $e');
+      }
     }
 
     // Pomodoro background service
-    try {
-      PomodoroBackgroundService.init();
-    } catch (e) {
-      debugPrint('Startup init failed: pomodoro_bg_init: $e');
+    if (Platform.isAndroid || Platform.isIOS) {
+      try {
+        PomodoroBackgroundService.init();
+      } catch (e) {
+        debugPrint('Startup init failed: pomodoro_bg_init: $e');
+      }
     }
   });
 }
@@ -1004,8 +1012,6 @@ class MyApp extends ConsumerWidget {
   }
 }
 
-
-
 class _ObjectDetailResolver extends ConsumerWidget {
   final String id;
   final String? searchQuery;
@@ -1056,4 +1062,3 @@ class _OrganizerDetailResolver extends ConsumerWidget {
     return OrganizerDetailScreen(organizer: organizer);
   }
 }
-

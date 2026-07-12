@@ -4,8 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../providers/today_provider.dart';
 import '../../providers/pomodoro_provider.dart';
-import '../../providers/tasks_provider.dart';
-import '../../providers/habits_provider.dart';
+import '../../providers/vault_provider.dart';
 import '../../models/task_model.dart';
 import '../../models/habit_model.dart';
 import '../../services/today_aggregator_service.dart';
@@ -73,9 +72,21 @@ class _WeekTimelineScreenState extends ConsumerState<WeekTimelineScreen> {
   void _loadPreviousDays() {
     final firstDate = _loadedDates.first;
     final newDates = List.generate(7, (i) => firstDate.subtract(Duration(days: 7 - i)));
+    
+    // Preserve current scroll position to prevent visual jump
+    final currentScrollOffset = _scrollController.offset;
+    
     setState(() {
       _loadedDates.insertAll(0, newDates);
       _previousDaysLoaded += 7;
+    });
+
+    // Adjust scroll position to account for new items added at top
+    // Approximate height per day section (header + items)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final estimatedHeightPerDay = 200.0; // Approximate height
+      final totalNewHeight = newDates.length * estimatedHeightPerDay;
+      _scrollController.jumpTo(currentScrollOffset + totalNewHeight);
     });
   }
 
@@ -380,7 +391,7 @@ class _WeekTimelineScreenState extends ConsumerState<WeekTimelineScreen> {
       final newStage = task.stage == TaskStage.finalized 
           ? TaskStage.todo 
           : TaskStage.finalized;
-      ref.read(tasksProvider.notifier).updateTask(task.copyWith(stage: newStage));
+      ref.read(vaultProvider.notifier).updateObject(task.copyWith(stage: newStage));
     } else if (item.kind == TodayItemKind.habitSlot && item.source is Habit) {
       final habit = item.source as Habit;
       final date = DateTime(item.timestamp.year, item.timestamp.month, item.timestamp.day);

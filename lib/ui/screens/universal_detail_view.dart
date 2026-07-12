@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/reminder_config.dart';
 import '../../services/notification_service.dart';
 import '../widgets/reminder_config_sheet.dart';
+import '../widgets/wiki_link_picker.dart';
 import 'package:flutter/services.dart';
 import '../../providers/history_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,7 +37,6 @@ import '../widgets/tracker_metric_card.dart';
 import '../widgets/rich_text_editor.dart';
 import '../widgets/outline_editor.dart';
 import '../widgets/property_grid.dart';
-import '../widgets/universal_search_picker.dart';
 import '../widgets/collection_view.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../../models/note_model.dart';
@@ -46,10 +46,8 @@ import '../../models/template_model.dart';
 import '../widgets/wiki_text_view.dart';
 import '../widgets/journal_body_view.dart';
 import '../widgets/markdown_body_view.dart';
+import '../widgets/universal_search_picker.dart';
 import '../widgets/conflict_badge.dart';
-import '../widgets/note_page_style_sheet.dart';
-import 'dart:io';
-import 'dart:convert';
 import '../../providers/settings_provider.dart';
 import '../forms/create_task_form.dart';
 import '../forms/create_habit_form.dart';
@@ -682,11 +680,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       ],
       'habit': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
       'note': [
+        'page_style',
         'search_in_page',
         'table_of_contents',
-        'page_style',
         'convert_to_checklist',
         'edit',
+        'move_to',
         'change_type',
         'merge_note',
         'save_template',
@@ -717,39 +716,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       },
       itemBuilder: (ctx) => actions.map((action) {
         switch (action) {
-          case 'search_in_page':
-            return const PopupMenuItem(
-              value: 'search_in_page',
-              child: Row(
-                children: [
-                  Icon(Icons.search_rounded, size: 18),
-                  SizedBox(width: 12),
-                  Text('Search in Page'),
-                ],
-              ),
-            );
-          case 'table_of_contents':
-            return const PopupMenuItem(
-              value: 'table_of_contents',
-              child: Row(
-                children: [
-                  Icon(Icons.list_outlined, size: 18),
-                  SizedBox(width: 12),
-                  Text('Table of Contents'),
-                ],
-              ),
-            );
-          case 'page_style':
-            return const PopupMenuItem(
-              value: 'page_style',
-              child: Row(
-                children: [
-                  Icon(Icons.style_rounded, size: 18),
-                  SizedBox(width: 12),
-                  Text('Page Style'),
-                ],
-              ),
-            );
           case 'edit':
             return const PopupMenuItem(
               value: 'edit',
@@ -857,6 +823,50 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 ],
               ),
             );
+          case 'search_in_page':
+            return const PopupMenuItem(
+              value: 'search_in_page',
+              child: Row(
+                children: [
+                  Icon(Icons.search_rounded, size: 18),
+                  SizedBox(width: 12),
+                  Text('Search in Page'),
+                ],
+              ),
+            );
+          case 'table_of_contents':
+            return const PopupMenuItem(
+              value: 'table_of_contents',
+              child: Row(
+                children: [
+                  Icon(Icons.list_outlined, size: 18),
+                  SizedBox(width: 12),
+                  Text('Table of Contents'),
+                ],
+              ),
+            );
+          case 'page_style':
+            return const PopupMenuItem(
+              value: 'page_style',
+              child: Row(
+                children: [
+                  Icon(Icons.style_rounded, size: 18),
+                  SizedBox(width: 12),
+                  Text('Page Style'),
+                ],
+              ),
+            );
+          case 'move_to':
+            return const PopupMenuItem(
+              value: 'move_to',
+              child: Row(
+                children: [
+                  Icon(Icons.drive_file_move_outline, size: 18),
+                  SizedBox(width: 12),
+                  Text('Mover para...'),
+                ],
+              ),
+            );
           case 'focus':
             return const PopupMenuItem(
               value: 'focus',
@@ -884,382 +894,426 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   ) {
     if (object is Resource) return [];
 
-    final cards = <Widget>[];
+    final cards = <PropertyCard>[];
 
     if (object is Task) {
       final task = object as Task;
-      cards.add(
-        _buildPropertiesCard(
+      cards.add(PropertyCard(
+        icon: Icons.calendar_today_outlined,
+        label: 'Criado',
+        value: DateFormat('d MMM yyyy').format(task.createdAt),
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.event,
+        label: 'Prazo',
+        value: task.endDate != null ? DateFormat('d MMM yyyy').format(task.endDate!) : 'Não definida',
+        state: task.endDate == null ? PropertyCardState.empty : (_isOverdue(task) ? PropertyCardState.overdue : PropertyCardState.normal),
+        onTap: () => _showTaskDueDatePicker(context, ref, task),
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.play_circle_outline,
+        label: 'Início',
+        value: task.startDate != null ? DateFormat('d MMM yyyy').format(task.startDate!) : 'Não definida',
+        state: task.startDate == null ? PropertyCardState.empty : PropertyCardState.normal,
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.priority_high,
+        label: 'Prioridade',
+        value: '',
+        customChild: _buildPriorityBadge(task),
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.linear_scale,
+        label: 'Stage',
+        value: _getStatusLabel(task),
+        onTap: () => _showEnumPropertyPicker<TaskStage>(
           context: context,
-          title: 'Datas',
-          icon: Icons.calendar_today_outlined,
-          rows: [
-            _PropRow(
-              label: 'Criado',
-              value: DateFormat('d MMM yyyy').format(task.createdAt),
-            ),
-            _PropRow(
-              label: 'Prazo',
-              value: task.endDate != null
-                  ? DateFormat('d MMM yyyy').format(task.endDate!)
-                  : 'Não definida',
-              isEmpty: task.endDate == null,
-              isOverdue: _isOverdue(task),
-              onTap: () => _showTaskDueDatePicker(context, ref, task),
-            ),
-            _PropRow(
-              label: 'Início',
-              value: task.startDate != null
-                  ? DateFormat('d MMM yyyy').format(task.startDate!)
-                  : 'Não definida',
-              isEmpty: task.startDate == null,
-            ),
-          ],
+          title: 'Status',
+          values: TaskStage.values,
+          initialValue: task.stage,
+          labelBuilder: (s) => s.name.toUpperCase(),
+          onSave: (val) {
+            final updated = task.copyWith(stage: val);
+            ref.read(vaultProvider.notifier).updateObject(updated);
+          },
         ),
-      );
-      cards.add(
-        _buildPropertiesCard(
-          context: context,
-          title: 'Configuração',
-          icon: Icons.tune_rounded,
-          rows: [
-            _PropRow(
-              label: 'Prioridade',
-              value: '',
-              trailing: _buildPriorityBadge(task),
-            ),
-            _PropRow(
-              label: 'Stage',
-              value: _getStatusLabel(task),
-              onTap: () => _onPropertyTap(context, ref, 'Status', _getStatus(task)),
-            ),
-            _PropRow(
-              label: 'Tempo estimado',
-              value: task.estimatedMinutes != null
-                  ? '${task.estimatedMinutes} min'
-                  : 'Não definido',
-              isEmpty: task.estimatedMinutes == null,
-            ),
-            _PropRow(
-              label: 'Tempo real',
-              value: task.actualMinutes > 0
-                  ? '${task.actualMinutes} min'
-                  : 'Não definido',
-              isEmpty: task.actualMinutes == 0,
-            ),
-            _PropRow(
-              label: 'Pomodoros',
-              value: task.pomodoroCount != null && task.pomodoroCount! > 0
-                  ? '${task.pomodoroCount}'
-                  : 'Não definido',
-              isEmpty: task.pomodoroCount == null || task.pomodoroCount == 0,
-            ),
-            ..._buildLinkedGoogleEventPropRows(context, task),
-          ],
-        ),
-      );
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.hourglass_empty,
+        label: 'Tempo estimado',
+        value: task.estimatedMinutes != null ? '${task.estimatedMinutes} min' : 'Não definido',
+        state: task.estimatedMinutes == null ? PropertyCardState.empty : PropertyCardState.normal,
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.hourglass_full,
+        label: 'Tempo real',
+        value: task.actualMinutes > 0 ? '${task.actualMinutes} min' : 'Não definido',
+        state: task.actualMinutes == 0 ? PropertyCardState.empty : PropertyCardState.normal,
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.timer,
+        label: 'Pomodoros',
+        value: task.pomodoroCount != null && task.pomodoroCount! > 0 ? '${task.pomodoroCount}' : 'Não definido',
+        state: task.pomodoroCount == null || task.pomodoroCount == 0 ? PropertyCardState.empty : PropertyCardState.normal,
+      ));
+      cards.addAll(_buildLinkedGoogleEventPropertyCards(context, task));
     } else if (object is Habit) {
       final habit = object as Habit;
       if (!habit.isChecklistHabit) {
-        cards.add(
-          _buildPropertiesCard(
-            context: context,
-            title: 'Config',
-            icon: Icons.tune_rounded,
-            rows: [
-              _PropRow(
-                label: 'Frequência',
-                value: habit.scheduler?.rules.isNotEmpty == true
-                    ? habit.scheduler!.rules.first.repeatType.name
-                    : 'Não definida',
-                isEmpty: habit.scheduler == null || habit.scheduler!.rules.isEmpty,
-              ),
-              _PropRow(label: 'Streak', value: '${habit.streak} 🔥'),
-              _PropRow(
-                label: 'Último registro',
-                value: habit.daysSinceLastCompletion == 0
-                    ? 'Hoje'
-                    : '${habit.daysSinceLastCompletion} dias atrás',
-                isEmpty: habit.completionHistory.isEmpty,
-              ),
-              _PropRow(
-                label: 'Categoria',
-                value: habit.categories.isNotEmpty
-                    ? habit.categories.first
-                    : 'Não definida',
-                isEmpty: habit.categories.isEmpty,
-              ),
-            ],
-          ),
-        );
+        cards.add(PropertyCard(
+          icon: Icons.repeat,
+          label: 'Frequência',
+          value: habit.scheduler?.rules.isNotEmpty == true ? habit.scheduler!.rules.first.repeatType.name : 'Não definida',
+          state: habit.scheduler == null || habit.scheduler!.rules.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
+        ));
+        cards.add(PropertyCard(
+          icon: Icons.local_fire_department,
+          label: 'Streak',
+          value: '${habit.streak} 🔥',
+          state: habit.streak > 0 ? PropertyCardState.streakActive : PropertyCardState.normal,
+        ));
+        cards.add(PropertyCard(
+          icon: Icons.history,
+          label: 'Último registro',
+          value: habit.daysSinceLastCompletion == 0 ? 'Hoje' : '${habit.daysSinceLastCompletion} dias atrás',
+          state: habit.completionHistory.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
+        ));
+        cards.add(PropertyCard(
+          icon: Icons.category,
+          label: 'Categoria',
+          value: habit.categories.isNotEmpty ? habit.categories.first : 'Não definida',
+          state: habit.categories.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
+        ));
       }
     } else if (object is Project) {
       final project = object as Project;
       final tasks = ref.watch(tasksProvider);
       final progress = KPIEngine.calculateProjectProgress(project, tasks);
-      final linkedTasks = tasks
-          .where((t) => project.taskLinks.contains(t.slug) || project.taskLinks.contains(t.id))
-          .toList();
+      final linkedTasks = tasks.where((t) => project.taskLinks.contains(t.slug) || project.taskLinks.contains(t.id)).toList();
       final doneCount = linkedTasks.where((t) => t.isCompleted).length;
 
       if (project.hasRotation) {
-        cards.add(
-          _buildPropertiesCard(
-            context: context,
-            title: 'Progresso',
-            icon: Icons.trending_up_rounded,
-            rows: [
-              _PropRow(
-                label: 'Concluído',
-                value: '${(progress * 100).toInt()}%',
-              ),
-              _PropRow(
-                label: 'Tarefas',
-                value: '$doneCount de ${linkedTasks.length}',
-              ),
-            ],
-          ),
-        );
+        cards.add(PropertyCard(
+          icon: Icons.trending_up_rounded,
+          label: 'Concluído',
+          value: '${(progress * 100).toInt()}%',
+        ));
+        cards.add(PropertyCard(
+          icon: Icons.task_alt,
+          label: 'Tarefas',
+          value: '$doneCount de ${linkedTasks.length}',
+        ));
       }
-      cards.add(
-        _buildPropertiesCard(
-          context: context,
-          title: 'Datas',
-          icon: Icons.calendar_today_outlined,
-          rows: [
-            _PropRow(
-              label: 'Início',
-              value: project.startDate != null
-                  ? DateFormat('d MMM yyyy').format(project.startDate!)
-                  : 'Não definida',
-              isEmpty: project.startDate == null,
-            ),
-            _PropRow(
-              label: 'Término',
-              value: project.endDate != null
-                  ? DateFormat('d MMM yyyy').format(project.endDate!)
-                  : 'Não definida',
-              isEmpty: project.endDate == null,
-              isOverdue: _isOverdue(project),
-            ),
-          ],
-        ),
-      );
-      cards.add(
-        _buildPropertiesCard(
-          context: context,
-          title: 'Config',
-          icon: Icons.tune_rounded,
-          rows: [
-            if (_hasPriority(project))
-              _PropRow(
-                label: 'Prioridade',
-                value: '',
-                trailing: _buildPriorityBadge(project),
-              ),
-            _PropRow(
-              label: 'Estado',
-              value: _getStatusLabel(project),
-              onTap: () =>
-                  _onPropertyTap(context, ref, 'Status', _getStatus(project)),
-            ),
-            ..._buildLinkedGoogleEventPropRows(context, project),
-          ],
-        ),
-      );
+      cards.add(PropertyCard(
+        icon: Icons.calendar_today,
+        label: 'Início',
+        value: project.startDate != null ? DateFormat('d MMM yyyy').format(project.startDate!) : 'Não definida',
+        state: project.startDate == null ? PropertyCardState.empty : PropertyCardState.normal,
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.event,
+        label: 'Término',
+        value: project.endDate != null ? DateFormat('d MMM yyyy').format(project.endDate!) : 'Não definida',
+        state: project.endDate == null ? PropertyCardState.empty : (_isOverdue(project) ? PropertyCardState.overdue : PropertyCardState.normal),
+      ));
+      if (_hasPriority(project)) {
+        cards.add(PropertyCard(
+          icon: Icons.priority_high,
+          label: 'Prioridade',
+          value: '',
+          customChild: _buildPriorityBadge(project),
+        ));
+      }
+      cards.add(PropertyCard(
+        icon: Icons.linear_scale,
+        label: 'Estado',
+        value: _getStatusLabel(project),
+        onTap: () => _onPropertyTap(context, ref, 'Status', _getStatus(project)),
+      ));
+      cards.addAll(_buildLinkedGoogleEventPropertyCards(context, project));
     } else if (object is Goal) {
       final goal = object as Goal;
-      cards.add(
-        _buildPropertiesCard(
+      cards.add(PropertyCard(
+        icon: Icons.calendar_today,
+        label: 'Início',
+        value: goal.startDate != null ? DateFormat('d MMM yyyy').format(goal.startDate!) : 'Não definida',
+        state: goal.startDate == null ? PropertyCardState.empty : PropertyCardState.normal,
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.event,
+        label: 'Prazo',
+        value: goal.deadline != null ? DateFormat('d MMM yyyy').format(goal.deadline!) : 'Não definida',
+        state: goal.deadline == null ? PropertyCardState.empty : (_isOverdue(goal) ? PropertyCardState.overdue : PropertyCardState.normal),
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.repeat,
+        label: 'Tipo',
+        value: goal.goalType == GoalType.repeating ? 'Recorrente' : 'Pontual',
+        onTap: () => _showEnumPropertyPicker<GoalType>(
           context: context,
-          title: 'Datas',
-          icon: Icons.calendar_today_outlined,
-          rows: [
-            _PropRow(
-              label: 'Início',
-              value: goal.startDate != null
-                  ? DateFormat('d MMM yyyy').format(goal.startDate!)
-                  : 'Não definida',
-              isEmpty: goal.startDate == null,
-            ),
-            _PropRow(
-              label: 'Prazo',
-              value: goal.deadline != null
-                  ? DateFormat('d MMM yyyy').format(goal.deadline!)
-                  : 'Não definida',
-              isEmpty: goal.deadline == null,
-              isOverdue: _isOverdue(goal),
-            ),
-            _PropRow(
-              label: 'Tipo',
-              value: goal.goalType == GoalType.repeating ? 'Recorrente' : 'Pontual',
-            ),
-            _PropRow(
-              label: 'Intervalo',
-              value: goal.repeatInterval ?? 'Não definido',
-              isEmpty: goal.repeatInterval == null,
-            ),
-          ],
+          title: 'Tipo',
+          values: GoalType.values,
+          initialValue: goal.goalType,
+          labelBuilder: (s) => s.name,
+          onSave: (val) {
+            final updated = goal.copyWith(goalType: val);
+            ref.read(vaultProvider.notifier).updateObject(updated);
+          },
         ),
-      );
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.timelapse,
+        label: 'Intervalo',
+        value: goal.repeatInterval ?? 'Não definido',
+        state: goal.repeatInterval == null ? PropertyCardState.empty : PropertyCardState.normal,
+      ));
     } else if (object is IdeaDefinition) {
       final idea = object as IdeaDefinition;
-      cards.add(
-        _buildPropertiesCard(
-          context: context,
-          title: 'Config',
-          icon: Icons.tune_rounded,
-          rows: [
-            _PropRow(
-              label: 'Horizonte',
-              value: '',
-              trailing: _buildHorizonBadge(idea),
-            ),
-            _PropRow(
-              label: 'Prioridade',
-              value: '',
-              trailing: idea.priority != null && idea.priority != TaskPriority.none
-                  ? _buildPriorityBadge(idea)
-                  : Text(
-                      'Não definida',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        fontStyle: FontStyle.italic,
-                        color: AppColors.textMuted.withValues(alpha: 0.4),
-                      ),
-                    ),
-            ),
-            _PropRow(
-              label: 'Convertida em',
-              value: idea.convertedToType ?? 'Não convertida',
-              isEmpty: idea.convertedToType == null,
-            ),
-          ],
-        ),
-      );
-      cards.add(
-        _buildPropertiesCard(
-          context: context,
-          title: 'Datas',
-          icon: Icons.calendar_today_outlined,
-          rows: [
-            _PropRow(
-              label: 'Data alvo',
-              value: idea.targetDate != null
-                  ? DateFormat('d MMM yyyy').format(idea.targetDate!)
-                  : 'Não definida',
-              isEmpty: idea.targetDate == null,
-              isOverdue: _isOverdue(idea),
-            ),
-            _PropRow(
-              label: 'Criado',
-              value: DateFormat('d MMM yyyy').format(idea.createdAt),
-            ),
-          ],
-        ),
-      );
+      cards.add(PropertyCard(
+        icon: Icons.visibility,
+        label: 'Horizonte',
+        value: '',
+        customChild: _buildHorizonBadge(idea),
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.priority_high,
+        label: 'Prioridade',
+        value: '',
+        customChild: idea.priority != null && idea.priority != TaskPriority.none
+            ? _buildPriorityBadge(idea)
+            : Text('Não definida', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, fontStyle: FontStyle.italic, color: AppColors.textMuted.withValues(alpha: 0.4))),
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.transform,
+        label: 'Convertida em',
+        value: idea.convertedToType ?? 'Não convertida',
+        state: idea.convertedToType == null ? PropertyCardState.empty : PropertyCardState.normal,
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.event,
+        label: 'Data alvo',
+        value: idea.targetDate != null ? DateFormat('d MMM yyyy').format(idea.targetDate!) : 'Não definida',
+        state: idea.targetDate == null ? PropertyCardState.empty : (_isOverdue(idea) ? PropertyCardState.overdue : PropertyCardState.normal),
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.calendar_today,
+        label: 'Criado',
+        value: DateFormat('d MMM yyyy').format(idea.createdAt),
+      ));
     } else if (object is Note) {
       final note = object as Note;
       final allNotes = ref.watch(notesProvider);
-      
-      cards.add(
+      return [
         _buildNotePropertiesGrid(context, note, allNotes),
-      );
+      ];
     } else if (object is Person) {
       final person = object as Person;
-      cards.add(
-        _buildPropertiesCard(
-          context: context,
-          title: 'Dados',
-          icon: Icons.person_outline_rounded,
-          rows: [
-            _PropRow(
-              label: 'Prioridade',
-              value: '',
-              trailing: _buildContactPriorityBadge(person),
-            ),
-            _PropRow(
-              label: 'Frequência',
-              value: person.contactFrequency != null
-                  ? 'A cada ${person.contactFrequency!.inDays} dias'
-                  : 'Não definida',
-              isEmpty: person.contactFrequency == null,
-              onTap: person.contactFrequency != null
-                  ? () => _showFrequencyPicker(context, ref, person)
-                  : null,
-            ),
-            _PropRow(
-              label: 'Próximo contato',
-              value: () {
-                if (person.lastContactDate == null ||
-                    person.contactFrequency == null) {
-                  return 'Não definido';
-                }
-                final next = person.lastContactDate!.add(person.contactFrequency!);
-                return DateFormat('d MMM yyyy').format(next);
-              }(),
-              isEmpty:
-                  person.lastContactDate == null || person.contactFrequency == null,
-            ),
-          ],
-        ),
-      );
-      cards.add(_buildDefaultDatesCard(context));
+      cards.add(PropertyCard(
+        icon: Icons.priority_high,
+        label: 'Prioridade',
+        value: '',
+        customChild: _buildContactPriorityBadge(person),
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.repeat,
+        label: 'Frequência',
+        value: person.contactFrequency != null ? 'A cada ${person.contactFrequency!.inDays} dias' : 'Não definida',
+        state: person.contactFrequency == null ? PropertyCardState.empty : PropertyCardState.normal,
+        onTap: person.contactFrequency != null ? () => _showFrequencyPicker(context, ref, person) : null,
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.phone,
+        label: 'Próximo contato',
+        value: () {
+          if (person.lastContactDate == null || person.contactFrequency == null) return 'Não definido';
+          final next = person.lastContactDate!.add(person.contactFrequency!);
+          return DateFormat('d MMM yyyy').format(next);
+        }(),
+        state: person.lastContactDate == null || person.contactFrequency == null ? PropertyCardState.empty : PropertyCardState.normal,
+      ));
+      cards.addAll(_buildDefaultDateCards(context));
     } else if (object is JournalEntry) {
       final entry = object as JournalEntry;
       final mood = _moodForEntry(entry);
-      cards.add(
-        _buildPropertiesCard(
-          context: context,
-          title: 'Contexto',
-          icon: Icons.auto_stories_outlined,
-          rows: [
-            _PropRow(
-              label: 'Mood',
-              value: mood != null
-                  ? '${mood.emoji} ${mood.title}'
-                  : (entry.moodSlug ?? 'Não definido'),
-              isEmpty: mood == null && (entry.moodSlug == null || entry.moodSlug!.isEmpty),
-            ),
-            _PropRow(
-              label: 'Data/hora',
-              value: DateFormat('d MMM yyyy • HH:mm').format(entry.date),
-            ),
-            if (entry.categories.isNotEmpty)
-              _PropRow(label: 'Categoria', value: entry.categories.first),
-          ],
-        ),
-      );
+      cards.add(PropertyCard(
+        icon: Icons.mood,
+        label: 'Mood',
+        value: mood != null ? '${mood.emoji} ${mood.title}' : (entry.moodSlug ?? 'Não definido'),
+        state: mood == null && (entry.moodSlug == null || entry.moodSlug!.isEmpty) ? PropertyCardState.empty : PropertyCardState.normal,
+      ));
+      cards.add(PropertyCard(
+        icon: Icons.access_time,
+        label: 'Data/hora',
+        value: DateFormat('d MMM yyyy • HH:mm').format(entry.date),
+      ));
+      if (entry.categories.isNotEmpty) {
+        cards.add(PropertyCard(
+          icon: Icons.category,
+          label: 'Categoria',
+          value: entry.categories.first,
+        ));
+      }
     } else {
-      cards.add(_buildDefaultDatesCard(context));
+      cards.addAll(_buildDefaultDateCards(context));
     }
 
-    return cards.map((c) => SliverToBoxAdapter(child: c)).toList();
-  }
-
-  Widget _buildDefaultDatesCard(BuildContext context) {
-    return _buildPropertiesCard(
-      context: context,
-      title: 'Datas',
-      icon: Icons.calendar_today_outlined,
-      rows: [
-        _PropRow(
-          label: 'Criado',
-          value: DateFormat('d MMM yyyy').format(object.createdAt),
+    if (cards.isEmpty) return [];
+    
+    return [
+      SliverToBoxAdapter(
+        child: _CollapsiblePropertiesSection(
+          title: 'PROPERTIES',
+          child: PropertyGrid(cards: cards),
         ),
-        _PropRow(
-          label: 'Modificado',
-          value: DateFormat('d MMM yyyy').format(object.updatedAt),
-        ),
-      ],
-    );
+      ),
+    ];
   }
 
   Widget _buildNotePropertiesGrid(BuildContext context, Note note, List<Note> allNotes) {
     return _CollapsiblePropertiesSection(
       title: 'PROPERTIES',
       child: _buildNotePropertiesCardContent(context, note, allNotes),
+    );
+  }
+
+  void _showStringPropertyPicker({
+    required BuildContext context,
+    required String title,
+    required String initialValue,
+    required void Function(String newValue) onSave,
+  }) {
+    final controller = TextEditingController(text: initialValue);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surfaceColor(context),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Editar $title', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: title,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Descartar', style: TextStyle(color: AppColors.textMuted)),
+            ),
+            TextButton(
+              onPressed: () {
+                onSave(controller.text);
+                Navigator.pop(context);
+              },
+              child: Text('Salvar', style: TextStyle(color: AppTheme.accentColor(context), fontWeight: FontWeight.w600)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showEnumPropertyPicker<T>({
+    required BuildContext context,
+    required String title,
+    required T initialValue,
+    required List<T> values,
+    required String Function(T) labelBuilder,
+    required void Function(T newValue) onSave,
+  }) {
+    T currentValue = initialValue;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.surfaceColor(context),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text('Editar $title', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: values.map((val) {
+                    return RadioListTile<T>(
+                      title: Text(labelBuilder(val)),
+                      value: val,
+                      groupValue: currentValue,
+                      onChanged: (newVal) {
+                        if (newVal != null) {
+                          setState(() => currentValue = newVal);
+                        }
+                      },
+                      contentPadding: EdgeInsets.zero,
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Descartar', style: TextStyle(color: AppColors.textMuted)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    onSave(currentValue);
+                    Navigator.pop(context);
+                  },
+                  child: Text('Salvar', style: TextStyle(color: AppTheme.accentColor(context), fontWeight: FontWeight.w600)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showBoolPropertyPicker({
+    required BuildContext context,
+    required String title,
+    required bool initialValue,
+    required void Function(bool newValue) onSave,
+  }) {
+    bool currentValue = initialValue;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.surfaceColor(context),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text('Editar $title', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              content: SwitchListTile(
+                title: Text(title),
+                value: currentValue,
+                onChanged: (val) => setState(() => currentValue = val),
+                contentPadding: EdgeInsets.zero,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Descartar', style: TextStyle(color: AppColors.textMuted)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    onSave(currentValue);
+                    Navigator.pop(context);
+                  },
+                  child: Text('Salvar', style: TextStyle(color: AppTheme.accentColor(context), fontWeight: FontWeight.w600)),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -1277,7 +1331,16 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         label: 'Subtype',
         value: note.subtype.name,
         onTap: () {
-          // TODO: Open subtype picker (N1)
+          _showEnumPropertyPicker<NoteSubtype>(
+            context: context,
+            title: 'Subtype',
+            initialValue: note.subtype,
+            values: NoteSubtype.values,
+            labelBuilder: (val) => val.name,
+            onSave: (val) {
+              ref.read(vaultProvider.notifier).updateObject(note.copyWith(subtype: val));
+            },
+          );
         },
       ),
       PropertyCard(
@@ -1286,38 +1349,61 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         value: note.categories.isNotEmpty ? note.categories.first : null,
         state: note.categories.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
         onTap: () {
-          // TODO: Open category picker (N1)
+          _showStringPropertyPicker(
+            context: context,
+            title: 'Category',
+            initialValue: note.categories.isNotEmpty ? note.categories.first : '',
+            onSave: (val) {
+              final newCategories = val.trim().isNotEmpty ? [val.trim()] : <String>[];
+              ref.read(vaultProvider.notifier).updateObject(note.copyWith(categories: newCategories));
+            },
+          );
         },
       ),
       PropertyCard(
         icon: Icons.push_pin_outlined,
         label: 'Pinned',
-        customChild: Switch(
-          value: note.pinned,
-          onChanged: (value) {
-            ref.read(vaultProvider.notifier).updateObject(note.copyWith(pinned: value));
-          },
-        ),
+        value: note.pinned ? 'Yes' : 'No',
+        onTap: () {
+          _showBoolPropertyPicker(
+            context: context,
+            title: 'Pinned',
+            initialValue: note.pinned,
+            onSave: (val) {
+              ref.read(vaultProvider.notifier).updateObject(note.copyWith(pinned: val));
+            },
+          );
+        },
       ),
       PropertyCard(
         icon: Icons.checklist_rtl_rounded,
         label: 'Checklist',
-        customChild: Switch(
-          value: note.isChecklist,
-          onChanged: (value) {
-            ref.read(vaultProvider.notifier).updateObject(note.copyWith(isChecklist: value));
-          },
-        ),
+        value: note.isChecklist ? 'Yes' : 'No',
+        onTap: () {
+          _showBoolPropertyPicker(
+            context: context,
+            title: 'Checklist',
+            initialValue: note.isChecklist,
+            onSave: (val) {
+              ref.read(vaultProvider.notifier).updateObject(note.copyWith(isChecklist: val));
+            },
+          );
+        },
       ),
       PropertyCard(
         icon: Icons.calendar_view_day_outlined,
         label: 'Show in Planner',
-        customChild: Switch(
-          value: note.showInPlanner,
-          onChanged: (value) {
-            ref.read(vaultProvider.notifier).updateObject(note.copyWith(showInPlanner: value));
-          },
-        ),
+        value: note.showInPlanner ? 'Yes' : 'No',
+        onTap: () {
+          _showBoolPropertyPicker(
+            context: context,
+            title: 'Show in Planner',
+            initialValue: note.showInPlanner,
+            onSave: (val) {
+              ref.read(vaultProvider.notifier).updateObject(note.copyWith(showInPlanner: val));
+            },
+          );
+        },
       ),
       PropertyCard(
         icon: Icons.drive_file_move_outline,
@@ -1357,351 +1443,44 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   void _showParentNotePicker(BuildContext context, Note note) {
     showModalBottomSheet(
       context: context,
-      builder: (sheetContext) => UniversalSearchPickerSheet(
-        title: 'Select Parent Note',
-        initialFilter: 'note',
-        onSelected: (selectedObj) {
-          if (selectedObj is Note && selectedObj.id != note.id) {
-            ref.read(vaultProvider.notifier).updateObject(
-              note.copyWith(parentNoteId: selectedObj.id),
-            );
-          }
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => WikiLinkPicker(
+        onSelected: (parentObj) {
+          ref.read(vaultProvider.notifier).updateObject(note.copyWith(parentNoteId: parentObj.id));
         },
-      ),
-    );
-  }
-}
-
-class _CollapsiblePropertiesSection extends StatefulWidget {
-  final String title;
-  final Widget child;
-
-  const _CollapsiblePropertiesSection({
-    required this.title,
-    required this.child,
-  });
-
-  @override
-  State<_CollapsiblePropertiesSection> createState() => _CollapsiblePropertiesSectionState();
-}
-
-class _CollapsiblePropertiesSectionState extends State<_CollapsiblePropertiesSection> {
-  bool _isExpanded = true;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Header row
-        InkWell(
-          onTap: () => setState(() => _isExpanded = !_isExpanded),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.tune_rounded,
-                  size: 16,
-                  color: AppColors.textMuted,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  widget.title,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-                const Spacer(),
-                Icon(
-                  _isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                  size: 20,
-                  color: AppColors.textMuted,
-                ),
-              ],
-            ),
-          ),
-        ),
-        // Collapsible content
-        AnimatedSize(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeInOut,
-          child: _isExpanded
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: widget.child,
-                )
-              : const SizedBox.shrink(),
-        ),
-      ],
-    );
-  }
-}
-
-class _Heading {
-  final String text;
-  final int level;
-  final int index;
-
-  _Heading({
-    required this.text,
-    required this.level,
-    required this.index,
-  });
-}
-
-class _TableOfContentsSheet extends StatelessWidget {
-  final List<_Heading> headings;
-  final ValueChanged<int> onHeadingTap;
-
-  const _TableOfContentsSheet({
-    required this.headings,
-    required this.onHeadingTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: AppTheme.sheetDecoration(context),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-        top: 24,
-        left: 24,
-        right: 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Table of Contents',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-              ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close_rounded),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Flexible(
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: headings.length,
-              itemBuilder: (context, index) {
-                final heading = headings[index];
-                return InkWell(
-                  onTap: () => onHeadingTap(heading.index),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      children: [
-                        SizedBox(width: (heading.level - 1) * 16.0),
-                        Text(
-                          heading.text,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: AppTheme.textPrimaryColor(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InPageSearchSheet extends StatefulWidget {
-  final String content;
-  final NoteSubtype subtype;
-
-  const _InPageSearchSheet({
-    required this.content,
-    required this.subtype,
-  });
-
-  @override
-  State<_InPageSearchSheet> createState() => _InPageSearchSheetState();
-}
-
-class _InPageSearchSheetState extends State<_InPageSearchSheet> {
-  final TextEditingController _searchController = TextEditingController();
-  int _currentMatchIndex = 0;
-  List<int> _matchIndices = [];
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _performSearch(String query) {
-    if (query.isEmpty) {
-      setState(() {
-        _matchIndices = [];
-        _currentMatchIndex = 0;
-      });
-      return;
-    }
-
-    final indices = <int>[];
-    final lowerQuery = query.toLowerCase();
-    final lowerContent = widget.content.toLowerCase();
-
-    int index = 0;
-    while (index < lowerContent.length) {
-      final found = lowerContent.indexOf(lowerQuery, index);
-      if (found == -1) break;
-      indices.add(found);
-      index = found + 1;
-    }
-
-    setState(() {
-      _matchIndices = indices;
-      _currentMatchIndex = indices.isNotEmpty ? 0 : 0;
-    });
-  }
-
-  void _nextMatch() {
-    if (_matchIndices.isEmpty) return;
-    setState(() {
-      _currentMatchIndex = (_currentMatchIndex + 1) % _matchIndices.length;
-    });
-  }
-
-  void _previousMatch() {
-    if (_matchIndices.isEmpty) return;
-    setState(() {
-      _currentMatchIndex = (_currentMatchIndex - 1 + _matchIndices.length) % _matchIndices.length;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: AppTheme.sheetDecoration(context),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-        top: 24,
-        left: 24,
-        right: 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Search in Page',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-              ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close_rounded),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _searchController,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: 'Search...',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              suffixIcon: _matchIndices.isNotEmpty
-                  ? Text(
-                      '${_currentMatchIndex + 1}/${_matchIndices.length}',
-                      style: const TextStyle(fontSize: 14),
-                    )
-                  : null,
-            ),
-            onChanged: _performSearch,
-          ),
-          if (_matchIndices.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _previousMatch,
-                    icon: const Icon(Icons.keyboard_arrow_up_rounded),
-                    label: const Text('Previous'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _nextMatch,
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                    label: const Text('Next'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.accentColor(context).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                _getMatchContext(),
-                style: const TextStyle(fontSize: 13),
-              ),
-            ),
-          ],
-        ],
+        initialQuery: '',
       ),
     );
   }
 
-  String _getMatchContext() {
-    if (_matchIndices.isEmpty) return '';
-    final matchIndex = _matchIndices[_currentMatchIndex];
-    final start = (matchIndex - 30).clamp(0, widget.content.length);
-    final end = (matchIndex + 30).clamp(0, widget.content.length);
-    final context = widget.content.substring(start, end);
-    return '...$context...';
+  void _shareNote(BuildContext context, Note note) {
+    // Implementation for sharing the note
   }
-}
 
-class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
-  bool _isEditing = false;
-  late ContentObject object;
-  String? _rotationTaskFilter;
+  List<PropertyCard> _buildDefaultDateCards(BuildContext context) {
+    return [
+      PropertyCard(
+        icon: Icons.calendar_today,
+        label: 'Criado',
+        value: DateFormat('d MMM yyyy').format(object.createdAt),
+      ),
+      PropertyCard(
+        icon: Icons.edit_calendar,
+        label: 'Modificado',
+        value: DateFormat('d MMM yyyy').format(object.updatedAt),
+      ),
+    ];
+  }
 
-  List<_PropRow> _buildLinkedGoogleEventPropRows(
-    BuildContext context,
-    Object source,
-  ) {
+  List<PropertyCard> _buildLinkedGoogleEventPropertyCards(BuildContext context, Object source) {
     final rows = _buildLinkedGoogleEventRows(context, source);
-    return rows
-        .map(
-          (item) => _PropRow(
-            label: item.label,
-            value: item.value,
-            onTap: item.onTap,
-          ),
-        )
-        .toList();
+    return rows.map((item) => PropertyCard(
+      icon: item.icon ?? Icons.event,
+      label: item.label,
+      value: item.value,
+      onTap: item.onTap,
+    )).toList();
   }
 
   List<PropertyGridItem> _buildLinkedGoogleEventRows(
@@ -3123,60 +2902,25 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   }
 
   Widget _buildNoteViewer(BuildContext context, Note note) {
-    final children = <Widget>[];
-
-    // Cover image
-    if (note.coverImagePath != null) {
-      children.add(_buildCoverImage(context, note.coverImagePath!));
-      children.add(const SizedBox(height: 16));
-    }
-
-    // Note content
     if (note.isChecklist && note.subtype == NoteSubtype.text) {
-      children.add(ChecklistView(note: note));
-    } else {
-      switch (note.subtype) {
-        case NoteSubtype.outline:
-          children.add(OutlineEditor(
-            initialContent: note.body,
-            onWikiLinkTap: (slug) => _navigateToSlug(context, ref, slug),
-            onChanged: (v) {
-              final updated = note.copyWith(body: v);
-              ref.read(vaultProvider.notifier).updateObject(updated);
-              setState(() => object = updated);
-            },
-          ));
-        case NoteSubtype.collection:
-          children.add(CollectionView(content: note.body));
-        case NoteSubtype.text:
-          children.add(MarkdownBodyView(content: note.body));
-      }
+      return ChecklistView(note: note);
     }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children,
-    );
-  }
-
-  Widget _buildCoverImage(BuildContext context, String imagePath) {
-    final vaultDir = ref.watch(settingsProvider).vaultPath;
-    if (vaultDir == null) return const SizedBox.shrink();
-
-    final fullPath = '$vaultDir/$imagePath';
-    final imageFile = File(fullPath);
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Image.file(
-        imageFile,
-        width: double.infinity,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return const SizedBox.shrink();
-        },
-      ),
-    );
+    switch (note.subtype) {
+      case NoteSubtype.outline:
+        return OutlineEditor(
+          initialContent: note.body,
+          onWikiLinkTap: (slug) => _navigateToSlug(context, ref, slug),
+          onChanged: (v) {
+            final updated = note.copyWith(body: v);
+            ref.read(vaultProvider.notifier).updateObject(updated);
+            setState(() => object = updated);
+          },
+        );
+      case NoteSubtype.collection:
+        return CollectionView(content: note.body);
+      case NoteSubtype.text:
+        return MarkdownBodyView(content: note.body);
+    }
   }
 
   void _navigateToSlug(BuildContext context, WidgetRef ref, String slug) {
@@ -4259,15 +4003,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       case 'edit':
         _editObject(context);
         break;
-      case 'search_in_page':
-        _showInPageSearch(context);
-        break;
-      case 'table_of_contents':
-        _showTableOfContents(context);
-        break;
-      case 'page_style':
-        _showPageStyleSheet(context);
-        break;
       case 'convert_to_checklist':
         _convertToChecklist(context, ref);
         break;
@@ -4304,121 +4039,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final updated = note.copyWith(isChecklist: !note.isChecklist);
     ref.read(vaultProvider.notifier).updateObject(updated);
     setState(() => object = updated);
-  }
-
-  void _showPageStyleSheet(BuildContext context) {
-    if (object is! Note) return;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => NotePageStyleSheet(note: object as Note),
-    );
-  }
-
-  void _showTableOfContents(BuildContext context) {
-    if (object is! Note) return;
-    final note = object as Note;
-    
-    if (note.subtype != NoteSubtype.text && note.subtype != NoteSubtype.outline) {
-      return;
-    }
-
-    final headings = _extractHeadings(note.body, note.subtype);
-    
-    if (headings.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No headings found')),
-      );
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _TableOfContentsSheet(
-        headings: headings,
-        onHeadingTap: (index) {
-          Navigator.pop(context);
-          // TODO: Scroll to heading position
-        },
-      ),
-    );
-  }
-
-  void _showInPageSearch(BuildContext context) {
-    if (object is! Note) return;
-    final note = object as Note;
-    
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _InPageSearchSheet(
-        content: note.body,
-        subtype: note.subtype,
-      ),
-    );
-  }
-
-  List<_Heading> _extractHeadings(String content, NoteSubtype subtype) {
-    final headings = <_Heading>[];
-    
-    if (subtype == NoteSubtype.text) {
-      final lines = content.split('\n');
-      for (int i = 0; i < lines.length; i++) {
-        final line = lines[i].trimLeft();
-        if (line.startsWith('#')) {
-          final level = line.takeWhile((c) => c == '#').length;
-          if (level <= 6) {
-            final text = line.substring(level).trim();
-            if (text.isNotEmpty) {
-              headings.add(_Heading(
-                text: text,
-                level: level,
-                index: i,
-              ));
-            }
-          }
-        }
-      }
-    } else if (subtype == NoteSubtype.outline) {
-      // Parse outline JSON structure
-      try {
-        final outline = jsonDecode(content) as List;
-        _extractOutlineHeadings(outline, headings, 0);
-      } catch (e) {
-        // If parsing fails, return empty
-      }
-    }
-    
-    return headings;
-  }
-
-  void _extractOutlineHeadings(List outline, List<_Heading> headings, int index) {
-    for (final item in outline) {
-      if (item is Map<String, dynamic>) {
-        final text = item['text'] as String?;
-        if (text != null && text.isNotEmpty) {
-          headings.add(_Heading(
-            text: text,
-            level: (item['depth'] as int? ?? 0) + 1,
-            index: index,
-          ));
-        }
-        if (item['children'] is List) {
-          _extractOutlineHeadings(item['children'] as List, headings, index + 1);
-        }
-      }
-    }
-  }
-
-  void _shareNote(BuildContext context, Note note) {
-    final shareText = '# ${note.title}\n\n${note.body}';
-    // TODO: Implement platform-specific sharing
-    // For now, just copy to clipboard
-    Clipboard.setData(ClipboardData(text: shareText));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Note copied to clipboard')),
-    );
   }
 
   Future<void> _showMergeTargetPicker(
@@ -7896,6 +7516,320 @@ class _SubtaskListViewState extends State<_SubtaskListView> {
         ),
       ),
     );
+  }
+}
+
+
+
+
+class _CollapsiblePropertiesSection extends StatefulWidget {
+  final String title;
+  final Widget child;
+
+  const _CollapsiblePropertiesSection({
+    required this.title,
+    required this.child,
+  });
+
+  @override
+  State<_CollapsiblePropertiesSection> createState() => _CollapsiblePropertiesSectionState();
+}
+
+class _CollapsiblePropertiesSectionState extends State<_CollapsiblePropertiesSection> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header row
+        InkWell(
+          onTap: () => setState(() => _isExpanded = !_isExpanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.tune_rounded,
+                  size: 16,
+                  color: AppColors.textMuted,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  widget.title,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  _isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                  size: 20,
+                  color: AppColors.textMuted,
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Collapsible content
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          child: _isExpanded
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: widget.child,
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+}
+
+class _Heading {
+  final String text;
+  final int level;
+  final int index;
+
+  _Heading({
+    required this.text,
+    required this.level,
+    required this.index,
+  });
+}
+
+class _TableOfContentsSheet extends StatelessWidget {
+  final List<_Heading> headings;
+  final ValueChanged<int> onHeadingTap;
+
+  const _TableOfContentsSheet({
+    required this.headings,
+    required this.onHeadingTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: AppTheme.sheetDecoration(context),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        top: 24,
+        left: 24,
+        right: 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Table of Contents',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: headings.length,
+              itemBuilder: (context, index) {
+                final heading = headings[index];
+                return InkWell(
+                  onTap: () => onHeadingTap(heading.index),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        SizedBox(width: (heading.level - 1) * 16.0),
+                        Text(
+                          heading.text,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.textPrimaryColor(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InPageSearchSheet extends StatefulWidget {
+  final String content;
+  final NoteSubtype subtype;
+
+  const _InPageSearchSheet({
+    required this.content,
+    required this.subtype,
+  });
+
+  @override
+  State<_InPageSearchSheet> createState() => _InPageSearchSheetState();
+}
+
+class _InPageSearchSheetState extends State<_InPageSearchSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  int _currentMatchIndex = 0;
+  List<int> _matchIndices = [];
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _performSearch(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        _matchIndices = [];
+        _currentMatchIndex = 0;
+      });
+      return;
+    }
+
+    final indices = <int>[];
+    final lowerQuery = query.toLowerCase();
+    final lowerContent = widget.content.toLowerCase();
+
+    int index = 0;
+    while (index < lowerContent.length) {
+      final found = lowerContent.indexOf(lowerQuery, index);
+      if (found == -1) break;
+      indices.add(found);
+      index = found + 1;
+    }
+
+    setState(() {
+      _matchIndices = indices;
+      _currentMatchIndex = indices.isNotEmpty ? 0 : 0;
+    });
+  }
+
+  void _nextMatch() {
+    if (_matchIndices.isEmpty) return;
+    setState(() {
+      _currentMatchIndex = (_currentMatchIndex + 1) % _matchIndices.length;
+    });
+  }
+
+  void _previousMatch() {
+    if (_matchIndices.isEmpty) return;
+    setState(() {
+      _currentMatchIndex = (_currentMatchIndex - 1 + _matchIndices.length) % _matchIndices.length;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: AppTheme.sheetDecoration(context),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        top: 24,
+        left: 24,
+        right: 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Search in Page',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _searchController,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Search...',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              suffixIcon: _matchIndices.isNotEmpty
+                  ? Text(
+                      '${_currentMatchIndex + 1}/${_matchIndices.length}',
+                      style: const TextStyle(fontSize: 14),
+                    )
+                  : null,
+            ),
+            onChanged: _performSearch,
+          ),
+          if (_matchIndices.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _previousMatch,
+                    icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                    label: const Text('Previous'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _nextMatch,
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                    label: const Text('Next'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.accentColor(context).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _getMatchContext(),
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _getMatchContext() {
+    if (_matchIndices.isEmpty) return '';
+    final matchIndex = _matchIndices[_currentMatchIndex];
+    final start = (matchIndex - 30).clamp(0, widget.content.length);
+    final end = (matchIndex + 30).clamp(0, widget.content.length);
+    final context = widget.content.substring(start, end);
+    return '...$context...';
   }
 }
 

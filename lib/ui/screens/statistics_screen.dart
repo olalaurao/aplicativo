@@ -209,9 +209,9 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
 
       Color cellColor = AppColors.textMuted.withValues(alpha: 0.1);
       if (count > 0) {
-        cellColor = AppTheme.accentColor(context).withValues(
-          alpha: math.min(1.0, 0.2 + (count * 0.25)),
-        );
+        cellColor = AppTheme.accentColor(
+          context,
+        ).withValues(alpha: math.min(1.0, 0.2 + (count * 0.25)));
       }
 
       dayWidgets.add(
@@ -223,7 +223,9 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
               color: cellColor,
               borderRadius: BorderRadius.circular(4),
               border: Border.all(
-                color: date == today ? AppTheme.accentColor(context) : Colors.transparent,
+                color: date == today
+                    ? AppTheme.accentColor(context)
+                    : Colors.transparent,
                 width: 1.5,
               ),
             ),
@@ -504,7 +506,10 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _buildTaskLegend(AppTheme.accentColor(context), 'Concluídas'),
+                    _buildTaskLegend(
+                      AppTheme.accentColor(context),
+                      'Concluídas',
+                    ),
                     const SizedBox(width: 16),
                     _buildTaskLegend(
                       AppColors.textMuted.withValues(alpha: 0.2),
@@ -691,7 +696,9 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
     for (final mood in moods) {
       final hex = mood.color.replaceAll('#', '0xFF');
       final val = int.tryParse(hex);
-      colorMap[mood.id] = val != null ? Color(val) : AppTheme.accentColor(context);
+      colorMap[mood.id] = val != null
+          ? Color(val)
+          : AppTheme.accentColor(context);
     }
 
     moodCounts.forEach((moodId, count) {
@@ -748,7 +755,8 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
                         width: 10,
                         height: 10,
                         decoration: BoxDecoration(
-                          color: colorMap[e.key] ?? AppTheme.accentColor(context),
+                          color:
+                              colorMap[e.key] ?? AppTheme.accentColor(context),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -865,7 +873,12 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
 
   // 7. Goal KPI Historical Line Chart
   Widget _buildGoalKPIChartCard(List<Goal> goals) {
-    final goalsWithKPIs = goals.where((g) => g.kpis.isNotEmpty).toList();
+    // Deduplicate goals by ID to prevent DropdownMenuItem duplicate values
+    final Map<String, Goal> uniqueGoalsMap = {};
+    for (final g in goals.where((g) => g.kpis.isNotEmpty)) {
+      uniqueGoalsMap[g.id] = g;
+    }
+    final goalsWithKPIs = uniqueGoalsMap.values.toList();
 
     if (goalsWithKPIs.isEmpty) {
       return Container(
@@ -880,7 +893,9 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
       );
     }
 
-    final currentGoal = (_selectedGoalForKPIChart != null && goalsWithKPIs.any((g) => g.id == _selectedGoalForKPIChart!.id))
+    final currentGoal =
+        (_selectedGoalForKPIChart != null &&
+            goalsWithKPIs.any((g) => g.id == _selectedGoalForKPIChart!.id))
         ? goalsWithKPIs.firstWhere((g) => g.id == _selectedGoalForKPIChart!.id)
         : (goalsWithKPIs.isNotEmpty ? goalsWithKPIs.first : null);
 
@@ -922,7 +937,10 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
               const Expanded(
                 child: Text(
                   'Progresso do KPI Principal',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -1002,7 +1020,9 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
                     dotData: const FlDotData(show: true),
                     belowBarData: BarAreaData(
                       show: true,
-                      color: AppTheme.accentColor(context).withValues(alpha: 0.15),
+                      color: AppTheme.accentColor(
+                        context,
+                      ).withValues(alpha: 0.15),
                     ),
                   ),
                 ],

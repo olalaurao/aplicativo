@@ -268,7 +268,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
               (h) => h.slug == segment.sourceSlug,
               orElse: () => allObjects.whereType<Habit>().firstWhere(
                 (h) => h.id == segment.sourceSlug,
-                orElse: () => Habit(id: '', title: '', slots: []),
+                orElse: () => Habit(id: '', title: '', color: '', slots: []),
               ),
             );
             final today = DateTime.now();
@@ -357,7 +357,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
                             (h) => h.slug == segment.sourceSlug,
                             orElse: () => allObjects.whereType<Habit>().firstWhere(
                               (h) => h.id == segment.sourceSlug,
-                              orElse: () => Habit(id: '', title: '', slots: []),
+                              orElse: () => Habit(id: '', title: '', color: '', slots: []),
                             ),
                           );
                           final today = DateTime.now();

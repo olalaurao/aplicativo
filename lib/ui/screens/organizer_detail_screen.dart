@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/organizer_model.dart';
 import 'package:intl/intl.dart';
-import '../../models/organizer_model.dart';
 import '../../models/content_object.dart';
 import '../../models/note_model.dart';
 import '../../models/social_post.dart';
@@ -320,6 +319,8 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
               padding: const EdgeInsets.all(3),
               child: TabBar(
                 controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
                 indicator: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(10),

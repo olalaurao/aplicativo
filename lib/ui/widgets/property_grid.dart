@@ -78,7 +78,7 @@ class PropertyGrid extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth >= 720 ? 2 : 1;
+        final crossAxisCount = 2;
 
         return GridView.builder(
           shrinkWrap: true,

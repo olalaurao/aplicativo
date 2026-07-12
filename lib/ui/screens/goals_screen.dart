@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../models/goal_model.dart';
+import '../../models/habit_model.dart';
+import '../../models/tracker_model.dart';
+import '../../models/journal_entry.dart';
+import '../../models/mood_model.dart';
+import '../../models/note_model.dart';
+import '../../models/task_model.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/kpi_engine.dart';
 import '../theme.dart';
@@ -210,6 +216,14 @@ class _GoalCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final color = _goalColor(goal.color);
     final accentColor = color;
+    
+    // Watch providers unconditionally to prevent rebuild loops and provider dependency issues
+    final habits = ref.watch(habitsProvider);
+    final trackerRecords = ref.watch(trackingRecordsProvider);
+    final entries = ref.watch(allEntriesProvider);
+    final moods = ref.watch(moodsProvider);
+    final notes = ref.watch(notesProvider);
+    final tasks = ref.watch(tasksProvider);
 
     return InkWell(
       onTap: () => Navigator.push(
@@ -217,10 +231,11 @@ class _GoalCard extends ConsumerWidget {
         MaterialPageRoute(builder: (_) => UniversalDetailView(object: goal)),
       ),
       child: Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: AppTheme.cardDecoration(context),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: AppTheme.cardDecoration(context),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: IntrinsicHeight(
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 80),
               child: Row(
@@ -291,7 +306,16 @@ class _GoalCard extends ConsumerWidget {
                             ),
                           ],
                           const SizedBox(height: 12),
-                          _buildProgressInfo(context, ref),
+                          _buildProgressInfo(
+                            context,
+                            ref: ref,
+                            habits: habits,
+                            trackerRecords: trackerRecords,
+                            entries: entries,
+                            moods: moods,
+                            notes: notes,
+                            tasks: tasks,
+                          ),
                         ],
                       ),
                     ),
@@ -301,10 +325,20 @@ class _GoalCard extends ConsumerWidget {
             ),
           ),
         ),
+      ),
     );
   }
 
-  Widget _buildProgressInfo(BuildContext context, WidgetRef ref) {
+  Widget _buildProgressInfo(
+    BuildContext context, {
+    required WidgetRef ref,
+    required List<Habit> habits,
+    required List<TrackingRecord> trackerRecords,
+    required List<JournalEntry> entries,
+    required List<MoodDefinition> moods,
+    required List<Note> notes,
+    required List<Task> tasks,
+  }) {
     if (isCompleted) {
       return Row(
         children: [
@@ -329,7 +363,14 @@ class _GoalCard extends ConsumerWidget {
     }
 
     final deadline = goal.deadline;
-    final progress = _calculateLiveProgress(ref);
+    final progress = _calculateLiveProgress(
+      habits: habits,
+      trackerRecords: trackerRecords,
+      entries: entries,
+      moods: moods,
+      notes: notes,
+      tasks: tasks,
+    );
 
     return Column(
       children: [
@@ -419,7 +460,6 @@ class _GoalCard extends ConsumerWidget {
                   color: AppColors.textMuted,
                 ),
               ),
-              // subtasks removed from Goal in V5.
             ],
           ),
         ],
@@ -428,15 +468,15 @@ class _GoalCard extends ConsumerWidget {
   }
 
   /// Calculate live progress using KPIEngine for real-time values.
-  double _calculateLiveProgress(WidgetRef ref) {
+  double _calculateLiveProgress({
+    required List<Habit> habits,
+    required List<TrackingRecord> trackerRecords,
+    required List<JournalEntry> entries,
+    required List<MoodDefinition> moods,
+    required List<Note> notes,
+    required List<Task> tasks,
+  }) {
     if (goal.kpis.isEmpty) return goal.progress;
-
-    final habits = ref.watch(habitsProvider);
-    final trackerRecords = ref.watch(trackingRecordsProvider);
-    final entries = ref.watch(allEntriesProvider);
-    final moods = ref.watch(moodsProvider);
-    final notes = ref.watch(notesProvider);
-    final tasks = ref.watch(tasksProvider);
 
     double total = 0;
     double completed = 0;

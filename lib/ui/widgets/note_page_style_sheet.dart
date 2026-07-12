@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../../models/note_model.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/obsidian_service.dart';
@@ -28,7 +29,7 @@ class _NotePageStyleSheetState extends ConsumerState<NotePageStyleSheet> {
     if (image != null) {
       final obsidianService = ref.read(obsidianServiceProvider);
       final relativePath = await obsidianService.saveAttachment(
-        await image.path.toFile(),
+        File(image.path),
       );
 
       if (relativePath != null && mounted) {
@@ -51,8 +52,8 @@ class _NotePageStyleSheetState extends ConsumerState<NotePageStyleSheet> {
     showModalBottomSheet(
       context: context,
       builder: (context) => AppColorPicker(
-        initialColor: widget.note.color,
-        onColorSelected: (color) {
+        value: widget.note.color ?? '',
+        onChanged: (color) {
           ref.read(vaultProvider.notifier).updateObject(
             widget.note.copyWith(color: color),
           );
