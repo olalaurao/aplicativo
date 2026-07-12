@@ -14,7 +14,15 @@ class DeletedFilesScreen extends ConsumerStatefulWidget {
 }
 
 class _DeletedFilesScreenState extends ConsumerState<DeletedFilesScreen> {
+  late Future<List<File>> _filesFuture;
   int _refreshKey = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final service = ref.read(obsidianServiceProvider);
+    _filesFuture = service.getFilesInFolder('_deleted');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +33,7 @@ class _DeletedFilesScreenState extends ConsumerState<DeletedFilesScreen> {
       appBar: AppBar(title: const Text('Trash')),
       body: FutureBuilder<List<File>>(
         key: ValueKey(_refreshKey),
-        future: service.getFilesInFolder('_deleted'),
+        future: _filesFuture,
         builder: (context, snapshot) {
           final files = snapshot.data ?? [];
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -64,7 +72,13 @@ class _DeletedFilesScreenState extends ConsumerState<DeletedFilesScreen> {
                       await ref
                           .read(vaultProvider.notifier)
                           .restoreDeletedFile(relativePath);
-                      if (mounted) setState(() => _refreshKey++);
+                      if (mounted) {
+                        setState(() {
+                          _refreshKey++;
+                          final service = ref.read(obsidianServiceProvider);
+                          _filesFuture = service.getFilesInFolder('_deleted');
+                        });
+                      }
                     },
                     child: const Text('Restore'),
                   ),

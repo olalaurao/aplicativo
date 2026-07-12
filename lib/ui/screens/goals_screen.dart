@@ -216,14 +216,15 @@ class _GoalCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final color = _goalColor(goal.color);
     final accentColor = color;
-    
-    // Watch providers unconditionally to prevent rebuild loops and provider dependency issues
-    final habits = ref.watch(habitsProvider);
-    final trackerRecords = ref.watch(trackingRecordsProvider);
-    final entries = ref.watch(allEntriesProvider);
-    final moods = ref.watch(moodsProvider);
-    final notes = ref.watch(notesProvider);
-    final tasks = ref.watch(tasksProvider);
+
+    // Only watch providers if the goal has KPIs that need live calculation
+    final needsLiveData = goal.kpis.isNotEmpty;
+    final habits = needsLiveData ? ref.watch(habitsProvider) : <Habit>[];
+    final trackerRecords = needsLiveData ? ref.watch(trackingRecordsProvider) : <TrackingRecord>[];
+    final entries = needsLiveData ? ref.watch(allEntriesProvider) : <JournalEntry>[];
+    final moods = needsLiveData ? ref.watch(moodsProvider) : <MoodDefinition>[];
+    final notes = needsLiveData ? ref.watch(notesProvider) : <Note>[];
+    final tasks = needsLiveData ? ref.watch(tasksProvider) : <Task>[];
 
     return InkWell(
       onTap: () => Navigator.push(

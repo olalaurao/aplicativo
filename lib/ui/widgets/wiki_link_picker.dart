@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/content_object.dart';
@@ -23,6 +24,8 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
   late TextEditingController _searchController;
   final SearchService _searchService = SearchService();
   final Set<String> _selectedTypes = {};
+  List<ContentObject>? _cachedCandidates;
+  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -33,6 +36,7 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
   @override
   void dispose() {
     _searchController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
@@ -113,7 +117,12 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
             child: TextField(
               controller: _searchController,
               autofocus: true,
-              onChanged: (_) => setState(() {}),
+              onChanged: (value) {
+                _debounceTimer?.cancel();
+                _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+                  setState(() {});
+                });
+              },
               decoration: InputDecoration(
                 hintText: 'Buscar ou criar link...',
                 prefixIcon: const Icon(Icons.search_rounded),
@@ -121,7 +130,13 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
                     ? null
                     : IconButton(
                         icon: const Icon(Icons.close_rounded),
-                        onPressed: () => setState(_searchController.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          _debounceTimer?.cancel();
+                          _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+                            setState(() {});
+                          });
+                        },
                       ),
                 filled: true,
                 fillColor: AppColors.surfaceVariant,
@@ -139,13 +154,18 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
           Expanded(
             child: allObjectsAsync.when(
               data: (objects) {
-                return FutureBuilder<List<ContentObject>>(
-                  future: _candidatesIncludingVaultFiles(objects),
-                  builder: (context, snapshot) {
-                    final candidates = snapshot.data ?? objects;
-                    return _buildResults(candidates);
-                  },
-                );
+                // Load vault files only once and cache the result
+                if (_cachedCandidates == null) {
+                  _candidatesIncludingVaultFiles(objects).then((candidates) {
+                    if (mounted) {
+                      setState(() {
+                        _cachedCandidates = candidates;
+                      });
+                    }
+                  });
+                }
+                final candidates = _cachedCandidates ?? objects;
+                return _buildResults(candidates);
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, s) => Center(child: Text('Error: $e')),

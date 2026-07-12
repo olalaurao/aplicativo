@@ -33,7 +33,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   double _commandCenterOverscroll = 0;
   bool _commandCenterOpenedThisScroll = false;
   DateTime? _lastBackPressTime;
-  bool _hasShownYamlErrorDialog = false;
+  final Set<String> _dismissedYamlErrorFiles = {};
 
   @override
   Widget build(BuildContext context) {
@@ -44,10 +44,15 @@ class _AppShellState extends ConsumerState<AppShell> {
     
     // Watch for YAML parsing errors and show dialog
     final yamlErrors = ref.watch(yamlErrorsProvider);
-    if (yamlErrors.isNotEmpty && _hasShownYamlErrorDialog != true) {
-      _hasShownYamlErrorDialog = true;
+    // Filter out errors for files that have already been dismissed
+    final undismissedErrors = yamlErrors.where((error) {
+      final filePath = error['file'];
+      return filePath != null && !_dismissedYamlErrorFiles.contains(filePath);
+    }).toList();
+
+    if (undismissedErrors.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showYamlErrorDialog(context, yamlErrors);
+        _showYamlErrorDialog(context, undismissedErrors);
       });
     }
 
@@ -851,7 +856,13 @@ class _AppShellState extends ConsumerState<AppShell> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              _hasShownYamlErrorDialog = false;
+              // Mark these error files as dismissed
+              for (final error in errors) {
+                final filePath = error['file'];
+                if (filePath != null) {
+                  _dismissedYamlErrorFiles.add(filePath);
+                }
+              }
             },
             child: const Text('OK'),
           ),

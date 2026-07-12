@@ -104,7 +104,7 @@ class MarkdownParser {
     if (normalized.startsWith("'") && normalized.endsWith("'")) {
       normalized = normalized.substring(1, normalized.length - 1);
     }
-    final wikiMatch = RegExp(r'^\[\[(.*)\]\]$').firstMatch(normalized);
+    final wikiMatch = _wikiLinkExactRegex.firstMatch(normalized);
     if (wikiMatch != null) {
       normalized = wikiMatch.group(1)!.trim();
     }
@@ -115,7 +115,7 @@ class MarkdownParser {
     return folder
         .trim()
         .replaceAll('\\', '/')
-        .replaceAll(RegExp(r'^/+|/+$'), '');
+        .replaceAll(_folderSlashRegex, '');
   }
 
   static Map<String, dynamic> mergeFrontmatter(
@@ -217,7 +217,7 @@ class MarkdownParser {
     }
 
     String quoteFlowValue(String input, String key) {
-      return input.replaceAllMapped(RegExp('($key:\\s*)([^,}\\]\\n]+)'), (
+      return input.replaceAllMapped(_quoteFlowValueRegex, (
         match,
       ) {
         final prefix = match.group(1)!;
@@ -246,7 +246,7 @@ class MarkdownParser {
     // Repair values that start with @ or contain special characters that break YAML parsing
     String quoteProblematicValues(String input) {
       // First handle @ symbols at start of values
-      var result = input.replaceAllMapped(RegExp(r'^(\w+):\s*(@\S+)$', multiLine: true), (match) {
+      var result = input.replaceAllMapped(_atSymbolRegex, (match) {
         final key = match.group(1)!;
         final value = match.group(2)!;
         final escaped = value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
@@ -255,7 +255,7 @@ class MarkdownParser {
 
       // Then handle long text values that contain special characters (colons, dashes, etc.)
       // This fixes issues with caption, transcription, and other long text fields
-      result = result.replaceAllMapped(RegExp(r'^(\w+):\s*(.+)$', multiLine: true), (match) {
+      result = result.replaceAllMapped(_longTextValueRegex, (match) {
         final key = match.group(1)!;
         final value = match.group(2)!.trim();
         
@@ -268,7 +268,7 @@ class MarkdownParser {
         // Skip if it's a boolean, number, or simple value
         if (value == 'true' || value == 'false' || value == 'null' ||
             num.tryParse(value) != null ||
-            RegExp(r'^[\w-]+$').hasMatch(value)) {
+            _simpleValueRegex.hasMatch(value)) {
           return match.group(0)!;
         }
         
@@ -359,9 +359,9 @@ class MarkdownParser {
   static String _sanitizeFileName(String value) {
     return value
         .trim()
-        .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .replaceAll(RegExp(r'^\.+|\.+$'), '');
+        .replaceAll(_sanitizeFileNameRegex1, '')
+        .replaceAll(_sanitizeFileNameRegex2, ' ')
+        .replaceAll(_sanitizeFileNameRegex3, '');
   }
 
   static String extractBody(String content) {
@@ -379,6 +379,37 @@ class MarkdownParser {
   static final _subtaskRegex = RegExp(r'^\s*-\s*\[([ xX])\]\s*(.*)$');
   static final _orgsRegex = RegExp(r'organizers::\s*(.*)');
   static final _pomodoroHeaderRegex = RegExp(r'^(\d{2}:\d{2})\s*[—-]\s*(.*)');
+  static final _blockquotePrefixRegex = RegExp(r'^>\s*(\[!\w+\]\s*)?');
+  static final _inlineTagRegex = RegExp(r'#(\w+)\s*$');
+  static final _dateRegex = RegExp(r'\d{4}-\d{2}-\d{2}');
+  static final _blockquoteContinuationRegex = RegExp(r'^>\s*');
+  static final _jsonTrailingCommaRegex = RegExp(r',\s*([\]}])');
+  static final _journalSectionRegex = RegExp(r'^## Journal Entries', multiLine: true);
+  static final _nextSectionRegex = RegExp(r'^## ', multiLine: true);
+  static final _journalEntryRegex = RegExp(r'^### ', multiLine: true);
+  static final _timeMatchRegex = RegExp(r'^(\d{1,2}:\d{2})(?:\s*-\s*(.*))?');
+  static final _moodLineRegex = RegExp(r'^mood::\s*(.*)$', multiLine: true);
+  static final _entryTypeRegex = RegExp(r'^entry_type::\s*(.*)$', multiLine: true);
+  static final _categoryRegex = RegExp(r'^category::\s*(.*)$', multiLine: true);
+  static final _energyRegex = RegExp(r'^energy_value::\s*(\d+)', multiLine: true);
+  static final _plusMinusNextSectionRegex = RegExp(r'^##\s*(Plus|Minus|Next)\s*$', multiLine: true, caseSensitive: false);
+  static final _bulletRegex = RegExp(r'^-\s*(.+)$', multiLine: true);
+  static final _pomodorosSectionRegex = RegExp(r'^## Pomodoros', multiLine: true);
+  static final _pomodorosSubsectionRegex = RegExp(r'^### ', multiLine: true);
+  static final _durationRegex = RegExp(r'Duration:\s*(\d+)');
+  static final _blocksRegex = RegExp(r'Blocks:\s*(\d+)');
+  static final _wikiLinkSimpleRegex = RegExp(r'\[\[(.*?)\]\]');
+  static final _wikiLinkExactRegex = RegExp(r'^\[\[(.*)\]\]$');
+  static final _folderSlashRegex = RegExp(r'^/+|/+$');
+  static final _quoteFlowValueRegex = RegExp(r'(\$key:\\s*)([^,}\\]\\n]+)');
+  static final _atSymbolRegex = RegExp(r'^(\w+):\\s*(@\\S+)$', multiLine: true);
+  static final _longTextValueRegex = RegExp(r'^(\w+):\\s*(.+)$', multiLine: true);
+  static final _simpleValueRegex = RegExp(r'^[\\w-]+$');
+  static final _sanitizeFileNameRegex1 = RegExp(r'[<>:"/\\\\|?*\\x00-\\x1F]');
+  static final _sanitizeFileNameRegex2 = RegExp(r'\\s+');
+  static final _sanitizeFileNameRegex3 = RegExp(r'^\\.+|\\.+$');
+  static final _tempoTrabalhadoRegex = RegExp(r'(?:trabalhado|Tempo):\\s*(\\d+)');
+  static final _pausaRegex = RegExp(r'(?:pausa|Pausas):\\s*(\\d+)');
 
   /// Extracts [[WikiLinks]] and @mentions from a string.
   static List<String> extractLinks(String content) {
@@ -430,12 +461,12 @@ class MarkdownParser {
       final line = lines[i].trim();
       if (!line.startsWith('>')) continue;
 
-      var text = line.replaceFirst(RegExp(r'^>\s*(\[!\w+\]\s*)?'), '').trim();
+      var text = line.replaceFirst(_blockquotePrefixRegex, '').trim();
       if (text.isEmpty) continue;
 
       // Extract inline tag: '…texto #tag' → tag separated
       String? tag;
-      final tagMatch = RegExp(r'#(\w+)\s*$').firstMatch(text);
+      final tagMatch = _inlineTagRegex.firstMatch(text);
       if (tagMatch != null) {
         tag = tagMatch.group(1);
         text = text.substring(0, tagMatch.start).trim();
@@ -443,13 +474,13 @@ class MarkdownParser {
 
       // Extract YYYY-MM-DD date if present
       String? date;
-      final dateMatch = RegExp(r'\d{4}-\d{2}-\d{2}').firstMatch(text);
+      final dateMatch = _dateRegex.firstMatch(text);
       if (dateMatch != null) date = dateMatch.group(0);
 
       // Multi-line blockquote continuation
       while (i + 1 < lines.length && lines[i + 1].trim().startsWith('>')) {
         i++;
-        final cont = lines[i].trim().replaceFirst(RegExp(r'^>\s*'), '').trim();
+        final cont = lines[i].trim().replaceFirst(_blockquoteContinuationRegex, '').trim();
         if (cont.isNotEmpty) text += ' $cont';
       }
 
@@ -550,7 +581,7 @@ class MarkdownParser {
       // If it looks like JSON but failed, try cleaning it further
       try {
         // Fix common JSON errors like trailing commas
-        final cleaned = trimmed.replaceAll(RegExp(r',\s*([\]}])'), r'$1');
+        final cleaned = trimmed.replaceAll(_jsonTrailingCommaRegex, r'$1');
         final data = jsonDecode(cleaned);
         final dynamic rawOps = data is Map ? data['ops'] : data;
         if (rawOps is List) {
@@ -575,14 +606,12 @@ class MarkdownParser {
     }
 
     final entries = <Map<String, dynamic>>[];
-    final journalSections = body.split(
-      RegExp(r'^## Journal Entries', multiLine: true),
-    );
+    final journalSections = body.split(_journalSectionRegex);
     final journalBody = journalSections.length < 2
         ? body
-        : journalSections[1].split(RegExp(r'^## ', multiLine: true))[0];
+        : journalSections[1].split(_nextSectionRegex)[0];
     // Split by level 3 headers (### HH:MM)
-    final sections = journalBody.split(RegExp(r'^### ', multiLine: true));
+    final sections = journalBody.split(_journalEntryRegex);
 
     for (final section in sections) {
       if (section.trim().isEmpty) continue;
@@ -590,9 +619,7 @@ class MarkdownParser {
       final header = lines[0].trim();
 
       // Match HH:MM or HH:MM - Title
-      final timeMatch = RegExp(
-        r'^(\d{1,2}:\d{2})(?:\s*-\s*(.*))?',
-      ).firstMatch(header);
+      final timeMatch = _timeMatchRegex.firstMatch(header);
       if (timeMatch != null) {
         final time = timeMatch.group(1)!;
         final title = timeMatch.group(2)?.trim() ?? '';
@@ -616,10 +643,7 @@ class MarkdownParser {
         final entryBody = entryBodyLines.join('\n').trim();
 
         // Extract inline dataview fields like mood:: [[good]], [[calm]]
-        final moodLineMatch = RegExp(
-          r'^mood::\s*(.*)$',
-          multiLine: true,
-        ).firstMatch(section);
+        final moodLineMatch = _moodLineRegex.firstMatch(section);
         final moodLinks = moodLineMatch == null
             ? const <String>[]
             : extractWikiLinks(moodLineMatch.group(1)!);
@@ -636,22 +660,13 @@ class MarkdownParser {
         }
 
         // Parse entry_type, category, energy_value inline Dataview fields
-        final entryTypeMatch = RegExp(
-          r'^entry_type::\s*(.*)$',
-          multiLine: true,
-        ).firstMatch(section);
+        final entryTypeMatch = _entryTypeRegex.firstMatch(section);
         final entryTypeStr = entryTypeMatch?.group(1)?.trim();
 
-        final categoryMatch = RegExp(
-          r'^category::\s*(.*)$',
-          multiLine: true,
-        ).firstMatch(section);
+        final categoryMatch = _categoryRegex.firstMatch(section);
         final categoryStr = categoryMatch?.group(1)?.trim();
 
-        final energyMatch = RegExp(
-          r'^energy_value::\s*(\d+)',
-          multiLine: true,
-        ).firstMatch(section);
+        final energyMatch = _energyRegex.firstMatch(section);
         final energyValue = energyMatch != null
             ? int.tryParse(energyMatch.group(1)!)
             : null;
@@ -764,19 +779,14 @@ class MarkdownParser {
       'minus': <String>[],
       'next': <String>[],
     };
-    final sectionRegex = RegExp(
-      r'^##\s*(Plus|Minus|Next)\s*$',
-      multiLine: true,
-      caseSensitive: false,
-    );
+    final sectionRegex = _plusMinusNextSectionRegex;
     final matches = sectionRegex.allMatches(body).toList();
     for (var i = 0; i < matches.length; i++) {
       final key = matches[i].group(1)!.toLowerCase();
       final start = matches[i].end;
       final end = i + 1 < matches.length ? matches[i + 1].start : body.length;
       final sectionText = body.substring(start, end);
-      final bullets = RegExp(r'^-\s*(.+)$', multiLine: true)
-          .allMatches(sectionText)
+      final bullets = _bulletRegex.allMatches(sectionText)
           .map((m) => m.group(1)!.trim())
           .where((s) => s.isNotEmpty)
           .toList();
@@ -787,11 +797,11 @@ class MarkdownParser {
 
   static List<Map<String, dynamic>> parsePomodoros(String body) {
     final pomodoros = <Map<String, dynamic>>[];
-    final sections = body.split(RegExp(r'^## Pomodoros', multiLine: true));
+    final sections = body.split(_pomodorosSectionRegex);
     if (sections.length < 2) return [];
 
-    final pomsSection = sections[1].split(RegExp(r'^## ', multiLine: true))[0];
-    final subSections = pomsSection.split(RegExp(r'^### ', multiLine: true));
+    final pomsSection = sections[1].split(_nextSectionRegex)[0];
+    final subSections = pomsSection.split(_pomodorosSubsectionRegex);
 
     for (final section in subSections) {
       if (section.trim().isEmpty) continue;
@@ -808,32 +818,27 @@ class MarkdownParser {
           final trimmed = line.trim();
           if (trimmed.contains('Duration:')) {
             pom['worked'] =
-                RegExp(r'Duration:\s*(\d+)').firstMatch(trimmed)?.group(1) ??
-                '';
+                _durationRegex.firstMatch(trimmed)?.group(1) ?? '';
           } else if (trimmed.contains('Blocks:')) {
             pom['blocks'] =
-                RegExp(r'Blocks:\s*(\d+)').firstMatch(trimmed)?.group(1) ?? '';
+                _blocksRegex.firstMatch(trimmed)?.group(1) ?? '';
           } else if (trimmed.contains('- Linked:')) {
-            final linkMatch = RegExp(r'\[\[(.*?)\]\]').firstMatch(trimmed);
+            final linkMatch = _wikiLinkSimpleRegex.firstMatch(trimmed);
             if (linkMatch != null) {
               pom['linked_item'] = linkMatch.group(1);
             }
           } else if (trimmed.contains('- Blocos:')) {
             pom['blocks'] =
-                RegExp(r'Blocos:\s*(\d+)').firstMatch(trimmed)?.group(1) ?? '';
+                _blocksRegex.firstMatch(trimmed)?.group(1) ?? '';
           } else if (trimmed.contains('- Tempo trabalhado:') ||
               trimmed.contains('- Tempo:')) {
             pom['worked'] =
-                RegExp(
-                  r'(?:trabalhado|Tempo):\s*(\d+)',
-                ).firstMatch(trimmed)?.group(1) ??
+                _tempoTrabalhadoRegex.firstMatch(trimmed)?.group(1) ??
                 '';
           } else if (trimmed.contains('- Tempo de pausa:') ||
               trimmed.contains('- Pausas:')) {
             pom['break'] =
-                RegExp(
-                  r'(?:pausa|Pausas):\s*(\d+)',
-                ).firstMatch(trimmed)?.group(1) ??
+                _pausaRegex.firstMatch(trimmed)?.group(1) ??
                 '';
           }
         }

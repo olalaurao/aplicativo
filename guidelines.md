@@ -1790,7 +1790,17 @@ date: 2026-05-19
 type: daily_note
 tags: [daily]
 
-# Habit completions — this block is the ONLY source of truth (Rule 14)
+# Habit completions — this block is a derived rendering (Rule 14)
+> **Implementation note (added 2026-07-12):** the authoritative in-memory
+> source of truth for habit completions is `Habit.completionHistory`
+> (`List<CompletionRecord>` on the `Habit` model), not the daily note's
+> YAML frontmatter block shown above. The frontmatter block below is a
+> *derived, generated rendering* of `completionHistory` for that date —
+> written on save, never parsed back — following the same
+> single-source-of-truth pattern already established for Tracking Records
+> in this document. Any future feature (e.g. the Aromatherapy addendum's
+> `linkedRef` field) should read/write `CompletionRecord` directly and
+> treat the frontmatter block as output only.
 meditate: true
 write-100-words: true
 water: 6

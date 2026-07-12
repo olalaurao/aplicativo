@@ -6,18 +6,32 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
 
-class VaultFilesScreen extends ConsumerWidget {
+class VaultFilesScreen extends ConsumerStatefulWidget {
   const VaultFilesScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<VaultFilesScreen> createState() => _VaultFilesScreenState();
+}
+
+class _VaultFilesScreenState extends ConsumerState<VaultFilesScreen> {
+  late Future<List<File>> _filesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    final service = ref.read(obsidianServiceProvider);
+    _filesFuture = service.getAllMarkdownFiles();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final service = ref.watch(obsidianServiceProvider);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(title: const Text('Vault Files')),
       body: FutureBuilder<List<File>>(
-        future: service.getAllMarkdownFiles(),
+        future: _filesFuture,
         builder: (context, snapshot) {
           final files = snapshot.data ?? [];
           if (snapshot.connectionState == ConnectionState.waiting) {

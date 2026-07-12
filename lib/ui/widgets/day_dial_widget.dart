@@ -262,7 +262,11 @@ class _DayDialWidgetState extends State<DayDialWidget> {
   Widget _buildCenterReadout(BuildContext context) {
     final now = DateTime.now();
     final isToday = _isSameDay(widget.selectedDate, now);
-    
+
+    // Check for overflow (more than 4 rings occupied)
+    final occupiedLayers = widget.snapshot.segments.map((s) => s.layer).toSet();
+    final hasOverflow = occupiedLayers.length > 4 || occupiedLayers.any((l) => l >= 4);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -284,6 +288,24 @@ class _DayDialWidgetState extends State<DayDialWidget> {
             color: AppTheme.textSecondaryColor(context),
           ),
         ),
+        if (hasOverflow) ...[
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF3B30).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              '+',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFFF3B30),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

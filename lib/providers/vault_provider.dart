@@ -1613,41 +1613,6 @@ DateTime _journalEntryDateFromDaily(String dateStr, String? time) {
   return DateTime(base.year, base.month, base.day, hour, minute);
 }
 
-bool _isDailyNote(
-  String relativePath,
-  Map<String, dynamic> frontmatter,
-  AppSettings settings,
-) {
-  final normalizedPath = relativePath.replaceAll('\\', '/');
-  final fileName = normalizedPath.split('/').last;
-  final folder = settings.dailyNoteFolder
-      .trim()
-      .replaceAll('\\', '/')
-      .replaceAll(RegExp(r'^/+|/+$'), '');
-
-  switch (settings.dailyNoteIdentifier) {
-    case 'folder':
-      return folder.isNotEmpty &&
-          (normalizedPath == '$folder/$fileName' ||
-              normalizedPath.startsWith('$folder/'));
-    case 'frontmatter_type':
-      return frontmatter['type']?.toString() == 'daily_note';
-    case 'filename_format':
-    default:
-      final pattern = settings.dailyNoteDateFormat == 'yy-MM-dd'
-          ? RegExp(r'^\d{2}-\d{2}-\d{2}\.md$')
-          : RegExp(r'^\d{4}-\d{2}-\d{2}\.md$');
-      return pattern.hasMatch(fileName);
-  }
-}
-
-String _normalizeDailyDate(String raw) {
-  if (RegExp(r'^\d{2}-\d{2}-\d{2}$').hasMatch(raw)) {
-    return '20$raw';
-  }
-  return raw;
-}
-
 class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
   @override
   Future<List<ContentObject>> build() async {

@@ -400,6 +400,19 @@ class SyncManager {
         if (remoteFile.id == null) continue;
         final remoteContent = await driveSync.downloadFile(remoteFile.id!);
         if (remoteContent != null) {
+          // Optimistic concurrency check: re-read sync state before writing
+          final currentSyncState = await queue.getFileSyncState(relPath);
+          if (currentSyncState != null && currentSyncState['remoteHash'] != null) {
+            // Another device already synced this file, treat as conflict
+            await _storeConflict(
+              driveSync: driveSync,
+              obsidian: obsidian,
+              relativePath: relPath,
+              localContent: content,
+              remoteContent: remoteContent,
+            );
+            continue;
+          }
           await _ensurePreSyncBackup(driveSync);
           await obsidian.writeFile(relPath, remoteContent);
           final newHash = driveSync.calculateHash(remoteContent);
@@ -415,6 +428,22 @@ class SyncManager {
         }
       } else if (remoteHash == null &&
           await _isLocalFileNewer(localFile, remoteFile)) {
+        // Optimistic concurrency check: re-read sync state before writing
+        final currentSyncState = await queue.getFileSyncState(relPath);
+        if (currentSyncState != null && currentSyncState['remoteHash'] != null) {
+          // Another device already synced this file, treat as conflict
+          final remoteContent = await driveSync.downloadFile(remoteFile.id!);
+          if (remoteContent != null) {
+            await _storeConflict(
+              driveSync: driveSync,
+              obsidian: obsidian,
+              relativePath: relPath,
+              localContent: content,
+              remoteContent: remoteContent,
+            );
+          }
+          continue;
+        }
         await _ensurePreSyncBackup(driveSync);
         final uploaded = await driveSync.syncFile(relPath, content, localHash);
         if (uploaded) {

@@ -239,6 +239,7 @@ class CompletionRecord {
   double? value;
   List<Comment> comments;
   List<JournalEntry> journalEntries; // Or references
+  DateTime? completedAt; // When the completion was recorded (time component)
 
   CompletionRecord({
     required this.date,
@@ -248,6 +249,7 @@ class CompletionRecord {
     this.value,
     List<Comment>? comments,
     List<JournalEntry>? journalEntries,
+    this.completedAt,
   }) : comments = comments ?? [],
        journalEntries = journalEntries ?? [];
 }

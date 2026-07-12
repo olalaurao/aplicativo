@@ -27,6 +27,8 @@ class _WeekTimelineScreenState extends ConsumerState<WeekTimelineScreen> {
   bool _isSearching = false;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  final Map<DateTime, GlobalKey> _daySectionKeys = {};
+  final Map<DateTime, double> _daySectionHeights = {};
 
   @override
   void initState() {
@@ -72,20 +74,22 @@ class _WeekTimelineScreenState extends ConsumerState<WeekTimelineScreen> {
   void _loadPreviousDays() {
     final firstDate = _loadedDates.first;
     final newDates = List.generate(7, (i) => firstDate.subtract(Duration(days: 7 - i)));
-    
+
     // Preserve current scroll position to prevent visual jump
     final currentScrollOffset = _scrollController.offset;
-    
+
     setState(() {
       _loadedDates.insertAll(0, newDates);
       _previousDaysLoaded += 7;
     });
 
     // Adjust scroll position to account for new items added at top
-    // Approximate height per day section (header + items)
+    // Use cached heights where available, fall back to 200.0 estimate
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final estimatedHeightPerDay = 200.0; // Approximate height
-      final totalNewHeight = newDates.length * estimatedHeightPerDay;
+      double totalNewHeight = 0;
+      for (final date in newDates) {
+        totalNewHeight += _daySectionHeights[date] ?? 200.0;
+      }
       _scrollController.jumpTo(currentScrollOffset + totalNewHeight);
     });
   }
@@ -93,14 +97,20 @@ class _WeekTimelineScreenState extends ConsumerState<WeekTimelineScreen> {
   void _scrollToToday() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    
-    final todayIndex = _loadedDates.indexWhere((date) => 
+
+    final todayIndex = _loadedDates.indexWhere((date) =>
         date.year == today.year && date.month == today.month && date.day == today.day);
-    
+
     if (todayIndex != -1) {
-      // Scroll to today's position (approximate, since we don't have exact item heights)
+      // Calculate scroll position using cached heights where available
+      double targetOffset = 0;
+      for (int i = 0; i < todayIndex; i++) {
+        final date = _loadedDates[i];
+        targetOffset += _daySectionHeights[date] ?? 200.0;
+      }
+
       _scrollController.animateTo(
-        todayIndex * 200.0, // Approximate height per day section
+        targetOffset,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
@@ -235,23 +245,59 @@ class _WeekTimelineScreenState extends ConsumerState<WeekTimelineScreen> {
     final weekday = DateFormat('EEEE', 'en_US').format(date);
     final dateStr = DateFormat('d MMM.').format(date);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Day header
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Row(
-            children: [
-              Text(
-                dateStr,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: isToday ? AppTheme.accentColor(context) : null,
+    // Ensure we have a key for this date
+    _daySectionKeys.putIfAbsent(date, () => GlobalKey());
+
+    // Measure height after the frame is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final key = _daySectionKeys[date];
+      if (key?.currentContext != null) {
+        final RenderBox? box = key!.currentContext!.findRenderObject() as RenderBox?;
+        if (box != null && box.hasSize) {
+          setState(() {
+            _daySectionHeights[date] = box.size.height;
+          });
+        }
+      }
+    });
+
+    return Container(
+      key: _daySectionKeys[date],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Day header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                Text(
+                  dateStr,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: isToday ? AppTheme.accentColor(context) : null,
+                  ),
                 ),
-              ),
-              if (relativeLabel.isNotEmpty) ...[
+                if (relativeLabel.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    '·',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    relativeLabel,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
+                      color: isToday ? AppTheme.accentColor(context) : null,
+                    ),
+                  ),
+                ],
                 const SizedBox(width: 6),
                 Text(
                   '·',
@@ -262,54 +308,37 @@ class _WeekTimelineScreenState extends ConsumerState<WeekTimelineScreen> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  relativeLabel,
-                  style: TextStyle(
+                  weekday,
+                  style: const TextStyle(
                     fontSize: 15,
-                    fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
-                    color: isToday ? AppTheme.accentColor(context) : null,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
-              const SizedBox(width: 6),
-              Text(
-                '·',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: AppColors.textMuted,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                weekday,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-        // Divider
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Divider(height: 1),
-        ),
-        // Items
-        if (items.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-            child: Text(
-              'Nothing scheduled',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textMuted,
-                fontStyle: FontStyle.italic,
-              ),
             ),
-          )
-        else
-          ...items.map((item) => _buildItemRow(item)),
-      ],
+          ),
+          // Divider
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Divider(height: 1),
+          ),
+          // Items
+          if (items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+              child: Text(
+                'Nothing scheduled',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textMuted,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            )
+          else
+            ...items.map((item) => _buildItemRow(item)),
+        ],
+      ),
     );
   }
 

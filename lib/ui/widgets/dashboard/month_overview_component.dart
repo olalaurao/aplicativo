@@ -153,10 +153,12 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
                             const SizedBox(height: 2),
                             if (isCurrentMonth)
                               Expanded(
-                                child: SingleChildScrollView(
-                                  child: Column(
-                                    children: [
-                                      ...visibleItems.map((item) => Padding(
+                                child: ListView(
+                                  shrinkWrap: true,
+                                  physics: const ClampingScrollPhysics(),
+                                  padding: EdgeInsets.zero,
+                                  children: [
+                                    ...visibleItems.map((item) => Padding(
                                       padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 0.5),
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
@@ -176,21 +178,23 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
                                       ),
                                     )),
                                     if (hasMore)
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Container(
-                                            width: 4,
-                                            height: 4,
-                                            decoration: const BoxDecoration(
-                                              color: AppColors.textMuted,
-                                              shape: BoxShape.circle,
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 1),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Container(
+                                              width: 4,
+                                              height: 4,
+                                              decoration: const BoxDecoration(
+                                                color: AppColors.textMuted,
+                                                shape: BoxShape.circle,
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
-                                    ],
-                                  ),
+                                  ],
                                 ),
                               ),
                           ],

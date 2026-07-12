@@ -12,6 +12,22 @@
 .swiftpm/
 migrate_working_dir/
 
+# Debug and log files (except README.md)
+*.txt
+!README.md
+build_log.txt
+
+# Tools and scripts
+.tools/
+*.ps1
+*.bat
+
+# Backup files
+*.bak
+
+# Crash reports
+crash_reports/
+
 # IntelliJ related
 *.iml
 *.ipr

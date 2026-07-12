@@ -1714,7 +1714,6 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                initialValue: trigger,
                 decoration: const InputDecoration(labelText: 'Quando disparar?'),
                 items: const [
                   DropdownMenuItem(

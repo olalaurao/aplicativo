@@ -2134,9 +2134,6 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            initialValue: groups.any((g) => g.id == _rotationGroupId)
-                ? _rotationGroupId
-                : null,
             decoration: const InputDecoration(
               labelText: 'Zona',
               border: OutlineInputBorder(),
@@ -2157,9 +2154,6 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<RotationFrequencyType>(
-            initialValue: _rotationFrequencyType == RotationFrequencyType.none
-                ? null
-                : _rotationFrequencyType,
             decoration: const InputDecoration(
               labelText: 'Tipo de frequência',
               border: OutlineInputBorder(),

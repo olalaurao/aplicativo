@@ -518,54 +518,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
-  Widget _buildProjectProgress(BuildContext context, WidgetRef ref) {
-    final tasks = ref.watch(tasksProvider);
-    final progress = KPIEngine.calculateProjectProgress(
-      object as Project,
-      tasks,
-    );
-    final percentage = (progress * 100).toInt();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'PROGRESS',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textMuted,
-                letterSpacing: 1.0,
-              ),
-            ),
-            Text(
-              '$percentage%',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.accentColor(context),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: progress,
-            backgroundColor: AppColors.surfaceVariant,
-            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentColor(context)),
-            minHeight: 8,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _badge(String text, {Color? color}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -1851,12 +1803,14 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
     if (object is Goal) {
       final goal = object as Goal;
-      final habits = ref.watch(habitsProvider);
-      final trackerRecords = ref.watch(trackingRecordsProvider);
-      final entries = ref.watch(allEntriesProvider);
-      final moods = ref.watch(moodsProvider);
-      final notes = ref.watch(notesProvider);
-      final tasks = ref.watch(tasksProvider);
+      // Only watch providers if the goal has KPIs that need live calculation
+      final needsLiveData = goal.kpis.isNotEmpty;
+      final habits = needsLiveData ? ref.watch(habitsProvider) : <Habit>[];
+      final trackerRecords = needsLiveData ? ref.watch(trackingRecordsProvider) : <TrackingRecord>[];
+      final entries = needsLiveData ? ref.watch(allEntriesProvider) : <JournalEntry>[];
+      final moods = needsLiveData ? ref.watch(moodsProvider) : <MoodDefinition>[];
+      final notes = needsLiveData ? ref.watch(notesProvider) : <Note>[];
+      final tasks = needsLiveData ? ref.watch(tasksProvider) : <Task>[];
 
       double total = 0;
       double completed = 0;
@@ -4937,23 +4891,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
-  void _showPersonPriorityPicker(
-    BuildContext context,
-    WidgetRef ref,
-    Person person,
-  ) {
-    _showOptionSheet<TaskPriority>(
-      context: context,
-      title: 'Contact Priority',
-      values: TaskPriority.values,
-      label: (value) => value.name,
-      onSelected: (value) {
-        person.contactPriority = value;
-        ref.read(vaultProvider.notifier).updateObject(person);
-      },
-    );
-  }
-
   void _showResourceStatusPicker(
     BuildContext context,
     WidgetRef ref,
@@ -4967,23 +4904,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       onSelected: (value) {
         resource.status = value;
         ref.read(vaultProvider.notifier).updateObject(resource);
-      },
-    );
-  }
-
-  void _showResourcePriorityPicker(
-    BuildContext context,
-    WidgetRef ref,
-    Resource resource,
-  ) {
-    _showOptionSheet<ResourcePriority>(
-      context: context,
-      title: 'Priority',
-      values: ResourcePriority.values,
-      label: (value) => value.name,
-      onSelected: (value) {
-        final updated = resource.copyWith(priority: value);
-        ref.read(vaultProvider.notifier).updateObject(updated);
       },
     );
   }
@@ -5237,6 +5157,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     Goal goal,
     KPI kpi,
   ) {
+    // Only watch providers if the goal has KPIs that need live calculation
     final habits = ref.watch(habitsProvider);
     final trackerRecords = ref.watch(trackingRecordsProvider);
     final entries = ref.watch(allEntriesProvider);
