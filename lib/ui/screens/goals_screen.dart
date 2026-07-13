@@ -8,6 +8,7 @@ import '../../models/journal_entry.dart';
 import '../../models/mood_model.dart';
 import '../../models/note_model.dart';
 import '../../models/task_model.dart';
+import '../../models/kpi_model.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/kpi_engine.dart';
 import '../theme.dart';
@@ -219,12 +220,41 @@ class _GoalCard extends ConsumerWidget {
 
     // Only watch providers if the goal has KPIs that need live calculation
     final needsLiveData = goal.kpis.isNotEmpty;
-    final habits = needsLiveData ? ref.watch(habitsProvider) : <Habit>[];
-    final trackerRecords = needsLiveData ? ref.watch(trackingRecordsProvider) : <TrackingRecord>[];
-    final entries = needsLiveData ? ref.watch(allEntriesProvider) : <JournalEntry>[];
-    final moods = needsLiveData ? ref.watch(moodsProvider) : <MoodDefinition>[];
-    final notes = needsLiveData ? ref.watch(notesProvider) : <Note>[];
-    final tasks = needsLiveData ? ref.watch(tasksProvider) : <Task>[];
+    
+    // Use .select() to narrow watches to only objects referenced by this goal's KPIs
+    final habits = needsLiveData 
+        ? ref.watch(habitsProvider.select((habits) => habits.where((h) => 
+            goal.kpis.any((k) => k.sourceType == KPISourceType.habit && k.sourceId == h.id)
+          ).toList()))
+        : <Habit>[];
+    final trackerRecords = needsLiveData 
+        ? ref.watch(trackingRecordsProvider.select((records) => records.where((r) => 
+            goal.kpis.any((k) => k.sourceType == KPISourceType.trackerField && k.sourceId == r.trackerId)
+          ).toList()))
+        : <TrackingRecord>[];
+    final entries = needsLiveData 
+        ? ref.watch(allEntriesProvider.select((entries) => entries.where((e) => 
+            goal.kpis.any((k) => k.sourceType == KPISourceType.entry)
+          ).toList()))
+        : <JournalEntry>[];
+    final moods = needsLiveData 
+        ? ref.watch(moodsProvider.select((moods) => moods.where((m) => 
+            goal.kpis.any((k) => k.sourceType == KPISourceType.others && 
+                (k.calculationMode == 'mood_average' || k.calculationMode == 'mood_trend'))
+          ).toList()))
+        : <MoodDefinition>[];
+    final notes = needsLiveData 
+        ? ref.watch(notesProvider.select((notes) => notes.where((n) => 
+            goal.kpis.any((k) => k.sourceType == KPISourceType.collection && k.sourceId == n.id)
+          ).toList()))
+        : <Note>[];
+    final tasks = needsLiveData 
+        ? ref.watch(tasksProvider.select((tasks) => tasks.where((t) => 
+            goal.kpis.any((k) => k.sourceType == KPISourceType.subtasks && 
+                (t.organizers.any((org) => org.slug == k.sourceId) || 
+                 t.dependsOn.contains('[[${k.sourceId}]]')))
+          ).toList()))
+        : <Task>[];
 
     return InkWell(
       onTap: () => Navigator.push(

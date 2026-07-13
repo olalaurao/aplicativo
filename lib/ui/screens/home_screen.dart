@@ -45,10 +45,13 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
   final TextEditingController _quickEntryController = TextEditingController();
   final TextEditingController _quickTaskController = TextEditingController();
   bool _editMode = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -238,6 +241,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     final blocksState = ref.watch(dashboardProvider);
 
     return Scaffold(

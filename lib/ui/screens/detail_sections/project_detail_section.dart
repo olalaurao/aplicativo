@@ -8,6 +8,7 @@ import '../../../providers/vault_provider.dart';
 import '../../../services/kpi_engine.dart';
 import '../../widgets/property_grid.dart';
 import '../../theme.dart';
+import '../universal_detail_view.dart';
 
 /// Project-specific property cards for universal detail view
 List<PropertyCard> buildProjectPropertyCards(
@@ -19,10 +20,9 @@ List<PropertyCard> buildProjectPropertyCards(
   final allObjects = ref.watch(allObjectsProvider).value ?? [];
   final tasks = allObjects.whereType<Task>().where((t) => 
       t.organizers.any((o) => o.slug == project.slug)).toList();
-  final progress = KPIEngine.calculateProjectProgress(project, tasks);
-  final linkedTasks = tasks.where((t) => 
-      project.taskLinks.contains(t.slug) || project.taskLinks.contains(t.id)).toList();
-  final doneCount = linkedTasks.where((t) => t.isCompleted).length;
+  final progress = ProjectProgressCache.getProgress(project.id, project, tasks);
+  final linkedTasksCount = ProjectProgressCache.getLinkedTaskCount(project.id, project, tasks);
+  final doneCount = ProjectProgressCache.getCompletedTaskCount(project.id, project, tasks);
 
   if (project.hasRotation) {
     cards.add(PropertyCard(
@@ -33,7 +33,7 @@ List<PropertyCard> buildProjectPropertyCards(
     cards.add(PropertyCard(
       icon: Icons.task_alt,
       label: 'Tarefas',
-      value: '$doneCount de ${linkedTasks.length}',
+      value: '$doneCount de $linkedTasksCount',
     ));
   }
   cards.add(PropertyCard(

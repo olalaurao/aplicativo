@@ -930,9 +930,27 @@ class _CombinedAnalysisScreenState
         );
         if (kpi != null) {
           // Calculate KPI value for the specific date
-          // Since KPIEngine calculates over a range, we'll use the date as both start and end
+          // Scope the calculation to the given date (start of day to end of day)
+          final dayStart = DateTime(date.year, date.month, date.day);
+          final dayEnd = DateTime(date.year, date.month, date.day, 23, 59, 59);
+          
+          final scopedKpi = KPI(
+            id: kpi.id,
+            title: kpi.title,
+            dataSource: kpi.dataSource,
+            calculationMode: kpi.calculationMode,
+            targetValue: kpi.targetValue,
+            currentValue: kpi.currentValue,
+            startDate: dayStart,
+            endDate: dayEnd,
+            displayType: kpi.displayType,
+            completed: kpi.completed,
+            autoComplete: kpi.autoComplete,
+            autoCompleteAction: kpi.autoCompleteAction,
+          );
+          
           final value = KPIEngine.calculateKPIValue(
-            kpi: kpi,
+            kpi: scopedKpi,
             habits: ref.read(habitsProvider),
             trackerRecords: ref.read(trackingRecordsProvider),
             entries: ref.read(allEntriesProvider),

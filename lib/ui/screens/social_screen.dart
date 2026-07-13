@@ -446,7 +446,13 @@ class _SocialScreenState extends ConsumerState<SocialScreen> {
             : Icons.radio_button_unchecked_rounded,
         color: selected ? AppTheme.accentColor(context) : AppColors.textMuted,
       ),
-      title: Text(label),
+      title: Flexible(
+        child: Text(
+          label,
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
+        ),
+      ),
       onTap: () => onChanged(value),
     );
   }

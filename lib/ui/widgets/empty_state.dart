@@ -47,6 +47,8 @@ class EmptyState extends StatelessWidget {
                 color: AppTheme.textPrimaryColor(context),
               ),
               textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
             ),
             const SizedBox(height: 12),
             Text(
@@ -57,6 +59,8 @@ class EmptyState extends StatelessWidget {
                 height: 1.5,
               ),
               textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 3,
             ),
             if (ctaLabel != null && onCta != null) ...[
               const SizedBox(height: 32),

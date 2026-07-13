@@ -33,7 +33,6 @@ import 'pomodoro_screen.dart';
 import '../theme.dart';
 import '../../services/undo_service.dart';
 import '../widgets/quartzo_chart.dart';
-import '../widgets/tracker_metric_card.dart';
 import '../widgets/rich_text_editor.dart';
 import '../widgets/outline_editor.dart';
 import '../widgets/property_grid.dart';
@@ -77,12 +76,25 @@ import 'detail_sections/note_detail_section.dart';
 import 'detail_sections/person_detail_section.dart';
 import 'detail_sections/journal_entry_detail_section.dart';
 import 'detail_sections/idea_detail_section.dart';
+import 'detail_views/resource_detail_view.dart';
+import 'detail_views/person_detail_view.dart';
+import 'detail_views/note_detail_view.dart';
+import 'detail_views/mood_detail_view.dart';
+import 'detail_views/tracker_detail_view.dart';
 
 /// Helper class to cache computed project progress to avoid duplicate calculations
-class _ProjectProgressCache {
+class ProjectProgressCache {
   static final Map<String, double> _cache = {};
   static final Map<String, int> _linkedTaskCountCache = {};
   static final Map<String, int> _completedTaskCountCache = {};
+  static final Map<String, List<Task>> _linkedTasksCache = {};
+
+  static List<Task> _getLinkedTasks(String projectId, Project project, List<Task> tasks) {
+    if (_linkedTasksCache.containsKey(projectId)) return _linkedTasksCache[projectId]!;
+    final linkedTasks = tasks.where((t) => project.taskLinks.contains(t.slug) || project.taskLinks.contains(t.id)).toList();
+    _linkedTasksCache[projectId] = linkedTasks;
+    return linkedTasks;
+  }
 
   static double getProgress(String projectId, Project project, List<Task> tasks) {
     if (_cache.containsKey(projectId)) return _cache[projectId]!;
@@ -93,17 +105,24 @@ class _ProjectProgressCache {
 
   static int getLinkedTaskCount(String projectId, Project project, List<Task> tasks) {
     if (_linkedTaskCountCache.containsKey(projectId)) return _linkedTaskCountCache[projectId]!;
-    final linkedTasks = tasks.where((t) => project.taskLinks.contains(t.slug) || project.taskLinks.contains(t.id)).toList();
+    final linkedTasks = _getLinkedTasks(projectId, project, tasks);
     _linkedTaskCountCache[projectId] = linkedTasks.length;
     return linkedTasks.length;
   }
 
   static int getCompletedTaskCount(String projectId, Project project, List<Task> tasks) {
     if (_completedTaskCountCache.containsKey(projectId)) return _completedTaskCountCache[projectId]!;
-    final linkedTasks = tasks.where((t) => project.taskLinks.contains(t.slug) || project.taskLinks.contains(t.id)).toList();
+    final linkedTasks = _getLinkedTasks(projectId, project, tasks);
     final doneCount = linkedTasks.where((t) => t.isCompleted).length;
     _completedTaskCountCache[projectId] = doneCount;
     return doneCount;
+  }
+
+  static void clearCache() {
+    _cache.clear();
+    _linkedTaskCountCache.clear();
+    _completedTaskCountCache.clear();
+    _linkedTasksCache.clear();
   }
 }
 
@@ -1056,118 +1075,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
-  Widget _buildNotePropertiesCardContent(BuildContext context, Note note, List<Note> allNotes) {
-    // Find parent note title
-    String? parentNoteTitle;
-    if (note.parentNoteId != null) {
-      final parent = allNotes.where((n) => n.id == note.parentNoteId).firstOrNull;
-      parentNoteTitle = parent?.title;
-    }
-
-    final cards = <PropertyCard>[
-      PropertyCard(
-        icon: _getSubtypeIcon(note.subtype),
-        label: 'Subtype',
-        value: note.subtype.name,
-        onTap: () {
-          _showEnumPropertyPicker<NoteSubtype>(
-            context: context,
-            title: 'Subtype',
-            initialValue: note.subtype,
-            values: NoteSubtype.values,
-            labelBuilder: (val) => val.name,
-            onSave: (val) {
-              ref.read(vaultProvider.notifier).updateObject(note.copyWith(subtype: val));
-            },
-          );
-        },
-      ),
-      PropertyCard(
-        icon: Icons.label_outline_rounded,
-        label: 'Category',
-        value: note.categories.isNotEmpty ? note.categories.first : null,
-        state: note.categories.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
-        onTap: () {
-          _showStringPropertyPicker(
-            context: context,
-            title: 'Category',
-            initialValue: note.categories.isNotEmpty ? note.categories.first : '',
-            onSave: (val) {
-              final newCategories = val.trim().isNotEmpty ? [val.trim()] : <String>[];
-              ref.read(vaultProvider.notifier).updateObject(note.copyWith(categories: newCategories));
-            },
-          );
-        },
-      ),
-      PropertyCard(
-        icon: Icons.push_pin_outlined,
-        label: 'Pinned',
-        value: note.pinned ? 'Yes' : 'No',
-        onTap: () {
-          _showBoolPropertyPicker(
-            context: context,
-            title: 'Pinned',
-            initialValue: note.pinned,
-            onSave: (val) {
-              ref.read(vaultProvider.notifier).updateObject(note.copyWith(pinned: val));
-            },
-          );
-        },
-      ),
-      PropertyCard(
-        icon: Icons.checklist_rtl_rounded,
-        label: 'Checklist',
-        value: note.isChecklist ? 'Yes' : 'No',
-        onTap: () {
-          _showBoolPropertyPicker(
-            context: context,
-            title: 'Checklist',
-            initialValue: note.isChecklist,
-            onSave: (val) {
-              ref.read(vaultProvider.notifier).updateObject(note.copyWith(isChecklist: val));
-            },
-          );
-        },
-      ),
-      PropertyCard(
-        icon: Icons.calendar_view_day_outlined,
-        label: 'Show in Planner',
-        value: note.showInPlanner ? 'Yes' : 'No',
-        onTap: () {
-          _showBoolPropertyPicker(
-            context: context,
-            title: 'Show in Planner',
-            initialValue: note.showInPlanner,
-            onSave: (val) {
-              ref.read(vaultProvider.notifier).updateObject(note.copyWith(showInPlanner: val));
-            },
-          );
-        },
-      ),
-      PropertyCard(
-        icon: Icons.drive_file_move_outline,
-        label: 'Parent Note',
-        value: parentNoteTitle ?? 'None',
-        state: note.parentNoteId == null ? PropertyCardState.empty : PropertyCardState.normal,
-        onTap: () {
-          _showParentNotePicker(context, note);
-        },
-      ),
-      PropertyCard(
-        icon: Icons.calendar_today_outlined,
-        label: 'Created',
-        value: DateFormat('d MMM yyyy').format(note.createdAt),
-      ),
-      PropertyCard(
-        icon: Icons.update_rounded,
-        label: 'Modified',
-        value: DateFormat('d MMM yyyy').format(note.updatedAt),
-      ),
-    ];
-
-    return PropertyGrid(cards: cards);
-  }
-
   IconData _getSubtypeIcon(NoteSubtype subtype) {
     switch (subtype) {
       case NoteSubtype.text:
@@ -1475,8 +1382,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     if (object is Project) {
       final project = object as Project;
       final tasks = ref.watch(tasksProvider.select((tasks) => tasks.where((t) => t.organizers.any((o) => o.slug == project.slug)).toList()));
-      final progress = _ProjectProgressCache.getProgress(project.id, project, tasks);
-      final doneCount = _ProjectProgressCache.getCompletedTaskCount(project.id, project, tasks);
+      final progress = ProjectProgressCache.getProgress(project.id, project, tasks);
+      final doneCount = ProjectProgressCache.getCompletedTaskCount(project.id, project, tasks);
 
       if (project.hasRotation) {
         return [
@@ -1514,7 +1421,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         ];
       }
 
-      final linkedTasksCount = _ProjectProgressCache.getLinkedTaskCount(project.id, project, tasks);
+      final linkedTasksCount = ProjectProgressCache.getLinkedTaskCount(project.id, project, tasks);
 
       return [
         SliverToBoxAdapter(
@@ -1589,12 +1496,41 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       final goal = object as Goal;
       // Only watch providers if the goal has KPIs that need live calculation
       final needsLiveData = goal.kpis.isNotEmpty;
-      final habits = needsLiveData ? ref.watch(habitsProvider) : <Habit>[];
-      final trackerRecords = needsLiveData ? ref.watch(trackingRecordsProvider) : <TrackingRecord>[];
-      final entries = needsLiveData ? ref.watch(allEntriesProvider) : <JournalEntry>[];
-      final moods = needsLiveData ? ref.watch(moodsProvider) : <MoodDefinition>[];
-      final notes = needsLiveData ? ref.watch(notesProvider) : <Note>[];
-      final tasks = needsLiveData ? ref.watch(tasksProvider) : <Task>[];
+      
+      // Use .select() to narrow watches to only objects referenced by this goal's KPIs
+      final habits = needsLiveData 
+          ? ref.watch(habitsProvider.select((habits) => habits.where((h) => 
+              goal.kpis.any((k) => k.sourceType == KPISourceType.habit && k.sourceId == h.id)
+            ).toList()))
+          : <Habit>[];
+      final trackerRecords = needsLiveData 
+          ? ref.watch(trackingRecordsProvider.select((records) => records.where((r) => 
+              goal.kpis.any((k) => k.sourceType == KPISourceType.trackerField && k.sourceId == r.trackerId)
+            ).toList()))
+          : <TrackingRecord>[];
+      final entries = needsLiveData 
+          ? ref.watch(allEntriesProvider.select((entries) => entries.where((e) => 
+              goal.kpis.any((k) => k.sourceType == KPISourceType.entry)
+            ).toList()))
+          : <JournalEntry>[];
+      final moods = needsLiveData 
+          ? ref.watch(moodsProvider.select((moods) => moods.where((m) => 
+              goal.kpis.any((k) => k.sourceType == KPISourceType.others && 
+                  (k.calculationMode == 'mood_average' || k.calculationMode == 'mood_trend'))
+            ).toList()))
+          : <MoodDefinition>[];
+      final notes = needsLiveData 
+          ? ref.watch(notesProvider.select((notes) => notes.where((n) => 
+              goal.kpis.any((k) => k.sourceType == KPISourceType.collection && k.sourceId == n.id)
+            ).toList()))
+          : <Note>[];
+      final tasks = needsLiveData 
+          ? ref.watch(tasksProvider.select((tasks) => tasks.where((t) => 
+              goal.kpis.any((k) => k.sourceType == KPISourceType.subtasks && 
+                  (t.organizers.any((org) => org.slug == k.sourceId) || 
+                   t.dependsOn.contains('[[${k.sourceId}]]')))
+            ).toList()))
+          : <Task>[];
 
       double total = 0;
       double completed = 0;
@@ -1676,468 +1612,29 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       ];
     }
     if (object is Resource) {
-      final resource = object as Resource;
-      final readDateStr = resource.readDate != null
-          ? DateFormat('d MMM yyyy').format(resource.readDate!)
-          : 'N/A';
-      final statusColor = _resourceStatusColor(resource.status);
-      final highlights = MarkdownParser.extractHighlights(resource.synopsis ?? '');
-
-      return [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: Column(
-              children: [
-                if (resource.coverImage != null)
-                  Center(
-                    child: Container(
-                      height: 220,
-                      decoration: BoxDecoration(
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.15),
-                            blurRadius: 16,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          resource.coverImage!,
-                          height: 220,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                        ),
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 20),
-                Text(
-                  resource.title,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Recurso · ${resource.mediaType}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                GestureDetector(
-                  onTap: () =>
-                      _showResourceStatusPicker(context, ref, resource),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        const Text(
-                          'Status',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          _resourceStatusLabel(resource.status).toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.chevron_right_rounded,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                GridView.count(
-                  crossAxisCount: 2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  childAspectRatio: 2.2,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  children: [
-                    _miniPropCard(
-                      context,
-                      icon: Icons.calendar_today_outlined,
-                      label: 'Criado',
-                      value: DateFormat('d MMM').format(resource.createdAt),
-                    ),
-                    _miniPropCard(
-                      context,
-                      icon: Icons.update_rounded,
-                      label: 'Modificado',
-                      value: DateFormat('d MMM').format(resource.updatedAt),
-                    ),
-                    _miniPropCard(
-                      context,
-                      icon: Icons.person_outline_rounded,
-                      label: 'Autor',
-                      value: resource.author ?? 'N/A',
-                      isEmpty: resource.author == null,
-                    ),
-                    _miniPropCard(
-                      context,
-                      icon: Icons.date_range_outlined,
-                      label: 'Ano',
-                      value: resource.year?.toString() ?? 'N/A',
-                      isEmpty: resource.year == null,
-                    ),
-                    _miniPropCard(
-                      context,
-                      icon: Icons.category_outlined,
-                      label: 'Categoria',
-                      value: resource.category ?? 'Sem categoria',
-                      isEmpty: resource.category == null,
-                    ),
-                    _miniPropCard(
-                      context,
-                      icon: Icons.menu_book_outlined,
-                      label: 'Data de leitura',
-                      value: readDateStr,
-                      isEmpty: resource.readDate == null,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                _buildRatingSection(context, ref, resource),
-                const SizedBox(height: 24),
-                _buildHighlightsSection(context, ref, resource, highlights),
-                const SizedBox(height: 24),
-                _buildSynopsisSection(context, ref, resource),
-              ],
-            ),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.timer_outlined, size: 18),
-              label: const Text('Start Pomodoro Session'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.error,
-                side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                minimumSize: const Size(double.infinity, 48),
-              ),
-              onPressed: () => _startFocusSession(context, ref),
-            ),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: LinkedObjectsSection(
-            owner: resource,
-            links: resource.links,
-            onAdd: (selected) async {
-              final linkRef = '[[${selected.slug}]]';
-              if (resource.links.contains(linkRef)) return;
-              final updated = resource.copyWith(
-                links: [...resource.links, linkRef],
-                updatedAt: DateTime.now(),
-              );
-              await this.ref
-                  .read(resourcesProvider.notifier)
-                  .updateResource(updated);
-              if (mounted) setState(() => object = updated);
-            },
-            onRemove: (slug) async {
-              final updated = resource.copyWith(
-                links: resource.links
-                    .where((r) => r != slug)
-                    .toList(),
-                updatedAt: DateTime.now(),
-              );
-              await this.ref
-                  .read(resourcesProvider.notifier)
-                  .updateResource(updated);
-              if (mounted) setState(() => object = updated);
-            },
-          ),
-        ),
-      ];
+      return buildResourceContentSection(
+        context,
+        ref,
+        object as Resource,
+        _resourceStatusColor,
+        _resourceStatusLabel,
+        _miniPropCard,
+        _buildHighlightsSection,
+        _buildSynopsisSection,
+        () => _startFocusSession(context, ref),
+      );
     }
     if (object is Person) {
-      final person = object as Person;
-      final daysSince = person.lastContactDate != null
-          ? DateTime.now().difference(person.lastContactDate!).inDays
-          : null;
-      final isOverdue = person.isDueForContact;
-      final frequencyDays = person.contactFrequency?.inDays ?? 0;
-      final progress = (daysSince != null && frequencyDays > 0)
-          ? (daysSince / frequencyDays).clamp(0.0, 1.0)
-          : 0.0;
-
-      return [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: AppTheme.cardDecoration(context),
-                  child: Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 60,
-                        backgroundColor: AppColors.surfaceVariant,
-                        backgroundImage: person.photo != null
-                            ? NetworkImage(person.photo!)
-                            : null,
-                        child: person.photo == null
-                            ? Text(
-                                person.title.isNotEmpty
-                                    ? person.title.substring(0, 1).toUpperCase()
-                                    : '?',
-                                style: TextStyle(
-                                  fontSize: 40,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppTheme.accentColor(context),
-                                ),
-                              )
-                            : null,
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _contactActionButton(
-                            context,
-                            ref,
-                            Icons.chat_bubble_outline_rounded,
-                            'WhatsApp',
-                            const Color(0xFF25D366),
-                          ),
-                          _contactActionButton(
-                            context,
-                            ref,
-                            Icons.message_outlined,
-                            'Message',
-                            AppTheme.accentColor(context),
-                          ),
-                          _contactActionButton(
-                            context,
-                            ref,
-                            Icons.call_outlined,
-                            'Call',
-                            AppColors.habitGreen,
-                          ),
-                          _contactActionButton(
-                            context,
-                            ref,
-                            Icons.mail_outline_rounded,
-                            'Email',
-                            AppColors.info,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                _personGoogleEventBanner(context, ref, person),
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: AppTheme.cardDecoration(context),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'CONTACT FREQUENCY',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textMuted,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                          if (isOverdue)
-                            _badge('OVERDUE', color: AppColors.error)
-                          else if (frequencyDays > 0)
-                            Text(
-                              '${frequencyDays - (daysSince ?? 0)} days left',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 12,
-                          backgroundColor: AppColors.surfaceVariant,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            isOverdue ? AppColors.error : AppTheme.accentColor(context),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        person.lastContactDate != null
-                            ? 'Last contact: ${DateFormat('MMMM d, yyyy').format(person.lastContactDate!)}'
-                            : 'Never contacted through Citrine',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // ─── Contact History ───
-                const Text(
-                  'CONTACT HISTORY',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textMuted,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Builder(
-                  builder: (ctx) {
-                    final historyAsync = ref.watch(
-                      backlinksProvider(person.id),
-                    );
-                    return historyAsync.when(
-                      data: (mentions) {
-                        if (mentions.isEmpty) {
-                          return Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: AppTheme.cardDecoration(ctx),
-                            child: const Text(
-                              'No contact entries yet.\nMention this person in journal entries or tasks to build the history.',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: AppColors.textMuted,
-                                height: 1.5,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          );
-                        }
-                        final sorted = mentions.toList()
-                          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-                        final display = sorted.take(10).toList();
-                        return Container(
-                          decoration: AppTheme.cardDecoration(ctx),
-                          child: Column(
-                            children: display.asMap().entries.map((e) {
-                              final item = e.value;
-                              final isLast = e.key == display.length - 1;
-                              return Column(
-                                children: [
-                                  ListTile(
-                                    leading: CircleAvatar(
-                                      radius: 16,
-                                      backgroundColor: _typeColorForMention(
-                                        item.type,
-                                      ).withValues(alpha: 0.1),
-                                      child: Icon(
-                                        _typeIconForMention(item.type),
-                                        size: 16,
-                                        color: _typeColorForMention(item.type),
-                                      ),
-                                    ),
-                                    title: Text(
-                                      item.title,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    subtitle: Text(
-                                      DateFormat(
-                                        'd MMM yyyy',
-                                      ).format(item.updatedAt),
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: AppColors.textMuted,
-                                      ),
-                                    ),
-                                    trailing: _badge(
-                                      item.type,
-                                      color: _typeColorForMention(item.type),
-                                    ),
-                                    dense: true,
-                                    onTap: () => Navigator.push(
-                                      ctx,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            UniversalDetailView(object: item),
-                                      ),
-                                    ),
-                                  ),
-                                  if (!isLast)
-                                    const Divider(
-                                      height: 1,
-                                      indent: 56,
-                                      color: AppColors.divider,
-                                    ),
-                                ],
-                              );
-                            }).toList(),
-                          ),
-                        );
-                      },
-                      loading: () => const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(20),
-                          child: CircularProgressIndicator(),
-                        ),
-                      ),
-                      error: (_, _) => const SizedBox.shrink(),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ];
+      return buildPersonContentSection(
+        context,
+        ref,
+        object as Person,
+        _contactActionButton,
+        _personGoogleEventBanner,
+        _badge,
+        _typeColorForMention,
+        _typeIconForMention,
+      );
     }
 
     if (object is Habit) {
@@ -2244,359 +1741,34 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       ];
     }
     if (object is MoodDefinition) {
-      final mood = object as MoodDefinition;
-      final moodEntries = ref.watch(allEntriesProvider.select((entries) => entries.where((e) => e.moodSlug == mood.id).toList()..sort((a, b) => b.date.compareTo(a.date))));
-
-      return [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Mood Frequency',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  height: 180,
-                  decoration: AppTheme.cardDecoration(context),
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-                  child: _buildMoodFrequencyChart(moodEntries),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Monthly Distribution',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  height: 120,
-                  width: double.infinity,
-                  decoration: AppTheme.cardDecoration(context),
-                  padding: const EdgeInsets.all(16),
-                  child: QuartzoChart(
-                    type: ChartType.heatmap,
-                    color: AppColors.habitPurple,
-                    data: List.generate(30, (i) {
-                      final date = DateTime.now().subtract(
-                        Duration(days: 29 - i),
-                      );
-                      final hasEntry = moodEntries.any(
-                        (e) =>
-                            e.moodSlug == mood.id && _isSameDay(e.date, date),
-                      );
-                      return ChartDataPoint(
-                        label: '',
-                        value: hasEntry ? 1.0 : 0.0,
-                      );
-                    }),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Recent Entries',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 12),
-              ],
-            ),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              if (moodEntries.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    'No entries with this mood yet.',
-                    style: TextStyle(color: AppColors.textMuted),
-                  ),
-                );
-              }
-              final entry = moodEntries[index];
-              return _buildMentionRow(context, entry);
-            }, childCount: moodEntries.isEmpty ? 1 : moodEntries.length),
-          ),
-        ),
-      ];
+      return buildMoodContentSection(
+        context,
+        ref,
+        object as MoodDefinition,
+        _buildMoodFrequencyChart,
+        _buildMentionRow,
+      );
     }
     if (object is TrackerDefinition) {
-      final tracker = object as TrackerDefinition;
-      final trackerRecords = ref.watch(
-        trackingRecordsProvider.select((records) => records
-            .where(
-              (r) =>
-                  r.trackerId == tracker.id ||
-                  r.trackerId == tracker.slug ||
-                  r.trackerId == tracker.title,
-            )
-            .toList()
-          ..sort((a, b) => b.date.compareTo(a.date)))
+      return buildTrackerContentSection(
+        context,
+        ref,
+        object as TrackerDefinition,
+        _parseColor,
+        _isSameDay,
+        _showRecordDetails,
       );
-
-      return [
-        // ─── Summaries ───
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'General Summary',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 16),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: tracker.sections.expand((s) => s.inputFields).map(
-                      (field) {
-                        final values = trackerRecords
-                            .map((r) => r.fieldValues[field.id])
-                            .whereType<num>()
-                            .map((n) => n.toDouble())
-                            .toList();
-
-                        final latestValue = trackerRecords.isNotEmpty
-                            ? trackerRecords.first.fieldValues[field.id]
-                            : null;
-
-                        return TrackerMetricCard(
-                          definition: tracker,
-                          fieldId: field.id,
-                          value: latestValue,
-                          history: values.reversed.toList(),
-                        );
-                      },
-                    ).toList(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // ─── Distribution ───
-        ...tracker.sections
-            .expand((s) => s.inputFields)
-            .where(
-              (f) =>
-                  f.type == InputFieldType.selection ||
-                  f.type == InputFieldType.checklist,
-            )
-            .map((field) {
-              final Map<String, int> counts = {};
-              for (var r in trackerRecords) {
-                final val = r.fieldValues[field.id];
-                if (val is String) {
-                  counts[val] = (counts[val] ?? 0) + 1;
-                } else if (val is List) {
-                  for (var item in val) {
-                    if (item is String) {
-                      counts[item] = (counts[item] ?? 0) + 1;
-                    }
-                  }
-                }
-              }
-
-              if (counts.isEmpty) {
-                return const SliverToBoxAdapter(child: SizedBox.shrink());
-              }
-
-              return SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Distribution: ${field.title}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        height: 200,
-                        width: double.infinity,
-                        decoration: AppTheme.cardDecoration(context),
-                        padding: const EdgeInsets.all(16),
-                        child: QuartzoChart(
-                          type: ChartType.pie,
-                          data: counts.entries
-                              .map(
-                                (e) => ChartDataPoint(
-                                  label: e.key,
-                                  value: e.value.toDouble(),
-                                  color:
-                                      Colors.primaries[counts.keys
-                                              .toList()
-                                              .indexOf(e.key) %
-                                          Colors.primaries.length],
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-
-        // ─── Activity Heatmap ───
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Monthly Activity',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  height: 130,
-                  width: double.infinity,
-                  decoration: AppTheme.cardDecoration(context),
-                  padding: const EdgeInsets.all(16),
-                  child: QuartzoChart(
-                    type: ChartType.heatmap,
-                    color: _parseColor(tracker.color),
-                    data: List.generate(30, (i) {
-                      final date = DateTime.now().subtract(
-                        Duration(days: 29 - i),
-                      );
-                      final count = trackerRecords
-                          .where((r) => _isSameDay(r.date, date))
-                          .length;
-                      return ChartDataPoint(label: '', value: count.toDouble());
-                    }),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // ─── Records List ───
-        const SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(20, 32, 20, 8),
-            child: Text(
-              'Records History',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-          ),
-        ),
-        SliverList(
-          delegate: SliverChildBuilderDelegate((context, index) {
-            final record = trackerRecords[index];
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: InkWell(
-                onTap: () => _showRecordDetails(context, ref, tracker, record),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: AppTheme.cardDecoration(context),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: _parseColor(
-                            tracker.color,
-                          ).withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.description_outlined,
-                          color: _parseColor(tracker.color),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              DateFormat(
-                                'dd MMM yyyy HH:mm',
-                              ).format(record.date),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                              ),
-                            ),
-                            Text(
-                              '${record.fieldValues.length} fields filled',
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        color: AppColors.textMuted,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }, childCount: trackerRecords.length),
-        ),
-      ];
     }
     if (object is Note) {
-      final note = object as Note;
-      final childNotes = ref.watch(notesProvider.select((notes) => notes.where((n) => n.parentNoteId == note.id).toList()));
-
-      return [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 680),
-              child: _isEditing
-                  ? _buildNoteEditor(context, note)
-                  : _buildNoteViewer(context, note),
-            ),
-          ),
-        ),
-        if (childNotes.isNotEmpty) ...[
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(20, 32, 20, 8),
-              child: Text(
-                'Nested Notes',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) =>
-                    _buildNoteListItem(context, childNotes[index]),
-                childCount: childNotes.length,
-              ),
-            ),
-          ),
-        ],
-      ];
+      return buildNoteContentSection(
+        context,
+        ref,
+        object as Note,
+        _isEditing,
+        _buildNoteEditor,
+        _buildNoteViewer,
+        _buildNoteListItem,
+      );
     }
     return [];
   }
@@ -3394,30 +2566,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       TaskPriority.none => ('⚪', 'Sem prioridade', AppColors.textMuted),
     };
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(emoji, style: const TextStyle(fontSize: 14)),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: color,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHorizonBadge(IdeaDefinition idea) {
-    final (emoji, label, color) = switch (idea.horizon) {
-      IdeaHorizon.now => ('🔴', 'Agora', AppColors.error),
-      IdeaHorizon.soon => ('🟡', 'Em breve', AppColors.warning),
-      IdeaHorizon.someday => ('🔵', 'Algum dia', AppColors.info),
-      IdeaHorizon.noDeadline => ('⚪', 'Sem prazo', AppColors.textMuted),
-    };
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -5414,7 +4562,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     } else if (object is Project) {
       final project = object as Project;
       final tasks = ref.read(tasksProvider);
-      currentKPIs['Progress'] = _ProjectProgressCache.getProgress(
+      currentKPIs['Progress'] = ProjectProgressCache.getProgress(
         project.id,
         project,
         tasks,

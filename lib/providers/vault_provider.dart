@@ -157,8 +157,8 @@ final backupServiceProvider = Provider<BackupService>((ref) {
 final groupedObjectsProvider = Provider<Map<String, List<ContentObject>>>((
   ref,
 ) {
-  final asyncAll = ref.watch(allObjectsProvider);
-  final all = asyncAll.valueOrNull ?? [];
+  final asyncAll = ref.watch(allObjectsProvider.select((async) => async.valueOrNull));
+  final all = asyncAll ?? [];
   final map = <String, List<ContentObject>>{};
   for (final obj in all) {
     final type = obj is TrackerDefinition
@@ -186,7 +186,7 @@ final objectsByTypeProvider = Provider.family<List<ContentObject>, String>((
 final conflictingObjectsProvider = Provider<Map<String, List<ContentObject>>>((
   ref,
 ) {
-  final objects = ref.watch(allObjectsProvider).valueOrNull ?? [];
+  final objects = ref.watch(allObjectsProvider.select((async) => async.valueOrNull)) ?? [];
   final byKey = <String, List<ContentObject>>{};
 
   for (final object in objects) {
@@ -542,7 +542,7 @@ class HabitsNotifier extends Notifier<List<Habit>> {
         trackers: trackers,
       );
       ref.read(allObjectsProvider.notifier).replaceObjectInMemory(updatedHabit);
-      ref.invalidate(objectsByTypeProvider('habit'));
+      // ref.invalidate(objectsByTypeProvider('habit')); // Removed - replaceObjectInMemory handles it
       ref.invalidate(dailyNoteDataProvider(dateStr));
 
       await syncQueue.enqueueAction(
@@ -644,7 +644,7 @@ class HabitsNotifier extends Notifier<List<Habit>> {
         frontmatter: frontmatter,
         trackers: trackers,
       );
-      ref.invalidate(objectsByTypeProvider('habit'));
+      // ref.invalidate(objectsByTypeProvider('habit')); // Removed - replaceObjectInMemory handles it
       ref.invalidate(dailyNoteDataProvider(dateStr));
 
       await syncQueue.enqueueAction(
@@ -826,7 +826,7 @@ class HabitsNotifier extends Notifier<List<Habit>> {
     final newContent = generateMarkdown(frontmatter, newBody);
     await obsidianService.writeFile(path, newContent);
 
-    ref.invalidate(allObjectsProvider);
+    // ref.invalidate(allObjectsProvider); // Removed - replaceObjectInMemory handles it
     ref.invalidate(dailyNoteDataProvider(dateStr));
 
     await syncQueue.enqueueAction(
@@ -1251,9 +1251,9 @@ final remindersProvider = NotifierProvider<RemindersNotifier, List<Reminder>>(
   },
 );
 
-final aggregatedRemindersProvider = Provider<List<Reminder>>((ref) {
-  final asyncAll = ref.watch(allObjectsProvider);
-  final all = asyncAll.valueOrNull ?? [];
+final aggregatedRemindersProvider = Provider.autoDispose<List<Reminder>>((ref) {
+  final asyncAll = ref.watch(allObjectsProvider.select((async) => async.valueOrNull));
+  final all = asyncAll ?? [];
   final List<Reminder> results = [];
 
   for (final obj in all) {
@@ -2856,7 +2856,8 @@ class VaultNotifier extends Notifier<void> {
         object is TrackingRecord ||
         object is JournalEntry ||
         object is Note ||
-        object is MoodDefinition;
+        object is MoodDefinition ||
+        object is Task;
   }
 
   Future<void> createObject(ContentObject object) async {

@@ -534,9 +534,13 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+        Flexible(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
         ),
       ],
     );

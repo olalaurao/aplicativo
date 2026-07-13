@@ -410,12 +410,16 @@ class _PopupNotificationScreenState
                 color: filled ? Colors.white : _accentColor,
               ),
               const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: filled ? Colors.white : _accentColor,
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: filled ? Colors.white : _accentColor,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
             ],

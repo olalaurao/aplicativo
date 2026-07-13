@@ -767,8 +767,8 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
     final goals = allObjects.where((o) => o.type == 'goal').toList();
     
     return [
-      ...projects.map((p) => _ScopeOption(label: p.displayTitle, value: p.id)),
-      ...goals.map((g) => _ScopeOption(label: g.displayTitle, value: g.id)),
+      ...projects.map((p) => _ScopeOption(label: p.displayTitle, value: p.slug)),
+      ...goals.map((g) => _ScopeOption(label: g.displayTitle, value: g.slug)),
     ];
   }
 

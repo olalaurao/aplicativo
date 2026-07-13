@@ -1356,7 +1356,9 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
           bottom: BorderSide(color: AppColors.divider, width: 0.5),
         ),
       ),
-      child: Column(
+      child: ListView(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
         children: allDayItems.map((event) {
           if (event is Habit) {
             return _buildHabitStripItem(context, event);
