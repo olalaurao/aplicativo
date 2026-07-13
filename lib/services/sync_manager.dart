@@ -250,7 +250,7 @@ class SyncManager {
           relativePath: relativePath,
           localHash: localHash,
           remoteHash: localHash,
-          baseHash: localHash,
+          baseHash: baseHash ?? localHash,
           remoteFileId: remoteFile?.id,
         );
       }
@@ -387,7 +387,7 @@ class SyncManager {
             relativePath: relPath,
             localHash: localHash,
             remoteHash: localHash,
-            baseHash: localHash,
+            baseHash: baseHash ?? localHash,
             remoteFileId: remoteFile.id,
             localModifiedAt: await localFile.lastModified(),
           );
@@ -451,7 +451,7 @@ class SyncManager {
             relativePath: relPath,
             localHash: localHash,
             remoteHash: localHash,
-            baseHash: localHash,
+            baseHash: baseHash ?? localHash,
             remoteFileId: remoteFile.id,
             localModifiedAt: await localFile.lastModified(),
           );

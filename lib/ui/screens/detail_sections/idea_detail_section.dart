@@ -71,10 +71,6 @@ Widget _buildHorizonBadge(IdeaDefinition idea) {
       color = Colors.blue;
       label = 'SEM PRAZO';
       break;
-    default:
-      color = Colors.grey;
-      label = 'DESCONHECIDO';
-      break;
   }
   
   return Container(
@@ -117,10 +113,6 @@ Widget _buildPriorityBadge(IdeaDefinition idea) {
     case TaskPriority.none:
       color = Colors.grey;
       label = 'NENHUMA';
-      break;
-    default:
-      color = Colors.grey;
-      label = 'DESCONHECIDO';
       break;
   }
   

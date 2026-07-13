@@ -692,6 +692,65 @@ Every object type has a **default icon/emoji**, used consistently in: list rows 
 | Label | 🏷 |
 | Person | 👤 |
 
+### 1.6 Configurable Emoji System (new in V5.3)
+
+**User-configurable emojis:** Every object type's emoji is customizable via Object Identification (Settings → Object Identification). Users can personalize the emoji for each type to match their preferences.
+
+**How it works:**
+
+1. **TypeSignature** (in `lib/models/shared_types.dart`):
+   - Defines how to identify an object type (markerType, markerValue)
+   - Includes `emoji` field for custom icon
+   - Stored in `settings.typeSignatures` (SharedPreferences)
+
+2. **ObjectIcons** (in `lib/ui/utils/object_icons.dart`):
+   - `emojiForType(type, ref)` - returns user-configured emoji from settings
+   - `defaultIconForType(type)` - returns default emoji (fallback)
+   - `defaultIconForNoteSubtype(subtype)` - emojis for Note subtypes
+   - `defaultIconForHabitMode(mode)` - emojis for Habit modes
+   - `defaultIconForEntryType(entryType)` - emojis for Entry types
+
+3. **type_signatures_screen.dart**:
+   - UI for editing emojis and identifiers
+   - Shows current emoji for each type
+   - "Emoji" field in edit dialog (2-character limit)
+
+**Usage rules:**
+
+**✅ CORRECT — Use configurable emojis:**
+```dart
+// In any Consumer widget
+import '../utils/object_icons.dart';
+
+// Get configured emoji (with fallback to default)
+final emoji = ObjectIcons.emojiForType('task', ref);
+Text(emoji, style: const TextStyle(fontSize: 20));
+
+// For specific subtypes
+final noteEmoji = ObjectIcons.defaultIconForNoteSubtype('outline');
+```
+
+**❌ WRONG — Hardcoded emojis:**
+```dart
+// Never use hardcoded emojis in UI
+Text('✅', style: const TextStyle(fontSize: 20));
+Text('🔄', style: const TextStyle(fontSize: 20));
+```
+
+**When to use `ObjectIcons.emojiForType()`:**
+- Showing type icon in lists (Tasks, Notes, etc.)
+- Showing icon in chips/badges of type
+- Showing icon in pickers/selectors
+- Any place where object type is visually identified
+
+**When to use hardcoded emojis:**
+- Specific subtype emoji (e.g., Note subtypes)
+- Contextual emoji (e.g., mood picker, status badges)
+- Does not represent an object type
+
+**Default emojis (fallback):**
+If user hasn't configured an emoji, the system uses the defaults listed in section 1.5 above.
+
 ---
 
 ## PART 1.4 — UNIFIED LINKING & DATA SOURCE

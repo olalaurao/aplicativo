@@ -55,13 +55,23 @@ class TypeSignaturesScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              trailing: IconButton(
-                icon: Icon(
-                  Icons.edit_rounded,
-                  size: 20,
-                  color: AppTheme.accentColor(context),
-                ),
-                onPressed: () => _showEditDialog(context, ref, notifier, sig),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    sig.emoji,
+                    style: const TextStyle(fontSize: 20),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: Icon(
+                      Icons.edit_rounded,
+                      size: 20,
+                      color: AppTheme.accentColor(context),
+                    ),
+                    onPressed: () => _showEditDialog(context, ref, notifier, sig),
+                  ),
+                ],
               ),
             ),
           );
@@ -133,6 +143,7 @@ class TypeSignaturesScreen extends ConsumerWidget {
     TypeSignature sig,
   ) {
     final valueController = TextEditingController(text: sig.markerValue);
+    final emojiController = TextEditingController(text: sig.emoji);
     MarkerType selectedMarker = sig.markerType;
 
     showDialog(
@@ -143,6 +154,15 @@ class TypeSignaturesScreen extends ConsumerWidget {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              TextField(
+                controller: emojiController,
+                decoration: const InputDecoration(
+                  labelText: 'Emoji',
+                  hintText: '📝',
+                ),
+                maxLength: 2,
+              ),
+              const SizedBox(height: 16),
               DropdownButtonFormField<MarkerType>(
                 initialValue: selectedMarker,
                 decoration: const InputDecoration(
@@ -182,10 +202,12 @@ class TypeSignaturesScreen extends ConsumerWidget {
             TextButton(
               onPressed: () async {
                 final newValue = valueController.text.trim();
+                final newEmoji = emojiController.text.trim();
                 final updatedSignature = TypeSignature(
                   objectType: sig.objectType,
                   markerType: selectedMarker,
                   markerValue: newValue,
+                  emoji: newEmoji,
                 );
                 if (selectedMarker == MarkerType.folder &&
                     newValue.isNotEmpty &&

@@ -240,6 +240,237 @@ final tasks = ref.watch(allObjectsProvider).whereType<Task>();
 
 ---
 
+## 8. SISTEMA DE EMOJIS — CONFIGURÁVEL
+
+### 8.1 Como Funciona
+
+Emojis são **configuráveis pelo usuário** via Object Identification (Settings → Object Identification). Cada tipo de objeto pode ter um emoji personalizado.
+
+**Componentes do sistema:**
+
+1. **`TypeSignature`** (em `lib/models/shared_types.dart`):
+   - Define como identificar um tipo de objeto (markerType, markerValue)
+   - Inclui campo `emoji` para o ícone personalizado
+   - Salvo em `settings.typeSignatures` (SharedPreferences)
+
+2. **`ObjectIcons`** (em `lib/ui/utils/object_icons.dart`):
+   - `emojiForType(type, ref)` - retorna emoji configurado nas settings
+   - `defaultIconForType(type)` - retorna emoji padrão (fallback)
+   - `defaultIconForNoteSubtype(subtype)` - emojis para subtipos de Note
+   - `defaultIconForHabitMode(mode)` - emojis para modos de Habit
+   - `defaultIconForEntryType(entryType)` - emojis para tipos de Entry
+
+3. **`type_signatures_screen.dart`**:
+   - UI para editar emojis e identificadores
+   - Mostra emoji atual de cada tipo
+   - Campo "Emoji" no diálogo de edição (limite 2 caracteres)
+
+### 8.2 Regras para Uso de Emojis
+
+**✅ CORRETO — Usar emojis configuráveis:**
+```dart
+// Em qualquer widget Consumer
+import '../utils/object_icons.dart';
+
+// Obter emoji configurado (com fallback para padrão)
+final emoji = ObjectIcons.emojiForType('task', ref);
+Text(emoji, style: const TextStyle(fontSize: 20));
+
+// Para subtipos específicos
+final noteEmoji = ObjectIcons.defaultIconForNoteSubtype('outline');
+```
+
+**❌ ERRADO — Emojis hardcoded:**
+```dart
+// Nunca use emojis hardcoded na UI
+Text('✅', style: const TextStyle(fontSize: 20));
+Text('🔄', style: const TextStyle(fontSize: 20));
+```
+
+### 8.3 Emojis Padrão (Fallback)
+
+Se o usuário não configurar um emoji, o sistema usa estes padrões:
+
+| Tipo | Emoji Padrão |
+|---|---|
+| Task | ✅ |
+| Habit | 🔁 |
+| Goal | 🎯 |
+| Note | 📝 |
+| Journal Entry | 📓 |
+| Event | 📅 |
+| Reminder | 🔔 |
+| Person | 👤 |
+| Resource | 📚 |
+| Idea | 💡 |
+| Project | 🎯 |
+| Area | 🗺️ |
+| Activity | ⚡ |
+| Label | 🏷️ |
+| Tracker | 📊 |
+| System | ⚙️ |
+| Social Post | 📱 |
+| Shopping List | 🛒 |
+| Template | 🧩 |
+| Inbox | 📥 |
+| Analysis | 📊 |
+| Mood Def | 😐 |
+
+### 8.4 Quando Usar Emojis Configuráveis
+
+**Use `ObjectIcons.emojiForType()` quando:**
+- Mostrar ícone de tipo em listas (Tasks, Notes, etc.)
+- Mostrar ícone em chips/badges de tipo
+- Mostrar ícone em pickers/seletores
+- Qualquer lugar onde o tipo de objeto é visualmente identificado
+
+**Use emojis hardcoded apenas quando:**
+- É um emoji específico de um subtipo (ex: Note subtypes)
+- É um emoji contextual (ex: mood picker, status badges)
+- Não representa um tipo de objeto
+
+### Anti-Patterns Comuns em Detail Sections
+
+**❌ ERRADO 1: Import paths incorretos**
+```dart
+// Errado - só 2 níveis para models
+import '../../models/task_model.dart';
+
+// Errado - só 1 nível para widgets
+import '../widgets/property_grid.dart';
+
+// Errado - caminho incorreto para theme
+import '../theme.dart';
+```
+
+**✅ CORRETO 1: Import paths corretos**
+```dart
+// Correto - 3 níveis para models/providers
+import '../../../models/task_model.dart';
+import '../../../providers/vault_provider.dart';
+import '../../../services/kpi_engine.dart';
+
+// Correto - 2 níveis para widgets/theme
+import '../../widgets/property_grid.dart';
+import '../../theme.dart';
+```
+
+**❌ ERRADO 2: Usar providers inexistentes**
+```dart
+// Errado - tasksProvider não existe mais
+final tasks = ref.watch(tasksProvider);
+
+// Errado - notesProvider não existe mais
+final notes = ref.watch(notesProvider);
+```
+
+**✅ CORRETO 2: Usar allObjectsProvider**
+```dart
+// Correto - usar allObjectsProvider e filtrar
+final allObjects = ref.watch(allObjectsProvider).value ?? [];
+final tasks = allObjects.whereType<Task>().where(...).toList();
+final notes = allObjects.whereType<Note>().where(...).toList();
+```
+
+**❌ ERRADO 3: Esquecer .value ?? [] para AsyncValue**
+```dart
+// Errado - AsyncValue não tem whereType diretamente
+final tasks = ref.watch(allObjectsProvider).whereType<Task>();
+
+// Errado - pode causar null pointer
+final tasks = ref.watch(allObjectsProvider).value;
+```
+
+**✅ CORRETO 3: Sempre usar .value ?? []**
+```dart
+// Correto - extrair valor com fallback
+final allObjects = ref.watch(allObjectsProvider).value ?? [];
+final tasks = allObjects.whereType<Task>().toList();
+```
+
+**❌ ERRADO 4: Usar enums/campos que não existem**
+```dart
+// Errado - TaskPriority.critical não existe
+case TaskPriority.critical:
+
+// Errado - TaskStage.cancelled não existe
+case TaskStage.cancelled:
+
+// Errado - TaskStage.waiting não existe
+case TaskStage.waiting:
+
+// Errado - IdeaHorizon.immediate não existe
+case IdeaHorizon.immediate:
+
+// Errado - Goal.status não existe (é Goal.state)
+if (goal.status == GoalStatus.completed):
+
+// Errado - ContactPriority não existe
+case ContactPriority.high:
+
+// Errado - ProjectPriority não existe
+case ProjectPriority.critical:
+```
+
+**✅ CORRETO 4: Usar enums/campos corretos**
+```dart
+// Correto - TaskPriority tem: none, low, medium, high
+case TaskPriority.high:
+
+// Correto - TaskStage tem: idea, backlog, todo, inProgress, pending, finalized
+case TaskStage.finalized:
+
+// Correto - IdeaHorizon tem: now, soon, someday, noDeadline
+case IdeaHorizon.now:
+
+// Correto - Goal usa campo state
+if (goal.state == GoalStatus.completed):
+
+// Correto - Person usa TaskPriority para contactPriority
+case TaskPriority.high:
+
+// Correto - Project usa TaskPriority para projectPriority
+case TaskPriority.high:
+```
+
+**❌ ERRADO 5: Esquecer default case em switch**
+```dart
+// Errado - pode causar erro se enum for expandido
+switch (task.priority) {
+  case TaskPriority.high:
+    color = Colors.red;
+    break;
+  case TaskPriority.medium:
+    color = Colors.orange;
+    break;
+}
+// Variável 'color' pode não ser inicializada
+```
+
+**✅ CORRETO 5: Sempre adicionar default case**
+```dart
+// Correto - cobre todos os casos
+switch (task.priority) {
+  case TaskPriority.high:
+    color = Colors.red;
+    break;
+  case TaskPriority.medium:
+    color = Colors.orange;
+    break;
+  case TaskPriority.low:
+    color = Colors.green;
+    break;
+  case TaskPriority.none:
+    color = Colors.grey;
+    break;
+  default:
+    color = Colors.grey;
+    break;
+}
+```
+
+---
+
 ## 5. O ARQUIVO MAIS IMPORTANTE: `vault_provider.dart`
 
 O `VaultNotifier` (~54KB) é o **coração do aplicativo**. Ele:
@@ -1083,7 +1314,7 @@ Toda mutação (create/update/delete) enfileira uma `SyncAction`. A fila é proc
 
 ## 13. NOTIFICAÇÕES
 
-### 12.1 Três Tipos
+### 13.1 Três Tipos
 
 | Tipo | Comportamento | Configuração |
 |---|---|---|
@@ -1091,13 +1322,13 @@ Toda mutação (create/update/delete) enfileira uma `SyncAction`. A fila é proc
 | **Popup** | Full-screen sobre lock screen | Background color, botões |
 | **Alarm** | Toca como alarme (ignora silencioso) | Ringtone, snooze duration |
 
-### 12.2 Action Buttons em Todas as Notificações
+### 13.2 Action Buttons em Todas as Notificações
 
 - **"Concluído"** — marca o objeto como completo SEM abrir o app
 - **"Adiar"** — adia pela duração de snooze configurada (padrão: 10min)
 - **"Dispensar"** — fecha sem marcar como completo
 
-### 12.3 Regras de Implementação
+### 13.3 Regras de Implementação
 
 - Usar `AlarmManager.setExactAndAllowWhileIdle()` no Android
 - Registrar alarmes no MOMENTO da criação, não ao abrir o app
@@ -1105,41 +1336,41 @@ Toda mutação (create/update/delete) enfileira uma `SyncAction`. A fila é proc
 
 ---
 
-## 13. ARMADILHAS CONHECIDAS (NÃO REINTRODUZIR)
+## 14. ARMADILHAS CONHECIDAS (NÃO REINTRODUZIR)
 
-### 13.1 Overflow de Texto
+### 14.1 Overflow de Texto
 
 **Problema**: Textos longos causam `RenderFlex overflowed`.
 **Solução**: TODO `Text` em listas/cards DEVE ter `maxLines` + `overflow: TextOverflow.ellipsis`.
 
-### 13.2 Widget de Mês Travado em "Carregando..."
+### 14.2 Widget de Mês Travado em "Carregando..."
 
 **Problema**: `WidgetSyncProvider` bloqueava quando `allObjectsProvider` não tinha carregado.
 **Solução**: Usar `maybeWhen`. Garantir que `monthFocus` nunca seja vazio — usar fallback.
 
-### 13.3 Exclusão de Hábitos Não Funcionava
+### 14.3 Exclusão de Hábitos Não Funcionava
 
 **Problema**: `deleteObject()` falhava quando backup retornava null.
 **Solução**: Deletar o original INDEPENDENTE do sucesso da cópia de backup.
 
-### 13.4 Duplicação de Objetos
+### 14.4 Duplicação de Objetos
 
 **Problema**: Arquivos em `_deleted/` eram re-parseados.
 **Solução**: Filtrar `_deleted/` e `_attachments/` durante o scan do vault.
 
-### 13.5 Journal Entry Mostrando JSON Bruto
+### 14.5 Journal Entry Mostrando JSON Bruto
 
 **Problema**: Campo `body` armazenado como JSON do Quill Delta.
 **Solução**: Converter Delta para plain text em previews.
 
-### 13.6 Organizer Summary Acessando Campo Inexistente
+### 14.6 Organizer Summary Acessando Campo Inexistente
 
 **Problema**: Dashboard acessava `.id` em `OrganizerReference`.
 **Solução**: Usar `.slug` e `.title`.
 
 ---
 
-## 14. CHECKLIST DE REVISÃO DE CÓDIGO
+## 15. CHECKLIST DE REVISÃO DE CÓDIGO
 
 ### UI/UX
 - [ ] Funciona em light mode E dark mode

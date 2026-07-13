@@ -10,6 +10,7 @@ import '../widgets/rich_text_editor.dart';
 import '../widgets/outline_editor.dart';
 import '../widgets/collection_editor.dart';
 import '../widgets/filter_sort_sheet.dart';
+import '../utils/object_icons.dart';
 import 'universal_detail_view.dart';
 
 enum NoteViewMode { grid, grouped, list }
@@ -310,8 +311,12 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           ]))));
   }
 
-  String _noteEmoji(dynamic note) => switch (note.noteType) {
-    'outline' => '🌿', 'collection' => '🔮', _ => '📝' };
+  String _noteEmoji(dynamic note) {
+    final emoji = ObjectIcons.emojiForType('note', ref);
+    if (note.noteType == 'outline') return ObjectIcons.defaultIconForNoteSubtype('outline');
+    if (note.noteType == 'collection') return ObjectIcons.defaultIconForNoteSubtype('collection');
+    return emoji;
+  }
 
   (IconData, Color, String) _noteTypeAssets(dynamic note) => switch (note.noteType) {
     'outline'    => (Icons.account_tree_outlined, AppColors.habitGreen, 'Outline'),
