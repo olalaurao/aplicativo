@@ -42,9 +42,13 @@ class OrganizerSelectorField extends ConsumerWidget {
               color: AppColors.textSecondary,
             ),
             const SizedBox(width: 12),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
             ),
             const Spacer(),
             if (selectedOrganizers.isNotEmpty)

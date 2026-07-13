@@ -368,8 +368,18 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
             Navigator.pop(sheetContext);
             if (selectedObject is Task) {
               // Add as dependency
-              final currentDeps = widget.task.dependsOn ?? [];
-              if (!currentDeps.contains(selectedObject.id)) {
+              final currentDeps = widget.task.dependsOn;
+              if (currentDeps == null) {
+                final updated = widget.task.copyWith(
+                  dependsOn: [selectedObject.id],
+                );
+                await ref.read(tasksProvider.notifier).updateTask(updated);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Dependência "${selectedObject.title}" adicionada.')),
+                  );
+                }
+              } else if (!currentDeps.contains(selectedObject.id)) {
                 final updated = widget.task.copyWith(
                   dependsOn: [...currentDeps, selectedObject.id],
                 );
@@ -388,8 +398,6 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
   }
 
   void _openWhatsAppHelp() async {
-    final message = Uri.encodeComponent('Hey, I could use some help with: ${widget.task.title}');
-    final url = 'https://wa.me/?text=$message';
     // TODO: Launch URL using url_launcher
     // For now, add note as placeholder
     final messenger = ScaffoldMessenger.of(context);

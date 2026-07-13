@@ -94,6 +94,18 @@ lib/
     │   ├── home_screen.dart     # Dashboard (~93KB) — blocos configuráveis
     │   ├── planner_screen.dart  # Planner Day/Week/Month (~62KB)
     │   ├── universal_detail_view.dart # Detail view universal (~116KB)
+│   ├── detail_sections/     # Seções modulares por tipo de conteúdo
+│   │   ├── task_detail_section.dart
+│   │   ├── habit_detail_section.dart
+│   │   ├── project_detail_section.dart
+│   │   ├── goal_detail_section.dart
+│   │   ├── note_detail_section.dart
+│   │   ├── person_detail_section.dart
+│   │   ├── journal_entry_detail_section.dart
+│   │   ├── idea_detail_section.dart
+│   │   ├── mood_detail_section.dart
+│   │   ├── tracker_detail_section.dart
+│   │   └── resource_detail_section.dart
     │   ├── journal_screen.dart  # Timeline de journal entries
     │   └── ...                  # 33 screens no total
     ├── forms/                   # Formulários de criação/edição
@@ -104,6 +116,7 @@ lib/
     │   ├── scheduler_picker.dart     # (~21KB) — 11 repeat types
     │   └── ...                       # 17 forms no total
     ├── widgets/                 # Componentes reutilizáveis
+    │   ├── property_grid.dart       # PropertyCard, PropertyGrid, PropertyCardState
     │   ├── timeline_day_view.dart    # Visualização de timeline
     │   ├── rich_text_editor.dart     # Editor rich text
     │   ├── wiki_link_picker.dart     # Picker de WikiLinks [[]]
@@ -143,7 +156,91 @@ vault/
 
 ---
 
-## 4. O ARQUIVO MAIS IMPORTANTE: `vault_provider.dart`
+## 4. DETAIL SECTIONS MODULARES
+
+O `universal_detail_view.dart` foi modularizado em arquivos separados por tipo de conteúdo em `ui/screens/detail_sections/`. Cada arquivo contém funções que constroem as property cards específicas para aquele tipo de objeto.
+
+### Arquivos de Detail Section
+
+- `task_detail_section.dart` - `buildTaskPropertyCards()`
+- `habit_detail_section.dart` - `buildHabitPropertyCards()`
+- `project_detail_section.dart` - `buildProjectPropertyCards()`
+- `goal_detail_section.dart` - `buildGoalPropertyCards()`
+- `note_detail_section.dart` - `buildNotePropertyCards()`
+- `person_detail_section.dart` - `buildPersonPropertyCards()`
+- `journal_entry_detail_section.dart` - `buildJournalEntryPropertyCards()`
+- `idea_detail_section.dart` - `buildIdeaPropertyCards()`
+- `mood_detail_section.dart` - `buildMoodPropertyCards()`
+- `tracker_detail_section.dart` - `buildTrackerPropertyCards()`
+- `resource_detail_section.dart` - `buildResourcePropertyCards()`
+
+### Regras de Import para Detail Sections
+
+Arquivos em `ui/screens/detail_sections/` estão em um subdiretório, então os caminhos de import são diferentes:
+
+```dart
+// ✅ CORRETO - 3 níveis acima para models/providers
+import '../../../models/task_model.dart';
+import '../../../providers/vault_provider.dart';
+import '../../../services/kpi_engine.dart';
+
+// ✅ CORRETO - 2 níveis acima para widgets/theme
+import '../../widgets/property_grid.dart';
+import '../../theme.dart';
+
+// ❌ ERRADO - não usar caminhos relativos incorretos
+import '../../models/task_model.dart';  // Errado - só 2 níveis
+import '../widgets/property_grid.dart'; // Errado - só 1 nível
+```
+
+### Regras de Providers em Detail Sections
+
+**NÃO use providers específicos como `tasksProvider` ou `notesProvider`** - eles não existem mais. Use sempre `allObjectsProvider`:
+
+```dart
+// ✅ CORRETO
+final allObjects = ref.watch(allObjectsProvider).value ?? [];
+final tasks = allObjects.whereType<Task>().where(...).toList();
+
+// ❌ ERRADO - tasksProvider não existe
+final tasks = ref.watch(tasksProvider);
+```
+
+**Sempre use `.value ?? []` para lidar com AsyncValue:**
+
+```dart
+// ✅ CORRETO
+final allObjects = ref.watch(allObjectsProvider).value ?? [];
+
+// ❌ ERRADO - AsyncValue não tem whereType diretamente
+final tasks = ref.watch(allObjectsProvider).whereType<Task>();
+```
+
+### Enums Atuais - Importante
+
+**TaskPriority** (em `task_model.dart`):
+- `none`, `low`, `medium`, `high`
+- **NÃO existe** `critical`
+
+**TaskStage** (em `task_model.dart`):
+- `idea`, `backlog`, `todo`, `inProgress`, `pending`, `finalized`
+- **NÃO existe** `cancelled`, **NÃO existe** `waiting`
+
+**IdeaHorizon** (em `idea_model.dart`):
+- `now`, `soon`, `someday`, `noDeadline`
+- **NÃO existe** `immediate`, `shortTerm`, `mediumTerm`, `longTerm`
+
+**GoalStatus** (em `goal_model.dart`):
+- `active`, `completed`, `cancelled`, `onHold`
+- Goal usa campo `state` (não `status`)
+
+**Person** usa `TaskPriority` para `contactPriority` (não existe `ContactPriority`)
+
+**Project** usa `TaskPriority` para `projectPriority` (não existe `ProjectPriority`)
+
+---
+
+## 5. O ARQUIVO MAIS IMPORTANTE: `vault_provider.dart`
 
 O `VaultNotifier` (~54KB) é o **coração do aplicativo**. Ele:
 
@@ -163,7 +260,7 @@ O `VaultNotifier` (~54KB) é o **coração do aplicativo**. Ele:
 
 ---
 
-## 5. TIPOS DE OBJETOS — REFERÊNCIA RÁPIDA
+## 6. TIPOS DE OBJETOS — REFERÊNCIA RÁPIDA
 
 | Tipo | Arquivo Vault | Provider | Modelo | Emoji Padrão |
 |---|---|---|---|---|
@@ -213,9 +310,9 @@ O `VaultNotifier` (~54KB) é o **coração do aplicativo**. Ele:
 
 ---
 
-## 6. DESIGN SYSTEM E UI/UX
+## 7. DESIGN SYSTEM E UI/UX
 
-### 6.1 Tema e Cores
+### 7.1 Tema e Cores
 
 O design system está centralizado em `ui/theme.dart`. Use **SEMPRE** as classes `AppTheme` e `AppColors`.
 
@@ -236,7 +333,7 @@ color: Colors.purple,
 - **Destructive**: Vermelho para ações de deletar
 - **Success/Warning**: Verde e amarelo para badges de status
 
-### 6.2 Regras de Layout Obrigatórias
+### 7.2 Regras de Layout Obrigatórias
 
 1. **SafeArea em TODA tela**: Envolver conteúdo com `SafeArea` ou respeitar `MediaQuery.of(context).padding`
 2. **Overflow prevention**: Todo `Text` em listas/cards DEVE ter `maxLines` + `overflow: TextOverflow.ellipsis`
@@ -244,7 +341,7 @@ color: Colors.purple,
 4. **Scroll**: Conteúdo entre nav bar e tab bar deve ser scrollável. Usar `SingleChildScrollView` ou `ListView`
 5. **Keyboard avoidance**: Formulários devem usar `resizeToAvoidBottomInset: true`
 
-### 6.3 Componentes Padrão
+### 7.3 Componentes Padrão
 
 | Componente | Padrão | Exemplo |
 |---|---|---|
@@ -257,7 +354,7 @@ color: Colors.purple,
 | Modal/Sheet | Bottom sheet com handle pill no topo, ou full-screen com X no canto | Pickers, forms |
 | Lista | Separador hairline inset 16pt, ou cards individuais | Timeline, Tasks |
 
-### 6.4 Tipografia (hierarquia)
+### 7.4 Tipografia (hierarquia)
 
 | Uso | Tamanho | Peso |
 |---|---|---|
@@ -269,7 +366,7 @@ color: Colors.purple,
 | Label de botão CTA | 16-17pt | Semibold, branco |
 | Campo de formulário | 15-16pt | Regular |
 
-### 6.5 Interações e Feedback
+### 7.5 Interações e Feedback
 
 - **Haptic feedback**: Light impact (hábito completo), medium (tarefa completa), warning (ação destrutiva)
 - **Undo snackbar**: 5 segundos, botão "Desfazer" em roxo, aparece em TODA ação destrutiva
@@ -278,13 +375,13 @@ color: Colors.purple,
 - **Long press**: Multi-select ou menu contextual
 - **Tap targets**: Mínimo 44×44pt (iOS) / 48×48dp (Android)
 
-### 6.6 Dark Mode
+### 7.6 Dark Mode
 
 - O app suporta Dark Mode. TODA nova tela/widget DEVE funcionar em ambos os temas
 - Use SEMPRE `AppColors` e `Theme.of(context)` — nunca cores hardcoded
 - Teste visualmente em ambos os modos antes de considerar uma tela pronta
 
-### 6.7 Constantes de Design System — OBRIGATÓRIO
+### 7.7 Constantes de Design System — OBRIGATÓRIO
 
 **NUNCA use valores hardcoded para spacing, border radius, font sizes, ou border width.** Use SEMPRE as constantes definidas em `lib/ui/theme.dart`:
 
@@ -346,7 +443,7 @@ borderWidth: 1.5,
 - `xxl` = 48.0 (ícones de destaque)
 - `display` = 56.0 (ícones hero)
 
-### 6.8 Componentes Reutilizáveis — OBRIGATÓRIO
+### 7.8 Componentes Reutilizáveis — OBRIGATÓRIO
 
 **Use SEMPRE os componentes reutilizáveis disponíveis em `lib/ui/widgets/` em vez de reimplementar padrões duplicados:**
 
@@ -705,9 +802,9 @@ final updatedTheme = AppThemeConfig(
 
 ---
 
-## 7. FORMATO DE DADOS OBSIDIAN
+## 8. FORMATO DE DADOS OBSIDIAN
 
-### 7.1 Daily Note (`daily/YYYY-MM-DD.md`)
+### 8.1 Daily Note (`daily/YYYY-MM-DD.md`)
 
 ```yaml
 ---
@@ -764,7 +861,7 @@ organizers:: [[trabalho]]
 - Tempo: 75 min
 ```
 
-### 7.2 Parsing Rules — CRÍTICO
+### 8.2 Parsing Rules — CRÍTICO
 
 1. **Frontmatter**: Entre o primeiro e segundo `---`. YAML puro
 2. **Hábitos**: Chaves YAML que correspondem a `habit_slug`. `true/false` para boolean, número para contagem
@@ -774,7 +871,7 @@ organizers:: [[trabalho]]
 6. **Organizers**: Inline Dataview `organizers:: [[slug1]], [[slug2]]`
 7. **Tags**: `#tag` no corpo da entry
 
-### 7.3 Regras de Escrita
+### 8.3 Regras de Escrita
 
 - **NUNCA** sobrescreva um daily note inteiro — leia, faça merge, escreva
 - **NUNCA** altere campos de frontmatter que você não reconhece — preserve-os
@@ -783,9 +880,9 @@ organizers:: [[trabalho]]
 
 ---
 
-## 8. REGRAS DE DESENVOLVIMENTO — O QUE FAZER E NÃO FAZER
+## 9. REGRAS DE DESENVOLVIMENTO — O QUE FAZER E NÃO FAZER
 
-### 8.1 ✅ FAZER SEMPRE
+### 9.1 ✅ FAZER SEMPRE
 
 1. **Ler o arquivo atual antes de editar** — nunca assuma o conteúdo
 2. **Usar `try-catch` em TODA operação de I/O** — arquivo pode não existir
@@ -799,7 +896,7 @@ organizers:: [[trabalho]]
 10. **Usar ingles** em todos os textos de UI
 11. **Após cada implementação, verificar se `agents.md` ou `guidelines.md` precisam ser atualizados** — se a mudança altera arquitetura, padrões ou regras, documente
 
-### 8.2 ❌ NUNCA FAZER
+### 9.2 ❌ NUNCA FAZER
 
 1. **NUNCA deletar arquivos do vault diretamente** — use `VaultNotifier.deleteObject()` que move para `_deleted/`
 2. **NUNCA hardcodar cores** — use `AppColors` e `Theme.of(context)`
@@ -814,7 +911,7 @@ organizers:: [[trabalho]]
 11. **NUNCA usar `late` sem necessidade** — prefira nullable com null check
 12. **NUNCA bloquear a UI com `await`** em providers de inicialização — use `AsyncValue` e `maybeWhen`
 
-### 8.3 Performance (CRÍTICO)
+### 9.3 Performance (CRÍTICO)
 
 1. **Listas grandes**: Use `ListView.builder` (lazy) em vez de `ListView(children: [...])`.
 2. **Rebuild desnecessário**: Use `select` em `ref.watch` para observar apenas campos necessários.
@@ -826,9 +923,9 @@ organizers:: [[trabalho]]
 
 ---
 
-## 9. PADRÕES DE CRUD
+## 10. PADRÕES DE CRUD
 
-### 9.1 Criação de Objetos
+### 10.1 Criação de Objetos
 
 ```dart
 // 1. Criar o modelo
@@ -923,9 +1020,9 @@ final habits = ref.read(allObjectsProvider).value!
 
 ---
 
-## 10. SINCRONIZAÇÃO E DADOS
+## 11. SINCRONIZAÇÃO E DADOS
 
-### 10.1 Fluxo de Sync
+### 11.1 Fluxo de Sync
 
 ```
 App (local) ──write──> Vault (filesystem local)
@@ -953,9 +1050,9 @@ Toda mutação (create/update/delete) enfileira uma `SyncAction`. A fila é proc
 
 ---
 
-## 11. SEGURANÇA E PRIVACIDADE
+## 12. SEGURANÇA E PRIVACIDADE
 
-### 11.1 Princípios
+### 12.1 Princípios
 
 1. **Zero dados em servidores do app** — tudo fica no dispositivo e no Google Drive do usuário
 2. **Auth via Google Sign-In** — tokens OAuth, nunca armazenar senhas
@@ -963,7 +1060,7 @@ Toda mutação (create/update/delete) enfileira uma `SyncAction`. A fila é proc
 4. **Vault local é plain text** — não criptografar (compatibilidade com Obsidian)
 5. **Tokens OAuth** são armazenados via `shared_preferences` com scope mínimo
 
-### 11.2 Permissões (Android)
+### 12.2 Permissões (Android)
 
 | Permissão | Uso | Obrigatória? |
 |---|---|---|
@@ -975,7 +1072,7 @@ Toda mutação (create/update/delete) enfileira uma `SyncAction`. A fila é proc
 | `FOREGROUND_SERVICE` | Pomodoro timer | Sim |
 | `USE_BIOMETRIC` | Lock screen | Não |
 
-### 11.3 Validação de Input
+### 12.3 Validação de Input
 
 - **Sempre sanitize** títulos antes de gerar slugs (remover caracteres especiais, converter para kebab-case)
 - **Nunca confie em dados** do frontmatter YAML — faça type checking (`is String`, `is int`)
@@ -984,7 +1081,7 @@ Toda mutação (create/update/delete) enfileira uma `SyncAction`. A fila é proc
 
 ---
 
-## 12. NOTIFICAÇÕES
+## 13. NOTIFICAÇÕES
 
 ### 12.1 Três Tipos
 

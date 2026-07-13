@@ -10,6 +10,7 @@ enum MetricType {
   trackerScore,
   googleCalendar,
   pomodoro,
+  kpi,
 }
 
 class MetricSource {
@@ -285,6 +286,11 @@ DataSourceReference? _toUnifiedDataSource({
         sourceType: DataSourceType.timeSpent,
         sourceId: id.isEmpty ? null : id,
       );
+    case MetricType.kpi:
+      return DataSourceReference(
+        sourceType: DataSourceType.manualQuantity,
+        sourceId: id.isEmpty ? null : id,
+      );
     case MetricType.googleCalendar:
       return null;
   }
@@ -300,10 +306,11 @@ MetricType _metricTypeFromUnified(DataSourceReference source) {
       return MetricType.trackerField;
     case DataSourceType.timeSpent:
       return MetricType.pomodoro;
+    case DataSourceType.manualQuantity:
+      return MetricType.kpi;
     case DataSourceType.subtasks:
     case DataSourceType.collection:
     case DataSourceType.entry:
-    case DataSourceType.manualQuantity:
       return MetricType.trackerScore;
   }
 }

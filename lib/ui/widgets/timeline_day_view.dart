@@ -84,7 +84,6 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                           : widget.gridGranularity == 30 ? 80.0 
                           : 160.0; // 60 min
     const double leftColumnWidth = 60.0;
-    final int slotsPerHour = 60 ~/ widget.gridGranularity;
 
     return Container(
       color: AppTheme.backgroundColor(context),

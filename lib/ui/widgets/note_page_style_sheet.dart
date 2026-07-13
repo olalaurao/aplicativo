@@ -4,7 +4,6 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../models/note_model.dart';
 import '../../providers/vault_provider.dart';
-import '../../services/obsidian_service.dart';
 import '../theme.dart';
 import '../widgets/app_color_picker.dart';
 

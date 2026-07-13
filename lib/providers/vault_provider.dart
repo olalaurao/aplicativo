@@ -13,6 +13,7 @@ import '../models/journal_entry.dart';
 import '../models/habit_model.dart';
 import '../models/organizer_model.dart';
 import '../models/goal_model.dart';
+import '../models/kpi_model.dart';
 import '../models/note_model.dart';
 import '../models/tracker_model.dart';
 import '../models/mood_model.dart';
@@ -24,6 +25,7 @@ import '../models/people_model.dart';
 import '../models/project_model.dart';
 import '../models/snapshot_model.dart';
 import '../models/scheduler.dart';
+import '../services/kpi_engine.dart';
 
 import '../models/template_model.dart';
 import '../models/idea_model.dart';
@@ -700,6 +702,7 @@ class HabitsNotifier extends Notifier<List<Habit>> {
       completions: count,
       slotCompletions: slotCompletions,
       successful: count >= habit.dailyGoal,
+      completedAt: DateTime.now(),
     );
   }
 
@@ -1133,11 +1136,25 @@ class GoalsNotifier extends Notifier<List<Goal>> {
   }
 
   Future<void> updateGoal(Goal goal) async {
+    // Update KPI values before persisting
+    final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+    final updatedKpis = List<KPI>.from(goal.kpis);
+    KPIEngine.updateKPIValues(
+      kpis: updatedKpis,
+      habits: allObjects.whereType<Habit>().toList(),
+      trackerRecords: allObjects.whereType<TrackingRecord>().toList(),
+      entries: allObjects.whereType<JournalEntry>().toList(),
+      moods: allObjects.whereType<MoodDefinition>().toList(),
+      notes: allObjects.whereType<Note>().toList(),
+      tasks: allObjects.whereType<Task>().toList(),
+    );
+    final updatedGoal = goal.copyWith(kpis: updatedKpis);
+    
     state = [
       for (final g in state)
-        if (g.id == goal.id) goal else g,
+        if (g.id == goal.id) updatedGoal else g,
     ];
-    await ref.read(vaultProvider.notifier).updateObject(goal);
+    await ref.read(vaultProvider.notifier).updateObject(updatedGoal);
   }
 
   Future<void> deleteGoal(Goal goal) async {
@@ -2755,6 +2772,10 @@ class VaultNotifier extends Notifier<void> {
         );
         if (sessions.isEmpty) return null;
         return sessions.fold<double>(0, (sum, s) => sum + s.minutesWorked);
+
+      case MetricType.kpi:
+        // KPI values are calculated separately in CombinedAnalysisScreen
+        return null;
     }
   }
 

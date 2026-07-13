@@ -45,15 +45,17 @@ class TodayCompletablesComponent extends ConsumerWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.checklist_rounded, color: AppColors.textMuted, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      block.title.isNotEmpty ? block.title : 'Hoje',
-                      style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(Icons.checklist_rounded, color: AppColors.textMuted, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        block.title.isNotEmpty ? block.title : 'Hoje',
+                        style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
                 ),
                 Text(
                   '$completedCount/$totalCount',
@@ -154,6 +156,7 @@ class TodayCompletablesComponent extends ConsumerWidget {
                                   date: today,
                                   completions: 1,
                                   successful: true,
+                                  completedAt: DateTime.now(),
                                 ));
                               } else {
                                 history.removeWhere((c) => c.date.year == today.year && c.date.month == today.month && c.date.day == today.day);

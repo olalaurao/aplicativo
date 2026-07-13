@@ -91,9 +91,7 @@ class _DayDialWidgetState extends State<DayDialWidget> {
     final size = box.size;
     final center = Offset(size.width / 2, size.height / 2);
     
-    bool isResizeStart = false;
-    bool isResizeEnd = false;
-    final tapped = _hitTestSegment(localPosition, size, center, (rs) => isResizeStart = rs, (re) => isResizeEnd = re);
+    final tapped = _hitTestSegment(localPosition, size, center, (rs) {}, (re) {});
     
     if (tapped != null && widget.onSegmentTap != null) {
       widget.onSegmentTap!(tapped);
@@ -308,15 +306,6 @@ class _DayDialWidgetState extends State<DayDialWidget> {
         ],
       ],
     );
-  }
-
-  String _formatCountdown(DialSegment next, DateTime now) {
-    final diff = next.start.difference(now);
-    if (diff.isNegative) return 'Now — ${next.title}';
-    if (diff.inMinutes < 60) return 'in ${diff.inMinutes}m — ${next.title}';
-    final h = diff.inHours;
-    final m = diff.inMinutes % 60;
-    return 'in ${h}h ${m}m — ${next.title}';
   }
 
   bool _isSameDay(DateTime a, DateTime b) {

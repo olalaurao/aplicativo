@@ -13,6 +13,9 @@ import '../../models/mood_model.dart';
 import '../../models/analysis_model.dart';
 import '../../models/pomodoro_session.dart';
 import '../../models/journal_entry.dart';
+import '../../models/goal_model.dart';
+import '../../models/kpi_model.dart';
+import '../../services/kpi_engine.dart';
 import '../theme.dart';
 import '../widgets/quartzo_chart.dart';
 import '../widgets/analysis_calendar.dart';
@@ -758,6 +761,8 @@ class _CombinedAnalysisScreenState
         return _getGoogleEventValueForDate(date);
       case MetricType.pomodoro:
         return _getPomodoroValueForDate(date);
+      case MetricType.kpi:
+        return _getKPIValueForDate(source.id, date);
     }
   }
 
@@ -908,6 +913,37 @@ class _CombinedAnalysisScreenState
       );
       if (sessions.isEmpty) return null;
       return sessions.fold<double>(0, (sum, s) => sum + s.minutesWorked);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  double? _getKPIValueForDate(String kpiId, DateTime date) {
+    try {
+      final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+      final goals = allObjects.whereType<Goal>().toList();
+      
+      for (final goal in goals) {
+        final kpi = goal.kpis.cast<KPI?>().firstWhere(
+          (k) => k != null && k.id == kpiId,
+          orElse: () => null,
+        );
+        if (kpi != null) {
+          // Calculate KPI value for the specific date
+          // Since KPIEngine calculates over a range, we'll use the date as both start and end
+          final value = KPIEngine.calculateKPIValue(
+            kpi: kpi,
+            habits: ref.read(habitsProvider),
+            trackerRecords: ref.read(trackingRecordsProvider),
+            entries: ref.read(allEntriesProvider),
+            moods: ref.read(moodsProvider),
+            notes: ref.read(notesProvider),
+            tasks: ref.read(tasksProvider),
+          );
+          return value;
+        }
+      }
+      return null;
     } catch (_) {
       return null;
     }
@@ -1476,6 +1512,8 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
   void _showPicker(BuildContext context) {
     final habits = ref.read(habitsProvider);
     final trackers = ref.read(trackersProvider);
+    final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+    final goals = allObjects.whereType<Goal>().toList();
 
     showModalBottomSheet(
       context: context,
@@ -1693,6 +1731,42 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                   Navigator.pop(ctx);
                 },
               ),
+
+              // KPIs Header
+              if (goals.isNotEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'KPIS',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ),
+                ...goals.expand((g) => g.kpis.map(
+                  (kpi) => _buildPickerItem(
+                    ctx,
+                    icon: Icons.show_chart_rounded,
+                    color: AppColors.warning,
+                    title: kpi.title,
+                    subtitle: 'KPI de ${g.title}',
+                    onTap: () {
+                      _onSourceSelected(
+                        MetricSource(
+                          type: MetricType.kpi,
+                          id: kpi.id,
+                          label: kpi.title,
+                          color: AppColors.warning,
+                        ),
+                      );
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                )),
+              ],
             ],
           ),
         ),
@@ -1818,6 +1892,8 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
         return Icons.calendar_today_rounded;
       case MetricType.pomodoro:
         return Icons.timer_outlined;
+      case MetricType.kpi:
+        return Icons.show_chart_rounded;
     }
   }
 
@@ -1835,6 +1911,8 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
         return 'Google Calendar';
       case MetricType.pomodoro:
         return 'Foco (Pomodoro)';
+      case MetricType.kpi:
+        return 'KPI';
     }
   }
 

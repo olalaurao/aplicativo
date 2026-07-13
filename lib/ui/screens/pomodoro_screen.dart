@@ -953,7 +953,6 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
           children: List.generate(steps.length, (index) {
             final isCompleted = index < currentIndex;
             final isCurrent = index == currentIndex;
-            final isBreak = steps[index].isBreak;
 
             return Expanded(
               child: Container(

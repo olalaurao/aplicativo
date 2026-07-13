@@ -724,11 +724,15 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                             onTap: _editEstimatedTime,
                             child: Row(
                               children: [
-                                const Text(
-                                  'Tempo Estimado',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
+                                Expanded(
+                                  child: Text(
+                                    'Tempo Estimado',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
                                   ),
                                 ),
                                 const Spacer(),
@@ -848,11 +852,15 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                         children: [
                           Row(
                             children: [
-                              const Text(
-                                'Depende de (Bloqueantes)',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
+                              Expanded(
+                                child: Text(
+                                  'Depende de (Bloqueantes)',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
                               ),
                               const Spacer(),

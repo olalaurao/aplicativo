@@ -177,7 +177,7 @@ class _NavigationShortcutPickerState
                           context,
                           o.title,
                           o.organizerType.name,
-                          o.id!,
+                          o.id,
                           _getIcon(o.organizerType.name),
                           '/organizer/${o.id}',
                         ),

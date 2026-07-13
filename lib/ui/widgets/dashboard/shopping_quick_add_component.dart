@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../../models/dashboard_block.dart';
 import '../../../models/shopping_list_model.dart';
@@ -37,7 +36,7 @@ class _ShoppingQuickAddComponentState extends ConsumerState<ShoppingQuickAddComp
 
     final activeLists = allLists.where((l) => !l.archived).toList();
     if (activeLists.isNotEmpty) {
-      activeLists.sort((a, b) => (b.updatedAt ?? b.createdAt).compareTo(a.updatedAt ?? a.createdAt));
+      activeLists.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       return activeLists.first;
     }
     return null;

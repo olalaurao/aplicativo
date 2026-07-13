@@ -410,6 +410,10 @@ class MarkdownParser {
   static final _sanitizeFileNameRegex3 = RegExp(r'^\\.+|\\.+$');
   static final _tempoTrabalhadoRegex = RegExp(r'(?:trabalhado|Tempo):\\s*(\\d+)');
   static final _pausaRegex = RegExp(r'(?:pausa|Pausas):\\s*(\\d+)');
+  static final _tasksSectionRegex = RegExp(r'^## Tasks', multiLine: true);
+  static final _moodSplitRegex = RegExp(r'[,;|]');
+  static final _ocrSectionRegex = RegExp(r'^##\s*📝\s*Texto Extraído \(OCR\)\s*$', multiLine: true);
+  static final _ocrSourceRegex = RegExp(r'<!--\s*ocr-source:\s*(.+?)\s*-->');
 
   /// Extracts [[WikiLinks]] and @mentions from a string.
   static List<String> extractLinks(String content) {
@@ -850,10 +854,10 @@ class MarkdownParser {
 
   static List<Map<String, dynamic>> parseTasksFromDailyNote(String body) {
     final tasks = <Map<String, dynamic>>[];
-    final sections = body.split(RegExp(r'^## Tasks', multiLine: true));
+    final sections = body.split(_tasksSectionRegex);
     if (sections.length < 2) return [];
 
-    final tasksSection = sections[1].split(RegExp(r'^## ', multiLine: true))[0];
+    final tasksSection = sections[1].split(_nextSectionRegex)[0];
     final lines = tasksSection.split('\n');
 
     for (final line in lines) {
@@ -894,7 +898,7 @@ class MarkdownParser {
         if (entry['mood'] != null) {
           final moods = entry['mood']
               .toString()
-              .split(RegExp(r'[,;|]'))
+              .split(_moodSplitRegex)
               .map((mood) => mood.trim())
               .where((mood) => mood.isNotEmpty)
               .map((mood) => mood.startsWith('[[') ? mood : '[[$mood]]')
@@ -1001,18 +1005,13 @@ class MarkdownParser {
   }
 
   static List<OcrBlock> parseOcrSections(String body) {
-    final sectionRegex = RegExp(
-      r'^##\s*📝\s*Texto Extraído \(OCR\)\s*$',
-      multiLine: true,
-    );
-    final sourceRegex = RegExp(r'<!--\s*ocr-source:\s*(.+?)\s*-->');
-    final matches = sectionRegex.allMatches(body).toList();
+    final matches = _ocrSectionRegex.allMatches(body).toList();
     final blocks = <OcrBlock>[];
     for (var i = 0; i < matches.length; i++) {
       final start = matches[i].end;
       final end = i + 1 < matches.length ? matches[i + 1].start : body.length;
       final sectionText = body.substring(start, end).trim();
-      final sourceMatch = sourceRegex.firstMatch(sectionText);
+      final sourceMatch = _ocrSourceRegex.firstMatch(sectionText);
       final text = sourceMatch != null
           ? sectionText.substring(sourceMatch.end).trim()
           : sectionText;

@@ -367,6 +367,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
                               date: today,
                               completions: 1,
                               successful: true,
+                              completedAt: DateTime.now(),
                             ));
                           } else {
                             history.removeWhere((c) => 
@@ -412,8 +413,6 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
         return '🌅';
       case DialSegmentKind.sleep:
         return '�';
-      default:
-        return '📌';
     }
   }
 }

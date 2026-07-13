@@ -437,7 +437,7 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
 
     final forecasts = dayThemes.map((theme) {
       final activeDates = dates
-          .where((d) => theme.id != null && isThemeActive(theme.id!, d))
+          .where((d) => isThemeActive(theme.id, d))
           .toList();
 
       final themeTasks = tasks.where((t) {
@@ -474,7 +474,7 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
         tasks: themeTasks,
         habits: themeHabits,
       );
-    }).toList();
+    }).whereType<_ThemeForecast>().toList();
 
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 40),

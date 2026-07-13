@@ -235,7 +235,7 @@ class Event extends ContentObject {
       if (val == null) return null;
       final str = val.toString().trim();
       final match = RegExp(r'\[\[(.*?)\]\]').firstMatch(str);
-      return match != null ? '[[${match.group(1)!}]]' : '[[$str]';
+      return match != null ? '[[${match.group(1)!}]]' : '[[${str}]]';
     }
 
     final taskLink = frontmatter['task'] != null

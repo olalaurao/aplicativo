@@ -11,13 +11,10 @@ import 'providers/vault_provider.dart';
 import 'providers/pomodoro_provider.dart';
 import 'models/content_object.dart';
 import 'models/event_model.dart';
-import 'models/habit_model.dart';
 import 'models/journal_entry.dart';
 import 'models/mood_model.dart';
 import 'models/organizer_model.dart';
 import 'models/reminder_model.dart';
-import 'models/task_model.dart';
-import 'models/pomodoro_session.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

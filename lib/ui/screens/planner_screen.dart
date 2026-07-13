@@ -171,10 +171,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   Widget build(BuildContext context) {
     final tasks = ref.watch(tasksProvider);
     final projects = ref.watch(projectsProvider);
-    final habits = ref
-        .watch(habitsProvider)
-        .where((h) => !h.isQuitting && !h.isNegative)
-        .toList();
+    final habits = ref.watch(habitsProvider.select((habits) => habits.where((h) => !h.isQuitting && !h.isNegative).toList()));
     final people = ref.watch(peopleProvider);
     final dayThemes = ref.watch(dayThemesProvider);
     final timeBlocks = ref.watch(timeBlocksProvider);
@@ -457,7 +454,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                         timeBlocks: activeTimeBlocks,
                         activeTheme: activeTheme,
                         gridGranularity: _gridGranularity,
-                        pomodoroSessions: ref.watch(pomodoroProvider).history,
+                        pomodoroSessions: ref.watch(pomodoroProvider.select((p) => p.history)),
                         onTaskDrop: (task, time) {
                           final timeStr = DateFormat('HH:mm').format(time);
                           final isBacklog =
@@ -566,7 +563,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                                 slotIndex: slotIndex,
                               );
                         },
-                        colorMode: ref.watch(settingsProvider).plannerColorMode,
+                        colorMode: ref.watch(settingsProvider.select((s) => s.plannerColorMode)),
                       ),
                     ),
                   )
@@ -925,7 +922,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     AsyncValue<List<google_calendar.Event>> googleEvents,
   ) {
     final dayThemes = ref.watch(dayThemesProvider);
-    final timeBlocks = ref.watch(timeBlocksProvider);
+    final timeBlocks = ref.watch(timeBlocksProvider.select((blocks) => blocks.where((b) => b.organizerType == OrganizerType.timeBlock).toList()));
     const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final selectedDayName = weekDayNames[_selectedDate.weekday - 1];
     final activeThemeBlockIds = dayThemes
@@ -1204,10 +1201,11 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                   children: [
                     Consumer(
                       builder: (ctx, ref, _) {
-                        final trackers = ref.watch(trackersProvider);
-                        final tracker = trackers.cast<dynamic>().firstWhere(
-                          (t) => t.id == record.trackerId,
-                          orElse: () => null,
+                        final tracker = ref.watch(
+                          trackersProvider.select((trackers) => trackers.cast<dynamic>().firstWhere(
+                            (t) => t.id == record.trackerId,
+                            orElse: () => null,
+                          ))
                         );
                         return Text(
                           tracker?.title ?? 'Registro',
@@ -1640,7 +1638,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   Widget _buildTaskCard(Task task, {bool isHighEnergyBlock = false}) {
-    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final allObjects = ref.watch(allObjectsProvider.select((async) => async.value ?? []));
     final isBlocked = task.isBlocked(allObjects);
     final isBestTime =
         isHighEnergyBlock &&
@@ -2150,7 +2148,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   Widget _buildWeekView(List<Task> tasks, List<Habit> habits) {
-    final timeBlocks = ref.watch(timeBlocksProvider);
+    final timeBlocks = ref.watch(timeBlocksProvider.select((blocks) => blocks.where((b) => b.organizerType == OrganizerType.timeBlock).toList()));
     final startOfWeek = DateTime.now().subtract(
       Duration(days: DateTime.now().weekday - 1),
     );
@@ -2191,19 +2189,19 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     List<Habit> habits,
     AsyncValue<List<google_calendar.Event>> googleEvents,
   ) {
-    final pomodoroSessions = ref.watch(pomodoroProvider).history;
+    final pomodoroSessions = ref.watch(pomodoroProvider.select((p) => p.history));
     final events = googleEvents.maybeWhen(
       data: (events) => events,
       orElse: () => <google_calendar.Event>[],
     );
 
-    final allOrganizers = ref.watch(organizersProvider);
-    final timeBlocks = allOrganizers.where((o) => o.organizerType == OrganizerType.timeBlock).toList();
+    final allOrganizers = ref.watch(organizersProvider.select((orgs) => orgs.where((o) => o.organizerType == OrganizerType.timeBlock).toList()));
+    final timeBlocks = allOrganizers;
     
-    final allObjectsAsync = ref.watch(allObjectsProvider);
-    final allObjects = allObjectsAsync.valueOrNull ?? [];
+    final allObjectsAsync = ref.watch(allObjectsProvider.select((async) => async.valueOrNull ?? []));
+    final allObjects = allObjectsAsync;
     
-    final localEvents = allObjects.whereType<Event>().toList();
+    final localEvents = allObjects.whereType<Event>().where((e) => _isSameDay(e.date, _selectedDate)).toList();
     
     final reminders = allObjects.whereType<Reminder>().where((r) => 
       !r.isCompleted && 

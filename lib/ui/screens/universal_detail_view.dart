@@ -22,7 +22,7 @@ import '../../models/project_model.dart';
 import '../../models/tracker_model.dart';
 import '../../models/snapshot_model.dart';
 import '../../models/organizer_model.dart';
-import '../../models/shared_types.dart' hide KPI;
+import '../../models/shared_types.dart';
 import '../../models/kpi_model.dart';
 import '../../providers/pomodoro_provider.dart';
 import '../../services/kpi_engine.dart';
@@ -69,6 +69,43 @@ import '../widgets/linked_objects_section.dart';
 import '../utils/social_ref_utils.dart';
 import '../navigation/object_navigation.dart';
 import '../../services/rotation_service.dart';
+import 'detail_sections/task_detail_section.dart';
+import 'detail_sections/habit_detail_section.dart';
+import 'detail_sections/project_detail_section.dart';
+import 'detail_sections/goal_detail_section.dart';
+import 'detail_sections/note_detail_section.dart';
+import 'detail_sections/person_detail_section.dart';
+import 'detail_sections/journal_entry_detail_section.dart';
+import 'detail_sections/idea_detail_section.dart';
+
+/// Helper class to cache computed project progress to avoid duplicate calculations
+class _ProjectProgressCache {
+  static final Map<String, double> _cache = {};
+  static final Map<String, int> _linkedTaskCountCache = {};
+  static final Map<String, int> _completedTaskCountCache = {};
+
+  static double getProgress(String projectId, Project project, List<Task> tasks) {
+    if (_cache.containsKey(projectId)) return _cache[projectId]!;
+    final progress = KPIEngine.calculateProjectProgress(project, tasks);
+    _cache[projectId] = progress;
+    return progress;
+  }
+
+  static int getLinkedTaskCount(String projectId, Project project, List<Task> tasks) {
+    if (_linkedTaskCountCache.containsKey(projectId)) return _linkedTaskCountCache[projectId]!;
+    final linkedTasks = tasks.where((t) => project.taskLinks.contains(t.slug) || project.taskLinks.contains(t.id)).toList();
+    _linkedTaskCountCache[projectId] = linkedTasks.length;
+    return linkedTasks.length;
+  }
+
+  static int getCompletedTaskCount(String projectId, Project project, List<Task> tasks) {
+    if (_completedTaskCountCache.containsKey(projectId)) return _completedTaskCountCache[projectId]!;
+    final linkedTasks = tasks.where((t) => project.taskLinks.contains(t.slug) || project.taskLinks.contains(t.id)).toList();
+    final doneCount = linkedTasks.where((t) => t.isCompleted).length;
+    _completedTaskCountCache[projectId] = doneCount;
+    return doneCount;
+  }
+}
 
 class _PropRow {
   final String label;
@@ -123,18 +160,17 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch active object reactively from the provider
-    final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
-    final found = allObjects.cast<ContentObject?>().firstWhere(
-      (o) => o != null && o.id == object.id,
-      orElse: () => null,
-    );
-    // Use the found object if available, otherwise fall back to cached
-    final currentObject = found ?? object;
+    // Watch active object reactively from the provider - use .select() to only rebuild when this specific object changes
+    final currentObject = ref.watch(
+      allObjectsProvider.select((async) => async.valueOrNull?.cast<ContentObject?>().firstWhere(
+        (o) => o != null && o.id == object.id,
+        orElse: () => null,
+      ))
+    ) ?? object;
     // Safely update the cached reference after the frame — never during build
-    if (found != null && !identical(found, object)) {
+    if (!identical(currentObject, object)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) object = found;
+        if (mounted) object = currentObject;
       });
     }
 
@@ -235,16 +271,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                               children: [
                                 Consumer(
                                   builder: (context, ref, _) {
-                                    final allObjects =
-                                        ref.watch(allObjectsProvider).value ??
-                                        [];
-                                    final linkedObj = allObjects
-                                        .cast<ContentObject?>()
-                                        .firstWhere(
-                                          (o) =>
-                                              o != null && o.id == refObj.slug,
-                                          orElse: () => null,
-                                        );
+                                    final linkedObj = ref.watch(
+                                      allObjectsProvider.select((async) => async.value?.cast<ContentObject?>().firstWhere(
+                                        (o) => o != null && o.id == refObj.slug,
+                                        orElse: () => null,
+                                      ))
+                                    );
 
                                     return ListTile(
                                       leading: CircleAvatar(
@@ -849,262 +881,24 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final cards = <PropertyCard>[];
 
     if (object is Task) {
-      final task = object as Task;
-      cards.add(PropertyCard(
-        icon: Icons.calendar_today_outlined,
-        label: 'Criado',
-        value: DateFormat('d MMM yyyy').format(task.createdAt),
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.event,
-        label: 'Prazo',
-        value: task.endDate != null ? DateFormat('d MMM yyyy').format(task.endDate!) : 'Não definida',
-        state: task.endDate == null ? PropertyCardState.empty : (_isOverdue(task) ? PropertyCardState.overdue : PropertyCardState.normal),
-        onTap: () => _showTaskDueDatePicker(context, ref, task),
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.play_circle_outline,
-        label: 'Início',
-        value: task.startDate != null ? DateFormat('d MMM yyyy').format(task.startDate!) : 'Não definida',
-        state: task.startDate == null ? PropertyCardState.empty : PropertyCardState.normal,
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.priority_high,
-        label: 'Prioridade',
-        value: '',
-        customChild: _buildPriorityBadge(task),
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.linear_scale,
-        label: 'Stage',
-        value: _getStatusLabel(task),
-        onTap: () => _showEnumPropertyPicker<TaskStage>(
-          context: context,
-          title: 'Status',
-          values: TaskStage.values,
-          initialValue: task.stage,
-          labelBuilder: (s) => s.name.toUpperCase(),
-          onSave: (val) {
-            final updated = task.copyWith(stage: val);
-            ref.read(vaultProvider.notifier).updateObject(updated);
-          },
-        ),
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.hourglass_empty,
-        label: 'Tempo estimado',
-        value: task.estimatedMinutes != null ? '${task.estimatedMinutes} min' : 'Não definido',
-        state: task.estimatedMinutes == null ? PropertyCardState.empty : PropertyCardState.normal,
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.hourglass_full,
-        label: 'Tempo real',
-        value: task.actualMinutes > 0 ? '${task.actualMinutes} min' : 'Não definido',
-        state: task.actualMinutes == 0 ? PropertyCardState.empty : PropertyCardState.normal,
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.timer,
-        label: 'Pomodoros',
-        value: task.pomodoroCount != null && task.pomodoroCount! > 0 ? '${task.pomodoroCount}' : 'Não definido',
-        state: task.pomodoroCount == null || task.pomodoroCount == 0 ? PropertyCardState.empty : PropertyCardState.normal,
-      ));
-      cards.addAll(_buildLinkedGoogleEventPropertyCards(context, task));
+      cards.addAll(buildTaskPropertyCards(context, ref, object as Task));
+      cards.addAll(_buildLinkedGoogleEventPropertyCards(context, object as Task));
     } else if (object is Habit) {
-      final habit = object as Habit;
-      if (!habit.isChecklistHabit) {
-        cards.add(PropertyCard(
-          icon: Icons.repeat,
-          label: 'Frequência',
-          value: habit.scheduler?.rules.isNotEmpty == true ? habit.scheduler!.rules.first.repeatType.name : 'Não definida',
-          state: habit.scheduler == null || habit.scheduler!.rules.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
-        ));
-        cards.add(PropertyCard(
-          icon: Icons.local_fire_department,
-          label: 'Streak',
-          value: '${habit.streak} 🔥',
-          state: habit.streak > 0 ? PropertyCardState.streakActive : PropertyCardState.normal,
-        ));
-        cards.add(PropertyCard(
-          icon: Icons.history,
-          label: 'Último registro',
-          value: habit.daysSinceLastCompletion == 0 ? 'Hoje' : '${habit.daysSinceLastCompletion} dias atrás',
-          state: habit.completionHistory.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
-        ));
-        cards.add(PropertyCard(
-          icon: Icons.category,
-          label: 'Categoria',
-          value: habit.categories.isNotEmpty ? habit.categories.first : 'Não definida',
-          state: habit.categories.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
-        ));
-      }
+      cards.addAll(buildHabitPropertyCards(object as Habit));
     } else if (object is Project) {
-      final project = object as Project;
-      final tasks = ref.watch(tasksProvider);
-      final progress = KPIEngine.calculateProjectProgress(project, tasks);
-      final linkedTasks = tasks.where((t) => project.taskLinks.contains(t.slug) || project.taskLinks.contains(t.id)).toList();
-      final doneCount = linkedTasks.where((t) => t.isCompleted).length;
-
-      if (project.hasRotation) {
-        cards.add(PropertyCard(
-          icon: Icons.trending_up_rounded,
-          label: 'Concluído',
-          value: '${(progress * 100).toInt()}%',
-        ));
-        cards.add(PropertyCard(
-          icon: Icons.task_alt,
-          label: 'Tarefas',
-          value: '$doneCount de ${linkedTasks.length}',
-        ));
-      }
-      cards.add(PropertyCard(
-        icon: Icons.calendar_today,
-        label: 'Início',
-        value: project.startDate != null ? DateFormat('d MMM yyyy').format(project.startDate!) : 'Não definida',
-        state: project.startDate == null ? PropertyCardState.empty : PropertyCardState.normal,
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.event,
-        label: 'Término',
-        value: project.endDate != null ? DateFormat('d MMM yyyy').format(project.endDate!) : 'Não definida',
-        state: project.endDate == null ? PropertyCardState.empty : (_isOverdue(project) ? PropertyCardState.overdue : PropertyCardState.normal),
-      ));
-      if (_hasPriority(project)) {
-        cards.add(PropertyCard(
-          icon: Icons.priority_high,
-          label: 'Prioridade',
-          value: '',
-          customChild: _buildPriorityBadge(project),
-        ));
-      }
-      cards.add(PropertyCard(
-        icon: Icons.linear_scale,
-        label: 'Estado',
-        value: _getStatusLabel(project),
-        onTap: () => _onPropertyTap(context, ref, 'Status', _getStatus(project)),
-      ));
-      cards.addAll(_buildLinkedGoogleEventPropertyCards(context, project));
+      cards.addAll(buildProjectPropertyCards(context, ref, object as Project));
+      cards.addAll(_buildLinkedGoogleEventPropertyCards(context, object as Project));
     } else if (object is Goal) {
-      final goal = object as Goal;
-      cards.add(PropertyCard(
-        icon: Icons.calendar_today,
-        label: 'Início',
-        value: goal.startDate != null ? DateFormat('d MMM yyyy').format(goal.startDate!) : 'Não definida',
-        state: goal.startDate == null ? PropertyCardState.empty : PropertyCardState.normal,
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.event,
-        label: 'Prazo',
-        value: goal.deadline != null ? DateFormat('d MMM yyyy').format(goal.deadline!) : 'Não definida',
-        state: goal.deadline == null ? PropertyCardState.empty : (_isOverdue(goal) ? PropertyCardState.overdue : PropertyCardState.normal),
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.repeat,
-        label: 'Tipo',
-        value: goal.goalType == GoalType.repeating ? 'Recorrente' : 'Pontual',
-        onTap: () => _showEnumPropertyPicker<GoalType>(
-          context: context,
-          title: 'Tipo',
-          values: GoalType.values,
-          initialValue: goal.goalType,
-          labelBuilder: (s) => s.name,
-          onSave: (val) {
-            final updated = goal.copyWith(goalType: val);
-            ref.read(vaultProvider.notifier).updateObject(updated);
-          },
-        ),
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.timelapse,
-        label: 'Intervalo',
-        value: goal.repeatInterval ?? 'Não definido',
-        state: goal.repeatInterval == null ? PropertyCardState.empty : PropertyCardState.normal,
-      ));
+      cards.addAll(buildGoalPropertyCards(context, ref, object as Goal));
     } else if (object is IdeaDefinition) {
-      final idea = object as IdeaDefinition;
-      cards.add(PropertyCard(
-        icon: Icons.visibility,
-        label: 'Horizonte',
-        value: '',
-        customChild: _buildHorizonBadge(idea),
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.priority_high,
-        label: 'Prioridade',
-        value: '',
-        customChild: idea.priority != null && idea.priority != TaskPriority.none
-            ? _buildPriorityBadge(idea)
-            : Text('Não definida', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, fontStyle: FontStyle.italic, color: AppColors.textMuted.withValues(alpha: 0.4))),
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.transform,
-        label: 'Convertida em',
-        value: idea.convertedToType ?? 'Não convertida',
-        state: idea.convertedToType == null ? PropertyCardState.empty : PropertyCardState.normal,
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.event,
-        label: 'Data alvo',
-        value: idea.targetDate != null ? DateFormat('d MMM yyyy').format(idea.targetDate!) : 'Não definida',
-        state: idea.targetDate == null ? PropertyCardState.empty : (_isOverdue(idea) ? PropertyCardState.overdue : PropertyCardState.normal),
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.calendar_today,
-        label: 'Criado',
-        value: DateFormat('d MMM yyyy').format(idea.createdAt),
-      ));
+      cards.addAll(buildIdeaPropertyCards(object as IdeaDefinition));
     } else if (object is Note) {
-      final note = object as Note;
-      final allNotes = ref.watch(notesProvider);
-      return [
-        _buildNotePropertiesGrid(context, note, allNotes),
-      ];
+      return buildNotePropertyCards(context, ref, object as Note);
     } else if (object is Person) {
-      final person = object as Person;
-      cards.add(PropertyCard(
-        icon: Icons.priority_high,
-        label: 'Prioridade',
-        value: '',
-        customChild: _buildContactPriorityBadge(person),
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.repeat,
-        label: 'Frequência',
-        value: person.contactFrequency != null ? 'A cada ${person.contactFrequency!.inDays} dias' : 'Não definida',
-        state: person.contactFrequency == null ? PropertyCardState.empty : PropertyCardState.normal,
-        onTap: person.contactFrequency != null ? () => _showFrequencyPicker(context, ref, person) : null,
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.phone,
-        label: 'Próximo contato',
-        value: () {
-          if (person.lastContactDate == null || person.contactFrequency == null) return 'Não definido';
-          final next = person.lastContactDate!.add(person.contactFrequency!);
-          return DateFormat('d MMM yyyy').format(next);
-        }(),
-        state: person.lastContactDate == null || person.contactFrequency == null ? PropertyCardState.empty : PropertyCardState.normal,
-      ));
-      cards.addAll(_buildDefaultDateCards(context));
+      cards.addAll(buildPersonPropertyCards(context, ref, object as Person));
     } else if (object is JournalEntry) {
-      final entry = object as JournalEntry;
-      final mood = _moodForEntry(entry);
-      cards.add(PropertyCard(
-        icon: Icons.mood,
-        label: 'Mood',
-        value: mood != null ? '${mood.emoji} ${mood.title}' : (entry.moodSlug ?? 'Não definido'),
-        state: mood == null && (entry.moodSlug == null || entry.moodSlug!.isEmpty) ? PropertyCardState.empty : PropertyCardState.normal,
-      ));
-      cards.add(PropertyCard(
-        icon: Icons.access_time,
-        label: 'Data/hora',
-        value: DateFormat('d MMM yyyy • HH:mm').format(entry.date),
-      ));
-      if (entry.categories.isNotEmpty) {
-        cards.add(PropertyCard(
-          icon: Icons.category,
-          label: 'Categoria',
-          value: entry.categories.first,
-        ));
-      }
+      final mood = _moodForEntry(object as JournalEntry);
+      cards.addAll(buildJournalEntryPropertyCards(object as JournalEntry, mood));
     } else {
       cards.addAll(_buildDefaultDateCards(context));
     }
@@ -1119,13 +913,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         ),
       ),
     ];
-  }
-
-  Widget _buildNotePropertiesGrid(BuildContext context, Note note, List<Note> allNotes) {
-    return _CollapsiblePropertiesSection(
-      title: 'PROPERTIES',
-      child: _buildNotePropertiesCardContent(context, note, allNotes),
-    );
   }
 
   void _showStringPropertyPicker({
@@ -1687,14 +1474,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
     if (object is Project) {
       final project = object as Project;
-      final tasks = ref.watch(tasksProvider);
-      final progress = KPIEngine.calculateProjectProgress(project, tasks);
-      final linkedTasks = tasks
-          .where((t) =>
-              project.taskLinks.contains(t.slug) ||
-              project.taskLinks.contains(t.id))
-          .toList();
-      final doneCount = linkedTasks.where((t) => t.isCompleted).length;
+      final tasks = ref.watch(tasksProvider.select((tasks) => tasks.where((t) => t.organizers.any((o) => o.slug == project.slug)).toList()));
+      final progress = _ProjectProgressCache.getProgress(project.id, project, tasks);
+      final doneCount = _ProjectProgressCache.getCompletedTaskCount(project.id, project, tasks);
 
       if (project.hasRotation) {
         return [
@@ -1732,6 +1514,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         ];
       }
 
+      final linkedTasksCount = _ProjectProgressCache.getLinkedTaskCount(project.id, project, tasks);
+
       return [
         SliverToBoxAdapter(
           child: Padding(
@@ -1754,7 +1538,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '$doneCount de ${linkedTasks.length} tarefas',
+                        '$doneCount de $linkedTasksCount tarefas',
                         style: const TextStyle(
                           fontSize: 13,
                           color: AppColors.textMuted,
@@ -2461,9 +2245,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
     if (object is MoodDefinition) {
       final mood = object as MoodDefinition;
-      final entries = ref.watch(allEntriesProvider);
-      final moodEntries = entries.where((e) => e.moodSlug == mood.id).toList()
-        ..sort((a, b) => b.date.compareTo(a.date));
+      final moodEntries = ref.watch(allEntriesProvider.select((entries) => entries.where((e) => e.moodSlug == mood.id).toList()..sort((a, b) => b.date.compareTo(a.date))));
 
       return [
         SliverToBoxAdapter(
@@ -2501,7 +2283,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                       final date = DateTime.now().subtract(
                         Duration(days: 29 - i),
                       );
-                      final hasEntry = entries.any(
+                      final hasEntry = moodEntries.any(
                         (e) =>
                             e.moodSlug == mood.id && _isSameDay(e.date, date),
                       );
@@ -2544,17 +2326,17 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
     if (object is TrackerDefinition) {
       final tracker = object as TrackerDefinition;
-      final allRecords = ref.watch(trackingRecordsProvider);
-      final trackerRecords =
-          allRecords
-              .where(
-                (r) =>
-                    r.trackerId == tracker.id ||
-                    r.trackerId == tracker.slug ||
-                    r.trackerId == tracker.title,
-              )
-              .toList()
-            ..sort((a, b) => b.date.compareTo(a.date));
+      final trackerRecords = ref.watch(
+        trackingRecordsProvider.select((records) => records
+            .where(
+              (r) =>
+                  r.trackerId == tracker.id ||
+                  r.trackerId == tracker.slug ||
+                  r.trackerId == tracker.title,
+            )
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date)))
+      );
 
       return [
         // ─── Summaries ───
@@ -2779,10 +2561,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
     if (object is Note) {
       final note = object as Note;
-      final allNotes = ref.watch(notesProvider);
-      final childNotes = allNotes
-          .where((n) => n.parentNoteId == note.id)
-          .toList();
+      final childNotes = ref.watch(notesProvider.select((notes) => notes.where((n) => n.parentNoteId == note.id).toList()));
 
       return [
         SliverToBoxAdapter(
@@ -3629,15 +3408,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildContactPriorityBadge(Person person) {
-    return _buildPriorityBadge(
-      Task(
-        title: person.title,
-        priority: person.contactPriority,
-      ),
     );
   }
 
@@ -4761,22 +4531,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
-  Future<void> _showTaskDueDatePicker(
-    BuildContext context,
-    WidgetRef ref,
-    Task task,
-  ) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: task.endDate ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2035),
-    );
-    if (picked == null) return;
-    task.endDate = picked;
-    await ref.read(vaultProvider.notifier).updateObject(task);
-  }
-
   void _showProjectStatePicker(
     BuildContext context,
     WidgetRef ref,
@@ -5157,13 +4911,13 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     Goal goal,
     KPI kpi,
   ) {
-    // Only watch providers if the goal has KPIs that need live calculation
-    final habits = ref.watch(habitsProvider);
-    final trackerRecords = ref.watch(trackingRecordsProvider);
-    final entries = ref.watch(allEntriesProvider);
-    final moods = ref.watch(moodsProvider);
-    final notes = ref.watch(notesProvider);
-    final tasks = ref.watch(tasksProvider);
+    // Only watch providers that the specific KPI source type requires
+    final habits = kpi.dataSource.sourceType == DataSourceType.habit ? ref.watch(habitsProvider) : <Habit>[];
+    final trackerRecords = kpi.dataSource.sourceType == DataSourceType.trackerField ? ref.watch(trackingRecordsProvider) : <TrackingRecord>[];
+    final entries = kpi.dataSource.sourceType == DataSourceType.entry ? ref.watch(allEntriesProvider) : <JournalEntry>[];
+    final moods = <MoodDefinition>[]; // Mood-based KPIs not currently supported
+    final notes = kpi.dataSource.sourceType == DataSourceType.collection ? ref.watch(notesProvider) : <Note>[];
+    final tasks = (kpi.dataSource.sourceType == DataSourceType.subtasks || kpi.dataSource.sourceType == DataSourceType.timeSpent) ? ref.watch(tasksProvider) : <Task>[];
 
     final currentValue = KPIEngine.calculateKPIValue(
       kpi: kpi,
@@ -5217,6 +4971,34 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     ),
                   ),
                 )
+              else if (kpi.displayType == KPIDisplayType.number)
+                Flexible(
+                  child: Text(
+                    currentValue.toInt().toString(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.accentColor(context),
+                    ),
+                  ),
+                )
+              else if (kpi.displayType == KPIDisplayType.percentage)
+                Flexible(
+                  child: Text(
+                    '${(progress * 100).toInt()}%',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.accentColor(context),
+                    ),
+                  ),
+                )
               else
                 Flexible(
                   child: Text(
@@ -5263,18 +5045,20 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              backgroundColor: AppColors.surfaceVariant,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                isComplete ? AppColors.success : AppTheme.accentColor(context),
+          if (kpi.displayType != KPIDisplayType.number) ...[
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: AppColors.surfaceVariant,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  isComplete ? AppColors.success : AppTheme.accentColor(context),
+                ),
+                minHeight: 8,
               ),
-              minHeight: 8,
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -5465,19 +5249,16 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           final slug = entry.value;
           return Consumer(
             builder: (context, ref, _) {
-              final allObjects = ref.watch(allObjectsProvider).value ?? [];
               final cleanRef = slug
                   .replaceAll('[[', '')
                   .replaceAll(']]', '')
                   .trim();
-              final blockingTask =
-                  allObjects.cast<ContentObject?>().firstWhere(
-                        (o) =>
-                            o is Task &&
-                            (o.slug == cleanRef || o.id == cleanRef),
-                        orElse: () => null,
-                      )
-                      as Task?;
+              final blockingTask = ref.watch(
+                allObjectsProvider.select((async) => async.value?.cast<ContentObject?>().firstWhere(
+                  (o) => o is Task && (o.slug == cleanRef || o.id == cleanRef),
+                  orElse: () => null,
+                ) as Task?)
+              );
 
               final isFinalized = blockingTask?.stage == TaskStage.finalized;
 
@@ -5492,14 +5273,17 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                           ? AppColors.habitGreen
                           : AppColors.error,
                     ),
-                    title: Text(
-                      blockingTask?.title ?? slug,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        decoration: isFinalized
-                            ? TextDecoration.lineThrough
-                            : null,
+                    title: Expanded(
+                      child: Text(
+                        blockingTask?.title ?? slug,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          decoration: isFinalized
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     trailing: const Icon(Icons.chevron_right_rounded, size: 16),
@@ -5630,7 +5414,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     } else if (object is Project) {
       final project = object as Project;
       final tasks = ref.read(tasksProvider);
-      currentKPIs['Progress'] = KPIEngine.calculateProjectProgress(
+      currentKPIs['Progress'] = _ProjectProgressCache.getProgress(
+        project.id,
         project,
         tasks,
       );
@@ -5748,20 +5533,23 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           ),
         ),
         const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(
-            5,
-            (i) => GestureDetector(
-              onTap: () => _updateResourceRating(ref, resource, i + 1),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Icon(
-                  Icons.star_rounded,
-                  size: 32,
-                  color: i < resource.rating
-                      ? AppColors.warning
-                      : AppColors.textMuted.withValues(alpha: 0.25),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              5,
+              (i) => GestureDetector(
+                onTap: () => _updateResourceRating(ref, resource, i + 1),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Icon(
+                    Icons.star_rounded,
+                    size: 32,
+                    color: i < resource.rating
+                        ? AppColors.warning
+                        : AppColors.textMuted.withValues(alpha: 0.25),
+                  ),
                 ),
               ),
             ),
@@ -6785,62 +6573,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     return all.firstWhere((o) => o.id == id, orElse: () => object);
   }
 
-  void _showFrequencyPicker(
-    BuildContext context,
-    WidgetRef ref,
-    Person person,
-  ) {
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        int days = person.contactFrequency?.inDays ?? 7;
-        return AlertDialog(
-          title: const Text('Contact Frequency'),
-          content: StatefulBuilder(
-            builder: (context, setState) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Every $days days',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Slider(
-                    value: days.toDouble(),
-                    min: 1,
-                    max: 90,
-                    divisions: 89,
-                    onChanged: (val) => setState(() => days = val.toInt()),
-                  ),
-                ],
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('CANCEL'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final updated = person.copyWith(
-                  contactFrequency: Duration(days: days),
-                );
-                await ref.read(vaultProvider.notifier).updateObject(updated);
-                if (!ctx.mounted) return;
-                Navigator.pop(ctx);
-              },
-              child: const Text('SAVE'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   Color _typeColorForMention(String type) {
     switch (type) {
       case 'task':
@@ -7508,89 +7240,6 @@ class _CollapsiblePropertiesSectionState extends State<_CollapsiblePropertiesSec
               : const SizedBox.shrink(),
         ),
       ],
-    );
-  }
-}
-
-class _Heading {
-  final String text;
-  final int level;
-  final int index;
-
-  _Heading({
-    required this.text,
-    required this.level,
-    required this.index,
-  });
-}
-
-class _TableOfContentsSheet extends StatelessWidget {
-  final List<_Heading> headings;
-  final ValueChanged<int> onHeadingTap;
-
-  const _TableOfContentsSheet({
-    required this.headings,
-    required this.onHeadingTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: AppTheme.sheetDecoration(context),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-        top: 24,
-        left: 24,
-        right: 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Table of Contents',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-              ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close_rounded),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Flexible(
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: headings.length,
-              itemBuilder: (context, index) {
-                final heading = headings[index];
-                return InkWell(
-                  onTap: () => onHeadingTap(heading.index),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      children: [
-                        SizedBox(width: (heading.level - 1) * 16.0),
-                        Text(
-                          heading.text,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: AppTheme.textPrimaryColor(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

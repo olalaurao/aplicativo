@@ -145,7 +145,7 @@ class WeekTimeGrid extends ConsumerWidget {
         if (slot.hasReminders && slot.primaryReminderTime != null) {
           if (slot.primaryReminderTime!.hour == hour) {
             // Check if habit is active on this day
-            for (final scheduler in habit.schedulers) {
+            if (habit.schedulers.isNotEmpty) {
               // Simple check - in production, use SchedulerService.shouldFire
               return true;
             }

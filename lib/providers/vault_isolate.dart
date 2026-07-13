@@ -542,6 +542,7 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
               completions: count,
               slotCompletions: slotCompletions,
               successful: successful,
+              completedAt: null, // Parsed from data, not live completion
             ),
           );
         }

@@ -34,6 +34,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   bool _commandCenterOpenedThisScroll = false;
   DateTime? _lastBackPressTime;
   final Set<String> _dismissedYamlErrorFiles = {};
+  bool _yamlDialogOpen = false;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +51,8 @@ class _AppShellState extends ConsumerState<AppShell> {
       return filePath != null && !_dismissedYamlErrorFiles.contains(filePath);
     }).toList();
 
-    if (undismissedErrors.isNotEmpty) {
+    if (undismissedErrors.isNotEmpty && !_yamlDialogOpen) {
+      _yamlDialogOpen = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showYamlErrorDialog(context, undismissedErrors);
       });
@@ -863,12 +865,13 @@ class _AppShellState extends ConsumerState<AppShell> {
                   _dismissedYamlErrorFiles.add(filePath);
                 }
               }
+              _yamlDialogOpen = false;
             },
             child: const Text('OK'),
           ),
         ],
       ),
-    );
+    ).then((_) => _yamlDialogOpen = false);
   }
 
   void _onItemTapped(

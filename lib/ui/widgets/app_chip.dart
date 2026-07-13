@@ -88,7 +88,6 @@ class AppChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final effectiveColor = _getEffectiveColor(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     switch (variant) {
       case ChipVariant.choice:
