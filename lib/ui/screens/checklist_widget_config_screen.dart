@@ -16,7 +16,8 @@ class ChecklistWidgetConfigScreen extends ConsumerStatefulWidget {
 class _ChecklistWidgetConfigScreenState extends ConsumerState<ChecklistWidgetConfigScreen> {
   @override
   Widget build(BuildContext context) {
-    final allNotes = ref.watch(notesProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final allNotes = allObjects.whereType<Note>().toList();
     final checklists = allNotes.where((n) => n.isChecklist).toList();
 
     return Scaffold(

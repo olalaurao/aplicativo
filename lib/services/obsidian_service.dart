@@ -17,7 +17,7 @@ class ObsidianService {
   List<File>? _allMarkdownFilesCache;
   DateTime? _allMarkdownFilesCacheTimestamp;
   final Map<String, MapEntry<List<File>, DateTime>> _folderCache = {};
-  static const _cacheValidDuration = Duration(seconds: 30);
+  static const _cacheValidDuration = Duration(minutes: 5);
 
   void invalidateFileCache() {
     _allMarkdownFilesCache = null;

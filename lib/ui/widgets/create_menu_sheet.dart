@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../theme.dart';
 import '../forms/create_entry_form.dart';
@@ -260,12 +261,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CreateEntryForm(initialTitle: widget.initialTitle),
-                ),
-              );
+              context.push('/create-entry', extra: {'initialTitle': widget.initialTitle});
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.accentColor(context),
@@ -342,7 +338,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
             TextField(
               controller: _quickTextController,
               maxLines: 4,
-              onChanged: (_) => setState(() {}),
+              onChanged: (_) { if (mounted) setState(() {}); },
               decoration: InputDecoration(
                 hintText: _getCategoryPlaceholder(_selectedCategory!),
                 border: OutlineInputBorder(
@@ -387,12 +383,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
           label: '✅ Nova task',
           onTap: () {
             Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CreateTaskForm(initialTitle: widget.initialTitle),
-              ),
-            );
+            context.push('/create-task', extra: {'initialTitle': widget.initialTitle});
           },
         ),
         const Divider(),
@@ -402,12 +393,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
           label: '🔁 Novo hábito',
           onTap: () {
             Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CreateHabitForm(initialTitle: widget.initialTitle),
-              ),
-            );
+            context.push('/create-habit', extra: {'initialTitle': widget.initialTitle});
           },
         ),
         const Divider(),
@@ -417,12 +403,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
           label: '🎯 Nova meta',
           onTap: () {
             Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CreateGoalForm(initialTitle: widget.initialTitle),
-              ),
-            );
+            context.push('/create-goal', extra: {'initialTitle': widget.initialTitle});
           },
         ),
         const Divider(),
@@ -432,12 +413,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
           label: '📅 Novo evento',
           onTap: () {
             Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CreateEventForm(initialTitle: widget.initialTitle),
-              ),
-            );
+            context.push('/create-event', extra: {'initialTitle': widget.initialTitle});
           },
         ),
         const Divider(),
@@ -447,10 +423,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
           label: '🔔 Novo lembrete',
           onTap: () {
             Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CreateReminderForm()),
-            );
+            context.push('/create-reminder');
           },
         ),
         const Divider(),
@@ -460,12 +433,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
           label: '📁 Novo projeto',
           onTap: () {
             Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CreateProjectForm(initialTitle: widget.initialTitle),
-              ),
-            );
+            context.push('/create-project', extra: {'initialTitle': widget.initialTitle});
           },
         ),
         const Divider(),
@@ -475,15 +443,10 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
           label: '📥 Adicionar ao backlog',
           onTap: () {
             Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CreateTaskForm(
-                  initialTitle: widget.initialTitle,
-                  initialStage: TaskStage.backlog,
-                ),
-              ),
-            );
+            context.push('/create-task', extra: {
+              'initialTitle': widget.initialTitle,
+              'initialStage': TaskStage.backlog,
+            });
           },
         ),
       ],

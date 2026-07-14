@@ -26,38 +26,38 @@ List<PropertyCard> buildProjectPropertyCards(
   if (project.hasRotation) {
     cards.add(PropertyCard(
       icon: Icons.trending_up_rounded,
-      label: 'Concluído',
+      label: 'Completed',
       value: '${(progress * 100).toInt()}%',
     ));
     cards.add(PropertyCard(
       icon: Icons.task_alt,
-      label: 'Tarefas',
-      value: '$doneCount de $linkedTasksCount',
+      label: 'Tasks',
+      value: '$doneCount of $linkedTasksCount',
     ));
   }
   cards.add(PropertyCard(
     icon: Icons.calendar_today,
-    label: 'Início',
-    value: project.startDate != null ? DateFormat('d MMM yyyy').format(project.startDate!) : 'Não definida',
+    label: 'Start',
+    value: project.startDate != null ? DateFormat('d MMM yyyy').format(project.startDate!) : 'Not set',
     state: project.startDate == null ? PropertyCardState.empty : PropertyCardState.normal,
   ));
   cards.add(PropertyCard(
     icon: Icons.event,
-    label: 'Término',
-    value: project.endDate != null ? DateFormat('d MMM yyyy').format(project.endDate!) : 'Não definida',
+    label: 'End',
+    value: project.endDate != null ? DateFormat('d MMM yyyy').format(project.endDate!) : 'Not set',
     state: project.endDate == null ? PropertyCardState.empty : (_isOverdue(project) ? PropertyCardState.overdue : PropertyCardState.normal),
   ));
   if (_hasPriority(project)) {
     cards.add(PropertyCard(
       icon: Icons.priority_high,
-      label: 'Prioridade',
+      label: 'Priority',
       value: '',
       customChild: _buildPriorityBadge(project),
     ));
   }
   cards.add(PropertyCard(
     icon: Icons.linear_scale,
-    label: 'Estado',
+    label: 'State',
     value: _getStatusLabel(project),
     onTap: () => _onPropertyTap(context, ref, 'Status', _getStatus(project)),
   ));
@@ -76,40 +76,40 @@ bool _hasPriority(Project project) {
 
 String _getStatusLabel(Project project) {
   if (project.hasRotation) {
-    return 'Em rotação';
+    return 'In rotation';
   }
-  return 'Ativo';
+  return 'Active';
 }
 
 String _getStatus(Project project) {
   if (project.hasRotation) {
-    return 'Em rotação';
+    return 'In rotation';
   }
-  return 'Ativo';
+  return 'Active';
 }
 
 Widget _buildPriorityBadge(Project project) {
   if (project.projectPriority == null) return const SizedBox.shrink();
   
   final color = switch (project.projectPriority) {
-    TaskPriority.high => Colors.red,
-    TaskPriority.medium => Colors.orange,
-    TaskPriority.low => Colors.green,
-    TaskPriority.none => Colors.grey,
+    TaskPriority.high => AppColors.priorityHigh,
+    TaskPriority.medium => AppColors.priorityMedium,
+    TaskPriority.low => AppColors.priorityLow,
+    TaskPriority.none => AppColors.textMuted,
   };
   
   final label = switch (project.projectPriority) {
-    TaskPriority.high => 'ALTA',
-    TaskPriority.medium => 'MÉDIA',
-    TaskPriority.low => 'BAIXA',
-    TaskPriority.none => 'NENHUMA',
+    TaskPriority.high => 'HIGH',
+    TaskPriority.medium => 'MEDIUM',
+    TaskPriority.low => 'LOW',
+    TaskPriority.none => 'NONE',
   };
   
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
     decoration: BoxDecoration(
       color: color.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(AppBorderRadius.sm),
       border: Border.all(color: color.withValues(alpha: 0.3)),
     ),
     child: Text(

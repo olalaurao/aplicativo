@@ -89,7 +89,7 @@ class CollectionRowService {
     final newId = slugify(row.displayTitle);
     final lines = note.body.split('\n');
     lines[row.lineIndex] = '${row.rawText} ^$newId';
-    await ref.read(notesProvider.notifier).updateNote(note.copyWith(body: lines.join('\n')));
+    await ref.read(vaultProvider.notifier).updateObject(note.copyWith(body: lines.join('\n')));
     return newId;
   }
 }

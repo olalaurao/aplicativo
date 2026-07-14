@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/reminder_config.dart';
 import '../theme.dart';
+import 'app_switch_tile.dart';
+import 'date_picker_field.dart';
 
 /// Mode of the reminder trigger
 enum _TriggerMode {
@@ -120,7 +122,7 @@ class _ReminderConfigSheetState extends State<ReminderConfigSheet> {
 
             // Notification Type
             const Text(
-              'Tipo de Notificação',
+              'Notification Type',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 12),
@@ -151,11 +153,11 @@ class _ReminderConfigSheetState extends State<ReminderConfigSheet> {
             TextField(
               controller: _bodyController,
               decoration: InputDecoration(
-                labelText: 'Mensagem (opcional)',
+                labelText: 'Message (optional)',
                 labelStyle: const TextStyle(fontSize: 14),
-                hintText: 'Ex: Não se esqueça de revisar...',
+                hintText: 'E.g: Don\'t forget to review...',
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppBorderRadius.md),
                 ),
               ),
             ),
@@ -163,29 +165,20 @@ class _ReminderConfigSheetState extends State<ReminderConfigSheet> {
 
             // Alarm-specific configs
             if (_type == NotificationType.alarm || _type == NotificationType.popup) ...[
-              SwitchListTile(
-                title: const Text(
-                  'Tocar mesmo no silencioso',
-                  style: TextStyle(fontSize: 14),
-                ),
+              AppSwitchTile(
+                title: 'Tocar mesmo no silencioso',
                 value: _ringOnSilent,
                 onChanged: (val) => setState(() => _ringOnSilent = val),
                 contentPadding: EdgeInsets.zero,
               ),
-              SwitchListTile(
-                title: const Text(
-                  'Reproduzir som',
-                  style: TextStyle(fontSize: 14),
-                ),
+              AppSwitchTile(
+                title: 'Reproduzir som',
                 value: _playSound,
                 onChanged: (val) => setState(() => _playSound = val),
                 contentPadding: EdgeInsets.zero,
               ),
-              SwitchListTile(
-                title: const Text(
-                  'Vibrar',
-                  style: TextStyle(fontSize: 14),
-                ),
+              AppSwitchTile(
+                title: 'Vibrar',
                 value: _vibrate,
                 onChanged: (val) => setState(() => _vibrate = val),
                 contentPadding: EdgeInsets.zero,
@@ -315,7 +308,7 @@ class _ReminderConfigSheetState extends State<ReminderConfigSheet> {
       children: [
         Row(
           children: [
-            const Text('Notificar', style: TextStyle(fontSize: 14)),
+            const Text('Notify', style: TextStyle(fontSize: 14)),
             const SizedBox(width: 12),
             _buildNumberStepper(
               value: _daysBeforeValue,
@@ -324,11 +317,11 @@ class _ReminderConfigSheetState extends State<ReminderConfigSheet> {
               onChanged: (v) => setState(() => _daysBeforeValue = v),
             ),
             const SizedBox(width: 12),
-            const Text('dia(s) antes', style: TextStyle(fontSize: 14)),
+            const Text('day(s) before', style: TextStyle(fontSize: 14)),
           ],
         ),
         const SizedBox(height: 14),
-        const Text('Às que horas:', style: TextStyle(fontSize: 14)),
+        const Text('At what time:', style: TextStyle(fontSize: 14)),
         const SizedBox(height: 8),
         _buildTimePicker(
           context,
@@ -344,7 +337,7 @@ class _ReminderConfigSheetState extends State<ReminderConfigSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'No mesmo dia, às:',
+          'On the same day, at:',
           style: TextStyle(fontSize: 14),
         ),
         const SizedBox(height: 8),
@@ -361,18 +354,13 @@ class _ReminderConfigSheetState extends State<ReminderConfigSheet> {
     return Row(
       children: [
         Expanded(
-          child: _buildPicker(
+          child: DatePickerField(
             label: 'Data',
-            value:
-                '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-            icon: Icons.calendar_today_rounded,
-            onTap: () async {
-              final date = await showDatePicker(
-                context: context,
-                initialDate: _selectedDate,
-                firstDate: DateTime.now().subtract(const Duration(days: 1)),
-                lastDate: DateTime.now().add(const Duration(days: 365)),
-              );
+            selectedDate: _selectedDate,
+            initialDate: _selectedDate,
+            firstDate: DateTime.now().subtract(const Duration(days: 1)),
+            lastDate: DateTime.now().add(const Duration(days: 365)),
+            onDateChanged: (date) {
               if (date != null) setState(() => _selectedDate = date);
             },
           ),
@@ -532,10 +520,10 @@ class _ReminderConfigSheetState extends State<ReminderConfigSheet> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(AppSpacing.sm),
         decoration: BoxDecoration(
           border: Border.all(color: AppColors.divider),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppBorderRadius.md),
         ),
         child: Row(
           children: [

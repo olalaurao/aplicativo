@@ -101,7 +101,7 @@ class QuartzoChart extends StatelessWidget {
                     pointIdx < d.length &&
                     (d[pointIdx].emoji?.isNotEmpty ?? false);
                 if (hasEmoji) {
-                  // Usar dot maior e colorido quando há emoji
+                  // Use larger, colored dot when there is an emoji
                   return FlDotCirclePainter(
                     radius: 6,
                     color: seriesColors[idx % seriesColors.length],
@@ -129,7 +129,7 @@ class QuartzoChart extends StatelessWidget {
         .where((bar) => bar.spots.isNotEmpty)
         .toList();
 
-    // Coletar anotações de emoji nos pontos
+    // Collect emoji annotations at points
     final List<ShowingTooltipIndicators> emojiAnnotations = [];
     for (var barIndex = 0; barIndex < segments.length; barIndex++) {
       final segment = segments[barIndex];
@@ -327,7 +327,7 @@ class ChartDataPoint {
   final double? value;
   final Color? color;
 
-  /// Emoji opcional — exibido como marcador visual no ponto do gráfico de linha
+  /// Optional emoji — displayed as visual marker at line chart point
   final String? emoji;
 
   ChartDataPoint({

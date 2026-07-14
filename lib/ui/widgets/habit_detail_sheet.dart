@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/habit_model.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
@@ -31,7 +32,8 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final habits = ref.watch(habitsProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final habits = allObjects.whereType<Habit>().toList();
     final currentHabit = habits.firstWhere(
       (h) => h.id == widget.habit.id,
       orElse: () => widget.habit,
@@ -167,12 +169,7 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
                     icon: const Icon(Icons.edit_outlined, size: 20),
                     onPressed: () {
                       Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CreateHabitForm(existingHabit: currentHabit),
-                        ),
-                      );
+                      context.push('/create-habit', extra: {'existingHabit': currentHabit});
                     },
                   ),
                   const SizedBox(width: 8),

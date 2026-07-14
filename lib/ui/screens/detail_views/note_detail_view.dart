@@ -23,7 +23,8 @@ List<Widget> buildNoteContentSection(
   Widget Function(BuildContext, Note) buildNoteViewer,
   Widget Function(BuildContext, Note) buildNoteListItem,
 ) {
-  final childNotes = ref.watch(notesProvider.select((notes) => notes.where((n) => n.parentNoteId == note.id).toList()));
+  final allObjects = ref.watch(allObjectsProvider).value ?? [];
+  final childNotes = allObjects.whereType<Note>().where((n) => n.parentNoteId == note.id).toList();
 
   return [
     SliverToBoxAdapter(
@@ -176,8 +177,6 @@ void _navigateToSlug(BuildContext context, WidgetRef ref, String slug) {
       MaterialPageRoute(builder: (_) => UniversalDetailView(object: target!)),
     );
   } else {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Objeto "$slug" não encontrado')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Objeto "$slug" não encontrado')));
   }
 }

@@ -34,23 +34,25 @@ class _SocialNativeVideoPlayerState extends State<SocialNativeVideoPlayer> {
   @override
   void initState() {
     super.initState();
-    _controller =
-        VideoPlayerController.networkUrl(
-            Uri.parse(widget.videoUrl),
-            httpHeaders: _httpHeaders,
-          )
-          ..addListener(_handlePlaybackError)
-          ..initialize()
-              .then((_) {
-                if (!mounted) return;
-                _controller.setLooping(true);
-                _controller.play();
-                setState(() => _initialized = true);
-              })
-              .catchError((error) {
-                if (!mounted) return;
-                setState(() => _failed = true);
-              });
+    _initializePlayer();
+  }
+
+  Future<void> _initializePlayer() async {
+    _controller = VideoPlayerController.networkUrl(
+      Uri.parse(widget.videoUrl),
+      httpHeaders: _httpHeaders,
+    )..addListener(_handlePlaybackError);
+    
+    try {
+      await _controller.initialize();
+      if (!mounted) return;
+      _controller.setLooping(true);
+      _controller.play();
+      if (mounted) setState(() => _initialized = true);
+    } catch (error) {
+      if (!mounted) return;
+      if (mounted) setState(() => _failed = true);
+    }
   }
 
   @override
@@ -67,7 +69,7 @@ class _SocialNativeVideoPlayerState extends State<SocialNativeVideoPlayer> {
         context,
         child: const Center(
           child: Text(
-            'Não foi possível tocar este vídeo.',
+            'Could not play this video.',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
           ),
         ),
@@ -150,7 +152,7 @@ class _SocialNativeVideoPlayerState extends State<SocialNativeVideoPlayer> {
     return AspectRatio(
       aspectRatio: aspectRatio <= 0 ? 9 / 16 : aspectRatio,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppBorderRadius.md),
         child: ColoredBox(color: Colors.black, child: child),
       ),
     );
@@ -158,7 +160,7 @@ class _SocialNativeVideoPlayerState extends State<SocialNativeVideoPlayer> {
 
   void _togglePlayback() {
     if (!_initialized) return;
-    setState(() {
+    if (mounted) setState(() {
       if (_controller.value.isPlaying) {
         _controller.pause();
       } else {
@@ -169,6 +171,6 @@ class _SocialNativeVideoPlayerState extends State<SocialNativeVideoPlayer> {
 
   void _handlePlaybackError() {
     if (!mounted || _failed || !_controller.value.hasError) return;
-    setState(() => _failed = true);
+    if (mounted) setState(() => _failed = true);
   }
 }

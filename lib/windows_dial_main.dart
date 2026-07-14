@@ -15,6 +15,8 @@ import 'models/journal_entry.dart';
 import 'models/mood_model.dart';
 import 'models/organizer_model.dart';
 import 'models/reminder_model.dart';
+import 'models/task_model.dart';
+import 'models/habit_model.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -81,10 +83,10 @@ class _WindowsDialHomeState extends ConsumerState<WindowsDialHome> {
 
   @override
   Widget build(BuildContext context) {
-    final tasks = ref.watch(tasksProvider);
-    final habits = ref.watch(habitsProvider);
-    final pomodoroHistory = ref.watch(pomodoroProvider).history;
     final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? <ContentObject>[];
+    final tasks = allObjects.whereType<Task>().toList();
+    final habits = allObjects.whereType<Habit>().toList();
+    final pomodoroHistory = ref.watch(pomodoroProvider).history;
     
     final journalEntries = allObjects.whereType<JournalEntry>().toList();
     final moodDefinitions = allObjects.whereType<MoodDefinition>().toList();
@@ -95,8 +97,9 @@ class _WindowsDialHomeState extends ConsumerState<WindowsDialHome> {
         .toList();
     
     final dayTasks = tasks.where((task) {
-      if (task.startDate == null) return false;
-      return _isSameDay(task.startDate!, _selectedDate);
+      final startDate = task.startDate;
+      if (startDate == null) return false;
+      return _isSameDay(startDate, _selectedDate);
     }).toList();
 
     final dayHabits = habits.where((habit) => true).toList();

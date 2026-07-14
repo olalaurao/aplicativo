@@ -205,7 +205,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
     // Providers
     final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
     final history = ref.watch(historyProvider);
-    final notes = ref.watch(notesProvider);
+    final notes = allObjects.whereType<Note>().toList();
     final organizers = ref.watch(organizersProvider);
     final topSystems = ref.watch(topSystemsProvider);
     final events = allObjects.whereType<Event>().toList();
@@ -328,7 +328,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                             child: TextField(
                               controller: _searchController,
                               focusNode: _searchFocus,
-                              onChanged: (_) => setState(() {}),
+                              onChanged: (_) { if (mounted) setState(() {}); },
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w500,
@@ -348,7 +348,7 @@ class _CommandCenterOverlayState extends ConsumerState<CommandCenterOverlay>
                                         ),
                                         onPressed: () {
                                           _searchController.clear();
-                                          setState(() {});
+                                          if (mounted) setState(() {});
                                         },
                                       )
                                     : null,

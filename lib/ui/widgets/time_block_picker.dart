@@ -16,7 +16,8 @@ class TimeBlockPicker extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final blocks = ref.watch(timeBlocksProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final blocks = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.timeBlock).toList();
 
     if (blocks.isEmpty) {
       return const SizedBox.shrink();
@@ -117,7 +118,7 @@ class TimeBlockPicker extends ConsumerWidget {
         return Color(int.parse('0x$value'));
       }
     } catch (_) {
-      debugPrint('Invalid time block color: $colorStr');
+      // Invalid time block color format
     }
     return null;
   }

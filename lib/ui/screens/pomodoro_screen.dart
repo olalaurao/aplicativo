@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/pomodoro_provider.dart';
 import '../../models/pomodoro_session.dart';
+import '../../models/task_model.dart';
 import '../theme.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../widgets/universal_search_picker.dart';
@@ -662,32 +663,32 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
   }
 
   Widget _buildScheduledPomodoros(BuildContext context) {
-    final tasks = ref.watch(tasksProvider);
-    final pomodoroTasks =
-        tasks
-            .where(
-              (t) =>
-                  t.pomodoroCount != null &&
-                  t.pomodoroCount! > 0 &&
-                  t.endDate != null,
-            )
-            .toList()
-          ..sort((a, b) {
-            if (a.endDate == null || b.endDate == null) return 0;
-            final aTime = a.endDate!.add(
-              Duration(
-                hours: int.parse(a.scheduledTime?.split(':')[0] ?? '0'),
-                minutes: int.parse(a.scheduledTime?.split(':')[1] ?? '0'),
-              ),
-            );
-            final bTime = b.endDate!.add(
-              Duration(
-                hours: int.parse(b.scheduledTime?.split(':')[0] ?? '0'),
-                minutes: int.parse(b.scheduledTime?.split(':')[1] ?? '0'),
-              ),
-            );
-            return aTime.compareTo(bTime);
-          });
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final tasks = allObjects.whereType<Task>();
+    final pomodoroTasks = tasks
+        .where(
+          (Task t) =>
+              t.pomodoroCount != null &&
+              t.pomodoroCount! > 0 &&
+              t.endDate != null,
+        )
+        .toList()
+      ..sort((Task a, Task b) {
+        if (a.endDate == null || b.endDate == null) return 0;
+        final aTime = a.endDate!.add(
+          Duration(
+            hours: int.parse(a.scheduledTime?.split(':')[0] ?? '0'),
+            minutes: int.parse(a.scheduledTime?.split(':')[1] ?? '0'),
+          ),
+        );
+        final bTime = b.endDate!.add(
+          Duration(
+            hours: int.parse(b.scheduledTime?.split(':')[0] ?? '0'),
+            minutes: int.parse(b.scheduledTime?.split(':')[1] ?? '0'),
+          ),
+        );
+        return aTime.compareTo(bTime);
+      });
 
     if (pomodoroTasks.isEmpty) return const SizedBox.shrink();
 
@@ -706,8 +707,8 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
             ),
           ),
           const SizedBox(height: 16),
-          ...pomodoroTasks.map(
-            (s) => ObjectActionWrapper(
+          for (final s in pomodoroTasks)
+            ObjectActionWrapper(
               object: s,
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -770,7 +771,6 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

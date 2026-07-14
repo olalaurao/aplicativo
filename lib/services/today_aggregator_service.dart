@@ -6,8 +6,10 @@ import '../models/event_model.dart';
 import '../models/habit_model.dart';
 import '../models/pomodoro_session.dart';
 import '../models/reminder_model.dart';
+import '../models/shared_types.dart';
 import '../services/scheduler_service.dart';
 import '../ui/theme.dart';
+import '../ui/utils/object_icons.dart';
 
 enum TodayItemKind { entry, task, event, habitSlot, pomodoro, trackerRecord, reminder }
 enum TodayItemOrigin { created, scheduled }
@@ -41,7 +43,7 @@ class TodayItem {
 }
 
 class TodayAggregatorService {
-  List<TodayItem> buildForDate(DateTime date, {required List<ContentObject> allObjects}) {
+  List<TodayItem> buildForDate(DateTime date, {required List<ContentObject> allObjects, Map<String, TypeSignature> typeSignatures = const {}}) {
     final List<TodayItem> items = [];
 
     for (final obj in allObjects) {
@@ -60,7 +62,7 @@ class TodayAggregatorService {
             origin: TodayItemOrigin.created,
             timestamp: ts,
             title: obj.title.isNotEmpty ? obj.title : 'Journal Entry',
-            emoji: '📝',
+            emoji: ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.entry, typeSignatures),
             color: AppColors.textPrimary,
             isCompletable: false,
             isCompleted: false,
@@ -86,7 +88,7 @@ class TodayAggregatorService {
             origin: TodayItemOrigin.scheduled,
             timestamp: ts,
             title: obj.title,
-            emoji: '✅',
+            emoji: ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.task, typeSignatures),
             color: _getTaskColor(obj),
             isCompletable: true,
             isCompleted: obj.isCompleted,
@@ -110,7 +112,7 @@ class TodayAggregatorService {
             origin: TodayItemOrigin.scheduled,
             timestamp: ts,
             title: obj.title,
-            emoji: '📅',
+            emoji: ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.event, typeSignatures),
             color: AppColors.accent,
             isCompletable: false,
             isCompleted: false,
@@ -143,7 +145,7 @@ class TodayAggregatorService {
               origin: TodayItemOrigin.scheduled,
               timestamp: ts,
               title: obj.title,
-              emoji: obj.icon ?? '🔄',
+              emoji: obj.icon ?? ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.habit, typeSignatures),
               color: AppColors.accent,
               isCompletable: true,
               isCompleted: isCompleted,
@@ -179,7 +181,7 @@ class TodayAggregatorService {
             origin: TodayItemOrigin.scheduled,
             timestamp: obj.time,
             title: obj.title,
-            emoji: '⏰',
+            emoji: ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.reminder, typeSignatures),
             color: AppColors.warning,
             isCompletable: false,
             isCompleted: false,

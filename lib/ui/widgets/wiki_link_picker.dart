@@ -5,6 +5,7 @@ import '../../models/content_object.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/search_service.dart';
 import '../theme.dart';
+import 'app_chip.dart';
 
 class WikiLinkPicker extends ConsumerStatefulWidget {
   final Function(ContentObject) onSelected;
@@ -63,7 +64,7 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
                     height: 4,
                     decoration: BoxDecoration(
                       color: AppColors.textMuted.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppBorderRadius.xs),
                     ),
                   ),
                 ),
@@ -71,7 +72,7 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
                   right: 8,
                   top: 0,
                   child: IconButton(
-                    tooltip: 'Fechar',
+                    tooltip: 'Close',
                     icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(context),
                   ),
@@ -86,10 +87,10 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
                 ..sort();
               return SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.sm),
                 child: Row(
                   children: [
-                    _typeChip('Todos', _selectedTypes.isEmpty, () {
+                    _typeChip('All', _selectedTypes.isEmpty, () {
                       setState(_selectedTypes.clear);
                     }),
                     for (final type in types)
@@ -120,7 +121,7 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
               onChanged: (value) {
                 _debounceTimer?.cancel();
                 _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-                  setState(() {});
+                  if (mounted) setState(() {});
                 });
               },
               decoration: InputDecoration(
@@ -134,17 +135,17 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
                           _searchController.clear();
                           _debounceTimer?.cancel();
                           _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-                            setState(() {});
+                            if (mounted) setState(() {});
                           });
                         },
                       ),
                 filled: true,
                 fillColor: AppColors.surfaceVariant,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppBorderRadius.md),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
               ),
             ),
           ),
@@ -201,7 +202,7 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
         );
       }
     } catch (e) {
-      debugPrint('WikiLinkPicker failed to load raw vault files: $e');
+      // Error handled silently
     }
     return result;
   }
@@ -278,30 +279,27 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
   Widget _typeChip(String label, bool selected, VoidCallback onTap) {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Text(label),
+      child: AppChip(
+        label: label,
         selected: selected,
-        onSelected: (_) => onTap(),
-        selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.14),
-        backgroundColor: AppColors.surfaceVariant,
-        side: BorderSide(
-          color: selected ? AppTheme.accentColor(context) : AppColors.divider,
-        ),
+        onTap: onTap,
+        variant: ChipVariant.choice,
+        size: ChipSize.medium,
       ),
     );
   }
 
   String _typeLabel(String type) {
     return switch (type) {
-      'task' => 'Tarefas',
-      'habit' => 'Hábitos',
-      'goal' => 'Metas',
-      'note' => 'Notas',
-      'resource' => 'Recursos',
-      'person' => 'Pessoas',
-      'project' => 'Projetos',
-      'area' => 'Áreas',
-      'activity' => 'Atividades',
+      'task' => 'Tasks',
+      'habit' => 'Habits',
+      'goal' => 'Goals',
+      'note' => 'Notes',
+      'resource' => 'Resources',
+      'person' => 'People',
+      'project' => 'Projects',
+      'area' => 'Areas',
+      'activity' => 'Activities',
       'social_post' => 'Social',
       _ => type,
     };

@@ -6,6 +6,7 @@ import '../widgets/object_action_wrapper.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../models/saved_filter.dart';
+import '../../models/note_model.dart';
 import '../widgets/rich_text_editor.dart';
 import '../widgets/outline_editor.dart';
 import '../widgets/collection_editor.dart';
@@ -92,7 +93,8 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allNotes = ref.watch(notesProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final allNotes = allObjects.whereType<Note>().toList();
     final filteredNotes = _applyFilterAndSort(allNotes);
 
     return Scaffold(

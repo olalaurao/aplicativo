@@ -17,23 +17,23 @@ List<PropertyCard> buildGoalPropertyCards(
   
   cards.add(PropertyCard(
     icon: Icons.calendar_today,
-    label: 'Início',
-    value: goal.startDate != null ? DateFormat('d MMM yyyy').format(goal.startDate!) : 'Não definida',
+    label: 'Start',
+    value: goal.startDate != null ? DateFormat('d MMM yyyy').format(goal.startDate!) : 'Not set',
     state: goal.startDate == null ? PropertyCardState.empty : PropertyCardState.normal,
   ));
   cards.add(PropertyCard(
     icon: Icons.event,
-    label: 'Prazo',
-    value: goal.deadline != null ? DateFormat('d MMM yyyy').format(goal.deadline!) : 'Não definida',
+    label: 'Deadline',
+    value: goal.deadline != null ? DateFormat('d MMM yyyy').format(goal.deadline!) : 'Not set',
     state: goal.deadline == null ? PropertyCardState.empty : (_isOverdue(goal) ? PropertyCardState.overdue : PropertyCardState.normal),
   ));
   cards.add(PropertyCard(
     icon: Icons.repeat,
-    label: 'Tipo',
-    value: goal.goalType == GoalType.repeating ? 'Recorrente' : 'Pontual',
+    label: 'Type',
+    value: goal.goalType == GoalType.repeating ? 'Recurring' : 'One-time',
     onTap: () => _showEnumPropertyPicker<GoalType>(
       context: context,
-      title: 'Tipo',
+      title: 'Type',
       values: GoalType.values,
       initialValue: goal.goalType,
       labelBuilder: (s) => s.name,

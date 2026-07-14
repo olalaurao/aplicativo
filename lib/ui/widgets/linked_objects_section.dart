@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/content_object.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
@@ -74,9 +75,7 @@ class LinkedObjectsSection extends ConsumerWidget {
                         children: entry.value.map((obj) => InputChip(
                           label: Text(obj.title, maxLines: 1,
                             overflow: TextOverflow.ellipsis),
-                          onPressed: () => Navigator.push(context,
-                            MaterialPageRoute(builder: (_) =>
-                              UniversalDetailView(object: obj))),
+                          onPressed: () => context.push('/detail/${obj.id}', extra: obj),
                           onDeleted: () => onRemove('[[${obj.slug}]]'),
                         )).toList(),
                       ),

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'vault_provider.dart';
 import '../models/tracker_model.dart';
 import '../models/task_model.dart';
+import '../models/habit_model.dart';
 
 // ---------------------------------------------------------------------------
 // HealthAlert data class
@@ -37,8 +38,9 @@ class HealthAlert {
 final healthAlertsProvider = Provider<List<HealthAlert>>((ref) {
   final trackers = ref.watch(trackersProvider);
   final allRecords = ref.watch(trackingRecordsProvider);
-  final habits = ref.watch(habitsProvider);
-  final tasks = ref.watch(tasksProvider);
+  final allObjects = ref.watch(allObjectsProvider).value ?? [];
+  final habits = allObjects.whereType<Habit>().toList();
+  final tasks = allObjects.whereType<Task>().toList();
   final now = DateTime.now();
   final alerts = <HealthAlert>[];
 
@@ -57,8 +59,8 @@ final healthAlertsProvider = Provider<List<HealthAlert>>((ref) {
           case FieldDataSource.habit:
             final linkedHabitId = field.linkedHabitId;
             final linkedHabits = linkedHabitId == null
-                ? const []
-                : habits.where((h) => h.id == linkedHabitId).toList();
+                ? <Habit>[]
+                : habits.whereType<Habit>().where((h) => h.id == linkedHabitId).toList();
             final linkedHabit = linkedHabits.isEmpty
                 ? null
                 : linkedHabits.first;

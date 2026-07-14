@@ -1015,7 +1015,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
     if (object is Project) {
       final project = object as Project;
-      final tasks = ref.watch(tasksProvider.select((tasks) => tasks.where((t) => t.organizers.any((o) => o.slug == project.slug)).toList()));
+      final allObjects = ref.watch(allObjectsProvider).value ?? [];
+      final tasks = allObjects.whereType<Task>().where((t) => t.organizers.any((o) => o.slug == project.slug)).toList();
       final progress = ProjectProgressCache.getProgress(project.id, project, tasks);
       final doneCount = ProjectProgressCache.getCompletedTaskCount(project.id, project, tasks);
       final linkedTasksCount = ProjectProgressCache.getLinkedTaskCount(project.id, project, tasks);
@@ -3414,11 +3415,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final trackerRecords = kpi.dataSource.sourceType == DataSourceType.trackerField ? ref.watch(trackingRecordsProvider) : <TrackingRecord>[];
     final entries = kpi.dataSource.sourceType == DataSourceType.entry ? ref.watch(allEntriesProvider) : <JournalEntry>[];
     final moods = <MoodDefinition>[]; // Mood-based KPIs not currently supported
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
     final notes = kpi.dataSource.sourceType == DataSourceType.collection
-        ? ref.watch(notesProvider.select((notes) => notes.where((n) => n.id == kpi.sourceId).toList()))
+        ? allObjects.whereType<Note>().where((n) => n.id == kpi.sourceId).toList()
         : <Note>[];
     // subtasks and timeSpent need to scan ALL tasks to find those linked to the organizer
-    final tasks = (kpi.dataSource.sourceType == DataSourceType.subtasks || kpi.dataSource.sourceType == DataSourceType.timeSpent) ? ref.watch(tasksProvider) : <Task>[];
+    final tasks = (kpi.dataSource.sourceType == DataSourceType.subtasks || kpi.dataSource.sourceType == DataSourceType.timeSpent) ? allObjects.whereType<Task>().toList() : <Task>[];
 
     final currentValue = KPIEngine.calculateKPIValue(
       kpi: kpi,
@@ -3426,8 +3428,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       trackerRecords: trackerRecords,
       entries: entries,
       moods: moods,
-      notes: notes,
-      tasks: tasks,
+      allObjects: allObjects,
     );
 
     final progress = kpi.targetValue <= 0
@@ -3898,8 +3899,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       final trackerRecords = ref.read(trackingRecordsProvider);
       final entries = ref.read(allEntriesProvider);
       final moods = ref.read(moodsProvider);
-      final notes = ref.read(notesProvider);
-      final tasks = ref.read(tasksProvider);
+      final allObjects = ref.read(allObjectsProvider).value ?? [];
+      final notes = allObjects.whereType<Note>().toList();
+      final tasks = allObjects.whereType<Task>().toList();
 
       for (final kpi in goal.kpis) {
         currentKPIs[kpi.title] = KPIEngine.calculateKPIValue(
@@ -3908,13 +3910,13 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           trackerRecords: trackerRecords,
           entries: entries,
           moods: moods,
-          notes: notes,
-          tasks: tasks,
+          allObjects: allObjects,
         );
       }
     } else if (object is Project) {
       final project = object as Project;
-      final tasks = ref.read(tasksProvider);
+      final allObjects = ref.read(allObjectsProvider).value ?? [];
+      final tasks = allObjects.whereType<Task>().toList();
       currentKPIs['Progress'] = ProjectProgressCache.getProgress(
         project.id,
         project,
@@ -4738,8 +4740,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final upcoming = RotationService.upcomingGroups(project, count: 1);
     if (upcoming.isEmpty) return '';
     final next = upcoming.first;
-    final taskCount = ref
-        .read(tasksProvider)
+    final allObjects = ref.read(allObjectsProvider).value ?? [];
+    final taskCount = allObjects.whereType<Task>()
         .where((t) => t.rotationGroupId == next.group.id)
         .length;
     return 'Próxima rotação: ${next.group.emoji ?? ''} ${next.group.name} · '
@@ -5444,7 +5446,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   ) {
     if (refItem.isRow) {
       Note? note;
-      for (final n in ref.read(notesProvider)) {
+      final allObjects = ref.read(allObjectsProvider).value ?? [];
+      for (final n in allObjects.whereType<Note>()) {
         if (n.slug == refItem.noteSlug) {
           note = n;
           break;

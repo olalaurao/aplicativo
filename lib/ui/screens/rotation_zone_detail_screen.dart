@@ -51,7 +51,8 @@ class RotationZoneDetailScreen extends ConsumerWidget {
         ? activeStatus
         : _previewStatus(project, group);
 
-    final tasks = ref.watch(tasksProvider).where((t) {
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final tasks = allObjects.whereType<Task>().where((t) {
       return t.rotationGroupId == groupId && t.isRotationTask;
     }).toList();
 
@@ -229,7 +230,7 @@ class RotationZoneDetailScreen extends ConsumerWidget {
         RotationService.toggleEveryNRotations(task, status),
       RotationFrequencyType.none => task,
     };
-    await ref.read(tasksProvider.notifier).updateTask(updated);
+    await ref.read(vaultProvider.notifier).updateObject(updated);
   }
 }
 

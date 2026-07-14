@@ -510,7 +510,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       final updatedTask = target.copyWith(
         timerSessions: target.timerSessions + session.minutesWorked,
       );
-      await ref.read(tasksProvider.notifier).updateTask(updatedTask);
+      await ref.read(vaultProvider.notifier).updateObject(updatedTask);
     } else if (target is Goal) {
       for (final kpi in target.kpis) {
         if (kpi.sourceType == KPISourceType.timeSpent ||
@@ -584,7 +584,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
           : [],
     );
     
-    await ref.read(tasksProvider.notifier).addTask(pomodoroBlock);
+    await ref.read(vaultProvider.notifier).createObject(pomodoroBlock);
   }
 
   /// F2.18: Log retroactive pomodoro session
@@ -628,7 +628,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       pomodoroCount: session.blocksCompleted,
     );
     
-    await ref.read(tasksProvider.notifier).addTask(event);
+    await ref.read(vaultProvider.notifier).createObject(event);
   }
 
 

@@ -69,7 +69,7 @@ List<Widget> buildResourceContentSection(
             ),
             const SizedBox(height: 4),
             Text(
-              'Recurso · ${resource.mediaType}',
+              'Resource · ${resource.mediaType}',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 13,
@@ -129,40 +129,40 @@ List<Widget> buildResourceContentSection(
                 miniPropCard(
                   context,
                   icon: Icons.calendar_today_outlined,
-                  label: 'Criado',
+                  label: 'Created',
                   value: DateFormat('d MMM').format(resource.createdAt),
                 ),
                 miniPropCard(
                   context,
                   icon: Icons.update_rounded,
-                  label: 'Modificado',
+                  label: 'Modified',
                   value: DateFormat('d MMM').format(resource.updatedAt),
                 ),
                 miniPropCard(
                   context,
                   icon: Icons.person_outline_rounded,
-                  label: 'Autor',
+                  label: 'Author',
                   value: resource.author ?? 'N/A',
                   isEmpty: resource.author == null,
                 ),
                 miniPropCard(
                   context,
                   icon: Icons.date_range_outlined,
-                  label: 'Ano',
+                  label: 'Year',
                   value: resource.year?.toString() ?? 'N/A',
                   isEmpty: resource.year == null,
                 ),
                 miniPropCard(
                   context,
                   icon: Icons.category_outlined,
-                  label: 'Categoria',
-                  value: resource.category ?? 'Sem categoria',
+                  label: 'Category',
+                  value: resource.category ?? 'No category',
                   isEmpty: resource.category == null,
                 ),
                 miniPropCard(
                   context,
                   icon: Icons.menu_book_outlined,
-                  label: 'Data de leitura',
+                  label: 'Read Date',
                   value: readDateStr,
                   isEmpty: resource.readDate == null,
                 ),
@@ -204,8 +204,8 @@ List<Widget> buildResourceContentSection(
             updatedAt: DateTime.now(),
           );
           await ref
-              .read(resourcesProvider.notifier)
-              .updateResource(updated);
+              .read(vaultProvider.notifier)
+              .updateObject(updated);
         },
         onRemove: (slug) async {
           final updated = resource.copyWith(
@@ -215,8 +215,8 @@ List<Widget> buildResourceContentSection(
             updatedAt: DateTime.now(),
           );
           await ref
-              .read(resourcesProvider.notifier)
-              .updateResource(updated);
+              .read(vaultProvider.notifier)
+              .updateObject(updated);
         },
       ),
     ),
@@ -227,7 +227,7 @@ void _showResourceStatusPicker(BuildContext context, WidgetRef ref, Resource res
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Status do recurso'),
+      title: const Text('Resource Status'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: ResourceStatus.values.map((status) {
@@ -235,7 +235,7 @@ void _showResourceStatusPicker(BuildContext context, WidgetRef ref, Resource res
             title: Text(_resourceStatusLabel(status)),
             onTap: () async {
               final updated = resource.copyWith(status: status);
-              await ref.read(resourcesProvider.notifier).updateResource(updated);
+              await ref.read(vaultProvider.notifier).updateObject(updated);
               if (context.mounted) Navigator.pop(context);
             },
           );
@@ -248,12 +248,12 @@ void _showResourceStatusPicker(BuildContext context, WidgetRef ref, Resource res
 String _resourceStatusLabel(ResourceStatus status) {
   switch (status) {
     case ResourceStatus.toConsume:
-      return 'Para consumir';
+      return 'To Consume';
     case ResourceStatus.inProgress:
-      return 'Em progresso';
+      return 'In Progress';
     case ResourceStatus.completed:
-      return 'Concluído';
+      return 'Completed';
     case ResourceStatus.dropped:
-      return 'Abandonado';
+      return 'Dropped';
   }
 }

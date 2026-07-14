@@ -349,7 +349,7 @@ class _CreateScanDocumentFormState
       body: finalBody,
       categories: const ['[[notes]]', '[[documents]]'],
     );
-    await ref.read(notesProvider.notifier).addNote(note);
+    await ref.read(vaultProvider.notifier).createObject(note);
     if (!mounted) return;
     Navigator.pop(context);
   }

@@ -7,7 +7,8 @@ class SystemsNotifier extends Notifier<List<SystemDefinition>> {
   @override
   List<SystemDefinition> build() {
     final systems = ref.watch(objectsByTypeProvider('system')).cast<SystemDefinition>();
-    final allTasks = ref.watch(tasksProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final allTasks = allObjects.whereType<Task>().toList();
     for (final system in systems) {
       _deriveSystemStats(system, allTasks);
     }

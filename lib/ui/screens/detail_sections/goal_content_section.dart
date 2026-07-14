@@ -46,17 +46,18 @@ List<Widget> buildGoalContentSection(
               (k.calculationMode == 'mood_average' || k.calculationMode == 'mood_trend'))
         ).toList()))
       : <MoodDefinition>[];
+  final allObjects = ref.watch(allObjectsProvider).value ?? [];
   final notes = needsLiveData 
-      ? ref.watch(notesProvider.select((notes) => notes.where((n) => 
+      ? allObjects.whereType<Note>().where((n) => 
           goal.kpis.any((k) => k.sourceType == KPISourceType.collection && k.sourceId == n.id)
-        ).toList()))
+        ).toList()
       : <Note>[];
   final tasks = needsLiveData 
-      ? ref.watch(tasksProvider.select((tasks) => tasks.where((t) => 
+      ? allObjects.whereType<Task>().where((t) => 
           goal.kpis.any((k) => k.sourceType == KPISourceType.subtasks && 
               (t.organizers.any((org) => org.slug == k.sourceId) || 
-               t.dependsOn.contains('[[${k.sourceId}]]')))
-        ).toList()))
+               t.dependsOn.contains('[[${k.sourceId}]]'))))
+        .toList()
       : <Task>[];
 
   double total = 0;
@@ -69,8 +70,7 @@ List<Widget> buildGoalContentSection(
       trackerRecords: trackerRecords,
       entries: entries,
       moods: moods,
-      notes: notes,
-      tasks: tasks,
+      allObjects: allObjects,
     );
     completed += (val / kpi.targetValue).clamp(0.0, 1.0);
   }

@@ -323,7 +323,8 @@ class _GoogleEventDetailScreenState
     if (frequency == null) return;
     final dueDate = (person.lastContactDate ?? DateTime.now()).add(frequency);
     final title = 'Entrar em contato com ${person.title}';
-    final tasks = ref.read(tasksProvider);
+    final allObjects = ref.read(allObjectsProvider).value ?? [];
+    final tasks = allObjects.whereType<Task>().toList();
     final existing = tasks
         .where(
           (task) =>
@@ -339,8 +340,8 @@ class _GoogleEventDetailScreenState
 
     if (existing != null) {
       await ref
-          .read(tasksProvider.notifier)
-          .updateTask(
+          .read(vaultProvider.notifier)
+          .updateObject(
             existing.copyWith(
               endDate: dueDate,
               stage: TaskStage.todo,
@@ -354,8 +355,8 @@ class _GoogleEventDetailScreenState
     }
 
     await ref
-        .read(tasksProvider.notifier)
-        .addTask(
+        .read(vaultProvider.notifier)
+        .createObject(
           Task(
             title: title,
             endDate: dueDate,

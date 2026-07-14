@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../theme.dart';
+import '../widgets/date_picker_field.dart';
 import '../../models/note_model.dart';
 import '../../models/shared_types.dart';
 import '../../providers/vault_provider.dart';
@@ -204,7 +205,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
                     // Title
                     TextField(
                       controller: _titleController,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) { if (mounted) setState(() {}); },
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
@@ -387,7 +388,7 @@ class _CreateNoteFormState extends ConsumerState<CreateNoteForm> {
     if (widget.existingNote != null) {
       ref.read(vaultProvider.notifier).updateObject(note);
     } else {
-      ref.read(notesProvider.notifier).addNote(note);
+      ref.read(vaultProvider.notifier).createObject(note);
     }
 
     Navigator.pop(context, true);

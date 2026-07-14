@@ -116,7 +116,7 @@ class JournalEntryCard extends StatelessWidget {
                       separatorBuilder: (context, sep) => const SizedBox(width: 6),
                       itemBuilder: (context, index) {
                         return ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(AppBorderRadius.sm),
                           child: Container(
                             width: 56,
                             height: 56,
@@ -262,14 +262,14 @@ class TaskCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppBorderRadius.md),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
           decoration: BoxDecoration(
             color: Theme.of(context).brightness == Brightness.dark
                 ? AppColors.darkCardFill
                 : AppColors.cardFill,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppBorderRadius.md),
             border: Border.all(
               color: Theme.of(context).brightness == Brightness.dark
                   ? AppColors.darkDivider
@@ -285,7 +285,7 @@ class TaskCard extends StatelessWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'Esta tarefa está bloqueada por dependências incompletas.',
+                              'This task is blocked by incomplete dependencies.',
                             ),
                           ),
                         );
@@ -489,10 +489,10 @@ class PmnCard extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.sm),
                       decoration: BoxDecoration(
                         color: AppTheme.accentColor(context).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppBorderRadius.sm),
                       ),
                       child: Icon(Icons.view_week_rounded, color: AppTheme.accentColor(context), size: 20),
                     ),

@@ -150,7 +150,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen>
 
         if (obj is Task) {
           final updated = obj.copyWith(stage: TaskStage.finalized);
-          await ref.read(tasksProvider.notifier).updateTask(updated);
+          await ref.read(vaultProvider.notifier).updateObject(updated);
         } else if (obj is Reminder) {
           obj.isCompleted = true;
           await ref.read(remindersProvider.notifier).updateReminder(obj);

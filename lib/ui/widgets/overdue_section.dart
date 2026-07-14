@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/task_model.dart';
 import '../../providers/overdue_provider.dart';
 import '../../providers/vault_provider.dart';
@@ -72,12 +73,7 @@ class _OverdueCard extends ConsumerWidget {
     };
 
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => UniversalDetailView(object: item.object),
-        ),
-      ),
+      onTap: () => context.push('/detail/${item.object.id}', extra: item.object),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -117,9 +113,8 @@ class _OverdueCard extends ConsumerWidget {
               GestureDetector(
                 onTap: () {
                   final task = item.object as Task;
-                  ref.read(tasksProvider.notifier).updateTask(
-                        task.copyWith(stage: TaskStage.finalized),
-                      );
+                  final updated = task.copyWith(stage: TaskStage.finalized);
+                  ref.read(vaultProvider.notifier).updateObject(updated);
                 },
                 child: const Padding(
                   padding: EdgeInsets.all(4),

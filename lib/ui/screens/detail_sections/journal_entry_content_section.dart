@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../models/journal_entry.dart';
 import '../../../models/mood_model.dart';
+import '../../../models/shared_types.dart';
 import '../../../services/markdown_parser.dart';
 import '../../widgets/journal_body_view.dart';
 import '../../widgets/rich_text_editor.dart';
 import '../../theme.dart';
+import '../../utils/object_icons.dart';
 
 /// Journal Entry-specific content section for universal detail view
 List<Widget> buildJournalEntryContentSection(
@@ -45,7 +47,7 @@ List<Widget> buildJournalEntryContentSection(
                       mood?.emoji ??
                           (entry.moodSlug != null
                               ? _fallbackMoodEmoji(entry.moodSlug!)
-                              : '📝'),
+                              : ObjectIcons.emojiForType(ObjectTypes.entry, ref)),
                       style: const TextStyle(fontSize: 22),
                     ),
                   ),

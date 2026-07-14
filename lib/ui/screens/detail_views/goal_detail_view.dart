@@ -76,12 +76,13 @@ class GoalDetailView {
   ) {
     // Only watch providers if the goal has KPIs that need live calculation
     final needsLiveData = goal.kpis.isNotEmpty;
-    final habits = needsLiveData ? ref.watch(habitsProvider) : <Habit>[];
+    final allObjects = needsLiveData ? ref.watch(allObjectsProvider).value ?? [] : <ContentObject>[];
+    final habits = needsLiveData ? allObjects.whereType<Habit>().toList() : <Habit>[];
     final trackerRecords = needsLiveData ? ref.watch(trackingRecordsProvider) : <TrackingRecord>[];
     final entries = needsLiveData ? ref.watch(allEntriesProvider) : <JournalEntry>[];
     final moods = needsLiveData ? ref.watch(moodsProvider) : <MoodDefinition>[];
-    final notes = needsLiveData ? ref.watch(notesProvider) : <Note>[];
-    final tasks = needsLiveData ? ref.watch(tasksProvider) : <Task>[];
+    final notes = allObjects.whereType<Note>().toList();
+    final tasks = allObjects.whereType<Task>().toList();
 
     double total = 0;
     double completed = 0;
@@ -93,8 +94,7 @@ class GoalDetailView {
         trackerRecords: trackerRecords,
         entries: entries,
         moods: moods,
-        notes: notes,
-        tasks: tasks,
+        allObjects: allObjects,
       );
       completed += (val / kpi.targetValue).clamp(0.0, 1.0);
     }
@@ -185,8 +185,9 @@ class GoalDetailView {
     final trackerRecords = ref.read(trackingRecordsProvider);
     final entries = ref.read(allEntriesProvider);
     final moods = ref.read(moodsProvider);
-    final notes = ref.read(notesProvider);
-    final tasks = ref.read(tasksProvider);
+    final allObjects = ref.read(allObjectsProvider).value ?? [];
+    final notes = allObjects.whereType<Note>().toList();
+    final tasks = allObjects.whereType<Task>().toList();
 
     for (final kpi in goal.kpis) {
       currentKPIs[kpi.id] = KPIEngine.calculateKPIValue(
@@ -195,8 +196,7 @@ class GoalDetailView {
         trackerRecords: trackerRecords,
         entries: entries,
         moods: moods,
-        notes: notes,
-        tasks: tasks,
+        allObjects: allObjects,
       );
     }
     return currentKPIs;

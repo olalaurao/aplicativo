@@ -169,8 +169,9 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
     final entries = ref.watch(allEntriesProvider);
-    final habits = ref.watch(habitsProvider);
+    final habits = allObjects.whereType<Habit>().toList();
     final reminders = ref.watch(remindersProvider);
     final moods = ref.watch(moodsProvider);
 

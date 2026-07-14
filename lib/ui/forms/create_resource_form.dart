@@ -6,6 +6,7 @@ import '../../models/resource_model.dart';
 import '../../models/shared_types.dart';
 import '../../services/resource_metadata_service.dart';
 import '../theme.dart';
+import '../widgets/date_picker_field.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../widgets/universal_search_picker.dart';
@@ -709,7 +710,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
       if (widget.existingResource != null) {
         await ref.read(vaultProvider.notifier).updateObject(resource);
       } else {
-        await ref.read(resourcesProvider.notifier).addResource(resource);
+        await ref.read(vaultProvider.notifier).createObject(resource);
       }
     } catch (e) {
       debugPrint('Failed to save resource: $e');

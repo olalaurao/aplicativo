@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../services/markdown_parser.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
@@ -251,10 +252,7 @@ class JournalBodyView extends ConsumerWidget {
           aliases.contains(lookup);
     }).firstOrNull;
     if (target == null) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => UniversalDetailView(object: target)),
-    );
+    context.push('/detail/${target.id}', extra: target);
   }
 
   InlineSpan _mediaSpan(

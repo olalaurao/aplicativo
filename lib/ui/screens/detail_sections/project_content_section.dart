@@ -68,7 +68,7 @@ List<Widget> buildProjectContentSection(
               child: Column(
                 children: [
                   Text(
-                    '${(progress * 100).toInt()}% Concluído',
+                    '${(progress * 100).toInt()}% Completed',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
@@ -77,7 +77,7 @@ List<Widget> buildProjectContentSection(
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '$doneCount de $linkedTasksCount tarefas',
+                    '$doneCount of $linkedTasksCount tasks',
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.textMuted,

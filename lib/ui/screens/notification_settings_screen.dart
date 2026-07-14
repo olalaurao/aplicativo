@@ -81,14 +81,14 @@ class _NotificationSettingsScreenState
     final notifier = ref.read(settingsProvider.notifier);
     final hex = '#${(color.toARGB32() & 0x00FFFFFF).toRadixString(16).padLeft(6, '0')}';
     await notifier.updateCategoryColor('notif_$key', hex);
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Future<void> _saveButton(String key, bool value) async {
     _buttonVisibility[key] = value;
     final notifier = ref.read(settingsProvider.notifier);
     await notifier.updateCategoryColor('btn_$key', value.toString());
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   @override

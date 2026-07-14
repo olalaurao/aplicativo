@@ -12,6 +12,7 @@ import 'dataview_generator.dart';
 import 'notification_service.dart';
 import '../models/content_object.dart';
 import '../models/sync_action.dart';
+import '../models/task_model.dart';
 import '../providers/sync_provider.dart';
 import '../providers/vault_provider.dart';
 import '../providers/settings_provider.dart';
@@ -267,7 +268,8 @@ class SyncManager {
       debugPrint('[SyncManager] Regenerating Dataview indexes.');
       final gen = DataviewGenerator(obsidian);
       final projects = _ref.read(projectsProvider);
-      final tasks = _ref.read(tasksProvider);
+      final allObjects = _ref.read(allObjectsProvider).value ?? [];
+      final tasks = allObjects.whereType<Task>().toList();
       await gen.regenerateAll(projects: projects, tasks: tasks);
     } catch (e) {
       debugPrint('[SyncManager] Failed to regenerate Dataview during sync: $e');

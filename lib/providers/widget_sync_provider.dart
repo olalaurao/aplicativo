@@ -25,9 +25,11 @@ import '../models/note_model.dart';
 import '../models/resource_model.dart';
 import '../models/day_dial_model.dart';
 import '../models/event_model.dart';
+import '../models/shared_types.dart';
 import '../services/scheduler_service.dart';
 import '../services/widget_service.dart';
 import '../services/day_dial_aggregator.dart';
+import '../ui/utils/object_icons.dart';
 import 'dashboard_provider.dart';
 import 'pomodoro_provider.dart';
 import 'vault_provider.dart';
@@ -168,7 +170,7 @@ Future<void> _updateAllWidgets(
     await WidgetService.updateQuickAddLabels();
     
     // Update day dial widget
-    await _updateDayDialWidget(allObjects, pomodoroHistory, googleEvents);
+    await _updateDayDialWidget(allObjects, pomodoroHistory, googleEvents, settings.typeSignatures);
   } catch (e, st) {
     debugPrint('[WidgetSync] failed: $e\n$st');
   }
@@ -898,6 +900,7 @@ Future<void> _updateDayDialWidget(
   List<ContentObject> allObjects,
   List<PomodoroSession> pomodoroHistory,
   List<calendar.Event> googleEvents,
+  Map<String, TypeSignature> typeSignatures,
 ) async {
   try {
     final now = DateTime.now();
@@ -922,6 +925,7 @@ Future<void> _updateDayDialWidget(
       timeBlocks: timeBlocks,
       journalEntries: journalEntries,
       moodCatalog: moodDefinitions,
+      typeSignatures: typeSignatures,
     );
     
     // Count activities for summary

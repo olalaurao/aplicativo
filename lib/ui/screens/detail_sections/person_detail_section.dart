@@ -18,22 +18,22 @@ List<PropertyCard> buildPersonPropertyCards(
   
   cards.add(PropertyCard(
     icon: Icons.priority_high,
-    label: 'Prioridade',
+    label: 'Priority',
     value: '',
     customChild: _buildContactPriorityBadge(person),
   ));
   cards.add(PropertyCard(
     icon: Icons.repeat,
-    label: 'Frequência',
-    value: person.contactFrequency != null ? 'A cada ${person.contactFrequency!.inDays} dias' : 'Não definida',
+    label: 'Frequency',
+    value: person.contactFrequency != null ? 'Every ${person.contactFrequency!.inDays} days' : 'Not set',
     state: person.contactFrequency == null ? PropertyCardState.empty : PropertyCardState.normal,
     onTap: person.contactFrequency != null ? () => _showFrequencyPicker(context, ref, person) : null,
   ));
   cards.add(PropertyCard(
     icon: Icons.phone,
-    label: 'Próximo contato',
+    label: 'Next contact',
     value: () {
-      if (person.lastContactDate == null || person.contactFrequency == null) return 'Não definido';
+      if (person.lastContactDate == null || person.contactFrequency == null) return 'Not set';
       final next = person.lastContactDate!.add(person.contactFrequency!);
       return DateFormat('d MMM yyyy').format(next);
     }(),
@@ -41,10 +41,10 @@ List<PropertyCard> buildPersonPropertyCards(
   ));
   cards.add(PropertyCard(
     icon: Icons.calendar_today,
-    label: 'Último contato',
+    label: 'Last contact',
     value: person.lastContactDate != null 
         ? DateFormat('d MMM yyyy').format(person.lastContactDate!) 
-        : 'Nunca',
+        : 'Never',
     state: person.lastContactDate == null || person.contactFrequency == null 
         ? PropertyCardState.empty 
         : PropertyCardState.normal,
@@ -59,32 +59,32 @@ Widget _buildContactPriorityBadge(Person person) {
   
   switch (person.contactPriority) {
     case TaskPriority.high:
-      color = Colors.red;
-      label = 'ALTA';
+      color = AppColors.priorityHigh;
+      label = 'HIGH';
       break;
     case TaskPriority.medium:
-      color = Colors.orange;
-      label = 'MÉDIA';
+      color = AppColors.priorityMedium;
+      label = 'MEDIUM';
       break;
     case TaskPriority.low:
-      color = Colors.green;
-      label = 'BAIXA';
+      color = AppColors.priorityLow;
+      label = 'LOW';
       break;
     case TaskPriority.none:
-      color = Colors.grey;
-      label = 'NENHUMA';
+      color = AppColors.textMuted;
+      label = 'NONE';
       break;
     default:
-      color = Colors.grey;
-      label = 'DESCONHECIDO';
+      color = AppColors.textMuted;
+      label = 'UNKNOWN';
       break;
   }
   
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
     decoration: BoxDecoration(
       color: color.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(AppBorderRadius.sm),
       border: Border.all(color: color.withValues(alpha: 0.3)),
     ),
     child: Text(
@@ -102,12 +102,12 @@ void _showFrequencyPicker(BuildContext context, WidgetRef ref, Person person) {
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Frequência de contato'),
+      title: const Text('Contact frequency'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           ListTile(
-            title: const Text('7 dias'),
+            title: const Text('7 days'),
             onTap: () {
               final updated = person.copyWith(contactFrequency: const Duration(days: 7));
               ref.read(vaultProvider.notifier).updateObject(updated);
@@ -115,7 +115,7 @@ void _showFrequencyPicker(BuildContext context, WidgetRef ref, Person person) {
             },
           ),
           ListTile(
-            title: const Text('14 dias'),
+            title: const Text('14 days'),
             onTap: () {
               final updated = person.copyWith(contactFrequency: const Duration(days: 14));
               ref.read(vaultProvider.notifier).updateObject(updated);
@@ -123,7 +123,7 @@ void _showFrequencyPicker(BuildContext context, WidgetRef ref, Person person) {
             },
           ),
           ListTile(
-            title: const Text('30 dias'),
+            title: const Text('30 days'),
             onTap: () {
               final updated = person.copyWith(contactFrequency: const Duration(days: 30));
               ref.read(vaultProvider.notifier).updateObject(updated);
@@ -131,7 +131,7 @@ void _showFrequencyPicker(BuildContext context, WidgetRef ref, Person person) {
             },
           ),
           ListTile(
-            title: const Text('60 dias'),
+            title: const Text('60 days'),
             onTap: () {
               final updated = person.copyWith(contactFrequency: const Duration(days: 60));
               ref.read(vaultProvider.notifier).updateObject(updated);

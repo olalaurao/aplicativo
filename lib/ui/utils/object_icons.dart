@@ -9,7 +9,13 @@ class ObjectIcons {
   /// Falls back to default if not configured.
   static String emojiForType(String type, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
-    final sig = settings.typeSignatures[type];
+    return emojiForTypeWithSignatures(type, settings.typeSignatures);
+  }
+
+  /// Returns the configured emoji icon for a given object type from a signatures map.
+  /// Falls back to default if not configured.
+  static String emojiForTypeWithSignatures(String type, Map<String, TypeSignature> typeSignatures) {
+    final sig = typeSignatures[type];
     if (sig != null && sig.emoji.isNotEmpty) {
       return sig.emoji;
     }

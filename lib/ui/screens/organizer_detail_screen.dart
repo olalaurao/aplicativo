@@ -9,6 +9,7 @@ import '../../models/social_post.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/wiki_link_resolver_provider.dart';
 import '../theme.dart';
+import '../utils/object_icons.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../widgets/social_post_grid_card.dart';
 import 'social_post_detail.dart';
@@ -974,8 +975,9 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
   }
 
   List<Note> _notesForOrganizer() {
-    return ref
-        .watch(notesProvider)
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final allNotes = allObjects.whereType<Note>().toList();
+    return allNotes
         .where(
           (note) => note.organizers.any(
             (organizer) => organizer.matches(
@@ -990,11 +992,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
   }
 
   String _noteSubtypeIcon(NoteSubtype subtype) {
-    return switch (subtype) {
-      NoteSubtype.text => '📝',
-      NoteSubtype.outline => '🗂',
-      NoteSubtype.collection => '🗃',
-    };
+    return ObjectIcons.defaultIconForNoteSubtype(subtype.name);
   }
 
   String _notePreview(Note note) {

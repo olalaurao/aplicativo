@@ -89,8 +89,7 @@ class AutomationService {
 
       case 'create_task':
         // Extensão não documentada na spec — mantida para retrocompatibilidade.
-        final tasksNotifier = ref.read(tasksProvider.notifier);
-        await tasksNotifier.addTask(
+        await ref.read(vaultProvider.notifier).createObject(
           Task(
             title: 'Acompanhamento: $sourceTitle',
             notes: [
@@ -118,8 +117,7 @@ class AutomationService {
       case 'add_text_note':
         // Cria uma nota de texto vinculada automaticamente.
         // targetNoteTitle pode vir em action.params['title'].
-        final notesNotifier = ref.read(notesProvider.notifier);
-        await notesNotifier.addNote(
+        await ref.read(vaultProvider.notifier).createObject(
           Note(
             title:
                 action.params?['title'] as String? ??
@@ -140,7 +138,8 @@ class AutomationService {
           break;
         }
 
-        final notes = ref.read(notesProvider);
+        final allObjects = ref.read(allObjectsProvider).value ?? [];
+        final notes = allObjects.whereType<Note>().toList();
         final collection = notes.where((note) {
           return note.subtype == NoteSubtype.collection &&
               (note.id == targetId ||
@@ -164,8 +163,8 @@ class AutomationService {
           '- $itemText',
         ].join('\n');
         await ref
-            .read(notesProvider.notifier)
-            .updateNote(collection.copyWith(body: nextBody));
+            .read(vaultProvider.notifier)
+            .updateObject(collection.copyWith(body: nextBody));
         break;
 
       case 'view_statistics':
@@ -283,7 +282,8 @@ class AutomationService {
   }
 
   static Future<void> checkPersonContacts(Ref ref, List<Person> people) async {
-    final tasks = ref.read(tasksProvider);
+    final allObjects = ref.read(allObjectsProvider).value ?? [];
+    final tasks = allObjects.whereType<Task>().toList();
     final entries = ref.read(allEntriesProvider);
     final now = DateTime.now();
 
@@ -357,14 +357,10 @@ class AutomationService {
                   )),
         );
         if (!exists) {
-          final tasksNotifier = ref.read(tasksProvider.notifier);
-          await tasksNotifier.addTask(
+          await ref.read(vaultProvider.notifier).createObject(
             Task(
               id: 'contact_${person.id}_${now.millisecondsSinceEpoch}',
               title: taskTitle,
-              notes: [
-                'Automatically created from this person contact frequency.',
-              ],
               startDate: now,
               priority: person.contactPriority,
               stage: TaskStage.todo,
@@ -435,8 +431,9 @@ class AutomationService {
       final trackers = ref.read(trackingRecordsProvider);
       final entries = ref.read(allEntriesProvider);
       final moods = ref.read(moodsProvider);
-      final notes = ref.read(notesProvider);
-      final tasks = ref.read(tasksProvider);
+      final allObjects = ref.read(allObjectsProvider).value ?? [];
+      final notes = allObjects.whereType<Note>().toList();
+      final tasks = allObjects.whereType<Task>().toList();
 
       for (final goal in goals) {
         bool goalChanged = false;
@@ -447,8 +444,7 @@ class AutomationService {
             trackerRecords: trackers,
             entries: entries,
             moods: moods,
-            notes: notes,
-            tasks: tasks,
+            allObjects: allObjects,
           );
           if (kpi.currentValue != newValue) {
             kpi.currentValue = newValue;
@@ -491,8 +487,7 @@ class AutomationService {
             trackerRecords: trackers,
             entries: entries,
             moods: moods,
-            notes: notes,
-            tasks: tasks,
+            allObjects: allObjects,
           );
           if (kpi.currentValue != newValue) {
             kpi.currentValue = newValue;

@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme.dart';
+import '../widgets/app_switch_tile.dart';
 import '../../providers/navigation_provider.dart';
 import '../../models/navigation_item.dart';
+import '../../models/task_model.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/google_calendar_provider.dart' as calendar_auth;
@@ -659,7 +661,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                         await PermissionService.showExactAlarmPermissionDialog(
                                           context,
                                         );
-                                        setState(() {}); // Refresh status
+                                        if (mounted) setState(() {}); // Refresh status
                                       },
                                       child: const Text(
                                         'Grant',
@@ -702,7 +704,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   : TextButton(
                                       onPressed: () async {
                                         await PermissionService.requestFullScreenIntent();
-                                        setState(() {}); // Refresh status
+                                        if (mounted) setState(() {}); // Refresh status
                                       },
                                       child: const Text(
                                         'Grant',
@@ -793,15 +795,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const Divider(height: 1, indent: 16),
-                      SwitchListTile(
-                        title: const Text('Mostrar seção Atrasados'),
-                        subtitle: const Text(
-                          'Exibe tarefas, metas e projetos com prazo vencido',
-                        ),
+                      AppSwitchTile(
+                        title: 'Mostrar seção Atrasados',
+                        subtitle: 'Exibe tarefas, metas e projetos com prazo vencido',
                         value: settings.showOverdueSection,
                         onChanged: (val) =>
                             notifier.updateShowOverdueSection(val),
-                        activeThumbColor: AppTheme.accentColor(context),
                       ),
                     ],
                   ),
@@ -1168,7 +1167,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final obsidian = ref.read(obsidianServiceProvider);
     final gen = DataviewGenerator(obsidian);
     final projects = ref.read(projectsProvider);
-    final tasks = ref.read(tasksProvider);
+    final allObjects = ref.read(allObjectsProvider).value ?? [];
+    final tasks = allObjects.whereType<Task>().toList();
     try {
       await gen.regenerateAll(projects: projects, tasks: tasks);
       if (!context.mounted) return;
@@ -2425,25 +2425,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       final id = calendar.id;
                       if (id == null) return const SizedBox.shrink();
                       final title = calendar.summary ?? id;
-                      return SwitchListTile.adaptive(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
+                      return AppSwitchTile(
+                        title: title,
+                        subtitle: calendar.primary == true
+                            ? 'Calendário principal'
+                            : id,
                         value: enabled.contains(id),
-                        activeThumbColor: AppTheme.accentColor(context),
-                        title: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                        subtitle: Text(
-                          calendar.primary == true
-                              ? 'Calendário principal'
-                              : id,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 11),
-                        ),
                         onChanged: (_) => ref
                             .read(
                               calendar_auth
@@ -2454,6 +2441,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               id,
                               defaultEnabledIds: defaultEnabled,
                             ),
+                        contentPadding: EdgeInsets.zero,
                       );
                     }).toList(),
                   ),

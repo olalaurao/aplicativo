@@ -10,6 +10,8 @@ import '../models/organizer_model.dart';
 import '../models/mood_model.dart';
 import '../models/journal_entry.dart';
 import '../models/event_model.dart';
+import '../models/shared_types.dart';
+import '../ui/utils/object_icons.dart';
 import 'package:googleapis/calendar/v3.dart' as google_calendar;
 
 /// Aggregates data from multiple sources to produce a DayDialSnapshot
@@ -25,6 +27,7 @@ class DayDialAggregator {
     required List<Organizer> timeBlocks,
     required List<JournalEntry> journalEntries,
     required List<MoodDefinition> moodCatalog,
+    Map<String, TypeSignature> typeSignatures = const {},
   }) {
     final segments = <DialSegment>[];
 
@@ -117,7 +120,7 @@ class DayDialAggregator {
         end: end,
         title: event.title,
         colorHex: '#007AFF', // AppColors.info
-        emoji: '📅',
+        emoji: ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.event, typeSignatures),
         isEditable: true,
         isResizable: true,
         sourceSlug: event.slug,
@@ -185,7 +188,7 @@ class DayDialAggregator {
           end: start.add(const Duration(minutes: 12)),
           title: habit.title,
           colorHex: habit.color ?? '#FF9500',
-          emoji: habit.icon,
+          emoji: habit.icon ?? ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.habit, typeSignatures),
           isEditable: true,
           isResizable: false,
           sourceSlug: habit.slug,
@@ -205,7 +208,7 @@ class DayDialAggregator {
         end: reminder.time.add(const Duration(minutes: 12)),
         title: reminder.title,
         colorHex: '#FFCC00',
-        emoji: '🔔',
+        emoji: ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.reminder, typeSignatures),
         isEditable: true,
         isResizable: false,
         sourceSlug: reminder.id,

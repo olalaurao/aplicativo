@@ -28,7 +28,8 @@ class GoalsScreen extends ConsumerStatefulWidget {
 class _GoalsScreenState extends ConsumerState<GoalsScreen> {
   @override
   Widget build(BuildContext context) {
-    final goals = ref.watch(goalsProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final goals = allObjects.whereType<Goal>().toList();
     final activeGoals = goals
         .where((g) => g.state == GoalStatus.active && !g.archived)
         .toList();
@@ -243,17 +244,18 @@ class _GoalCard extends ConsumerWidget {
                 (k.calculationMode == 'mood_average' || k.calculationMode == 'mood_trend'))
           ).toList()))
         : <MoodDefinition>[];
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
     final notes = needsLiveData 
-        ? ref.watch(notesProvider.select((notes) => notes.where((n) => 
+        ? allObjects.whereType<Note>().where((n) => 
             goal.kpis.any((k) => k.sourceType == KPISourceType.collection && k.sourceId == n.id)
-          ).toList()))
+          ).toList()
         : <Note>[];
     final tasks = needsLiveData 
-        ? ref.watch(tasksProvider.select((tasks) => tasks.where((t) => 
+        ? allObjects.whereType<Task>().where((t) => 
             goal.kpis.any((k) => k.sourceType == KPISourceType.subtasks && 
                 (t.organizers.any((org) => org.slug == k.sourceId) || 
                  t.dependsOn.contains('[[${k.sourceId}]]')))
-          ).toList()))
+          ).toList()
         : <Task>[];
 
     return InkWell(
@@ -344,8 +346,7 @@ class _GoalCard extends ConsumerWidget {
                             trackerRecords: trackerRecords,
                             entries: entries,
                             moods: moods,
-                            notes: notes,
-                            tasks: tasks,
+                            allObjects: allObjects,
                           ),
                         ],
                       ),
@@ -367,8 +368,7 @@ class _GoalCard extends ConsumerWidget {
     required List<TrackingRecord> trackerRecords,
     required List<JournalEntry> entries,
     required List<MoodDefinition> moods,
-    required List<Note> notes,
-    required List<Task> tasks,
+    required List<dynamic> allObjects,
   }) {
     if (isCompleted) {
       return Row(
@@ -399,8 +399,7 @@ class _GoalCard extends ConsumerWidget {
       trackerRecords: trackerRecords,
       entries: entries,
       moods: moods,
-      notes: notes,
-      tasks: tasks,
+      allObjects: allObjects,
     );
 
     return Column(
@@ -504,8 +503,7 @@ class _GoalCard extends ConsumerWidget {
     required List<TrackingRecord> trackerRecords,
     required List<JournalEntry> entries,
     required List<MoodDefinition> moods,
-    required List<Note> notes,
-    required List<Task> tasks,
+    required List<dynamic> allObjects,
   }) {
     if (goal.kpis.isEmpty) return goal.progress;
 
@@ -520,8 +518,7 @@ class _GoalCard extends ConsumerWidget {
         trackerRecords: trackerRecords,
         entries: entries,
         moods: moods,
-        notes: notes,
-        tasks: tasks,
+        allObjects: allObjects,
       );
       completed += (currentValue / kpi.targetValue).clamp(0.0, 1.0);
     }

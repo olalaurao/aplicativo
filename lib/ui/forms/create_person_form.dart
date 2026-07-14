@@ -109,7 +109,7 @@ class _CreatePersonFormState extends ConsumerState<CreatePersonForm> {
                 children: [
                   TextField(
                     controller: _nameController,
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) { if (mounted) setState(() {}); },
                     style: const TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w700,

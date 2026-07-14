@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/organizer_model.dart';
-import '../../providers/day_theme_provider.dart';
+import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import '../widgets/app_color_picker.dart';
 import '../forms/create_organizer_form.dart';
@@ -12,8 +12,9 @@ class DayThemeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themes = ref.watch(dayThemesProvider);
-    final blocks = [...ref.watch(timeBlocksProvider)]
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final themes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final blocks = [...allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.timeBlock).toList()]
       ..sort((Organizer a, Organizer b) {
         final aStart = a.timeRanges.isEmpty ? 24 * 60 : a.timeRanges.first.startHour * 60 + a.timeRanges.first.startMinute;
         final bStart = b.timeRanges.isEmpty ? 24 * 60 : b.timeRanges.first.startHour * 60 + b.timeRanges.first.startMinute;
@@ -46,18 +47,18 @@ class DayThemeScreen extends ConsumerWidget {
                 }
               },
               itemBuilder: (context) => const [
-                PopupMenuItem(value: 'block', child: Text('Novo bloco')),
-                PopupMenuItem(value: 'theme', child: Text('Novo tema')),
+                PopupMenuItem(value: 'block', child: Text('New Block')),
+                PopupMenuItem(value: 'theme', child: Text('New Theme')),
               ],
             ),
           ],
           bottom: TabBar(
-            tabs: [
-              Tab(text: 'Themes', icon: Icon(Icons.wb_sunny_outlined)),
-              Tab(text: 'Blocks', icon: Icon(Icons.view_day_outlined)),
-            ],
             indicatorColor: AppTheme.accentColor(context),
             labelColor: AppTheme.accentColor(context),
+            tabs: const [
+              Tab(text: 'Themes'),
+              Tab(text: 'Blocks'),
+            ],
           ),
         ),
         body: TabBarView(
@@ -67,7 +68,7 @@ class DayThemeScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(20),
               children: [
                 themes.isEmpty
-                    ? _buildEmptyCard('Nenhum tema definido')
+                    ? _buildEmptyCard('No themes defined')
                     : Column(
                         children: themes
                             .map((t) => _buildThemeTile(context, ref, t, blocks))
@@ -78,7 +79,7 @@ class DayThemeScreen extends ConsumerWidget {
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.add_rounded, size: 16),
-                    label: const Text('Novo Tema do Dia'),
+                    label: const Text('New Day Theme'),
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: AppTheme.accentColor(context).withValues(alpha: 0.4)),
                       foregroundColor: AppTheme.accentColor(context),
@@ -99,7 +100,7 @@ class DayThemeScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(20),
               children: [
                 blocks.isEmpty
-                    ? _buildEmptyCard('Nenhum bloco definido')
+                    ? _buildEmptyCard('No blocks defined')
                     : ReorderableListView(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -132,7 +133,7 @@ class DayThemeScreen extends ConsumerWidget {
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.add_rounded, size: 16),
-                    label: const Text('Novo Bloco de Tempo'),
+                    label: const Text('New Time Block'),
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: AppTheme.accentColor(context).withValues(alpha: 0.4)),
                       foregroundColor: AppTheme.accentColor(context),
@@ -195,7 +196,7 @@ class DayThemeScreen extends ConsumerWidget {
               topLeft: Radius.circular(20), bottomLeft: Radius.circular(20)))),
         title: Text(block.title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(rangeText,
-          style: TextStyle(fontSize: 11, color: AppTheme.textMutedColor(context))),
+          style: TextStyle(fontSize: AppTextSize.xs, color: AppTheme.textMutedColor(context))),
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
           _buildTimeBar(block, color),
           const SizedBox(width: 8),
@@ -210,7 +211,7 @@ class DayThemeScreen extends ConsumerWidget {
                 ));
               }
               if (value == 'delete') {
-                final confirmed = await _confirmDelete(context, 'Excluir bloco?');
+                final confirmed = await _confirmDelete(context, 'Delete block?');
                 if (confirmed) {
                   await ref
                       .read(timeBlocksProvider.notifier)
@@ -219,8 +220,8 @@ class DayThemeScreen extends ConsumerWidget {
               }
             },
             itemBuilder: (context) => const [
-              PopupMenuItem(value: 'edit', child: Text('Editar')),
-              PopupMenuItem(value: 'delete', child: Text('Excluir')),
+              PopupMenuItem(value: 'edit', child: Text('Edit')),
+              PopupMenuItem(value: 'delete', child: Text('Delete')),
             ],
           ),
           const SizedBox(width: 4),
@@ -310,7 +311,7 @@ class DayThemeScreen extends ConsumerWidget {
               ));
             }
             if (value == 'delete') {
-              final confirmed = await _confirmDelete(context, 'Excluir tema?');
+              final confirmed = await _confirmDelete(context, 'Delete theme?');
               if (confirmed) {
                 await ref
                     .read(dayThemesProvider.notifier)
@@ -319,8 +320,8 @@ class DayThemeScreen extends ConsumerWidget {
             }
           },
           itemBuilder: (context) => const [
-            PopupMenuItem(value: 'edit', child: Text('Editar')),
-            PopupMenuItem(value: 'delete', child: Text('Excluir')),
+            PopupMenuItem(value: 'edit', child: Text('Edit')),
+            PopupMenuItem(value: 'delete', child: Text('Delete')),
           ],
         ),
       ),
@@ -333,17 +334,17 @@ class DayThemeScreen extends ConsumerWidget {
       builder: (context) => AlertDialog(
         title: Text(title),
         content: const Text(
-          'Esta ação pode ser desfeita pela lixeira do vault.',
+          'This action can be undone via the vault trash.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Excluir'),
+            child: const Text('Delete'),
           ),
         ],
       ),

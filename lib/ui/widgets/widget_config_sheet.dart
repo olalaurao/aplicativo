@@ -12,6 +12,8 @@ import '../../providers/dashboard_provider.dart';
 import '../../providers/widget_sync_provider.dart';
 import '../../services/widget_service.dart';
 import '../theme.dart';
+import 'app_chip.dart';
+import 'app_switch_tile.dart';
 
 class WidgetConfigSheet extends ConsumerStatefulWidget {
   const WidgetConfigSheet({super.key});
@@ -87,7 +89,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                   _buildWidgetHeader(
                     key: 'quick',
                     title: 'Quick-Add (2x1)',
-                    desc: 'Atalhos configuráveis de entrada rápida.',
+                    desc: 'Configurable quick entry shortcuts.',
                     icon: Icons.add_box_rounded,
                   ),
                   if (_expanded['quick'] == true) ...[
@@ -98,9 +100,9 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                   // --- CALENDAR WIDGET ---
                   _buildWidgetHeader(
                     key: 'calendar',
-                    title: 'Calendário (4x2)',
+                    title: 'Calendar (4x2)',
                     desc:
-                        'Visão semanal/mensal integrada com tarefas e hábitos.',
+                        'Weekly/monthly view integrated with tasks and habits.',
                     icon: Icons.calendar_today_rounded,
                   ),
                   if (_expanded['calendar'] == true) ...[
@@ -111,8 +113,8 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                   // --- HABIT SUMMARY WIDGET ---
                   _buildWidgetHeader(
                     key: 'habit',
-                    title: 'Resumo de Hábitos (2x2)',
-                    desc: 'Sua taxa de conclusão e hábitos ativos por área.',
+                    title: 'Habit Summary (2x2)',
+                    desc: 'Your completion rate and active habits by area.',
                     icon: Icons.loop_rounded,
                   ),
                   if (_expanded['habit'] == true) ...[
@@ -123,9 +125,9 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                   // --- FILTER WIDGET ---
                   _buildWidgetHeader(
                     key: 'filter',
-                    title: 'Filtro (4x2)',
+                    title: 'Filter (4x2)',
                     desc:
-                        'Filtro de tarefas, hábitos e outros por organizador.',
+                        'Filter tasks, habits and others by organizer.',
                     icon: Icons.filter_alt_rounded,
                   ),
                   if (_expanded['filter'] == true) ...[
@@ -136,9 +138,9 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                   // --- OBSIDIAN NOTE WIDGET ---
                   _buildWidgetHeader(
                     key: 'note',
-                    title: 'Nota Fixada (2x2)',
+                    title: 'Pinned Note (2x2)',
                     desc:
-                        'Fixe uma nota específica do Obsidian na tela inicial.',
+                        'Pin a specific Obsidian note to the home screen.',
                     icon: Icons.sticky_note_2_rounded,
                   ),
                   if (_expanded['note'] == true) ...[
@@ -156,7 +158,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
               backgroundColor: AppTheme.accentColor(context),
               minimumSize: const Size(double.infinity, 50),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppBorderRadius.xl),
               ),
               elevation: 0,
             ),
@@ -198,7 +200,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
         await WidgetService.saveUniversalWidgetConfig(
           widgetId: widgetId,
           type: 'filter',
-          title: 'Filtro',
+          title: 'Filter',
           size: 'medium',
           organizer: organizer,
           objectTypes: objectTypes,
@@ -208,16 +210,15 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Configurações dos widgets sincronizadas.'),
+          content: Text('Widget settings synchronized.'),
           backgroundColor: AppTheme.accentColor(context),
         ),
       );
       Navigator.pop(context);
     } catch (e) {
-      debugPrint('Falha ao sincronizar widgets: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao sincronizar widgets: $e')),
+        SnackBar(content: Text('Failed to sync widgets: $e')),
       );
     }
   }
@@ -234,13 +235,13 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
       padding: const EdgeInsets.only(bottom: 8.0),
       child: InkWell(
         onTap: () {
-          setState(() {
+          if (mounted) setState(() {
             _expanded[key] = !isExpanded;
           });
         },
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
             color: AppTheme.surfaceVariantColor(context),
             borderRadius: BorderRadius.circular(16),
@@ -254,12 +255,12 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
                   color: isExpanded
                       ? AppTheme.accentColor(context).withValues(alpha: 0.1)
                       : AppTheme.surfaceColor(context),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppBorderRadius.md),
                 ),
                 child: Icon(
                   icon,
@@ -307,17 +308,17 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
 
   Widget _buildQuickAddConfig(AppSettings settings) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: AppTheme.surfaceVariantColor(context).withValues(alpha: 0.5),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(AppBorderRadius.xl)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Botão 1 (Esquerda)',
+            'Button 1 (Left)',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
           const SizedBox(height: 8),
@@ -348,7 +349,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
               Expanded(
                 child: DropdownButtonFormField<String>(
                   decoration: const InputDecoration(
-                    labelText: 'Ação',
+                    labelText: 'Action',
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
@@ -372,7 +373,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Botão 2 (Direita)',
+            'Button 2 (Right)',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
           const SizedBox(height: 8),
@@ -403,7 +404,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
               Expanded(
                 child: DropdownButtonFormField<String>(
                   decoration: const InputDecoration(
-                    labelText: 'Ação',
+                    labelText: 'Action',
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
@@ -432,17 +433,17 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
 
   Widget _buildCalendarConfig(AppSettings settings) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: AppTheme.surfaceVariantColor(context).withValues(alpha: 0.5),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(AppBorderRadius.xl)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Tipo de Visualização',
+            'View Type',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
           const SizedBox(height: 8),
@@ -453,9 +454,9 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
             ),
             initialValue: settings.calendarWidgetType,
             items: const [
-              DropdownMenuItem(value: 'day', child: Text('Dia')),
-              DropdownMenuItem(value: 'week', child: Text('Semana')),
-              DropdownMenuItem(value: 'month', child: Text('Mês')),
+              DropdownMenuItem(value: 'day', child: Text('Day')),
+              DropdownMenuItem(value: 'week', child: Text('Week')),
+              DropdownMenuItem(value: 'month', child: Text('Month')),
             ],
             onChanged: (val) {
               if (val != null) {
@@ -467,54 +468,39 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Exibir no Calendário',
+            'Show in Calendar',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
           const SizedBox(height: 8),
-          SwitchListTile.adaptive(
-            title: const Text(
-              'Tarefas agendadas',
-              style: TextStyle(fontSize: 13),
-            ),
+          AppSwitchTile(
+            title: 'Tarefas agendadas',
             value: settings.calendarWidgetShowTasks,
-            activeThumbColor: AppTheme.accentColor(context),
-            contentPadding: EdgeInsets.zero,
-            dense: true,
             onChanged: (val) {
               ref
                   .read(settingsProvider.notifier)
                   .updateWidgetCalendarSettings(showTasks: val);
             },
-          ),
-          SwitchListTile.adaptive(
-            title: const Text(
-              'Hábitos frequentes',
-              style: TextStyle(fontSize: 13),
-            ),
-            value: settings.calendarWidgetShowHabits,
-            activeThumbColor: AppTheme.accentColor(context),
             contentPadding: EdgeInsets.zero,
-            dense: true,
+          ),
+          AppSwitchTile(
+            title: 'Frequent habits',
+            value: settings.calendarWidgetShowHabits,
             onChanged: (val) {
               ref
                   .read(settingsProvider.notifier)
                   .updateWidgetCalendarSettings(showHabits: val);
             },
-          ),
-          SwitchListTile.adaptive(
-            title: const Text(
-              'Foco do Dia e Pomodoros',
-              style: TextStyle(fontSize: 13),
-            ),
-            value: settings.calendarWidgetShowSessions,
-            activeThumbColor: AppTheme.accentColor(context),
             contentPadding: EdgeInsets.zero,
-            dense: true,
+          ),
+          AppSwitchTile(
+            title: 'Foco do Dia e Pomodoros',
+            value: settings.calendarWidgetShowSessions,
             onChanged: (val) {
               ref
                   .read(settingsProvider.notifier)
                   .updateWidgetCalendarSettings(showSessions: val);
             },
+            contentPadding: EdgeInsets.zero,
           ),
         ],
       ),
@@ -526,17 +512,17 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
     List<OrganizerReference> organizers,
   ) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: AppTheme.surfaceVariantColor(context).withValues(alpha: 0.5),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(AppBorderRadius.xl)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Filtrar Hábitos',
+            'Filter Habits',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
           const SizedBox(height: 8),
@@ -549,11 +535,11 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
             items: const [
               DropdownMenuItem(
                 value: 'all',
-                child: Text('Todos os hábitos ativos'),
+                child: Text('All active habits'),
               ),
               DropdownMenuItem(
                 value: 'organizer',
-                child: Text('Por Organizador (Área/Projeto)'),
+                child: Text('By Organizer (Area/Project)'),
               ),
             ],
             onChanged: (val) {
@@ -567,7 +553,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
           if (settings.habitWidgetFilterType == 'organizer') ...[
             const SizedBox(height: 16),
             const Text(
-              'Selecionar Organizador',
+              'Select Organizer',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
             ),
             const SizedBox(height: 8),
@@ -579,7 +565,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
               initialValue: settings.habitWidgetOrganizer.isEmpty
                   ? null
                   : settings.habitWidgetOrganizer,
-              hint: const Text('Selecione uma área/projeto'),
+              hint: const Text('Select an area/project'),
               items: organizers.map((o) {
                 return DropdownMenuItem(
                   value: o.slug,
@@ -602,17 +588,17 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
 
   Widget _buildNoteConfig(AppSettings settings) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: AppTheme.surfaceVariantColor(context).withValues(alpha: 0.5),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(AppBorderRadius.xl)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Modo de Exibição de Nota',
+            'Note Display Mode',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
           const SizedBox(height: 8),
@@ -627,11 +613,11 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
             items: const [
               DropdownMenuItem(
                 value: 'latest',
-                child: Text('Última nota modificada'),
+                child: Text('Last modified note'),
               ),
               DropdownMenuItem(
                 value: 'fixed',
-                child: Text('Nota fixada específica'),
+                child: Text('Specific pinned note'),
               ),
             ],
             onChanged: (val) {
@@ -692,17 +678,17 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
     };
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: AppTheme.surfaceVariantColor(context).withValues(alpha: 0.5),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(AppBorderRadius.xl)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Selecionar Organizador',
+            'Select Organizer',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
           const SizedBox(height: 8),
@@ -714,12 +700,12 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
             initialValue: organizers.any((o) => o.slug == organizerSlug)
                 ? organizerSlug
                 : null,
-            hint: const Text('Selecione uma área/projeto/goal'),
+            hint: const Text('Select an area/project/goal'),
             items: organizers.map((o) {
               return DropdownMenuItem(
                 value: o.slug,
                 child: Text(
-                  o is Goal ? 'Objetivo · ${o.title}' : o.title,
+                  o is Goal ? 'Goal · ${o.title}' : o.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -756,12 +742,13 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
             runSpacing: 8,
             children: filterObjectTypes.entries.map((entry) {
               final selected = selectedObjectTypes.contains(entry.key);
-              return FilterChip(
-                label: Text(entry.value),
+              return AppChip(
+                label: entry.value,
                 selected: selected,
-                onSelected: (value) {
+                onTap: () {
                   final next = Set<String>.from(selectedObjectTypes);
-                  value ? next.add(entry.key) : next.remove(entry.key);
+                  final isSelected = !selected;
+                  isSelected ? next.add(entry.key) : next.remove(entry.key);
                   final updatedMetadata = Map<String, dynamic>.from(
                     block?.metadata ?? const <String, dynamic>{},
                   );
@@ -779,8 +766,6 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                         .updateBlock(block.copyWith(metadata: updatedMetadata));
                   }
                 },
-                selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.16),
-                checkmarkColor: AppTheme.accentColor(context),
               );
             }).toList(),
           ),

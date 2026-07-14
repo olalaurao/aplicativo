@@ -16,9 +16,10 @@ class SchedulerManagementScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tasks = ref.watch(tasksProvider);
-    final habits = ref.watch(habitsProvider);
-    final goals = ref.watch(goalsProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final tasks = allObjects.whereType<Task>().toList();
+    final habits = allObjects.whereType<Habit>().toList();
+    final goals = allObjects.whereType<Goal>().toList();
     // final reminders = ref.watch(remindersProvider); // If exists
 
     final scheduledObjects = [
@@ -209,7 +210,7 @@ class SchedulerManagementScreen extends ConsumerWidget {
   ) async {
     if (obj is Task) {
       obj.scheduler = scheduler;
-      await ref.read(tasksProvider.notifier).updateTask(obj);
+      await ref.read(vaultProvider.notifier).updateObject(obj);
     } else if (obj is Habit) {
       obj.scheduler = scheduler;
       await ref.read(habitsProvider.notifier).updateHabit(obj);

@@ -435,4 +435,57 @@ class _WeekTimelineScreenState extends ConsumerState<WeekTimelineScreen> {
       MaterialPageRoute(builder: (_) => const PomodoroScreen()),
     );
   }
+
+  void _jumpToDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    
+    if (picked != null) {
+      final targetDate = DateTime(picked.year, picked.month, picked.day);
+      
+      // Check if the date is already in loaded dates
+      final existingIndex = _loadedDates.indexWhere((date) =>
+          date.year == targetDate.year && 
+          date.month == targetDate.month && 
+          date.day == targetDate.day);
+      
+      if (existingIndex != -1) {
+        // Date is already loaded, scroll to it
+        _scrollToDateIndex(existingIndex);
+      } else {
+        // Date is not loaded, add it to the list and scroll to it
+        setState(() {
+          _loadedDates.add(targetDate);
+          _loadedDates.sort();
+        });
+        
+        final newIndex = _loadedDates.indexWhere((date) =>
+            date.year == targetDate.year && 
+            date.month == targetDate.month && 
+            date.day == targetDate.day);
+        
+        if (newIndex != -1) {
+          _scrollToDateIndex(newIndex);
+        }
+      }
+    }
+  }
+
+  void _scrollToDateIndex(int index) {
+    double targetOffset = 0;
+    for (int i = 0; i < index; i++) {
+      final date = _loadedDates[i];
+      targetOffset += _daySectionHeights[date] ?? 200.0;
+    }
+
+    _scrollController.animateTo(
+      targetOffset,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
 }

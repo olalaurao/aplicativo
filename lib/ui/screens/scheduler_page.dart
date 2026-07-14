@@ -36,10 +36,11 @@ class _SchedulerPageState extends ConsumerState<SchedulerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final tasks = ref.watch(tasksProvider);
-    final habits = ref.watch(habitsProvider);
-    final dayThemes = ref.watch(dayThemesProvider);
-    final timeBlocks = ref.watch(timeBlocksProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final tasks = allObjects.whereType<Task>().toList();
+    final habits = allObjects.whereType<Habit>().toList();
+    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final timeBlocks = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.timeBlock).toList();
 
     final scheduledTasks = tasks.where((t) => t.scheduler != null).toList();
     final scheduledHabits = habits

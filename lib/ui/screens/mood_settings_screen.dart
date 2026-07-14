@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/mood_model.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
+import '../widgets/app_switch_tile.dart';
 import '../widgets/app_color_picker.dart';
 
 class MoodSettingsScreen extends ConsumerWidget {
@@ -464,13 +465,12 @@ class _MoodDetailSheetState extends State<_MoodDetailSheet> {
               ],
             ),
             const SizedBox(height: 16),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
+            AppSwitchTile(
+              title: 'Show in picker',
+              subtitle: 'Hiding preserves all historical records.',
               value: !_mood.hidden,
-              activeThumbColor: color,
-              title: const Text('Show in picker'),
-              subtitle: const Text('Hiding preserves all historical records.'),
               onChanged: (_) => _update(_mood.copyWith(hidden: !_mood.hidden)),
+              contentPadding: EdgeInsets.zero,
             ),
             if (widget.onEdit != null) ...[
               const SizedBox(height: 8),
@@ -629,7 +629,7 @@ class _MoodFormScreenState extends ConsumerState<_MoodFormScreen> {
       _color = mood.color;
       _aliases.addAll(mood.aliases);
     }
-    _nameController.addListener(() => setState(() {}));
+    _nameController.addListener(() { if (mounted) setState(() {}); });
   }
 
   @override

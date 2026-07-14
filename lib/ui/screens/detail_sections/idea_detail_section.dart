@@ -12,33 +12,33 @@ List<PropertyCard> buildIdeaPropertyCards(IdeaDefinition idea) {
   
   cards.add(PropertyCard(
     icon: Icons.visibility,
-    label: 'Horizonte',
+    label: 'Horizon',
     value: '',
     customChild: _buildHorizonBadge(idea),
   ));
   cards.add(PropertyCard(
     icon: Icons.priority_high,
-    label: 'Prioridade',
+    label: 'Priority',
     value: '',
     customChild: idea.priority != null && idea.priority != TaskPriority.none
         ? _buildPriorityBadge(idea)
-        : Text('Não definida', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, fontStyle: FontStyle.italic, color: Colors.grey.withValues(alpha: 0.4))),
+        : Text('Not set', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, fontStyle: FontStyle.italic, color: AppColors.textMuted.withValues(alpha: 0.4))),
   ));
   cards.add(PropertyCard(
     icon: Icons.transform,
-    label: 'Convertida em',
-    value: idea.convertedToType ?? 'Não convertida',
+    label: 'Converted to',
+    value: idea.convertedToType ?? 'Not converted',
     state: idea.convertedToType == null ? PropertyCardState.empty : PropertyCardState.normal,
   ));
   cards.add(PropertyCard(
     icon: Icons.event,
-    label: 'Data alvo',
-    value: idea.targetDate != null ? DateFormat('d MMM yyyy').format(idea.targetDate!) : 'Não definida',
+    label: 'Target date',
+    value: idea.targetDate != null ? DateFormat('d MMM yyyy').format(idea.targetDate!) : 'Not set',
     state: idea.targetDate == null ? PropertyCardState.empty : (_isOverdue(idea) ? PropertyCardState.overdue : PropertyCardState.normal),
   ));
   cards.add(PropertyCard(
     icon: Icons.calendar_today,
-    label: 'Criado',
+    label: 'Created',
     value: DateFormat('d MMM yyyy').format(idea.createdAt),
   ));
   
@@ -56,28 +56,31 @@ Widget _buildHorizonBadge(IdeaDefinition idea) {
   
   switch (idea.horizon) {
     case IdeaHorizon.now:
-      color = Colors.red;
-      label = 'AGORA';
+      color = AppColors.priorityHigh;
+      label = 'NOW';
       break;
     case IdeaHorizon.soon:
-      color = Colors.orange;
-      label = 'EM BREVE';
+      color = AppColors.priorityMedium;
+      label = 'SOON';
       break;
     case IdeaHorizon.someday:
-      color = Colors.grey;
-      label = 'ALGUM DIA';
+      color = AppColors.textMuted;
+      label = 'SOMEDAY';
       break;
     case IdeaHorizon.noDeadline:
-      color = Colors.blue;
-      label = 'SEM PRAZO';
+      color = AppColors.info;
+      label = 'NO DEADLINE';
       break;
+    default:
+      color = AppColors.textMuted;
+      label = 'UNKNOWN';
   }
   
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
     decoration: BoxDecoration(
       color: color.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(AppBorderRadius.sm),
       border: Border.all(color: color.withValues(alpha: 0.3)),
     ),
     child: Text(
@@ -99,28 +102,31 @@ Widget _buildPriorityBadge(IdeaDefinition idea) {
   
   switch (idea.priority!) {
     case TaskPriority.high:
-      color = Colors.red;
-      label = 'ALTA';
+      color = AppColors.priorityHigh;
+      label = 'HIGH';
       break;
     case TaskPriority.medium:
-      color = Colors.orange;
-      label = 'MÉDIA';
+      color = AppColors.priorityMedium;
+      label = 'MEDIUM';
       break;
     case TaskPriority.low:
-      color = Colors.green;
-      label = 'BAIXA';
+      color = AppColors.priorityLow;
+      label = 'LOW';
       break;
     case TaskPriority.none:
-      color = Colors.grey;
-      label = 'NENHUMA';
+      color = AppColors.textMuted;
+      label = 'NONE';
       break;
+    default:
+      color = AppColors.textMuted;
+      label = 'UNKNOWN';
   }
   
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
     decoration: BoxDecoration(
       color: color.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(AppBorderRadius.sm),
       border: Border.all(color: color.withValues(alpha: 0.3)),
     ),
     child: Text(

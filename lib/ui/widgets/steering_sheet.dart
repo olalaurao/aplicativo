@@ -1,6 +1,7 @@
 // lib/ui/widgets/steering_sheet.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/habit_model.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
@@ -71,7 +72,7 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
 
   void _nextStep() {
     if (_currentStep < 3) {
-      setState(() {
+      if (mounted) setState(() {
         _currentStep++;
       });
     }
@@ -79,7 +80,7 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
 
   void _previousStep() {
     if (_currentStep > 1) {
-      setState(() {
+      if (mounted) setState(() {
         _currentStep--;
       });
     }
@@ -168,7 +169,7 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
     try {
       await ref.read(vaultProvider.notifier).updateObject(updatedHabit);
     } catch (e) {
-      debugPrint('Failed to save Steering Sheet outcome: $e');
+      // Error saving steering sheet outcome
     }
 
     if (mounted) {
@@ -176,12 +177,7 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
       Navigator.pop(context);
 
       if (outcome == PactOutcome.pivot) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => CreateHabitForm(existingHabit: updatedHabit),
-          ),
-        );
+        context.push('/create-habit', extra: {'existingHabit': updatedHabit});
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -307,7 +303,7 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
                         TextButton.icon(
                           onPressed: _previousStep,
                           icon: const Icon(Icons.arrow_back_rounded),
-                          label: const Text('Voltar'),
+                          label: const Text('Back'),
                           style: TextButton.styleFrom(foregroundColor: color),
                         )
                       else
@@ -317,7 +313,7 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
                         FilledButton.icon(
                           onPressed: _canAdvance ? _nextStep : null,
                           icon: const Icon(Icons.arrow_forward_rounded),
-                          label: const Text('Avançar'),
+                          label: const Text('Next'),
                           style: FilledButton.styleFrom(
                             backgroundColor: color,
                             disabledBackgroundColor: AppColors.textMuted
@@ -325,7 +321,7 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
                             disabledForegroundColor: AppColors.textMuted,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(AppBorderRadius.md),
                             ),
                           ),
                         )
@@ -381,24 +377,24 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Etapa 1 — Revisão',
+          'Step 1 — Review',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
         if (widget.habit.hypothesis?.isNotEmpty == true) ...[
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppSpacing.sm),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppBorderRadius.md),
               border: Border.all(color: color.withValues(alpha: 0.15)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Sua hipótese era:',
+                  'Your hypothesis was:',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -426,13 +422,13 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
         const SizedBox(height: 8),
         TextField(
           controller: _reflectionController,
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) { if (mounted) setState(() {}); },
           maxLines: 4,
           decoration: InputDecoration(
             hintText: 'Escreva livremente sobre como foi esse ciclo...',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppBorderRadius.md)),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppBorderRadius.md),
               borderSide: BorderSide(color: color, width: 2),
             ),
           ),
@@ -447,34 +443,34 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Etapa 2 — Reflexão',
+          'Step 2 — Reflection',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 14),
         const Text(
-          'O que você aprendeu com a hipótese?',
+          'What did you learn from the hypothesis?',
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         _buildSelectOption(
-          label: 'Minha hipótese estava correta',
+          label: 'My hypothesis was correct',
           value: 'correct',
           groupValue: _hypothesisEvaluation,
-          onChanged: (val) => setState(() => _hypothesisEvaluation = val),
+          onChanged: (val) { if (mounted) setState(() => _hypothesisEvaluation = val); },
           activeColor: color,
         ),
         _buildSelectOption(
-          label: 'Minha hipótese estava incorreta',
+          label: 'My hypothesis was incorrect',
           value: 'incorrect',
           groupValue: _hypothesisEvaluation,
-          onChanged: (val) => setState(() => _hypothesisEvaluation = val),
+          onChanged: (val) { if (mounted) setState(() => _hypothesisEvaluation = val); },
           activeColor: color,
         ),
         _buildSelectOption(
-          label: 'Não tenho certeza',
+          label: 'Not sure',
           value: 'not_sure',
           groupValue: _hypothesisEvaluation,
-          onChanged: (val) => setState(() => _hypothesisEvaluation = val),
+          onChanged: (val) { if (mounted) setState(() => _hypothesisEvaluation = val); },
           activeColor: color,
         ),
         const SizedBox(height: 20),
@@ -484,24 +480,24 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
         ),
         const SizedBox(height: 8),
         _buildSelectOption(
-          label: 'Concluí o objetivo',
+          label: 'Achieved the goal',
           value: 'goal_achieved',
           groupValue: _endedReason,
-          onChanged: (val) => setState(() => _endedReason = val),
+          onChanged: (val) { if (mounted) setState(() => _endedReason = val); },
           activeColor: color,
         ),
         _buildSelectOption(
-          label: 'Virou obrigação / peso',
+          label: 'Became a burden / weight',
           value: 'obligation',
           groupValue: _endedReason,
-          onChanged: (val) => setState(() => _endedReason = val),
+          onChanged: (val) { if (mounted) setState(() => _endedReason = val); },
           activeColor: color,
         ),
         _buildSelectOption(
           label: 'Quero ajustar o escopo',
           value: 'adjust_scope',
           groupValue: _endedReason,
-          onChanged: (val) => setState(() => _endedReason = val),
+          onChanged: (val) { if (mounted) setState(() => _endedReason = val); },
           activeColor: color,
         ),
       ],
@@ -514,12 +510,12 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Etapa 3 — Decisão',
+          'Step 3 — Decision',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
         const Text(
-          'O que você aprendeu com esse pacto?',
+          'What did you learn from this pact?',
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 6),
@@ -528,7 +524,7 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
           maxLines: 2,
           decoration: InputDecoration(
             hintText: 'Inscreva o aprendizado chave (opcional)...',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppBorderRadius.md)),
           ),
         ),
         const SizedBox(height: 16),

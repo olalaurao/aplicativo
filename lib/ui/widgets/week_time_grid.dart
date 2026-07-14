@@ -29,13 +29,13 @@ class WeekTimeGrid extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surfaceVariantColor(context),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppBorderRadius.xl),
       ),
       child: Column(
         children: [
           // Header row with day names
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
             child: Row(
               children: [
                 const SizedBox(width: 40), // Time column
@@ -49,7 +49,7 @@ class WeekTimeGrid extends ConsumerWidget {
                           Text(
                             dayNames[index],
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: AppTextSize.xs,
                               fontWeight: FontWeight.w700,
                               color: isToday 
                                   ? AppTheme.accentColor(context) 
@@ -59,7 +59,7 @@ class WeekTimeGrid extends ConsumerWidget {
                           Text(
                             '${date.day}',
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: AppTextSize.lg,
                               fontWeight: FontWeight.w800,
                               color: isToday 
                                   ? AppTheme.accentColor(context) 
@@ -91,7 +91,7 @@ class WeekTimeGrid extends ConsumerWidget {
                             '${hour.toString().padLeft(2, '0')}:00',
                             textAlign: TextAlign.right,
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: AppTextSize.xs,
                               fontWeight: FontWeight.w600,
                               color: AppTheme.textMutedColor(context),
                             ),
@@ -169,10 +169,10 @@ class WeekTimeGrid extends ConsumerWidget {
     }
 
     return Container(
-      margin: const EdgeInsets.all(1),
+      margin: const EdgeInsets.all(AppSpacing.xs),
       decoration: BoxDecoration(
         color: AppTheme.accentColor(context).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(AppBorderRadius.sm),
       ),
       child: Stack(
         children: [
@@ -189,16 +189,16 @@ class WeekTimeGrid extends ConsumerWidget {
     return GestureDetector(
       onTap: () => onTaskTap?.call(task, task.startDate ?? DateTime.now()),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xs),
         decoration: BoxDecoration(
           color: AppTheme.accentColor(context),
-          borderRadius: BorderRadius.circular(3),
+          borderRadius: BorderRadius.circular(AppBorderRadius.xs),
         ),
         child: Text(
           task.title,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 8,
+            fontSize: AppTextSize.xs,
             fontWeight: FontWeight.bold,
           ),
           maxLines: 1,
@@ -212,16 +212,16 @@ class WeekTimeGrid extends ConsumerWidget {
     return GestureDetector(
       onTap: () => onHabitTap?.call(habit),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xs),
         decoration: BoxDecoration(
           color: AppColors.habitGreen,
-          borderRadius: BorderRadius.circular(3),
+          borderRadius: BorderRadius.circular(AppBorderRadius.xs),
         ),
         child: Text(
           habit.displayTitle,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 8,
+            fontSize: AppTextSize.xs,
             fontWeight: FontWeight.bold,
           ),
           maxLines: 1,

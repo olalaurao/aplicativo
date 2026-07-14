@@ -55,8 +55,9 @@ final wellbeingSignalStatusesProvider = Provider<List<WellbeingSignalStatus>>((r
   final indicators = ref.watch(wellbeingIndicatorsProvider);
   // Use select to only rebuild when specific data changes, not on every vault update
   final trackers = ref.watch(trackersProvider);
-  final habits = ref.watch(habitsProvider);
-  final tasks = ref.watch(tasksProvider);
+  final allObjects = ref.watch(allObjectsProvider).value ?? [];
+  final habits = allObjects.whereType<Habit>().toList();
+  final tasks = allObjects.whereType<Task>().toList();
   final journalEntries = ref.watch(allEntriesProvider);
   final trackingRecords = ref.watch(trackingRecordsProvider);
   final now = DateTime.now();

@@ -10,10 +10,10 @@ List<PropertyCard> buildHabitPropertyCards(Habit habit) {
   if (!habit.isChecklistHabit) {
     cards.add(PropertyCard(
       icon: Icons.repeat,
-      label: 'Frequência',
+      label: 'Frequency',
       value: habit.scheduler?.rules.isNotEmpty == true 
           ? habit.scheduler!.rules.first.repeatType.name 
-          : 'Não definida',
+          : 'Not set',
       state: habit.scheduler == null || habit.scheduler!.rules.isEmpty 
           ? PropertyCardState.empty 
           : PropertyCardState.normal,
@@ -26,16 +26,16 @@ List<PropertyCard> buildHabitPropertyCards(Habit habit) {
     ));
     cards.add(PropertyCard(
       icon: Icons.history,
-      label: 'Último registro',
+      label: 'Last record',
       value: habit.daysSinceLastCompletion == 0 
-          ? 'Hoje' 
-          : '${habit.daysSinceLastCompletion} dias atrás',
+          ? 'Today' 
+          : '${habit.daysSinceLastCompletion} days ago',
       state: habit.completionHistory.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
     ));
     cards.add(PropertyCard(
       icon: Icons.category,
-      label: 'Categoria',
-      value: habit.categories.isNotEmpty ? habit.categories.first : 'Não definida',
+      label: 'Category',
+      value: habit.categories.isNotEmpty ? habit.categories.first : 'Not set',
       state: habit.categories.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
     ));
   }

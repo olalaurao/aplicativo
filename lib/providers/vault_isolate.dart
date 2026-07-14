@@ -81,34 +81,11 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
     final needsRewritePaths = <String>[];
     final yamlErrors = <Map<String, String>>[];
 
-    // 1. Fetch markdown files, prioritizing user-configured object folders - parallel folder scanning
-    final scannedPaths = <String>{};
-    final mdFiles = <File>[];
-    
-    // Scan all folders in parallel for faster I/O
-    final folderScanTasks = [
-      // Scan configured folders
-      ...params.folderPaths.values.map((folder) => 
-        service.getFilesInFolder(folder).then((files) => (folder, files))
-      ),
-      // Scan root folder
-      service.getFilesInFolder('').then((files) => ('', files)),
-    ];
-    
-    final folderResults = await Future.wait(folderScanTasks);
-    
-    for (final (folder, files) in folderResults) {
-      for (final file in files) {
-        final normalized = file.path.replaceAll('\\', '/');
-        // Only add .md files from root folder, but all files from configured folders
-        if (scannedPaths.add(normalized) && (folder.isNotEmpty || file.path.endsWith('.md'))) {
-          mdFiles.add(file);
-        }
-      }
-    }
+    // 1. Fetch markdown files using cached getAllMarkdownFiles for better performance
+    final mdFiles = await service.getAllMarkdownFiles();
 
-    // 2. Read and parse files in parallel batches (max 100 concurrent I/O ops for better throughput)
-    const batchSize = 100;
+    // 2. Read and parse files in parallel batches (max 250 concurrent I/O ops for better throughput)
+    const batchSize = 250;
     final Map<String, Map<String, dynamic>> dailyMap = {};
 
     for (int i = 0; i < mdFiles.length; i += batchSize) {

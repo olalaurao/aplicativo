@@ -113,12 +113,12 @@ class _PropertyCardWidget extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppBorderRadius.md),
         onTap: card.onTap,
         child: Ink(
           decoration: BoxDecoration(
             color: _backgroundColor(cs, isDark),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppBorderRadius.md),
             border: card.leftBorderColor == null
                 ? null
                 : Border(
@@ -128,7 +128,7 @@ class _PropertyCardWidget extends StatelessWidget {
                     ),
                   ),
           ),
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.sm, AppSpacing.sm, AppSpacing.sm),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

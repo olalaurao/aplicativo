@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import '../screens/universal_detail_view.dart';
@@ -67,12 +68,7 @@ class WikiTextView extends ConsumerWidget {
             baseline: TextBaseline.alphabetic,
             child: GestureDetector(
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => UniversalDetailView(object: matchingObject),
-                  ),
-                );
+                context.push('/detail/${matchingObject.id}', extra: matchingObject);
               },
               onLongPress: () =>
                   showObjectActionSheet(context, ref, matchingObject),

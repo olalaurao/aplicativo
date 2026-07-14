@@ -10,6 +10,7 @@ import '../../models/kpi_model.dart';
 import '../../models/mood_model.dart';
 import '../../models/note_model.dart';
 import '../../models/organizer_model.dart';
+import '../../models/shared_types.dart';
 import '../theme.dart';
 import '../../models/journal_entry.dart';
 import '../../models/tracker_model.dart';
@@ -22,6 +23,7 @@ import '../../models/event_model.dart';
 import '../widgets/timeline_day_view.dart';
 import '../widgets/week_time_grid.dart';
 import '../widgets/day_dial_widget.dart';
+import '../utils/object_icons.dart';
 
 import '../../services/day_dial_aggregator.dart';
 import '../../services/scheduler_service.dart';
@@ -123,7 +125,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     if (widget.showPopup) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        final tasks = ref.read(tasksProvider);
+        final allObjects = ref.read(allObjectsProvider).value ?? [];
+        final tasks = allObjects.whereType<Task>().toList();
         final habits = ref.read(habitsProvider);
         _showDayDetailsSheet(_selectedDate, tasks, habits);
       });
@@ -169,12 +172,13 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tasks = ref.watch(tasksProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final tasks = allObjects.whereType<Task>().toList();
     final projects = ref.watch(projectsProvider);
     final habits = ref.watch(habitsProvider.select((habits) => habits.where((h) => !h.isQuitting && !h.isNegative).toList()));
     final people = ref.watch(peopleProvider);
-    final dayThemes = ref.watch(dayThemesProvider);
-    final timeBlocks = ref.watch(timeBlocksProvider);
+    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final timeBlocks = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.timeBlock).toList();
     final googleEvents = ref.watch(googleCalendarEventsProvider(_selectedDate));
 
     final dayName = const [
@@ -468,21 +472,18 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                               ? task.estimatedMinutes!
                               : task.duration;
 
-                          ref
-                              .read(tasksProvider.notifier)
-                              .updateTask(
-                                task.copyWith(
-                                  scheduledTime: timeStr,
-                                  endDate: isBacklog
-                                      ? _selectedDate
-                                      : task.endDate,
-                                  startDate: isBacklog
-                                      ? _selectedDate
-                                      : task.startDate,
-                                  stage: TaskStage.todo,
-                                  duration: targetDuration,
-                                ),
-                              );
+                          final updated = task.copyWith(
+                            scheduledTime: timeStr,
+                            endDate: isBacklog
+                                ? _selectedDate
+                                : task.endDate,
+                            startDate: isBacklog
+                                ? _selectedDate
+                                : task.startDate,
+                            stage: TaskStage.todo,
+                            duration: targetDuration,
+                          );
+                          ref.read(vaultProvider.notifier).updateObject(updated);
                         },
                         onHabitDrop: (habit, time) async {
                           final updatedSlots = List<HabitSlot>.from(
@@ -545,11 +546,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                         },
                         onDurationChange: (item, newDuration) {
                           if (item is Task) {
-                            ref
-                                .read(tasksProvider.notifier)
-                                .updateTask(
-                                  item.copyWith(duration: newDuration),
-                                );
+                            final updated = item.copyWith(duration: newDuration);
+                            ref.read(vaultProvider.notifier).updateObject(updated);
                           }
                         },
                         onToggleComplete: _toggleTaskCompletion,
@@ -597,9 +595,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   Widget _buildBacklogPanel() {
-    final tasks = ref.read(tasksProvider);
-    final routines = ref
-        .read(notesProvider)
+    final allObjects = ref.read(allObjectsProvider).value ?? [];
+    final tasks = allObjects.whereType<Task>().toList();
+    final routines = allObjects
+        .whereType<Note>()
         .where(
           (note) => note.subtype == NoteSubtype.text && note.showInPlanner,
         )
@@ -921,8 +920,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     List<TrackingRecord> records,
     AsyncValue<List<google_calendar.Event>> googleEvents,
   ) {
-    final dayThemes = ref.watch(dayThemesProvider);
-    final timeBlocks = ref.watch(timeBlocksProvider.select((blocks) => blocks.where((b) => b.organizerType == OrganizerType.timeBlock).toList()));
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final timeBlocks = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.timeBlock).toList();
     const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final selectedDayName = weekDayNames[_selectedDate.weekday - 1];
     final activeThemeBlockIds = dayThemes
@@ -1349,9 +1349,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                       if (obj.order != i) {
                         if (obj is Task) {
                           final updated = obj.copyWith(order: i);
-                          await ref
-                              .read(tasksProvider.notifier)
-                              .updateTask(updated);
+                          await ref.read(vaultProvider.notifier).updateObject(updated);
                         } else if (obj is Habit) {
                           final updated = obj.copyWith(order: i);
                           await ref
@@ -1494,9 +1492,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                       if (obj.order != i) {
                         if (obj is Task) {
                           final updated = obj.copyWith(order: i);
-                          await ref
-                              .read(tasksProvider.notifier)
-                              .updateTask(updated);
+                          await ref.read(vaultProvider.notifier).updateObject(updated);
                         } else if (obj is Habit) {
                           final updated = obj.copyWith(order: i);
                           await ref
@@ -1681,15 +1677,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                         }
                       : () {
                           HapticFeedback.mediumImpact();
-                          ref
-                              .read(tasksProvider.notifier)
-                              .updateTask(
-                                task.copyWith(
-                                  stage: task.stage == TaskStage.finalized
-                                      ? TaskStage.todo
-                                      : TaskStage.finalized,
-                                ),
-                              );
+                          final updated = task.copyWith(
+                            stage: task.stage == TaskStage.finalized
+                                ? TaskStage.todo
+                                : TaskStage.finalized,
+                          );
+                          ref.read(vaultProvider.notifier).updateObject(updated);
                         },
                   child: Padding(
                     padding: const EdgeInsets.all(4.0),
@@ -2028,9 +2021,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   void _showBacklogSheet() {
-    final tasks = ref.read(tasksProvider);
-    final routines = ref
-        .read(notesProvider)
+    final allObjects = ref.read(allObjectsProvider).value ?? [];
+    final tasks = allObjects.whereType<Task>().toList();
+    final routines = allObjects
+        .whereType<Note>()
         .where(
           // TODO: NoteSubtype.routine was removed per spec. We now check note.showInPlanner for notes of type text.
           (note) => note.subtype == NoteSubtype.text && note.showInPlanner,
@@ -2882,7 +2876,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   void _toggleTaskCompletion(Task task) {
     final wasFinalized = task.stage == TaskStage.finalized;
     final newStage = wasFinalized ? TaskStage.todo : TaskStage.finalized;
-    ref.read(tasksProvider.notifier).updateTask(task.copyWith(stage: newStage));
+    final updated = task.copyWith(stage: newStage);
+    ref.read(vaultProvider.notifier).updateObject(updated);
 
     if (newStage == TaskStage.finalized) {
       HapticFeedback.heavyImpact();
@@ -2891,9 +2886,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         context: context,
         message: '"${task.title}" completed!',
         onUndo: () {
-          ref
-              .read(tasksProvider.notifier)
-              .updateTask(task.copyWith(stage: TaskStage.todo));
+          final updated = task.copyWith(stage: TaskStage.todo);
+          ref.read(vaultProvider.notifier).updateObject(updated);
         },
       );
       // Offer reflection prompt after a short delay
@@ -2926,7 +2920,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
           children: [
             Row(
               children: [
-                const Text('✅', style: TextStyle(fontSize: 24)),
+                Text(ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.task, ref.read(settingsProvider).typeSignatures), style: const TextStyle(fontSize: 24)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -2970,14 +2964,11 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                     // Persist reflection in task notes
                     final updatedNotes = List<String>.from(task.notes);
                     updatedNotes.add('Reflection: $reflection');
-                    ref
-                        .read(tasksProvider.notifier)
-                        .updateTask(
-                          task.copyWith(
-                            stage: TaskStage.finalized,
-                            notes: updatedNotes,
-                          ),
-                        );
+                    final updated = task.copyWith(
+                      stage: TaskStage.finalized,
+                      notes: updatedNotes,
+                    );
+                    ref.read(vaultProvider.notifier).updateObject(updated);
                   }
                   Navigator.pop(ctx);
                 },

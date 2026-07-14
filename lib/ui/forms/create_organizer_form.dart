@@ -113,7 +113,7 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
                 children: [
                   TextField(
                     controller: _titleController,
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) { if (mounted) setState(() {}); },
                     style: const TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w700,

@@ -8,6 +8,7 @@ import '../../models/template_model.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/collection_row_service.dart';
 import '../theme.dart';
+import '../widgets/app_switch_tile.dart';
 import '../../models/shared_types.dart';
 import '../../models/reminder_config.dart';
 import 'scheduler_picker.dart';
@@ -258,7 +259,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                   // ─── Title ───
                   TextField(
                     controller: _titleController,
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) { if (mounted) setState(() {}); },
                     style: const TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w700,
@@ -552,21 +553,12 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text(
-                            'Usar checklist por etapas',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          subtitle: const Text(
-                            'Rotina multi-etapa com seções que resetam todo dia',
-                            style: TextStyle(fontSize: 12),
-                          ),
+                        AppSwitchTile(
+                          title: 'Usar checklist por etapas',
+                          subtitle: 'Rotina multi-etapa com seções que resetam todo dia',
                           value: _useChecklist,
                           onChanged: (v) => setState(() => _useChecklist = v),
+                          contentPadding: EdgeInsets.zero,
                         ),
                         if (_useChecklist) ...[
                           const SizedBox(height: 8),
@@ -1727,12 +1719,12 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                 ],
                 onChanged: (v) => setModalState(() => trigger = v ?? trigger),
               ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Permitir vincular mais de um item'),
+              AppSwitchTile(
+                title: 'Permitir vincular mais de um item',
                 value: allowMultiple,
                 onChanged: (v) =>
                     setModalState(() => allowMultiple = v ?? allowMultiple),
+                contentPadding: EdgeInsets.zero,
               ),
               TextField(
                 controller: promptController,

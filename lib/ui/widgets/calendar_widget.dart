@@ -29,8 +29,9 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final allTasks = ref.watch(tasksProvider);
-    final habits = ref.watch(habitsProvider).where((h) => !h.isQuitting).toList();
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final allTasks = allObjects.whereType<Task>().toList();
+    final habits = allObjects.whereType<Habit>().where((h) => !h.isQuitting).toList();
     final reminders = ref.watch(remindersProvider);
     final organizerObjects =
         ref
@@ -328,13 +329,12 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () {
-                ref
-                    .read(tasksProvider.notifier)
-                    .updateTask(
-                      task.copyWith(
-                        stage: task.isCompleted
-                            ? TaskStage.todo
-                            : TaskStage.finalized,
+                final updated = task.copyWith(
+                  stage: task.isCompleted
+                      ? TaskStage.todo
+                      : TaskStage.finalized,
+                );
+                ref.read(vaultProvider.notifier).updateObject(updated);
                       ),
                     );
               },

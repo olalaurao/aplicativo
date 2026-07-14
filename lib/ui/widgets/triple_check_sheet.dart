@@ -2,6 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/task_model.dart';
 import '../../providers/vault_provider.dart';
@@ -104,16 +107,16 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
     final handBlocked = _hand != TripleCheckAnswer.yes;
 
     if (!headBlocked && !heartBlocked && !handBlocked) {
-      return 'Tudo verde! O bloqueio pode ser externo. Verifique dependências e agenda.';
+      return 'All green! The blockage may be external. Check dependencies and schedule.';
     }
     if (headBlocked) {
-      return 'A tarefa pode não fazer sentido agora. Reformular ou arquivar?';
+      return 'The task may not make sense now. Reformulate or archive?';
     }
     if (heartBlocked) {
-      return 'O bloqueio é emocional. Tente parear com algo prazeroso, mudar de ambiente, ou quebrar em partes menores.';
+      return 'The blockage is emotional. Try pairing with something enjoyable, changing environment, or breaking into smaller parts.';
     }
     // handBlocked
-    return 'Falta recurso ou clareza. O que você precisa antes de começar?';
+    return 'Missing resource or clarity. What do you need before starting?';
   }
 
   IconData _diagnosisIcon() {
@@ -170,14 +173,14 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
     );
 
     final updated = widget.task.copyWith(tripleCheck: tc);
-    await ref.read(tasksProvider.notifier).updateTask(updated);
+    await ref.read(vaultProvider.notifier).updateObject(updated);
 
     if (!mounted) return;
     setState(() => _saved = true);
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Diagnóstico salvo.'),
+        content: Text('Diagnosis saved.'),
         duration: Duration(seconds: 2),
       ),
     );
@@ -196,14 +199,14 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
     if (allGood) {
       return [
         _ActionButton(
-          label: 'Ver dependências',
+          label: 'View dependencies',
           icon: Icons.link_off_rounded,
           onTap: () {
             _openViewDependencies();
           },
         ),
         _ActionButton(
-          label: 'Ver agenda',
+          label: 'View schedule',
           icon: Icons.calendar_today_rounded,
           color: AppColors.textSecondary,
           onTap: () {
@@ -216,23 +219,23 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
     if (headBlocked) {
       return [
         _ActionButton(
-          label: 'Reformular',
+          label: 'Reformulate',
           icon: Icons.edit_note_rounded,
           onTap: () {
             _openEditTask();
           },
         ),
         _ActionButton(
-          label: 'Arquivar',
+          label: 'Archive',
           icon: Icons.archive_outlined,
           color: AppColors.textSecondary,
           onTap: () async {
             Navigator.pop(context);
             final messenger = ScaffoldMessenger.of(context);
             final archived = widget.task.copyWith(archived: true);
-            await ref.read(tasksProvider.notifier).updateTask(archived);
+            await ref.read(vaultProvider.notifier).updateObject(archived);
             messenger.showSnackBar(
-              const SnackBar(content: Text('Tarefa arquivada.')),
+              const SnackBar(content: Text('Task archived.')),
             );
           },
         ),
@@ -242,14 +245,14 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
     if (heartBlocked) {
       return [
         _ActionButton(
-          label: 'Criar subtarefas',
+          label: 'Create subtasks',
           icon: Icons.account_tree_outlined,
           onTap: () {
             _openCreateSubtask();
           },
         ),
         _ActionButton(
-          label: 'Adiar',
+          label: 'Postpone',
           icon: Icons.schedule_rounded,
           color: AppColors.textSecondary,
           onTap: () async {
@@ -262,14 +265,14 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
     // handBlocked
     return [
       _ActionButton(
-        label: 'Adicionar dependência',
+        label: 'Add dependency',
         icon: Icons.link_rounded,
         onTap: () {
           _openDependencyPicker();
         },
       ),
       _ActionButton(
-        label: 'Pedir ajuda',
+        label: 'Pediajajuda',
         icon: Icons.person_add_alt_1_outlined,
         color: AppColors.textSecondary,
         onTap: () async {
@@ -296,21 +299,21 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Adiar tarefa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('Postpone Task', style: TextStyle(fontSize: AppTextSize.xl, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,
               children: [
                 _PostponeChip(
-                  label: '+1 dia',
+                  label: '+1 day',
                   onTap: () => _postponeTask(1),
                 ),
                 _PostponeChip(
-                  label: '+1 semana',
+                  label: '+1 week',
                   onTap: () => _postponeTask(7),
                 ),
                 _PostponeChip(
-                  label: '+1 mês',
+                  label: '+1 month',
                   onTap: () => _postponeTask(30),
                 ),
               ],
@@ -321,7 +324,7 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
                 Navigator.pop(context);
                 _openDatePicker();
               },
-              child: const Text('Escolher data...'),
+              child: const Text('Choose date...'),
             ),
           ],
         ),
@@ -334,9 +337,9 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
     final messenger = ScaffoldMessenger.of(context);
     final newDate = DateTime.now().add(Duration(days: days));
     final snoozed = widget.task.copyWith(startDate: newDate);
-    await ref.read(tasksProvider.notifier).updateTask(snoozed);
+    await ref.read(vaultProvider.notifier).updateObject(snoozed);
     messenger.showSnackBar(
-      SnackBar(content: Text('Tarefa adiada por $days dias.')),
+      SnackBar(content: Text('Task postponed by $days days.')),
     );
   }
 
@@ -362,7 +365,7 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (sheetContext) => UniversalSearchPickerSheet(
-          title: 'Adicionar dependência',
+          title: 'Add dependency',
           initialFilter: 'task',
           onSelected: (selectedObject) async {
             Navigator.pop(sheetContext);
@@ -373,10 +376,10 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
                 final updated = widget.task.copyWith(
                   dependsOn: [...currentDeps, selectedObject.id],
                 );
-                await ref.read(tasksProvider.notifier).updateTask(updated);
+                await ref.read(vaultProvider.notifier).updateObject(updated);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Dependência "${selectedObject.title}" adicionada.')),
+                    SnackBar(content: Text('Dependency "${selectedObject.title}" added.')),
                   );
                 }
               }
@@ -392,41 +395,75 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
     // For now, add note as placeholder
     final messenger = ScaffoldMessenger.of(context);
     final notes = [...widget.task.notes];
-    if (!notes.any((note) => note.contains('Pedir ajuda'))) {
-      notes.add('Pedir ajuda: identificar pessoa ou recurso necessário.');
+    if (!notes.any((note) => note.contains('Ask for help'))) {
+      notes.add('Ask for help: identify person or resource needed.');
     }
     final updated = widget.task.copyWith(notes: notes);
-    await ref.read(tasksProvider.notifier).updateTask(updated);
+    await ref.read(vaultProvider.notifier).updateObject(updated);
     if (!mounted) return;
     Navigator.pop(context);
     messenger.showSnackBar(
-      const SnackBar(content: Text('Tarefa marcada para pedir ajuda.')),
+      const SnackBar(content: Text('Task marked for asking help.')),
     );
   }
 
-  void _openViewDependencies() {
-    // TODO: Navigate to depends_on list on this Task
-    // For now, open edit task as placeholder
-    _openEditTask();
+  void _openViewDependencies() async {
+    // Show dependencies in a dialog
+    if (widget.task.dependsOn.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This task has no dependencies.')),
+      );
+      return;
+    }
+    
+    final allObjects = ref.read(allObjectsProvider).value ?? [];
+    final dependencies = allObjects.whereType<Task>()
+        .where((t) => widget.task.dependsOn.contains(t.id))
+        .toList();
+    
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Dependencies'),
+        content: dependencies.isEmpty
+            ? const Text('No matching tasks found.')
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: dependencies.map((dep) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text('• ${dep.title}'),
+                )).toList(),
+              ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _openCheckSchedule() {
-    // TODO: Navigate to Planner on this Task's start_date/end_date
-    // For now, open edit task as placeholder
-    _openEditTask();
+  void _openCheckSchedule() async {
+    // Navigate to planner with the task's date
+    await _autoSavePartialState();
+    Navigator.of(context).pop();
+    
+    final targetDate = widget.task.startDate ?? widget.task.endDate ?? DateTime.now();
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (!mounted) return;
+      context.push('/planner', extra: {'initialDate': targetDate});
+    });
   }
 
   void _openEditTask() async {
     // Auto-save partial state before navigation (F2.4)
     await _autoSavePartialState();
-    final navigator = Navigator.of(context);
-    navigator.pop();
+    Navigator.of(context).pop();
     Future.delayed(const Duration(milliseconds: 200), () {
-      navigator.push(
-        MaterialPageRoute(
-          builder: (_) => CreateTaskForm(existingTask: widget.task),
-        ),
-      );
+      context.push('/create-task', extra: {'existingTask': widget.task});
     });
   }
 
@@ -528,7 +565,7 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
                     // Question 1 — Head
                     _QuestionRow(
                       emoji: '🧠',
-                      question: 'A tarefa faz sentido agora?',
+                      question: 'Does the task make sense now?',
                       current: _head,
                       enabled: !widget.readOnly || _editingExistingCheck,
                       onChanged: (v) => setState(() => _head = v),
@@ -538,7 +575,7 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
                     // Question 2 — Heart
                     _QuestionRow(
                       emoji: '❤️',
-                      question: 'Você está animado com isso?',
+                      question: 'Are you excited about this?',
                       current: _heart,
                       enabled: !widget.readOnly || _editingExistingCheck,
                       onChanged: (v) => setState(() => _heart = v),
@@ -548,7 +585,7 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
                     // Question 3 — Hand
                     _QuestionRow(
                       emoji: '🖐',
-                      question: 'Você tem o que precisa para começar?',
+                      question: 'Do you have what you need to start?',
                       current: _hand,
                       enabled: !widget.readOnly || _editingExistingCheck,
                       onChanged: (v) => setState(() => _hand = v),
@@ -628,8 +665,8 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
                         ),
                         child: Text(
                           widget.readOnly && !_editingExistingCheck
-                              ? 'Diagnóstico salvo'
-                              : 'Salvar diagnóstico',
+                              ? 'Diagnosis saved'
+                              : 'Save diagnosis',
                         ),
                       ),
                     ),
@@ -651,7 +688,7 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
                             );
                           },
                           icon: const Icon(Icons.refresh_rounded),
-                          label: const Text('Re-executar diagnóstico'),
+                          label: const Text('Re-run diagnosis'),
                         ),
                       ),
                     ],
@@ -661,7 +698,7 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
                       const SizedBox(height: 12),
                       Center(
                         child: Text(
-                          'Diagnóstico anterior: ${_formatDate(widget.task.tripleCheck!.checkedAt)}',
+                          'Previous diagnosis: ${_formatDate(widget.task.tripleCheck!.checkedAt)}',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppTheme.textMutedColor(context),
@@ -683,9 +720,9 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
   String _formatDate(DateTime dt) {
     final now = DateTime.now();
     final diff = now.difference(dt).inDays;
-    if (diff == 0) return 'hoje';
-    if (diff == 1) return 'ontem';
-    return 'há $diff dias';
+    if (diff == 0) return 'today';
+    if (diff == 1) return 'yesterday';
+    return '$diff days ago';
   }
 }
 
@@ -774,7 +811,7 @@ class _QuestionRow extends StatelessWidget {
         Row(
           children: [
             _AnswerChip(
-              label: 'Sim',
+              label: 'Yes',
               value: TripleCheckAnswer.yes,
               current: current,
               activeColor: AppColors.success,
@@ -782,7 +819,7 @@ class _QuestionRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             _AnswerChip(
-              label: 'Incerto',
+              label: 'Unsure',
               value: TripleCheckAnswer.unsure,
               current: current,
               activeColor: AppColors.warning,
@@ -790,7 +827,7 @@ class _QuestionRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             _AnswerChip(
-              label: 'Não',
+              label: 'No',
               value: TripleCheckAnswer.no,
               current: current,
               activeColor: AppColors.error,

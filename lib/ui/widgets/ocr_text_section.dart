@@ -209,7 +209,7 @@ class _OcrTextSectionState extends State<OcrTextSection> {
         return Column(
           children: [
             const Text(
-              'Não foi possível ler o texto desta imagem',
+              'Could not read text from this image',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.error),
             ),

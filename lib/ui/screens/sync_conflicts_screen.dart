@@ -38,11 +38,18 @@ final persistedSyncConflictsProvider =
       return rows.map(PersistedSyncConflict.fromMap).toList();
     });
 
-class SyncConflictsScreen extends ConsumerWidget {
+class SyncConflictsScreen extends ConsumerStatefulWidget {
   const SyncConflictsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SyncConflictsScreen> createState() => _SyncConflictsScreenState();
+}
+
+class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
+  bool _isResolvingAll = false;
+
+  @override
+  Widget build(BuildContext context) {
     final conflictsAsync = ref.watch(persistedSyncConflictsProvider);
 
     return Scaffold(
@@ -82,12 +89,73 @@ class SyncConflictsScreen extends ConsumerWidget {
               );
             }
 
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: conflicts.length,
-              itemBuilder: (context, index) {
-                return _ConflictCard(conflict: conflicts[index]);
-              },
+            return Column(
+              children: [
+                if (conflicts.isNotEmpty && !_isResolvingAll)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.cardFillColor(context),
+                      border: Border(
+                        bottom: BorderSide(
+                          color: AppTheme.dividerColor(context),
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _resolveAll(context, conflicts, keepLocal: true),
+                            icon: const Icon(Icons.phone_android, size: 18),
+                            label: const Text(
+                              'Manter todos local',
+                              style: TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _resolveAll(context, conflicts, keepLocal: false),
+                            icon: const Icon(Icons.cloud, size: 18),
+                            label: const Text(
+                              'Manter todos Drive',
+                              style: TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (_isResolvingAll)
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text(
+                          'Resolvendo conflitos...',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: conflicts.length,
+                    itemBuilder: (context, index) {
+                      return _ConflictCard(conflict: conflicts[index]);
+                    },
+                  ),
+                ),
+              ],
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -106,15 +174,134 @@ class SyncConflictsScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Future<void> _resolveAll(
+    BuildContext context,
+    List<PersistedSyncConflict> conflicts, {
+    required bool keepLocal,
+  }) async {
+    setState(() {
+      _isResolvingAll = true;
+    });
+
+    final messenger = ScaffoldMessenger.of(context);
+    int resolved = 0;
+    int failed = 0;
+
+    try {
+      final obsidian = ref.read(obsidianServiceProvider);
+      final queue = ref.read(syncQueueServiceProvider);
+      final driveSync = ref.read(googleDriveSyncServiceProvider);
+      final authService = ref.read(auth.googleAuthServiceProvider);
+      final settings = ref.read(settingsProvider);
+      final backupService = ref.read(backupServiceProvider);
+
+      final client = await authService.ensureClient();
+      if (client == null) {
+        throw Exception('Google Drive não está conectado');
+      }
+
+      driveSync.init(client);
+      if (settings.driveSyncFolderId.isNotEmpty) {
+        await driveSync.useExistingVaultFolder(settings.driveSyncFolderId);
+      } else {
+        await driveSync.setupVaultFolder(settings.driveSyncFolder);
+      }
+
+      final zipFile = await backupService.createBackup();
+      if (zipFile != null) {
+        await driveSync.createBackupFromFile(zipFile);
+      }
+
+      for (final conflict in conflicts) {
+        try {
+          final sourcePath = keepLocal ? conflict.localPath : conflict.remotePath;
+          final chosenContent = await obsidian.readFile(sourcePath);
+          if (chosenContent == null) {
+            failed++;
+            debugPrint('Failed to resolve ${conflict.relativePath}: version not found');
+            continue;
+          }
+
+          await obsidian.writeFile(conflict.relativePath, chosenContent);
+          final hash = driveSync.calculateHash(chosenContent);
+          final uploaded = await driveSync.syncFile(
+            conflict.relativePath,
+            chosenContent,
+            hash,
+          );
+          if (!uploaded) {
+            failed++;
+            debugPrint('Failed to resolve ${conflict.relativePath}: upload failed');
+            continue;
+          }
+
+          await queue.upsertFileSyncState(
+            relativePath: conflict.relativePath,
+            localHash: hash,
+            remoteHash: hash,
+            baseHash: hash,
+          );
+          await queue.removeConflict(conflict.relativePath);
+
+          ref
+              .read(syncConflictsProvider.notifier)
+              .removeConflict(conflict.relativePath);
+          resolved++;
+        } catch (e) {
+          failed++;
+          debugPrint('Failed to resolve ${conflict.relativePath}: $e');
+        }
+      }
+
+      ref.invalidate(persistedSyncConflictsProvider);
+      ref.invalidate(allObjectsProvider);
+
+      final remaining = await queue.getConflicts();
+      ref
+          .read(syncStatusProvider.notifier)
+          .setStatus(
+            remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
+          );
+
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            keepLocal
+                ? 'Resolvidos: $resolved, Falharam: $failed (versão local)'
+                : 'Resolvidos: $resolved, Falharam: $failed (versão Drive)',
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Failed to resolve all conflicts: $e');
+      messenger.showSnackBar(
+        SnackBar(content: Text('Erro ao resolver conflitos: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResolvingAll = false;
+        });
+      }
+    }
+  }
 }
 
-class _ConflictCard extends ConsumerWidget {
+class _ConflictCard extends ConsumerStatefulWidget {
   final PersistedSyncConflict conflict;
 
   const _ConflictCard({required this.conflict});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ConflictCard> createState() => _ConflictCardState();
+}
+
+class _ConflictCardState extends ConsumerState<_ConflictCard> {
+  bool _isResolving = false;
+
+  @override
+  Widget build(BuildContext context) {
     final obsidian = ref.watch(obsidianServiceProvider);
 
     return Container(
@@ -145,7 +332,7 @@ class _ConflictCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      conflict.relativePath,
+                      widget.conflict.relativePath,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -155,7 +342,7 @@ class _ConflictCard extends ConsumerWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _formatDate(conflict.detectedAt),
+                      _formatDate(widget.conflict.detectedAt),
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textMuted,
@@ -171,8 +358,8 @@ class _ConflictCard extends ConsumerWidget {
           const SizedBox(height: 14),
           FutureBuilder<List<String?>>(
             future: Future.wait([
-              obsidian.readFile(conflict.localPath),
-              obsidian.readFile(conflict.remotePath),
+              obsidian.readFile(widget.conflict.localPath),
+              obsidian.readFile(widget.conflict.remotePath),
             ]),
             builder: (context, snapshot) {
               final local = snapshot.data?[0] ?? '';
@@ -200,47 +387,53 @@ class _ConflictCard extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed:
-                              snapshot.connectionState == ConnectionState.done
-                              ? () => _resolve(
-                                  context,
-                                  ref,
-                                  conflict,
-                                  keepLocal: true,
-                                )
-                              : null,
-                          child: const Text(
-                            'Manter local',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                  if (_isResolving)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(12),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed:
+                                snapshot.connectionState == ConnectionState.done
+                                ? () => _resolve(
+                                    context,
+                                    widget.conflict,
+                                    keepLocal: true,
+                                  )
+                                : null,
+                            child: const Text(
+                              'Manter local',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed:
-                              snapshot.connectionState == ConnectionState.done
-                              ? () => _resolve(
-                                  context,
-                                  ref,
-                                  conflict,
-                                  keepLocal: false,
-                                )
-                              : null,
-                          child: const Text(
-                            'Manter Drive',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed:
+                                snapshot.connectionState == ConnectionState.done
+                                ? () => _resolve(
+                                    context,
+                                    widget.conflict,
+                                    keepLocal: false,
+                                  )
+                                : null,
+                            child: const Text(
+                              'Manter Drive',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                 ],
               );
             },
@@ -252,10 +445,13 @@ class _ConflictCard extends ConsumerWidget {
 
   Future<void> _resolve(
     BuildContext context,
-    WidgetRef ref,
     PersistedSyncConflict conflict, {
     required bool keepLocal,
   }) async {
+    setState(() {
+      _isResolving = true;
+    });
+
     HapticFeedback.mediumImpact();
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -335,6 +531,12 @@ class _ConflictCard extends ConsumerWidget {
       messenger.showSnackBar(
         SnackBar(content: Text('Erro ao resolver conflito: $e')),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResolving = false;
+        });
+      }
     }
   }
 

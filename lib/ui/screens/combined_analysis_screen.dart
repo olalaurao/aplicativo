@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/pomodoro_provider.dart';
 import '../../providers/google_calendar_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../models/tracker_model.dart';
 import '../../models/mood_model.dart';
 import '../../models/analysis_model.dart';
@@ -15,11 +16,13 @@ import '../../models/pomodoro_session.dart';
 import '../../models/journal_entry.dart';
 import '../../models/goal_model.dart';
 import '../../models/kpi_model.dart';
+import '../../models/shared_types.dart';
 import '../../services/kpi_engine.dart';
 import '../theme.dart';
 import '../widgets/quartzo_chart.dart';
 import '../widgets/analysis_calendar.dart';
 import '../widgets/mood_emoji_timeline.dart';
+import '../utils/object_icons.dart';
 
 class CombinedAnalysisScreen extends ConsumerStatefulWidget {
   const CombinedAnalysisScreen({super.key});
@@ -543,7 +546,7 @@ class _CombinedAnalysisScreenState
           });
         },
         avatar: source.type == MetricType.mood
-            ? const Text('😊', style: TextStyle(fontSize: 14))
+            ? Text(ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.moodDef, ref.watch(settingsProvider).typeSignatures), style: const TextStyle(fontSize: 14))
             : Icon(
                 Icons.circle,
                 color: source.color ?? AppTheme.accentColor(context),
@@ -955,8 +958,7 @@ class _CombinedAnalysisScreenState
             trackerRecords: ref.read(trackingRecordsProvider),
             entries: ref.read(allEntriesProvider),
             moods: ref.read(moodsProvider),
-            notes: ref.read(notesProvider),
-            tasks: ref.read(tasksProvider),
+            allObjects: ref.read(allObjectsProvider).value ?? [],
           );
           return value;
         }

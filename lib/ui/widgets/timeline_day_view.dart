@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/task_model.dart';
 import '../../models/organizer_model.dart';
 import '../../providers/vault_provider.dart';
@@ -462,13 +463,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                           height: height < 20 ? 20 : height, // Minimum height
                           child: GestureDetector(
                             onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      GoogleEventDetailScreen(event: event),
-                                ),
-                              );
+                              context.push('/google-event-detail', extra: event);
                             },
                             child: Container(
                               decoration: BoxDecoration(
@@ -590,16 +585,11 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
         child: GestureDetector(
           onLongPress: () {
             // Open CreateTaskForm with pre-filled date and time
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CreateTaskForm(
-                  initialDate: widget.selectedDate,
-                  initialTime: TimeOfDay(hour: hour, minute: minute),
-                  initialStage: TaskStage.todo,
-                ),
-              ),
-            );
+            context.push('/create-task', extra: {
+              'initialDate': widget.selectedDate,
+              'initialTime': TimeOfDay(hour: hour, minute: minute),
+              'initialStage': TaskStage.todo,
+            });
           },
           child: DragTarget<Object>(
             onWillAcceptWithDetails: (details) =>
@@ -831,10 +821,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                                     task.title,
                                   );
                                   ref.read(pomodoroProvider.notifier).start();
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (_) => const PomodoroScreen()),
-                                  );
+                                  context.push('/pomodoro');
                                 },
                               ),
                           ],
@@ -881,12 +868,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => UniversalDetailView(object: task),
-              ),
-            );
+            context.push('/detail/${task.id}', extra: task);
           },
           borderRadius: BorderRadius.circular(10),
           child: Container(
@@ -934,7 +916,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                                         ).showSnackBar(
                                           const SnackBar(
                                             content: Text(
-                                              'Esta tarefa está bloqueada por dependências incompletas.',
+                                              'This task is blocked by incomplete dependencies.',
                                             ),
                                           ),
                                         );
@@ -1010,7 +992,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onVerticalDragStart: (_) {
-                      setState(() {
+                      if (mounted) setState(() {
                         _localDurations[task.id] = task.duration;
                       });
                     },
@@ -1020,7 +1002,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                       final newDuration = (newHeight / hourHeight * 60)
                           .round()
                           .clamp(10, 480);
-                      setState(() {
+                      if (mounted) setState(() {
                         _localDurations[task.id] = newDuration;
                       });
                     },
@@ -1097,10 +1079,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                 Navigator.pop(ctx);
                 ref.read(pomodoroProvider.notifier).setCurrentItem(task.id, task.title);
                 ref.read(pomodoroProvider.notifier).start();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const PomodoroScreen()),
-                );
+                context.push('/pomodoro');
               },
             ),
             ListTile(
@@ -1108,10 +1087,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
               title: const Text('Editar agendamento'),
               onTap: () {
                 Navigator.pop(ctx);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const PomodoroScreen()),
-                );
+                context.push('/pomodoro');
               },
             ),
             ListTile(
@@ -1168,12 +1144,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => UniversalDetailView(object: habit),
-              ),
-            );
+            context.push('/detail/${habit.id}', extra: habit);
           },
           borderRadius: BorderRadius.circular(10),
           child: Container(
@@ -1260,7 +1231,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
         return Color(int.parse('0x$colorStr'));
       }
     } catch (_) {
-      debugPrint('Invalid timeline color: $color');
+      // Invalid timeline color format
     }
     return null;
   }
@@ -1377,20 +1348,15 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
       object: task,
       child: InkWell(
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => UniversalDetailView(object: task),
-            ),
-          );
+          context.push('/detail/${task.id}', extra: task);
         },
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppBorderRadius.sm),
         child: Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
           decoration: BoxDecoration(
             color: AppColors.secondary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppBorderRadius.sm),
             border: Border.all(
               color: AppColors.secondary.withValues(alpha: 0.3),
             ),
@@ -1412,7 +1378,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
-                                'Esta tarefa está bloqueada por dependências incompletas.',
+                                'This task is blocked by incomplete dependencies.',
                               ),
                             ),
                           );
@@ -1462,13 +1428,10 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
     return ObjectActionWrapper(
       object: habit,
       child: InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => UniversalDetailView(object: habit)),
-        ),
-        borderRadius: BorderRadius.circular(12),
+        onTap: () => context.push('/detail/${habit.id}', extra: habit),
+        borderRadius: BorderRadius.circular(AppBorderRadius.md),
         child: Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
+          padding: const EdgeInsets.only(bottom: AppBorderRadius.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1581,7 +1544,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
         return Color(int.parse('0x$colorStr'));
       }
     } catch (_) {
-      debugPrint('Invalid color: $colorHex');
+      // Invalid color format
     }
     return AppColors.secondary;
   }

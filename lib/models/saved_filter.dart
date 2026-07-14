@@ -143,7 +143,7 @@ class HabitFilterProperties {
 class TaskFilterProperties {
   static const all = [
     FilterProperty(key: 'status', label: 'Status', allowedValues: ['idea','todo','inProgress','pending','finalized']),
-    FilterProperty(key: 'priority', label: 'Prioridade', allowedValues: ['low','medium','high','critical']),
+    FilterProperty(key: 'priority', label: 'Prioridade', allowedValues: ['low','medium','high']),
     FilterProperty(key: 'tags', label: 'Tags'),
     FilterProperty(key: 'organizers', label: 'Organizer'),
     FilterProperty(key: 'archived', label: 'Arquivado', allowedValues: ['true', 'false']),
@@ -161,7 +161,7 @@ class GoalFilterProperties {
 
 class PersonFilterProperties {
   static const all = [
-    FilterProperty(key: 'contactPriority', label: 'Prioridade', allowedValues: ['low','medium','high','critical']),
+    FilterProperty(key: 'contactPriority', label: 'Prioridade', allowedValues: ['low','medium','high']),
     FilterProperty(key: 'tags', label: 'Tags'),
     FilterProperty(key: 'organizers', label: 'Organizer'),
   ];

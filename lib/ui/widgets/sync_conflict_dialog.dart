@@ -81,9 +81,9 @@ class SyncConflictDialog extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppBorderRadius.sm),
             ),
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(AppSpacing.sm),
             child: SingleChildScrollView(
               child: Text(
                 content,

@@ -51,10 +51,8 @@ class _VaultLinkPickerSheetState extends ConsumerState<VaultLinkPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final query = _searchController.text.trim().toLowerCase();
-    final notes = ref
-        .watch(notesProvider)
-        .where((n) => n.subtype == NoteSubtype.collection)
-        .toList();
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final notes = allObjects.whereType<Note>().where((n) => n.subtype == NoteSubtype.collection).toList();
     final objects = ref.watch(allObjectsProvider).valueOrNull ?? [];
 
     final collectionRows = <CollectionRow>[];
@@ -124,16 +122,17 @@ class _VaultLinkPickerSheetState extends ConsumerState<VaultLinkPickerSheet> {
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
                   children: [
                     if (filteredRows.isNotEmpty) ...[
-                      _sectionHeader('Linhas de coleções'),
+                      _sectionHeader('Collection rows'),
                       ...filteredRows.map((row) {
                         final note = notes.firstWhere(
                           (n) => n.slug == row.noteSlug,
+                          orElse: () => notes.first,
                         );
                         return _buildRowTile(row, note);
                       }),
                     ],
                     if (filteredObjects.isNotEmpty) ...[
-                      _sectionHeader('Objetos do vault'),
+                      _sectionHeader('Vault objects'),
                       ...filteredObjects.map(_buildObjectTile),
                     ],
                     if (filteredRows.isEmpty &&
@@ -141,17 +140,17 @@ class _VaultLinkPickerSheetState extends ConsumerState<VaultLinkPickerSheet> {
                         query.isNotEmpty)
                       const EmptyState(
                         icon: Icons.search_off_rounded,
-                        headline: 'Nenhum resultado',
-                        subtext: 'Tente outro termo de busca.',
+                        headline: 'No results',
+                        subtext: 'Try another search term.',
                       ),
                     if (filteredRows.isEmpty &&
                         filteredObjects.isEmpty &&
                         query.isEmpty)
                       const EmptyState(
                         icon: Icons.collections_bookmark_outlined,
-                        headline: 'Nada para vincular',
+                        headline: 'Nothing to link',
                         subtext:
-                            'Crie uma Note do tipo Coleção para vincular linhas dela.',
+                            'Create a Collection Note to link its rows.',
                       ),
                   ],
                 ),
@@ -267,7 +266,7 @@ class _VaultLinkPickerSheetState extends ConsumerState<VaultLinkPickerSheet> {
   }
 
   void _toggleKey(String key) {
-    setState(() {
+    if (mounted) setState(() {
       if (_selectedKeys.contains(key)) {
         _selectedKeys.remove(key);
       } else {
@@ -315,9 +314,12 @@ class _VaultLinkPickerSheetState extends ConsumerState<VaultLinkPickerSheet> {
           final lineIndex = int.tryParse(parts[2]) ?? -1;
           final row = allRows.firstWhere(
             (r) => r.noteSlug == parts[1] && r.lineIndex == lineIndex,
-            orElse: () => allRows.first,
+            orElse: () => allRows.firstOrNull ?? allRows.first,
           );
-          final note = notes.firstWhere((n) => n.slug == row.noteSlug);
+          final note = notes.firstWhere(
+            (n) => n.slug == row.noteSlug,
+            orElse: () => notes.first,
+          );
           final blockId =
               await CollectionRowService.ensureBlockId(ref, note, row);
           refs.add(VaultLinkRef(

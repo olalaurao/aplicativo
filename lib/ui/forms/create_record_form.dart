@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../../models/tracker_model.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
+import '../widgets/date_picker_field.dart';
 
 class CreateRecordForm extends ConsumerStatefulWidget {
   final TrackerDefinition? tracker;
@@ -121,45 +122,17 @@ class _CreateRecordFormState extends ConsumerState<CreateRecordForm> {
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                 child: Row(
                   children: [
-                    GestureDetector(
-                      onTap: () async {
-                        final d = await showDatePicker(
-                          context: context,
-                          initialDate: _date,
-                          firstDate: DateTime.now().subtract(
-                            const Duration(days: 365),
-                          ),
-                          lastDate: DateTime.now(),
-                        );
+                    DatePickerField(
+                      label: 'Date',
+                      selectedDate: _date,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime.now().subtract(
+                        const Duration(days: 365),
+                      ),
+                      lastDate: DateTime.now(),
+                      onDateChanged: (d) {
                         if (d != null) setState(() => _date = d);
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceVariant,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.calendar_today_rounded,
-                              size: 14,
-                              color: AppColors.textSecondary,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              DateFormat('MMM d, yyyy').format(_date),
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ),
                   ],
                 ),

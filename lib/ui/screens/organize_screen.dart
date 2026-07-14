@@ -111,14 +111,15 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
     BuildContext context,
     List<Organizer> organizers,
   ) {
-    final allGoals = ref.watch(goalsProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final allGoals = allObjects.whereType<Goal>().toList();
     final goals = allGoals
         .where(
           (o) => o.title.toLowerCase().contains(_searchQuery.toLowerCase()),
         )
         .toList();
 
-    final allHabits = ref.watch(habitsProvider);
+    final allHabits = allObjects.whereType<Habit>().toList();
     final habits = allHabits
         .where(
           (o) => o.title.toLowerCase().contains(_searchQuery.toLowerCase()),

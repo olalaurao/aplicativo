@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../models/goal_model.dart';
+import '../../models/habit_model.dart';
 import '../../models/kpi_model.dart';
 import '../../models/note_model.dart';
 import '../../models/organizer_model.dart';
@@ -13,6 +14,7 @@ import '../../providers/vault_provider.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../theme.dart';
+import '../widgets/date_picker_field.dart';
 
 class CreateGoalForm extends ConsumerStatefulWidget {
   final String? initialTitle;
@@ -163,7 +165,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
                     // âÂ”Â€âÂ”Â€âÂ”Â€ Title âÂ”Â€âÂ”Â€âÂ”Â€
                     TextField(
                       controller: _titleController,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) { if (mounted) setState(() {}); },
                       style: const TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.w700,
@@ -867,7 +869,8 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final habits = ref.watch(habitsProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final habits = allObjects.whereType<Habit>().toList();
     final trackers = ref.watch(trackersProvider);
 
     return Padding(
@@ -942,7 +945,7 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
                 border: OutlineInputBorder(),
               ),
               items: habits
-                  .map(
+                  .map<DropdownMenuItem<String>>(
                     (h) => DropdownMenuItem(
                       value: h.id,
                       child: Text(h.displayTitle),
@@ -1201,54 +1204,30 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
           const SizedBox(height: 12),
 
           // Date Range Pickers
-          InkWell(
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _startDate ?? DateTime.now(),
-                firstDate: DateTime(2020),
-                lastDate: DateTime(2030),
-              );
+          DatePickerField(
+            label: 'Data de início (opcional)',
+            selectedDate: _startDate,
+            initialDate: DateTime.now(),
+            firstDate: DateTime(2020),
+            lastDate: DateTime(2030),
+            onDateChanged: (picked) {
               if (picked != null) {
                 setState(() => _startDate = picked);
               }
             },
-            child: InputDecorator(
-              decoration: const InputDecoration(
-                labelText: 'Data de início (opcional)',
-                border: OutlineInputBorder(),
-              ),
-              child: Text(
-                _startDate != null
-                    ? DateFormat('dd/MM/yyyy').format(_startDate!)
-                    : 'Não definido',
-              ),
-            ),
           ),
           const SizedBox(height: 12),
-          InkWell(
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _endDate ?? DateTime.now(),
-                firstDate: DateTime(2020),
-                lastDate: DateTime(2030),
-              );
+          DatePickerField(
+            label: 'Data de término (opcional)',
+            selectedDate: _endDate,
+            initialDate: DateTime.now(),
+            firstDate: DateTime(2020),
+            lastDate: DateTime(2030),
+            onDateChanged: (picked) {
               if (picked != null) {
                 setState(() => _endDate = picked);
               }
             },
-            child: InputDecorator(
-              decoration: const InputDecoration(
-                labelText: 'Data de término (opcional)',
-                border: OutlineInputBorder(),
-              ),
-              child: Text(
-                _endDate != null
-                    ? DateFormat('dd/MM/yyyy').format(_endDate!)
-                    : 'Não definido',
-              ),
-            ),
           ),
           const SizedBox(height: 12),
 

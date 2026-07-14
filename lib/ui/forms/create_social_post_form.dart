@@ -866,7 +866,7 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
-    await ref.read(tasksProvider.notifier).addTask(task);
+    await ref.read(vaultProvider.notifier).createObject(task);
     await _appendLink(post, _objectWikiLink(task));
   }
 
@@ -907,8 +907,8 @@ class _CreateSocialPostFormState extends ConsumerState<CreateSocialPostForm> {
     final postRef = _objectWikiLink(post);
     if (object is Task && !object.links.contains(postRef)) {
       await ref
-          .read(tasksProvider.notifier)
-          .updateTask(
+          .read(vaultProvider.notifier)
+          .updateObject(
             object.copyWith(links: [...object.links, postRef]),
           );
     } else if (object is Project &&

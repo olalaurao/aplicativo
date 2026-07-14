@@ -43,9 +43,10 @@ class KPIEngine {
     required List<TrackingRecord> trackerRecords,
     required List<JournalEntry> entries,
     required List<MoodDefinition> moods,
-    required List<Note> notes,
-    required List<Task> tasks,
+    required List<dynamic> allObjects,
   }) {
+    final notes = allObjects.whereType<Note>().toList();
+    final tasks = allObjects.whereType<Task>().toList();
     switch (kpi.sourceType) {
       // ─── HABITS ───
       case KPISourceType.habit:
@@ -351,8 +352,7 @@ class KPIEngine {
     required List<TrackingRecord> trackerRecords,
     required List<JournalEntry> entries,
     required List<MoodDefinition> moods,
-    required List<Note> notes,
-    required List<Task> tasks,
+    required List<dynamic> allObjects,
   }) {
     bool allMet = true;
     for (final kpi in kpis) {
@@ -362,8 +362,7 @@ class KPIEngine {
         trackerRecords: trackerRecords,
         entries: entries,
         moods: moods,
-        notes: notes,
-        tasks: tasks,
+        allObjects: allObjects,
       );
       if (kpi.currentValue >= kpi.targetValue) {
         kpi.completed = true;

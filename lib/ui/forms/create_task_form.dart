@@ -12,6 +12,7 @@ import '../theme.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/rich_text_editor.dart';
 import '../widgets/organizer_selector_field.dart';
+import '../widgets/date_picker_field.dart';
 import '../forms/scheduler_picker.dart';
 import '../widgets/time_block_picker.dart';
 import '../../models/scheduler.dart';
@@ -1953,7 +1954,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       if (widget.existingTask != null) {
         await ref.read(vaultProvider.notifier).updateObject(task);
       } else {
-        await ref.read(tasksProvider.notifier).addTask(task);
+        await ref.read(vaultProvider.notifier).createObject(task);
       }
 
       await _createPromotedSubtasks(task);
@@ -1985,7 +1986,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
           ),
           TextButton(
             onPressed: () {
-              ref.read(tasksProvider.notifier).deleteTask(widget.existingTask!);
+              ref.read(vaultProvider.notifier).deleteObject(widget.existingTask!);
               Navigator.pop(ctx);
               Navigator.pop(context);
             },
@@ -2005,7 +2006,6 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     }).toList();
     if (promoted.isEmpty) return;
 
-    final tasksNotifier = ref.read(tasksProvider.notifier);
     for (final subtask in promoted) {
       final child = Task(
         title: subtask.title,
@@ -2022,12 +2022,12 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
           ),
         ],
       );
-      await tasksNotifier.addTask(child);
+      await ref.read(vaultProvider.notifier).createObject(child);
       subtask.slug = child.slug;
     }
     await ref
-        .read(tasksProvider.notifier)
-        .updateTask(parentTask.copyWith(subtasks: _subtasks));
+        .read(vaultProvider.notifier)
+        .updateObject(parentTask.copyWith(subtasks: _subtasks));
   }
 
   Future<String?> _showReflectionPrompt() async {

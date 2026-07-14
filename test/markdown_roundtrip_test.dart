@@ -516,8 +516,7 @@ Texto original.
         trackerRecords: const [],
         entries: const [],
         moods: const [],
-        notes: [note],
-        tasks: const [],
+        allObjects: [note],
       );
 
       expect(value, 3);
@@ -543,8 +542,7 @@ Texto original.
         trackerRecords: const [],
         entries: const [],
         moods: const [],
-        notes: [note],
-        tasks: const [],
+        allObjects: [note],
       );
 
       expect(value, 3);

@@ -12,6 +12,7 @@ import '../forms/create_habit_form.dart';
 import '../forms/create_task_form.dart';
 import '../theme.dart';
 import 'triple_check_sheet.dart';
+import 'app_chip.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -55,7 +56,7 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
     final validOrganizers = [...organizerObjects, ...goalOrganizers];
     
     if (_selectedSlug == null && validOrganizers.isNotEmpty) {
-      _selectedSlug = validOrganizers.first.slug;
+      _selectedSlug = validOrganizers.firstOrNull?.slug;
     }
 
     final selectedOrganizer = validOrganizers
@@ -164,16 +165,10 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
                 final color = org is Organizer ? _parseHexColor(org.color) : AppTheme.accentColor(context);
                 return Padding(
                   padding: const EdgeInsets.only(right: 8.0),
-                  child: FilterChip(
-                    label: Text(
-                      org.title,
-                      style: TextStyle(
-                        color: isSelected ? AppTheme.textPrimaryColor(context) : AppTheme.textSecondaryColor(context),
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
+                  child: AppChip(
+                    label: org.title,
                     selected: isSelected,
-                    onSelected: (selected) {
+                    onTap: () {
                       setState(() {
                             _selectedSlug = org.slug;
                       });
@@ -182,18 +177,11 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
                         organizer: org.slug,
                       );
                     },
-                    backgroundColor: AppTheme.surfaceVariantColor(context),
-                    selectedColor: AppTheme.surfaceVariantColor(context),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      side: isSelected 
-                        ? BorderSide(color: color.withValues(alpha: 0.3), width: 1.5)
-                        : BorderSide(color: AppTheme.dividerColor(context).withValues(alpha: 0.2)),
-                    ),
+                    variant: ChipVariant.filter,
+                    size: ChipSize.medium,
+                    color: color,
+                    icon: isSelected ? _buildOrganizerIconData(org) : null,
                     showCheckmark: false,
-                    avatar: isSelected
-                        ? _buildOrganizerIcon(org, color)
-                        : null,
                   ),
                 );
               }).toList(),
@@ -203,10 +191,10 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
 
           if (selectedOrganizer != null) ...[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
               decoration: BoxDecoration(
                 color: organizerColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppBorderRadius.md),
               ),
               child: Column(
                 children: [
@@ -244,7 +232,7 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Hábitos hoje: $completedHabitsCount/${visibleHabits.length}',
+                        'Habits today: $completedHabitsCount/${visibleHabits.length}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppTheme.textSecondaryColor(context),
                               fontSize: 11,
@@ -297,8 +285,8 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
                   const SizedBox(width: 8),
                   Text(
                     widget.objectTypes.length == 1 && widget.objectTypes.contains('habit')
-                        ? 'Adicionar hábito'
-                        : 'Adicionar tarefa',
+                        ? 'Add habit'
+                        : 'Add task',
                     style: TextStyle(
                       color: AppTheme.textSecondaryColor(context),
                       fontWeight: FontWeight.w600,
@@ -317,10 +305,10 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
   Widget _buildFilterSummary(int tasks, int habits, int pomodoros) {
     final chips = <Widget>[];
     if (widget.objectTypes.contains('task')) {
-      chips.add(_summaryPill('Tarefas', tasks));
+      chips.add(_summaryPill('Tasks', tasks));
     }
     if (widget.objectTypes.contains('habit')) {
-      chips.add(_summaryPill('Hábitos', habits));
+      chips.add(_summaryPill('Habits', habits));
     }
     if (widget.objectTypes.contains('pomodoro')) {
       chips.add(_summaryPill('Pomodoros', pomodoros));
@@ -360,7 +348,7 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
                 ? IconButton(
                     icon: const Icon(Icons.lock_rounded, size: 20, color: AppColors.error),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Esta tarefa está bloqueada por dependências incompletas.')));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This task is blocked by incomplete dependencies.')));
                     },
                   )
                 : Checkbox(
@@ -370,11 +358,10 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
                     activeColor: organizerColor,
                     onChanged: (bool? newValue) {
                       if (newValue != null) {
-                        ref.read(tasksProvider.notifier).updateTask(
-                              item.copyWith(
-                                stage: newValue ? TaskStage.finalized : TaskStage.todo,
-                              ),
-                            );
+                        final updated = item.copyWith(
+                          stage: newValue ? TaskStage.finalized : TaskStage.todo,
+                        );
+                        ref.read(vaultProvider.notifier).updateObject(updated);
                       }
                     },
                   ),
@@ -540,22 +527,15 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
     );
   }
 
-  Widget _buildOrganizerIcon(ContentObject org, Color color) {
+  IconData? _buildOrganizerIconData(ContentObject org) {
     if (org is Goal) {
-      return Icon(Icons.flag_rounded, color: color, size: 14);
+      return Icons.flag_rounded;
     }
     final iconStr = org is Organizer ? org.icon : null;
     if (iconStr != null && iconStr.startsWith('ph-')) {
-      return Icon(PhosphorIcons.folder(), color: color, size: 14);
-    } else if (iconStr != null && iconStr.endsWith('.svg')) {
-      return SvgPicture.asset(
-        'assets/icons/$iconStr',
-        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-        width: 14,
-        height: 14,
-      );
+      return Icons.folder_rounded;
     }
-    return Icon(Icons.folder_open, color: color, size: 14);
+    return null;
   }
 
   IconData _iconForFilter(Set<String> types) {

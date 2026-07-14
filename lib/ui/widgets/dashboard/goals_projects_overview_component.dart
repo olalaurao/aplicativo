@@ -5,10 +5,13 @@ import '../../../models/content_object.dart';
 import '../../../models/dashboard_block.dart';
 import '../../../models/goal_model.dart';
 import '../../../models/project_model.dart';
+import '../../../models/shared_types.dart';
 import '../../../providers/vault_provider.dart';
+import '../../../providers/settings_provider.dart';
 import '../../../services/project_progress_resolver.dart';
 import '../../theme.dart';
 import '../../navigation/object_navigation.dart';
+import '../../utils/object_icons.dart';
 
 class _ProgressItem {
   final ContentObject source;
@@ -34,6 +37,7 @@ class GoalsProjectsOverviewComponent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
+    final settings = ref.watch(settingsProvider);
 
     final maxItems = block.metadata['maxItems'] as int? ?? 5;
     final sortMode = block.metadata['sortMode'] as String? ?? 'progress_asc';
@@ -51,7 +55,7 @@ class GoalsProjectsOverviewComponent extends ConsumerWidget {
         items.add(_ProgressItem(
           source: g,
           title: g.title,
-          emoji: g.icon ?? '🎯',
+          emoji: g.icon ?? ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.goal, settings.typeSignatures),
           progress: g.progress,
           isGoal: true,
         ));
@@ -68,7 +72,7 @@ class GoalsProjectsOverviewComponent extends ConsumerWidget {
         items.add(_ProgressItem(
           source: p,
           title: p.title,
-          emoji: p.icon ?? '🚀',
+          emoji: p.icon ?? ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.project, settings.typeSignatures),
           progress: prog,
           isGoal: false,
         ));

@@ -93,8 +93,8 @@ class _PomodoroFloatingClockState extends ConsumerState<PomodoroFloatingClock> {
                             const SizedBox(width: 10),
                             Text(
                               isOverDismissZone
-                                  ? 'Solte para fechar'
-                                  : 'Arraste até aqui para fechar',
+                                  ? 'Release to close'
+                                  : 'Drag here to close',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w700,

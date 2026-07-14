@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/project_model.dart';
 import '../../models/task_model.dart';
 import '../../models/shared_types.dart';
@@ -11,9 +12,13 @@ import '../../models/kpi_model.dart' as kpi_model;
 import '../../models/scheduler.dart';
 import '../../models/habit_model.dart';
 import '../../models/tracker_model.dart';
+import '../../models/note_model.dart';
+import '../../models/organizer_model.dart';
 import '../../providers/vault_provider.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/organizer_selector_field.dart';
+import '../widgets/app_switch_tile.dart';
+import '../widgets/date_picker_field.dart';
 import '../../services/collection_row_service.dart';
 import '../theme.dart';
 import 'scheduler_picker.dart';
@@ -169,7 +174,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
                   // âÂ”Â€âÂ”Â€âÂ”Â€ Title âÂ”Â€âÂ”Â€âÂ”Â€
                   TextField(
                     controller: _titleController,
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) { if (mounted) setState(() {}); },
                     style: const TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w700,
@@ -439,11 +444,11 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Este projeto usa rotação de zonas'),
+                        AppSwitchTile(
+                          title: 'Este projeto usa rotação de zonas',
                           value: _useRotation,
                           onChanged: (v) => setState(() => _useRotation = v),
+                          contentPadding: EdgeInsets.zero,
                         ),
                         if (_useRotation) ...[
                           ListTile(
@@ -825,10 +830,161 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
   kpi_model.KPISourceType _sourceType = kpi_model.KPISourceType.manualQuantity;
   String? _sourceId;
   String? _fieldId;
+  String? _calculationMode;
+  String? _selectedOtherMode;
+  kpi_model.KPIDisplayType _displayType = kpi_model.KPIDisplayType.progressBar;
+  DateTime? _startDate;
+  DateTime? _endDate;
+  bool _autoComplete = false;
+  ActionDef? _autoCompleteAction;
+
+  List<_CalculationModeOption> _getCalculationModeOptions(kpi_model.KPISourceType sourceType) {
+    switch (sourceType) {
+      case kpi_model.KPISourceType.habit:
+        return const [
+          _CalculationModeOption(label: 'Total de conclusões', value: null),
+          _CalculationModeOption(label: 'Sequência atual (streak)', value: 'streak'),
+          _CalculationModeOption(label: 'Taxa de sucesso (%)', value: 'success_rate'),
+        ];
+      case kpi_model.KPISourceType.trackerField:
+        return const [
+          _CalculationModeOption(label: 'Soma', value: null),
+          _CalculationModeOption(label: 'Média', value: 'average'),
+          _CalculationModeOption(label: 'Máximo', value: 'max'),
+          _CalculationModeOption(label: 'Mínimo', value: 'min'),
+          _CalculationModeOption(label: 'Valor mais recente', value: 'latest'),
+        ];
+      case kpi_model.KPISourceType.subtasks:
+        return const [
+          _CalculationModeOption(label: 'Contagem de tarefas concluídas', value: null),
+          _CalculationModeOption(label: 'Porcentagem de conclusão', value: 'goal_percentage'),
+        ];
+      case kpi_model.KPISourceType.entry:
+        return const [
+          _CalculationModeOption(label: 'Contagem de entradas', value: null),
+          _CalculationModeOption(label: 'Contagem de palavras', value: 'word_count'),
+        ];
+      default:
+        return const [];
+    }
+  }
+
+  List<_ScopeOption> _getProjectAndGoalOptions() {
+    final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
+    final projects = allObjects.where((o) => o.type == 'project').toList();
+    final goals = allObjects.where((o) => o.type == 'goal').toList();
+    
+    return [
+      ...projects.map((p) => _ScopeOption(label: p.displayTitle, value: p.slug)),
+      ...goals.map((g) => _ScopeOption(label: g.displayTitle, value: g.slug)),
+    ];
+  }
+
+  List<_ScopeOption> _getCollectionOptions() {
+    final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
+    final collections = allObjects.whereType<Note>()
+        .where((n) => n.subtype == NoteSubtype.collection)
+        .toList();
+    
+    return collections.map((c) => _ScopeOption(label: c.displayTitle, value: c.id)).toList();
+  }
+
+  List<_ScopeOption> _getOrganizerOptions() {
+    final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
+    final organizers = allObjects.whereType<Organizer>().toList();
+    
+    return [
+      const _ScopeOption(label: 'Todos', value: null),
+      ...organizers.map((o) => _ScopeOption(label: o.displayTitle, value: o.slug)),
+    ];
+  }
+
+  void _showKpiActionPicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          left: 16,
+          right: 16,
+          top: 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Selecionar Ação',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              title: const Text('Adicionar Entrada de Journal'),
+              onTap: () {
+                setState(() {
+                  _autoCompleteAction = ActionDef(
+                    type: 'add_entry',
+                    trigger: 'kpi_reached',
+                  );
+                });
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              title: const Text('Criar Tarefa'),
+              onTap: () {
+                setState(() {
+                  _autoCompleteAction = ActionDef(
+                    type: 'create_task',
+                    trigger: 'kpi_reached',
+                  );
+                });
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              title: const Text('Adicionar Nota de Texto'),
+              onTap: () {
+                setState(() {
+                  _autoCompleteAction = ActionDef(
+                    type: 'add_text_note',
+                    trigger: 'kpi_reached',
+                  );
+                });
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              title: const Text('Abrir URL'),
+              onTap: () {
+                setState(() {
+                  _autoCompleteAction = ActionDef(
+                    type: 'launch_url',
+                    trigger: 'kpi_reached',
+                  );
+                });
+                Navigator.pop(ctx);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _parseColor(String hex) {
+    try {
+      return Color(int.parse(hex.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return AppTheme.accentColor(context);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final habits = ref.watch(objectsByTypeProvider('habit')).whereType<Habit>().toList();
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final habits = allObjects.whereType<Habit>().toList();
     final trackers = ref.watch(objectsByTypeProvider('tracker')).whereType<TrackerDefinition>().toList();
 
     return Padding(
@@ -874,11 +1030,22 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
                   ),
                 )
                 .toList(),
+            selectedItemBuilder: (context) => kpi_model.KPISourceType.values
+                .map(
+                  (t) => Text(
+                    t.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                )
+                .toList(),
             onChanged: (v) {
               setState(() {
                 _sourceType = v!;
                 _sourceId = null;
                 _fieldId = null;
+                _calculationMode = null;
+                _selectedOtherMode = null;
               });
             },
           ),
@@ -955,6 +1122,229 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
               _sourceType.name.startsWith('tracker'))
             const SizedBox(height: 12),
 
+          // Scope pickers for subtasks, collection, entry, timeSpent
+          if (_sourceType == kpi_model.KPISourceType.subtasks) ...[
+            DropdownButtonFormField<String>(
+              value: _sourceId,
+              decoration: const InputDecoration(
+                labelText: 'Selecionar Projeto ou Meta',
+                border: OutlineInputBorder(),
+              ),
+              items: _getProjectAndGoalOptions().map((option) {
+                return DropdownMenuItem<String>(
+                  value: option.value,
+                  child: Text(option.label),
+                );
+              }).toList(),
+              onChanged: (v) => setState(() => _sourceId = v),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          if (_sourceType == kpi_model.KPISourceType.collection) ...[
+            DropdownButtonFormField<String>(
+              value: _sourceId,
+              decoration: const InputDecoration(
+                labelText: 'Selecionar Coleção',
+                border: OutlineInputBorder(),
+              ),
+              items: _getCollectionOptions().map((option) {
+                return DropdownMenuItem<String>(
+                  value: option.value,
+                  child: Text(option.label),
+                );
+              }).toList(),
+              onChanged: (v) => setState(() => _sourceId = v),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          if (_sourceType == kpi_model.KPISourceType.entry ||
+              _sourceType == kpi_model.KPISourceType.timeSpent) ...[
+            DropdownButtonFormField<String>(
+              value: _sourceId,
+              decoration: const InputDecoration(
+                labelText: 'Filtrar por Organizador (opcional)',
+                border: OutlineInputBorder(),
+              ),
+              items: _getOrganizerOptions().map((option) {
+                return DropdownMenuItem<String>(
+                  value: option.value,
+                  child: Text(option.label),
+                );
+              }).toList(),
+              onChanged: (v) => setState(() => _sourceId = v),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // Others source type - second dropdown for specific modes
+          if (_sourceType == kpi_model.KPISourceType.others) ...[
+            DropdownButtonFormField<String>(
+              value: _selectedOtherMode,
+              decoration: const InputDecoration(
+                labelText: 'Tipo de Indicador',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: 'mood_average',
+                  child: Text('Humor Médio'),
+                ),
+                DropdownMenuItem(
+                  value: 'mood_trend',
+                  child: Text('Tendência de Humor'),
+                ),
+                DropdownMenuItem(
+                  value: 'photo_count',
+                  child: Text('Contagem de Fotos'),
+                ),
+                DropdownMenuItem(
+                  value: 'comment_count',
+                  child: Text('Contagem de Comentários'),
+                ),
+                DropdownMenuItem(
+                  value: 'reflection_length',
+                  child: Text('Tamanho das Reflexões'),
+                ),
+                DropdownMenuItem(
+                  value: 'planner_task_count',
+                  child: Text('Contagem de Tarefas'),
+                ),
+                DropdownMenuItem(
+                  value: 'planner_overdue_count',
+                  child: Text('Tarefas Atrasadas'),
+                ),
+                DropdownMenuItem(
+                  value: 'organizer_association_count',
+                  child: Text('Associações do Organizador'),
+                ),
+              ],
+              onChanged: (v) => setState(() {
+                _selectedOtherMode = v;
+                _calculationMode = v;
+              }),
+            ),
+            const SizedBox(height: 12),
+            // Mood axis toggle for mood_average
+            if (_selectedOtherMode == 'mood_average') ...[
+              SegmentedButton<String?>(
+                segments: const [
+                  ButtonSegment(
+                    value: null,
+                    label: Text('Prazer (padrão)'),
+                  ),
+                  ButtonSegment(
+                    value: 'energy',
+                    label: Text('Energia'),
+                  ),
+                ],
+                selected: {_fieldId},
+                onSelectionChanged: (Set<String?> newSelection) {
+                  setState(() {
+                    _fieldId = newSelection.firstOrNull;
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+            // Organizer scope picker for task-based modes
+            if (_selectedOtherMode == 'planner_task_count' ||
+                _selectedOtherMode == 'planner_overdue_count' ||
+                _selectedOtherMode == 'organizer_association_count') ...[
+              DropdownButtonFormField<String>(
+                value: _sourceId,
+                decoration: const InputDecoration(
+                  labelText: 'Filtrar por Organizador',
+                  border: OutlineInputBorder(),
+                ),
+                items: _getOrganizerOptions().map((option) {
+                  return DropdownMenuItem<String>(
+                    value: option.value,
+                    child: Text(option.label),
+                  );
+                }).toList(),
+                onChanged: (v) => setState(() => _sourceId = v),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ],
+
+          // Calculation Mode Picker
+          if (_sourceType == kpi_model.KPISourceType.habit ||
+              _sourceType == kpi_model.KPISourceType.trackerField ||
+              _sourceType == kpi_model.KPISourceType.subtasks ||
+              _sourceType == kpi_model.KPISourceType.entry) ...[
+            DropdownButtonFormField<String>(
+              value: _calculationMode,
+              decoration: const InputDecoration(
+                labelText: 'Modo de Cálculo',
+                border: OutlineInputBorder(),
+              ),
+              items: _getCalculationModeOptions(_sourceType).map((option) {
+                return DropdownMenuItem<String>(
+                  value: option.value,
+                  child: Text(option.label),
+                );
+              }).toList(),
+              onChanged: (v) => setState(() => _calculationMode = v),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // Display Type Picker
+          DropdownButtonFormField<kpi_model.KPIDisplayType>(
+            value: _displayType,
+            decoration: const InputDecoration(
+              labelText: 'Como exibir',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(
+                value: kpi_model.KPIDisplayType.number,
+                child: Text('Número'),
+              ),
+              DropdownMenuItem(
+                value: kpi_model.KPIDisplayType.percentage,
+                child: Text('Porcentagem'),
+              ),
+              DropdownMenuItem(
+                value: kpi_model.KPIDisplayType.progressBar,
+                child: Text('Barra de progresso'),
+              ),
+            ],
+            onChanged: (v) => setState(() => _displayType = v!),
+          ),
+          const SizedBox(height: 12),
+
+          // Date Range Pickers
+          DatePickerField(
+            label: 'Data de início (opcional)',
+            selectedDate: _startDate,
+            initialDate: DateTime.now(),
+            firstDate: DateTime(2020),
+            lastDate: DateTime(2030),
+            onDateChanged: (picked) {
+              if (picked != null) {
+                setState(() => _startDate = picked);
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          DatePickerField(
+            label: 'Data de término (opcional)',
+            selectedDate: _endDate,
+            initialDate: DateTime.now(),
+            firstDate: DateTime(2020),
+            lastDate: DateTime(2030),
+            onDateChanged: (picked) {
+              if (picked != null) {
+                setState(() => _endDate = picked);
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+
           TextField(
             controller: _targetController,
             keyboardType: TextInputType.number,
@@ -963,6 +1353,27 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
               border: OutlineInputBorder(),
             ),
           ),
+          const SizedBox(height: 12),
+
+          // Auto-complete toggle
+          CheckboxListTile(
+            title: const Text('Auto-completar ao atingir meta'),
+            subtitle: const Text('Executar ação automaticamente quando o KPI atingir o valor alvo'),
+            value: _autoComplete,
+            onChanged: (v) => setState(() => _autoComplete = v ?? false),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+          ),
+          if (_autoComplete) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => _showKpiActionPicker(),
+              icon: Icon(_autoCompleteAction != null ? Icons.check : Icons.add),
+              label: Text(_autoCompleteAction != null 
+                  ? 'Ação: ${_autoCompleteAction!.type}' 
+                  : 'Selecionar Ação'),
+            ),
+          ],
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
@@ -978,8 +1389,13 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
                   sourceType: _sourceType,
                   sourceId: _sourceId,
                   fieldId: _fieldId,
+                  calculationMode: _calculationMode,
                   targetValue: double.tryParse(_targetController.text) ?? 100,
-                  autoComplete: false,
+                  displayType: _displayType,
+                  startDate: _startDate,
+                  endDate: _endDate,
+                  autoComplete: _autoComplete,
+                  autoCompleteAction: _autoCompleteAction?.toJson(),
                 );
                 widget.onSave(newKpi);
                 Navigator.pop(context);
@@ -992,4 +1408,16 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
       ),
     );
   }
+}
+
+class _CalculationModeOption {
+  final String label;
+  final String? value;
+  const _CalculationModeOption({required this.label, this.value});
+}
+
+class _ScopeOption {
+  final String label;
+  final String? value;
+  const _ScopeOption({required this.label, this.value});
 }

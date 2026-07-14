@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/content_object.dart';
@@ -256,7 +257,7 @@ void _showChangeTypeSheet(
   final types = [
     {
       'type': 'task',
-      'label': 'Tarefa',
+      'label': 'Task',
       'icon': Icons.check_circle_outline_rounded,
     },
     {'type': 'habit', 'label': 'Hábito', 'icon': Icons.loop_rounded},
@@ -402,6 +403,7 @@ Future<void> _confirmAndChangeType(
 }
 
 void _editObject(BuildContext context, ContentObject object) {
+  // Fallback to form-based navigation for other types
   final formPage = _formPageFor(object);
   if (formPage == null) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -496,21 +498,21 @@ Future<void> _confirmDelete(
 
   // Eagerly update state for instantaneous UI feedback
   if (object is Habit) {
-    ref.read(habitsProvider.notifier).deleteHabit(object);
+    ref.read(vaultProvider.notifier).deleteObject(object);
   } else if (object is Task) {
-    ref.read(tasksProvider.notifier).deleteTask(object);
+    ref.read(vaultProvider.notifier).deleteObject(object);
   } else if (object is Project) {
-    ref.read(projectsProvider.notifier).deleteProject(object);
+    ref.read(vaultProvider.notifier).deleteObject(object);
   } else if (object is Person) {
-    ref.read(peopleProvider.notifier).deletePerson(object);
+    ref.read(vaultProvider.notifier).deleteObject(object);
   } else if (object is TrackerDefinition) {
-    ref.read(trackersProvider.notifier).deleteTracker(object);
+    ref.read(vaultProvider.notifier).deleteObject(object);
   } else if (object is Goal) {
-    ref.read(goalsProvider.notifier).deleteGoal(object);
+    ref.read(vaultProvider.notifier).deleteObject(object);
   } else if (object is Note) {
-    ref.read(notesProvider.notifier).deleteNote(object);
+    ref.read(vaultProvider.notifier).deleteObject(object);
   } else if (object is JournalEntry) {
-    await ref.read(todayJournalProvider.notifier).deleteEntry(object);
+    await ref.read(vaultProvider.notifier).deleteObject(object);
   } else {
     await ref.read(vaultProvider.notifier).deleteObject(object);
   }

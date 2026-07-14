@@ -282,7 +282,7 @@ class _BookSearchSheetState extends ConsumerState<BookSearchSheet> {
       aliases: aliases,
     );
 
-    await ref.read(resourcesProvider.notifier).addResource(resource);
+    await ref.read(vaultProvider.notifier).createObject(resource);
     widget.onSaved?.call();
     if (!mounted) return;
     ScaffoldMessenger.of(

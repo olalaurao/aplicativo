@@ -14,6 +14,7 @@ import '../../models/social_post.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/search_service.dart';
 import '../theme.dart';
+import 'app_chip.dart';
 
 class UniversalSearchPickerSheet extends ConsumerStatefulWidget {
   final String title;
@@ -95,7 +96,7 @@ class _UniversalSearchPickerSheetState
           // Search Field
           TextField(
             controller: _searchController,
-            onChanged: (val) => setState(() {}),
+            onChanged: (val) { if (mounted) setState(() {}); },
             decoration: InputDecoration(
               hintText: 'Pesquisar...',
               prefixIcon: const Icon(Icons.search_rounded),
@@ -118,18 +119,18 @@ class _UniversalSearchPickerSheetState
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _filterChip('all', 'Tudo'),
-                _filterChip('task', 'Tarefas'),
-                _filterChip('habit', 'Hábitos'),
-                _filterChip('goal', 'Objetivos'),
-                _filterChip('project', 'Projetos'),
-                _filterChip('area', 'Áreas'),
-                _filterChip('label', 'Etiquetas'),
-                _filterChip('note', 'Notas'),
-                _filterChip('idea', 'Ideias'),
-                _filterChip('resource', 'Recursos'),
+                _filterChip('all', 'All'),
+                _filterChip('task', 'Tasks'),
+                _filterChip('habit', 'Habits'),
+                _filterChip('goal', 'Goals'),
+                _filterChip('project', 'Projects'),
+                _filterChip('area', 'Areas'),
+                _filterChip('label', 'Labels'),
+                _filterChip('note', 'Notes'),
+                _filterChip('idea', 'Ideas'),
+                _filterChip('resource', 'Resources'),
                 _filterChip('social_post', 'Posts'),
-                _filterChip('person', 'Pessoas'),
+                _filterChip('person', 'People'),
               ],
             ),
           ),
@@ -264,7 +265,7 @@ class _UniversalSearchPickerSheetState
                   widget.onClear!();
                 },
                 child: const Text(
-                  'Limpar Seleção',
+                  'Clear Selection',
                   style: TextStyle(color: AppColors.textMuted),
                 ),
               ),
@@ -279,21 +280,11 @@ class _UniversalSearchPickerSheetState
     final isSelected = _selectedFilter == filter;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Text(label),
+      child: AppChip(
+        label: label,
         selected: isSelected,
-        selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.1),
-        labelStyle: TextStyle(
-          color: isSelected ? AppTheme.accentColor(context) : AppColors.textSecondary,
-          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-          fontSize: 12,
-        ),
-        side: isSelected
-            ? BorderSide(color: AppTheme.accentColor(context))
-            : BorderSide(color: AppColors.textMuted.withValues(alpha: 0.3)),
-        onSelected: (val) {
-          if (!val) return;
-          setState(() {
+        onTap: () {
+          if (mounted) setState(() {
             _selectedFilter = filter;
             if (filter != 'social_post') {
               _socialPlatformFilter = null;
@@ -301,6 +292,8 @@ class _UniversalSearchPickerSheetState
             }
           });
         },
+        variant: ChipVariant.choice,
+        size: ChipSize.small,
       ),
     );
   }
@@ -351,10 +344,12 @@ class _UniversalSearchPickerSheetState
     final selected = _socialPlatformFilter == platform;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      child: AppChip(
+        label: label,
         selected: selected,
-        onSelected: (_) => setState(() => _socialPlatformFilter = platform),
+        onTap: () { if (mounted) setState(() => _socialPlatformFilter = platform); },
+        variant: ChipVariant.filter,
+        size: ChipSize.small,
       ),
     );
   }
@@ -363,10 +358,12 @@ class _UniversalSearchPickerSheetState
     final selected = _socialCreatorFilter == creator;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      child: AppChip(
+        label: label,
         selected: selected,
-        onSelected: (_) => setState(() => _socialCreatorFilter = creator),
+        onTap: () { if (mounted) setState(() => _socialCreatorFilter = creator); },
+        variant: ChipVariant.filter,
+        size: ChipSize.small,
       ),
     );
   }
@@ -469,46 +466,46 @@ class _UniversalSearchPickerSheetState
     if (obj is Organizer) {
       switch (obj.organizerType) {
         case OrganizerType.area:
-          return 'Área';
+          return 'Area';
         case OrganizerType.project:
-          return 'Projeto';
+          return 'Project';
         case OrganizerType.activity:
-          return 'Atividade';
+          return 'Activity';
         case OrganizerType.label:
-          return 'Etiqueta';
+          return 'Label';
         case OrganizerType.person:
-          return 'Pessoa';
+          return 'Person';
         case OrganizerType.task:
-          return 'Tarefa';
+          return 'Task';
         case OrganizerType.goal:
-          return 'Objetivo';
+          return 'Goal';
         case OrganizerType.habit:
-          return 'Hábito';
+          return 'Habit';
         case OrganizerType.tracker:
-          return 'Rastreador';
+          return 'Tracker';
       case OrganizerType.dayTheme:
-        return 'Tema do Dia';
+        return 'Day Theme';
       case OrganizerType.timeBlock:
-        return 'Bloco de Tempo';
+        return 'Time Block';
       }
     }
     switch (obj.type) {
       case 'task':
-        return 'Tarefa';
+        return 'Task';
       case 'habit':
-        return 'Hábito';
+        return 'Habit';
       case 'goal':
-        return 'Objetivo';
+        return 'Goal';
       case 'note':
-        return 'Nota';
+        return 'Note';
       case 'idea':
-        return 'Ideia';
+        return 'Idea';
       case 'resource':
-        return 'Recurso';
+        return 'Resource';
       case 'social_post':
         return 'Post social';
       case 'person':
-        return 'Pessoa';
+        return 'Person';
       default:
         return obj.type;
     }
@@ -518,30 +515,30 @@ class _UniversalSearchPickerSheetState
     final types = [
       {
         'type': 'task',
-        'label': 'Tarefa',
+        'label': 'Task',
         'icon': Icons.check_circle_outline_rounded,
       },
-      {'type': 'habit', 'label': 'Hábito', 'icon': Icons.loop_rounded},
+      {'type': 'habit', 'label': 'Habit', 'icon': Icons.loop_rounded},
       {
         'type': 'goal',
-        'label': 'Objetivo',
+        'label': 'Goal',
         'icon': Icons.track_changes_rounded,
       },
-      {'type': 'note', 'label': 'Nota', 'icon': Icons.article_outlined},
-      {'type': 'project', 'label': 'Projeto', 'icon': Icons.folder_outlined},
+      {'type': 'note', 'label': 'Note', 'icon': Icons.article_outlined},
+      {'type': 'project', 'label': 'Project', 'icon': Icons.folder_outlined},
       {
         'type': 'area',
-        'label': 'Área (Organizador)',
+        'label': 'Area (Organizer)',
         'icon': Icons.layers_outlined,
       },
       {
         'type': 'person',
-        'label': 'Pessoa',
+        'label': 'Person',
         'icon': Icons.person_outline_rounded,
       },
       {
         'type': 'resource',
-        'label': 'Recurso',
+        'label': 'Resource',
         'icon': Icons.menu_book_outlined,
       },
     ];

@@ -8,6 +8,7 @@ import '../../models/template_model.dart';
 import '../../providers/vault_provider.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../theme.dart';
+import '../widgets/app_switch_tile.dart';
 
 class CreateTrackerForm extends ConsumerStatefulWidget {
   final TrackerDefinition? tracker;
@@ -478,15 +479,11 @@ class _CreateTrackerFormState extends ConsumerState<CreateTrackerForm> {
                   ),
                 ),
               const SizedBox(height: 16),
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
+              AppSwitchTile(
+                title: 'Sempre alertar quando registrado',
                 value: field.alwaysAlert,
                 onChanged: (value) => setState(() => field.alwaysAlert = value),
-                title: const Text(
-                  'Sempre alertar quando registrado',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                contentPadding: EdgeInsets.zero,
               ),
               DropdownButtonFormField<FieldAlertLevel>(
                 initialValue: field.alertLevel,

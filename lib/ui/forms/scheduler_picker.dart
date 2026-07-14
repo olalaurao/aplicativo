@@ -3,8 +3,9 @@ import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/scheduler.dart';
 import '../../models/organizer_model.dart';
-import '../../providers/day_theme_provider.dart';
+import '../../providers/vault_provider.dart';
 import '../theme.dart';
+import '../widgets/date_picker_field.dart';
 import '../widgets/wiki_link_picker.dart';
 
 class SchedulerPicker extends ConsumerStatefulWidget {
@@ -770,7 +771,8 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
   }
 
   Widget _buildThemeSelector() {
-    final themes = ref.watch(dayThemesProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final themes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
     if (themes.isEmpty) {
       return const Padding(
         padding: EdgeInsets.only(top: 24),
@@ -835,7 +837,8 @@ class _SchedulerPickerState extends ConsumerState<SchedulerPicker> {
   }
 
   Widget _buildBlockSelector() {
-    final blocks = ref.watch(timeBlocksProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final blocks = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.timeBlock).toList();
     if (blocks.isEmpty) {
       return const Padding(
         padding: EdgeInsets.only(top: 24),

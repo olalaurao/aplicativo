@@ -216,7 +216,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       final task = Task(title: text, stage: TaskStage.todo, endDate: today);
-      await ref.read(tasksProvider.notifier).addTask(task);
+      await ref.read(vaultProvider.notifier).createObject(task);
       _quickTaskController.clear();
       if (mounted) {
         ScaffoldMessenger.of(

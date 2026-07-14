@@ -52,7 +52,8 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
 
   List<ContentObject> _getFilteredItems() {
     final entries = ref.watch(allEntriesProvider);
-    final tasks = ref.watch(tasksProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final tasks = allObjects.whereType<Task>().toList();
     final habits = ref.watch(habitsProvider);
     // Combine everything into a unified list
     final allItems = <ContentObject>[...entries, ...tasks, ...habits];

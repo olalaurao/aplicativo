@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/goal_model.dart';
 import '../models/idea_model.dart';
 import '../models/project_model.dart';
+import '../models/task_model.dart';
 import '../models/content_object.dart';
 import 'vault_provider.dart';
 import 'settings_provider.dart';
@@ -35,7 +36,8 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
 
   final items = <OverdueItem>[];
 
-  for (final task in ref.watch(tasksProvider)) {
+  final allObjects = ref.watch(allObjectsProvider).value ?? [];
+  for (final task in allObjects.whereType<Task>()) {
     if (task.isCompleted || task.archived) continue;
     final dl = task.endDate ?? task.startDate;
     if (!isOverdue(dl)) continue;
@@ -46,7 +48,7 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
       itemType: 'task',
     ));
   }
-  for (final goal in ref.watch(goalsProvider)) {
+  for (final goal in allObjects.whereType<Goal>()) {
     if (goal.state == GoalStatus.completed ||
         goal.state == GoalStatus.cancelled ||
         goal.archived) {

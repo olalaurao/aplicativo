@@ -56,7 +56,7 @@ class _SocialBulkImportScreenState
                 controller: _controller,
                 minLines: 10,
                 maxLines: 18,
-                onChanged: (_) => setState(() {}),
+                onChanged: (_) { if (mounted) setState(() {}); },
                 decoration: const InputDecoration(
                   hintText: 'Cole um link por linha...',
                   border: InputBorder.none,

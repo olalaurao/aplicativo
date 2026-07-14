@@ -67,7 +67,7 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
     NavigationItem(section: NavSection.more, label: 'More', route: '/more'),
     NavigationItem(
       section: NavSection.statistics,
-      label: 'Estatísticas',
+      label: 'Statistics',
       route: '/statistics',
       inBottomBar: false,
     ),

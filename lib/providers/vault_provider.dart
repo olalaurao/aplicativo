@@ -1165,8 +1165,7 @@ class GoalsNotifier extends Notifier<List<Goal>> {
       trackerRecords: allObjects.whereType<TrackingRecord>().toList(),
       entries: allObjects.whereType<JournalEntry>().toList(),
       moods: allObjects.whereType<MoodDefinition>().toList(),
-      notes: allObjects.whereType<Note>().toList(),
-      tasks: allObjects.whereType<Task>().toList(),
+      allObjects: allObjects,
     );
     final updatedGoal = goal.copyWith(kpis: updatedKpis);
     
@@ -1658,9 +1657,12 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
 
     // 1. Run migrations on the main thread that require SharedPreferences/platform channels.
     // migrateDailyHabitCompletions uses SharedPreferences, so we keep it here.
-    await service.migrateDailyHabitCompletions(
-      ref.read(sharedPreferencesProvider),
-    );
+    // Defer to microtask to avoid blocking initial UI render
+    Future.microtask(() async {
+      await service.migrateDailyHabitCompletions(
+        ref.read(sharedPreferencesProvider),
+      );
+    });
 
     // 2. Offload listing, reading, parsing and post-processing to the background isolate.
     final parsedVault = await parseVaultInIsolate(
@@ -2420,7 +2422,8 @@ class VaultNotifier extends Notifier<void> {
 
   Future<void> _updateWidgetsFor(ContentObject object) async {
     if (object is Task) {
-      final tasks = ref.read(tasksProvider);
+      final allObjects = ref.read(allObjectsProvider).value ?? [];
+      final tasks = allObjects.whereType<Task>().toList();
       final pending =
           tasks.where((t) => t.stage != TaskStage.finalized).toList()..sort(
             (a, b) => (a.scheduledTime ?? '99:99').compareTo(
@@ -3576,8 +3579,8 @@ class VaultNotifier extends Notifier<void> {
     if (parsed.title.isEmpty) return;
 
     await ref
-        .read(tasksProvider.notifier)
-        .addTask(
+        .read(vaultProvider.notifier)
+        .createObject(
           Task(
             title: parsed.title,
             stage: TaskStage.todo,
@@ -3786,7 +3789,7 @@ class VaultNotifier extends Notifier<void> {
           stage: TaskStage.finalized,
           reflection: target.reflection ?? 'Concluído via notificação.',
         );
-        await ref.read(tasksProvider.notifier).updateTask(updated);
+        await ref.read(vaultProvider.notifier).updateObject(updated);
         await _completeContactTaskIfNeeded(updated);
       } else if (target is Reminder) {
         // Reminder is a mutable model — set field then persist
@@ -3876,7 +3879,8 @@ class VaultNotifier extends Notifier<void> {
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
     final endOfWeek = startOfWeek.add(const Duration(days: 6));
 
-    final tasks = ref.read(tasksProvider);
+    final allObjects = ref.read(allObjectsProvider).value ?? [];
+    final tasks = allObjects.whereType<Task>().toList();
     final completedThisWeek = tasks
         .where(
           (t) =>

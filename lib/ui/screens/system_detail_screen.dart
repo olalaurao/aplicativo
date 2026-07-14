@@ -152,7 +152,8 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final system = _system;
-    final history = ref.watch(tasksProvider)
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final history = allObjects.whereType<Task>()
         .where((task) => task.linkedSystem == system.id)
         .toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));

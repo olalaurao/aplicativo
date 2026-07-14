@@ -154,7 +154,8 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final resources = ref.watch(resourcesProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final resources = allObjects.whereType<Resource>().toList();
     final filtered = _applyFilterAndSort(resources).cast<Resource>();
 
     return Scaffold(
@@ -173,7 +174,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                 IconButton(
                   icon: const Icon(Icons.select_all_rounded),
                   onPressed: () {
-                    final filtered = _applyFilterAndSort(ref.watch(resourcesProvider));
+                    final allObjects = ref.read(allObjectsProvider).value ?? [];
+                    final resources = allObjects.whereType<Resource>().toList();
+                    final filtered = _applyFilterAndSort(resources);
                     setState(() {
                       _selectedIds.clear();
                       _selectedIds.addAll(filtered.map((r) => r.id));
@@ -428,7 +431,8 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   }
 
   void _showBulkStatusPicker() {
-    final resources = ref.read(resourcesProvider);
+    final allObjects = ref.read(allObjectsProvider).value ?? [];
+    final resources = allObjects.whereType<Resource>().toList();
     final selectedResources = resources.where((r) => _selectedIds.contains(r.id)).toList();
     
     showModalBottomSheet(
@@ -446,7 +450,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
               onTap: () async {
                 for (final resource in selectedResources) {
                   final updated = resource.copyWith(status: status);
-                  await ref.read(resourcesProvider.notifier).updateResource(updated);
+                  await ref.read(vaultProvider.notifier).updateObject(updated);
                 }
                 if (mounted) {
                   Navigator.pop(ctx);
@@ -479,11 +483,12 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
               children: List.generate(5, (i) => IconButton(
                 icon: const Icon(Icons.star_rounded, size: 32, color: AppColors.warning),
                 onPressed: () async {
-                  final resources = ref.read(resourcesProvider);
+                  final allObjects = ref.read(allObjectsProvider).value ?? [];
+                  final resources = allObjects.whereType<Resource>().toList();
                   final selectedResources = resources.where((r) => _selectedIds.contains(r.id)).toList();
                   for (final resource in selectedResources) {
                     final updated = resource.copyWith(rating: i + 1);
-                    await ref.read(resourcesProvider.notifier).updateResource(updated);
+                    await ref.read(vaultProvider.notifier).updateObject(updated);
                   }
                   if (mounted) {
                     Navigator.pop(ctx);
@@ -502,7 +507,8 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   }
 
   void _showBulkCategoryPicker() {
-    final resources = ref.read(resourcesProvider);
+    final allObjects = ref.read(allObjectsProvider).value ?? [];
+    final resources = allObjects.whereType<Resource>().toList();
     final allCategories = resources.map((r) => r.category).whereType<String>().toSet().toList();
     
     showModalBottomSheet(
@@ -524,7 +530,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                   final selectedResources = resources.where((r) => _selectedIds.contains(r.id)).toList();
                   for (final resource in selectedResources) {
                     final updated = resource.copyWith(category: cat);
-                    await ref.read(resourcesProvider.notifier).updateResource(updated);
+                    await ref.read(vaultProvider.notifier).updateObject(updated);
                   }
                   if (mounted) {
                     Navigator.pop(ctx);
@@ -541,7 +547,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                 final selectedResources = resources.where((r) => _selectedIds.contains(r.id)).toList();
                 for (final resource in selectedResources) {
                   final updated = resource.copyWith(category: null);
-                  await ref.read(resourcesProvider.notifier).updateResource(updated);
+                  await ref.read(vaultProvider.notifier).updateObject(updated);
                 }
                 if (mounted) {
                   Navigator.pop(ctx);
@@ -572,11 +578,12 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
             ...ResourcePriority.values.map((priority) => ListTile(
               title: Text(priority.name),
               onTap: () async {
-                final resources = ref.read(resourcesProvider);
+                final allObjects = ref.read(allObjectsProvider).value ?? [];
+                final resources = allObjects.whereType<Resource>().toList();
                 final selectedResources = resources.where((r) => _selectedIds.contains(r.id)).toList();
                 for (final resource in selectedResources) {
                   final updated = resource.copyWith(priority: priority);
-                  await ref.read(resourcesProvider.notifier).updateResource(updated);
+                  await ref.read(vaultProvider.notifier).updateObject(updated);
                 }
                 if (mounted) {
                   Navigator.pop(ctx);

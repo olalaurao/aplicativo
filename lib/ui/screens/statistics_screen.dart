@@ -42,11 +42,12 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final habits = ref.watch(habitsProvider);
-    final tasks = ref.watch(tasksProvider);
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final tasks = allObjects.whereType<Task>().toList();
+    final habits = allObjects.whereType<Habit>().toList();
+    final goals = allObjects.whereType<Goal>().toList();
     final entries = ref.watch(allEntriesProvider);
     final moods = ref.watch(moodsProvider);
-    final goals = ref.watch(goalsProvider);
     final pomodoroHistory = ref.watch(pomodoroProvider).history;
 
     if (_selectedGoalForKPIChart == null && goals.isNotEmpty) {

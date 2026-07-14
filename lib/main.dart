@@ -153,7 +153,7 @@ Future<void> _handleWidgetToggleUri(
         endDate: today,
         allDay: true,
       );
-      await container.read(tasksProvider.notifier).addTask(newTask);
+      await container.read(vaultProvider.notifier).createObject(newTask);
       await forceWidgetSync(container);
       debugPrint('[WidgetCallback] quick add task: $title');
     }
@@ -211,8 +211,8 @@ Future<void> _handleWidgetToggleUri(
       .firstOrNull;
   if (type == 'task' && object is Task) {
     await container
-        .read(tasksProvider.notifier)
-        .updateTask(
+        .read(vaultProvider.notifier)
+        .updateObject(
           object.copyWith(
             stage: object.isCompleted ? TaskStage.todo : TaskStage.finalized,
           ),

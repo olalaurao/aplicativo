@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/vault_provider.dart';
 import '../screens/universal_detail_view.dart';
 import '../theme.dart';
@@ -77,12 +78,7 @@ class MarkdownBodyView extends ConsumerWidget {
             }).firstOrNull;
 
             if (matchingObject != null) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => UniversalDetailView(object: matchingObject),
-                ),
-              );
+              context.push('/detail/${matchingObject.id}', extra: matchingObject);
             } else {
               // Handle broken link
               _showCreateBrokenLinkDialog(context, objectTitle);

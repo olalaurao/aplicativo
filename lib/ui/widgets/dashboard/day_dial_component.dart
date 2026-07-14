@@ -13,12 +13,14 @@ import '../../../models/organizer_model.dart';
 import '../../../models/pomodoro_session.dart';
 import '../../../models/reminder_model.dart';
 import '../../../models/task_model.dart';
+import '../../../models/shared_types.dart';
 import '../../../services/day_dial_aggregator.dart';
 import '../../../services/day_dial_legend_builder.dart';
 import '../../../providers/vault_provider.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../providers/pomodoro_provider.dart';
 import '../../theme.dart';
+import '../../utils/object_icons.dart';
 import '../day_dial_widget.dart';
 
 class DayDialComponent extends ConsumerStatefulWidget {
@@ -45,6 +47,8 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
     final today = DateTime(now.year, now.month, now.day);
 
     final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
+    final settings = ref.watch(settingsProvider);
+    final typeSignatures = settings.typeSignatures;
 
     final snapshot = DayDialAggregator.aggregateForDate(
       date: today,
@@ -57,6 +61,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
       timeBlocks: allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.timeBlock).toList(),
       journalEntries: allObjects.whereType<JournalEntry>().toList(),
       moodCatalog: allObjects.whereType<MoodDefinition>().toList(),
+      typeSignatures: typeSignatures,
     );
 
     final showLegend = widget.block.metadata['showLegend'] as bool? ?? true;
@@ -148,7 +153,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
                     const SizedBox(height: 8),
                     _buildLegend(context, snapshot.segments),
                     const SizedBox(height: 12),
-                    _buildChronologicalList(context, snapshot.segments, allObjects),
+                    _buildChronologicalList(context, snapshot.segments, allObjects, typeSignatures),
                   ],
                 ),
               ),
@@ -226,7 +231,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
     );
   }
 
-  Widget _buildChronologicalList(BuildContext context, List<DialSegment> segments, List<dynamic> allObjects) {
+  Widget _buildChronologicalList(BuildContext context, List<DialSegment> segments, List<dynamic> allObjects, Map<String, TypeSignature> typeSignatures) {
     if (segments.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -242,7 +247,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
         itemBuilder: (context, index) {
           final segment = sortedSegments[index];
           final timeStr = DateFormat('HH:mm').format(segment.start);
-          final emoji = _getEmojiForSegment(segment);
+          final emoji = _getEmojiForSegment(segment, typeSignatures);
           final segColor = Color(int.parse(segment.colorHex.replaceAll('#', '0xFF')));
           
           // Check if segment is completable (task or habit)
@@ -391,28 +396,28 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
     );
   }
 
-  String _getEmojiForSegment(DialSegment segment) {
+  String _getEmojiForSegment(DialSegment segment, Map<String, TypeSignature> typeSignatures) {
     if (segment.emoji != null) return segment.emoji!;
     
-    // Fallback emojis based on segment kind
+    // Fallback emojis based on segment kind using ObjectIcons
     switch (segment.kind) {
       case DialSegmentKind.taskPlanned:
-        return '✅';
+        return ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.task, typeSignatures);
       case DialSegmentKind.habitSlot:
-        return '🔄';
+        return ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.habit, typeSignatures);
       case DialSegmentKind.event:
-        return '📅';
+        return ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.event, typeSignatures);
       case DialSegmentKind.pomodoroPlanned:
       case DialSegmentKind.pomodoroCompleted:
         return '🍅';
       case DialSegmentKind.timeBlock:
         return '⏱️';
       case DialSegmentKind.reminder:
-        return '⏰';
+        return ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.reminder, typeSignatures);
       case DialSegmentKind.dayTheme:
         return '🌅';
       case DialSegmentKind.sleep:
-        return '�';
+        return '😴';
     }
   }
 }

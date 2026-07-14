@@ -9,6 +9,8 @@ import '../../models/shared_types.dart';
 import '../../models/template_model.dart';
 import '../../models/organizer_model.dart';
 import '../../providers/vault_provider.dart';
+import '../widgets/app_switch_tile.dart';
+import '../widgets/date_picker_field.dart';
 import '../theme.dart';
 import 'scheduler_picker.dart';
 import '../widgets/wiki_link_controller.dart';
@@ -136,7 +138,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
                 children: [
                   TextField(
                     controller: _titleController,
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) { if (mounted) setState(() {}); },
                     style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
@@ -238,11 +240,8 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
                         ),
                         if (_type == NotificationType.alarm) ...[
                           const SizedBox(height: 16),
-                          SwitchListTile(
-                            title: const Text(
-                              'Tocar no silencioso',
-                              style: TextStyle(fontSize: 14),
-                            ),
+                          AppSwitchTile(
+                            title: 'Tocar no silencioso',
                             value: _ringOnSilent,
                             onChanged: (val) => setState(() => _ringOnSilent = val),
                             contentPadding: EdgeInsets.zero,

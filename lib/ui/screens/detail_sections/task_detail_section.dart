@@ -18,13 +18,13 @@ List<PropertyCard> buildTaskPropertyCards(
   
   cards.add(PropertyCard(
     icon: Icons.calendar_today_outlined,
-    label: 'Criado',
+    label: 'Created',
     value: DateFormat('d MMM yyyy').format(task.createdAt),
   ));
   cards.add(PropertyCard(
     icon: Icons.event,
-    label: 'Prazo',
-    value: task.endDate != null ? DateFormat('d MMM yyyy').format(task.endDate!) : 'Não definida',
+    label: 'Deadline',
+    value: task.endDate != null ? DateFormat('d MMM yyyy').format(task.endDate!) : 'Not set',
     state: task.endDate == null 
         ? PropertyCardState.empty 
         : (_isOverdue(task) ? PropertyCardState.overdue : PropertyCardState.normal),
@@ -32,13 +32,13 @@ List<PropertyCard> buildTaskPropertyCards(
   ));
   cards.add(PropertyCard(
     icon: Icons.play_circle_outline,
-    label: 'Início',
-    value: task.startDate != null ? DateFormat('d MMM yyyy').format(task.startDate!) : 'Não definida',
+    label: 'Start',
+    value: task.startDate != null ? DateFormat('d MMM yyyy').format(task.startDate!) : 'Not set',
     state: task.startDate == null ? PropertyCardState.empty : PropertyCardState.normal,
   ));
   cards.add(PropertyCard(
     icon: Icons.priority_high,
-    label: 'Prioridade',
+    label: 'Priority',
     value: '',
     customChild: _buildPriorityBadge(task),
   ));
@@ -99,6 +99,8 @@ String _getStatusLabel(Task task) {
       return 'PENDING';
     case TaskStage.finalized:
       return 'DONE';
+    default:
+      return 'UNKNOWN';
   }
 }
 
@@ -108,28 +110,31 @@ Widget _buildPriorityBadge(Task task) {
   
   switch (task.priority) {
     case TaskPriority.high:
-      color = Colors.red;
-      label = 'ALTA';
+      color = AppColors.priorityHigh;
+      label = 'HIGH';
       break;
     case TaskPriority.medium:
-      color = Colors.orange;
-      label = 'MÉDIA';
+      color = AppColors.priorityMedium;
+      label = 'MEDIUM';
       break;
     case TaskPriority.low:
-      color = Colors.green;
-      label = 'BAIXA';
+      color = AppColors.priorityLow;
+      label = 'LOW';
       break;
     case TaskPriority.none:
-      color = Colors.grey;
-      label = 'NENHUMA';
+      color = AppColors.textMuted;
+      label = 'NONE';
       break;
+    default:
+      color = AppColors.textMuted;
+      label = 'UNKNOWN';
   }
   
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
     decoration: BoxDecoration(
       color: color.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(AppBorderRadius.sm),
       border: Border.all(color: color.withValues(alpha: 0.3)),
     ),
     child: Text(
@@ -143,18 +148,17 @@ Widget _buildPriorityBadge(Task task) {
   );
 }
 
-void _showTaskDueDatePicker(BuildContext context, WidgetRef ref, Task task) {
-  showDatePicker(
+void _showTaskDueDatePicker(BuildContext context, WidgetRef ref, Task task) async {
+  final picked = await showDatePicker(
     context: context,
     initialDate: task.endDate ?? DateTime.now(),
     firstDate: DateTime.now(),
     lastDate: DateTime(2030),
-  ).then((picked) {
-    if (picked != null) {
-      final updated = task.copyWith(endDate: picked);
-      ref.read(vaultProvider.notifier).updateObject(updated);
-    }
-  });
+  );
+  if (picked != null) {
+    final updated = task.copyWith(endDate: picked);
+    ref.read(vaultProvider.notifier).updateObject(updated);
+  }
 }
 
 void _showEnumPropertyPicker<T>({
