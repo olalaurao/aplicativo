@@ -368,18 +368,8 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
             Navigator.pop(sheetContext);
             if (selectedObject is Task) {
               // Add as dependency
-              final currentDeps = widget.task.dependsOn;
-              if (currentDeps == null) {
-                final updated = widget.task.copyWith(
-                  dependsOn: [selectedObject.id],
-                );
-                await ref.read(tasksProvider.notifier).updateTask(updated);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Dependência "${selectedObject.title}" adicionada.')),
-                  );
-                }
-              } else if (!currentDeps.contains(selectedObject.id)) {
+              final currentDeps = widget.task.dependsOn ?? [];
+              if (!currentDeps.contains(selectedObject.id)) {
                 final updated = widget.task.copyWith(
                   dependsOn: [...currentDeps, selectedObject.id],
                 );

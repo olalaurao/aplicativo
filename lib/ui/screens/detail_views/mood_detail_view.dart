@@ -7,6 +7,7 @@ import '../../../models/content_object.dart';
 import '../../../providers/vault_provider.dart';
 import '../../theme.dart';
 import '../../widgets/object_action_wrapper.dart';
+import '../../widgets/quartzo_chart.dart';
 import '../universal_detail_view.dart';
 
 /// MoodDefinition-specific content section for universal detail view
@@ -48,14 +49,22 @@ List<Widget> buildMoodContentSection(
               width: double.infinity,
               decoration: AppTheme.cardDecoration(context),
               padding: const EdgeInsets.all(16),
-              child: Center(
-                child: Text(
-                  'Mood frequency chart (placeholder)',
-                  style: TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 14,
-                  ),
-                ),
+              child: QuartzoChart(
+                type: ChartType.heatmap,
+                color: AppColors.habitPurple,
+                data: List.generate(30, (i) {
+                  final date = DateTime.now().subtract(
+                    Duration(days: 29 - i),
+                  );
+                  final hasEntry = moodEntries.any(
+                    (e) =>
+                        e.moodSlug == mood.id && _isSameDay(e.date, date),
+                  );
+                  return ChartDataPoint(
+                    label: '',
+                    value: hasEntry ? 1.0 : 0.0,
+                  );
+                }),
               ),
             ),
             const SizedBox(height: 24),

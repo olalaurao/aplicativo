@@ -76,7 +76,7 @@ class _SocialPostDetailState extends ConsumerState<SocialPostDetail> {
               ),
               title: Row(
                 children: [
-                  Flexible(
+                  Expanded(
                     child: Text(
                       _titleFor(post),
                       maxLines: 1,

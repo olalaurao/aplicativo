@@ -91,27 +91,19 @@ String _getStatus(Project project) {
 Widget _buildPriorityBadge(Project project) {
   if (project.projectPriority == null) return const SizedBox.shrink();
   
-  Color color;
-  String label;
+  final color = switch (project.projectPriority) {
+    TaskPriority.high => Colors.red,
+    TaskPriority.medium => Colors.orange,
+    TaskPriority.low => Colors.green,
+    TaskPriority.none => Colors.grey,
+  };
   
-  switch (project.projectPriority) {
-    case TaskPriority.high:
-      color = Colors.red;
-      label = 'ALTA';
-      break;
-    case TaskPriority.medium:
-      color = Colors.orange;
-      label = 'MÉDIA';
-      break;
-    case TaskPriority.low:
-      color = Colors.green;
-      label = 'BAIXA';
-      break;
-    case TaskPriority.none:
-      color = Colors.grey;
-      label = 'NENHUMA';
-      break;
-  }
+  final label = switch (project.projectPriority) {
+    TaskPriority.high => 'ALTA',
+    TaskPriority.medium => 'MÉDIA',
+    TaskPriority.low => 'BAIXA',
+    TaskPriority.none => 'NENHUMA',
+  };
   
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

@@ -570,10 +570,9 @@ class NotificationService with WidgetsBindingObserver {
       category: (isAlarm || isPopup)
           ? AndroidNotificationCategory.alarm
           : AndroidNotificationCategory.reminder,
-      // Use user-configurable sound and vibration settings
-      // Note: vibrationPattern is set at channel level, not here
-      playSound: (isAlarm || isPopup) ? true : config.playSound,
-      enableVibration: (isAlarm || isPopup) || config.vibrate,
+      // Force sound and vibration for all notifications to ensure they work reliably
+      playSound: true,
+      enableVibration: true,
       audioAttributesUsage: isAlarm || isPopup
           ? AudioAttributesUsage.alarm
           : AudioAttributesUsage.notification,

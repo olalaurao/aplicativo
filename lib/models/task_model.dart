@@ -118,7 +118,7 @@ class Task extends ContentObject {
   String? linkedGoogleEventUrl;
   int? pomodoroCount;
   String? timeBlock;
-  List<String> dependsOn;
+  List<String> dependsOn = const [];
   int? estimatedMinutes;
   TripleCheck? tripleCheck;
   String? linkedSystem;
@@ -184,19 +184,19 @@ class Task extends ContentObject {
     super.updatedAt,
     super.obsidianPath,
     super.reminders,
-    this.exportedCalendarId,
-    this.linkedGoogleEventId,
-    this.linkedGoogleEventTitle,
-    this.linkedGoogleEventDate,
-    this.linkedGoogleEventUrl,
-    this.pomodoroCount,
-    this.timeBlock,
-    this.dependsOn = const [],
-    this.estimatedMinutes,
-    this.tripleCheck,
-    this.linkedSystem,
-    this.rotationGroupId,
-    this.rotationFrequencyType = RotationFrequencyType.none,
+    exportedCalendarId,
+    linkedGoogleEventId,
+    linkedGoogleEventTitle,
+    linkedGoogleEventDate,
+    linkedGoogleEventUrl,
+    pomodoroCount,
+    timeBlock,
+    dependsOn = const [],
+    estimatedMinutes,
+    tripleCheck,
+    linkedSystem,
+    rotationGroupId,
+    rotationFrequencyType = RotationFrequencyType.none,
     this.rotationEveryN,
     this.rotationLastCompletedAtOccurrence,
     Map<String, bool>? rotationDailyCompletions,

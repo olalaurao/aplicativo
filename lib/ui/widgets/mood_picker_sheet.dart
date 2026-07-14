@@ -303,27 +303,31 @@ class _MoodWordTile extends StatelessWidget {
               style: const TextStyle(fontSize: 32),
             ),
             const SizedBox(height: 8),
-            Text(
-              mood.label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
+            Flexible(
+              child: Text(
+                mood.label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
             if (mood.description != null && mood.description!.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(
-                mood.description!,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textMuted,
+              Flexible(
+                child: Text(
+                  mood.description!,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textMuted,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
             ],
           ],

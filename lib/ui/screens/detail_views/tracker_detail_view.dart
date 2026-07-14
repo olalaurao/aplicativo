@@ -6,6 +6,7 @@ import '../../../models/tracker_model.dart';
 import '../../../providers/vault_provider.dart';
 import '../../theme.dart';
 import '../../widgets/tracker_metric_card.dart';
+import '../../widgets/quartzo_chart.dart';
 import '../../../models/content_object.dart';
 
 /// TrackerDefinition-specific content section for universal detail view
@@ -118,14 +119,21 @@ List<Widget> buildTrackerContentSection(
                     width: double.infinity,
                     decoration: AppTheme.cardDecoration(context),
                     padding: const EdgeInsets.all(16),
-                    child: Center(
-                      child: Text(
-                        'Distribution chart (placeholder)',
-                        style: TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 14,
-                        ),
-                      ),
+                    child: QuartzoChart(
+                      type: ChartType.pie,
+                      data: counts.entries
+                          .map(
+                            (e) => ChartDataPoint(
+                              label: e.key,
+                              value: e.value.toDouble(),
+                              color:
+                                  Colors.primaries[counts.keys
+                                          .toList()
+                                          .indexOf(e.key) %
+                                      Colors.primaries.length],
+                            ),
+                          )
+                          .toList(),
                     ),
                   )
                 ],
@@ -151,14 +159,18 @@ List<Widget> buildTrackerContentSection(
               width: double.infinity,
               decoration: AppTheme.cardDecoration(context),
               padding: const EdgeInsets.all(16),
-              child: Center(
-                child: Text(
-                  'Activity heatmap (placeholder)',
-                  style: TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 14,
-                  ),
-                ),
+              child: QuartzoChart(
+                type: ChartType.heatmap,
+                color: parseColor(tracker.color),
+                data: List.generate(30, (i) {
+                  final date = DateTime.now().subtract(
+                    Duration(days: 29 - i),
+                  );
+                  final count = trackerRecords
+                      .where((r) => isSameDay(r.date, date))
+                      .length;
+                  return ChartDataPoint(label: '', value: count.toDouble());
+                }),
               ),
             ),
           ],
