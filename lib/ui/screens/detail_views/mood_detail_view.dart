@@ -7,7 +7,6 @@ import '../../../models/content_object.dart';
 import '../../../providers/vault_provider.dart';
 import '../../theme.dart';
 import '../../widgets/object_action_wrapper.dart';
-import '../../widgets/quartzo_chart.dart';
 import '../universal_detail_view.dart';
 
 /// MoodDefinition-specific content section for universal detail view
@@ -16,7 +15,7 @@ List<Widget> buildMoodContentSection(
   WidgetRef ref,
   MoodDefinition mood,
   Widget Function(List<JournalEntry>) buildMoodFrequencyChart,
-  Widget Function(BuildContext, ContentObject) buildMentionRow,
+  Widget Function(BuildContext, dynamic) buildMentionRow,
 ) {
   final moodEntries = ref.watch(allEntriesProvider.select((entries) => entries.where((e) => e.moodSlug == mood.id).toList()..sort((a, b) => b.date.compareTo(a.date))));
 
@@ -49,22 +48,14 @@ List<Widget> buildMoodContentSection(
               width: double.infinity,
               decoration: AppTheme.cardDecoration(context),
               padding: const EdgeInsets.all(16),
-              child: QuartzoChart(
-                type: ChartType.heatmap,
-                color: AppColors.habitPurple,
-                data: List.generate(30, (i) {
-                  final date = DateTime.now().subtract(
-                    Duration(days: 29 - i),
-                  );
-                  final hasEntry = moodEntries.any(
-                    (e) =>
-                        e.moodSlug == mood.id && _isSameDay(e.date, date),
-                  );
-                  return ChartDataPoint(
-                    label: '',
-                    value: hasEntry ? 1.0 : 0.0,
-                  );
-                }),
+              child: Center(
+                child: Text(
+                  'Mood frequency chart (placeholder)',
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 14,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 24),

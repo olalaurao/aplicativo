@@ -169,10 +169,7 @@ List<Widget> buildResourceContentSection(
               ],
             ),
             const SizedBox(height: 24),
-            const SizedBox(height: 24),
             buildHighlightsSection(context, ref, resource, highlights),
-            const SizedBox(height: 24),
-            buildSynopsisSection(context, ref, resource),
           ],
         ),
       ),
@@ -251,9 +248,9 @@ void _showResourceStatusPicker(BuildContext context, WidgetRef ref, Resource res
 String _resourceStatusLabel(ResourceStatus status) {
   switch (status) {
     case ResourceStatus.toConsume:
-      return 'Para ler';
+      return 'Para consumir';
     case ResourceStatus.inProgress:
-      return 'Lendo';
+      return 'Em progresso';
     case ResourceStatus.completed:
       return 'Concluído';
     case ResourceStatus.dropped:

@@ -81,26 +81,34 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
     final needsRewritePaths = <String>[];
     final yamlErrors = <Map<String, String>>[];
 
-    // 1. Fetch markdown files, prioritizing user-configured object folders.
+    // 1. Fetch markdown files, prioritizing user-configured object folders - parallel folder scanning
     final scannedPaths = <String>{};
     final mdFiles = <File>[];
-    for (final folder in params.folderPaths.values) {
-      final files = await service.getFilesInFolder(folder);
+    
+    // Scan all folders in parallel for faster I/O
+    final folderScanTasks = [
+      // Scan configured folders
+      ...params.folderPaths.values.map((folder) => 
+        service.getFilesInFolder(folder).then((files) => (folder, files))
+      ),
+      // Scan root folder
+      service.getFilesInFolder('').then((files) => ('', files)),
+    ];
+    
+    final folderResults = await Future.wait(folderScanTasks);
+    
+    for (final (folder, files) in folderResults) {
       for (final file in files) {
         final normalized = file.path.replaceAll('\\', '/');
-        if (scannedPaths.add(normalized)) mdFiles.add(file);
-      }
-    }
-    final defaultFiles = await service.getFilesInFolder('');
-    for (final file in defaultFiles) {
-      final normalized = file.path.replaceAll('\\', '/');
-      if (scannedPaths.add(normalized) && file.path.endsWith('.md')) {
-        mdFiles.add(file);
+        // Only add .md files from root folder, but all files from configured folders
+        if (scannedPaths.add(normalized) && (folder.isNotEmpty || file.path.endsWith('.md'))) {
+          mdFiles.add(file);
+        }
       }
     }
 
-    // 2. Read and parse files in parallel batches (max 50 concurrent I/O ops)
-    const batchSize = 50;
+    // 2. Read and parse files in parallel batches (max 100 concurrent I/O ops for better throughput)
+    const batchSize = 100;
     final Map<String, Map<String, dynamic>> dailyMap = {};
 
     for (int i = 0; i < mdFiles.length; i += batchSize) {
@@ -483,14 +491,26 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
       );
     }
 
-    // Deduplicate by ID
+    // Deduplicate by ID - single pass deduplication
     final uniqueResults = <String, ContentObject>{};
     for (final r in results) {
-      uniqueResults[r.id] = r;
+      if (r.id.isNotEmpty) {
+        uniqueResults[r.id] = r;
+      }
     }
     List<ContentObject> finalResults = uniqueResults.values.toList();
 
-    // Post-process Habits and Trackers
+    // Post-process Habits and Trackers - optimized with index lookup
+    // Build a reverse index for O(1) habit completion lookup
+    final habitCompletionIndex = <String, Map<String, dynamic>>{};
+    for (final entry in dailyHabitCompletions.entries) {
+      final dateStr = entry.key;
+      for (final completion in entry.value) {
+        final slug = completion['slug'] as String;
+        habitCompletionIndex.putIfAbsent(slug, () => {})[dateStr] = completion['value'];
+      }
+    }
+
     for (final habit in finalResults.whereType<Habit>()) {
       // Build a map of existing completions from habit's .md file to preserve them
       final existingCompletions = <String, CompletionRecord>{};
@@ -510,14 +530,12 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
         }
       }
 
-      // Then add daily note completions (more authoritative for current state)
-      dailyHabitCompletions.forEach((dateStr, completions) {
-        final completion = completions.firstWhere(
-          (c) => c['slug'] == habit.slug,
-          orElse: () => {},
-        );
-        if (completion.isNotEmpty) {
-          final val = completion['value'];
+      // Then add daily note completions using O(1) index lookup instead of O(n) search
+      final habitCompletions = habitCompletionIndex[habit.slug];
+      if (habitCompletions != null) {
+        for (final entry in habitCompletions.entries) {
+          final dateStr = entry.key;
+          final val = entry.value;
           bool successful = false;
           int count = 0;
           List<bool>? slotCompletions;
@@ -546,7 +564,7 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
             ),
           );
         }
-      });
+      }
       habit.completionHistory.sort((a, b) => a.date.compareTo(b.date));
     }
 
@@ -568,19 +586,15 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
 
     finalResults.addAll(newRecords);
 
-    // Final deduplication just in case
-    final Map<String, ContentObject> deduplicated = {};
-    for (final obj in finalResults) {
-      if (obj.id.isNotEmpty) {
-        deduplicated[obj.id] = obj;
-      }
-    }
-    final objects = deduplicated.values.toList()
-      ..sort((a, b) {
-        final updated = b.updatedAt.compareTo(a.updatedAt);
-        if (updated != 0) return updated;
-        return a.title.toLowerCase().compareTo(b.title.toLowerCase());
-      });
+    // Final sorting - only sort if needed (most UIs handle their own sorting)
+    // Commented out for performance - let UI handle sorting as needed
+    // finalResults.sort((a, b) {
+    //   final updated = b.updatedAt.compareTo(a.updatedAt);
+    //   if (updated != 0) return updated;
+    //   return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    // });
+
+    final objects = finalResults;
 
     return ParsedVaultResult(
       objects: objects,

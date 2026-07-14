@@ -6,9 +6,9 @@ import '../../../models/project_model.dart';
 import '../../../models/task_model.dart';
 import '../../../providers/vault_provider.dart';
 import '../../../services/kpi_engine.dart';
+import '../../../services/project_progress_cache.dart';
 import '../../widgets/property_grid.dart';
 import '../../theme.dart';
-import '../universal_detail_view.dart';
 
 /// Project-specific property cards for universal detail view
 List<PropertyCard> buildProjectPropertyCards(
@@ -18,8 +18,7 @@ List<PropertyCard> buildProjectPropertyCards(
 ) {
   final cards = <PropertyCard>[];
   final allObjects = ref.watch(allObjectsProvider).value ?? [];
-  final tasks = allObjects.whereType<Task>().where((t) => 
-      t.organizers.any((o) => o.slug == project.slug)).toList();
+  final tasks = allObjects.whereType<Task>().toList();
   final progress = ProjectProgressCache.getProgress(project.id, project, tasks);
   final linkedTasksCount = ProjectProgressCache.getLinkedTaskCount(project.id, project, tasks);
   final doneCount = ProjectProgressCache.getCompletedTaskCount(project.id, project, tasks);

@@ -162,16 +162,18 @@ Widget buildNoteListItem(BuildContext context, Note note) {
 
 void _navigateToSlug(BuildContext context, WidgetRef ref, String slug) {
   final all = ref.read(allObjectsProvider).valueOrNull ?? [];
-  final target = all.cast<ContentObject?>().firstWhere(
-    (o) =>
-        o != null &&
-        (o.slug == slug || o.title.toLowerCase() == slug.toLowerCase()),
-    orElse: () => null,
-  );
+  ContentObject? target;
+  try {
+    target = all.whereType<ContentObject>().firstWhere(
+      (o) => o.slug == slug || o.title.toLowerCase() == slug.toLowerCase(),
+    );
+  } catch (_) {
+    target = null;
+  }
   if (target != null) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => UniversalDetailView(object: target)),
+      MaterialPageRoute(builder: (_) => UniversalDetailView(object: target!)),
     );
   } else {
     ScaffoldMessenger.of(

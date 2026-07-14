@@ -427,7 +427,7 @@ class HabitDetailView {
               return FlSpot(entry.key.toDouble(), entry.value.value);
             }).toList(),
             isCurved: true,
-            color: AppTheme.accentColor(BuildContext as BuildContext),
+            color: AppColors.primary,
             barWidth: 3,
             dotData: const FlDotData(show: false),
           ),

@@ -26,6 +26,7 @@ import '../models/project_model.dart';
 import '../models/snapshot_model.dart';
 import '../models/scheduler.dart';
 import '../services/kpi_engine.dart';
+import '../services/project_progress_cache.dart';
 
 import '../models/template_model.dart';
 import '../models/idea_model.dart';
@@ -306,6 +307,8 @@ class TasksNotifier extends Notifier<List<Task>> {
   Future<void> addTask(Task task) async {
     state = [...state, task];
     await ref.read(vaultProvider.notifier).createObject(task);
+    // Invalidate project progress cache when a task is added
+    _invalidateProjectProgressCache(task);
   }
 
   Future<void> updateTask(Task task) async {
@@ -318,6 +321,8 @@ class TasksNotifier extends Notifier<List<Task>> {
     ];
 
     await ref.read(vaultProvider.notifier).updateObject(task);
+    // Invalidate project progress cache when a task is updated
+    _invalidateProjectProgressCache(task);
     if (previous?.stage != TaskStage.finalized &&
         task.stage == TaskStage.finalized) {
       await _completeContactTaskIfNeeded(task);
@@ -327,6 +332,21 @@ class TasksNotifier extends Notifier<List<Task>> {
   Future<void> deleteTask(Task task) async {
     state = state.where((t) => t.id != task.id).toList();
     await ref.read(vaultProvider.notifier).deleteObject(task);
+    // Invalidate project progress cache when a task is deleted
+    _invalidateProjectProgressCache(task);
+  }
+
+  void _invalidateProjectProgressCache(Task task) {
+    // Invalidate cache for all projects this task is linked to
+    final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+    final projects = allObjects.whereType<Project>().toList();
+    
+    for (final project in projects) {
+      if (project.taskLinks.contains(task.slug) || project.taskLinks.contains(task.id) ||
+          task.organizers.any((org) => org.slug == project.slug)) {
+        ProjectProgressCache.invalidateForProject(project.id);
+      }
+    }
   }
 
   Future<void> _completeContactTaskIfNeeded(Task task) async {

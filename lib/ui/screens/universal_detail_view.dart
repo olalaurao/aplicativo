@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../models/reminder_config.dart';
 import '../../services/notification_service.dart';
 import '../widgets/reminder_config_sheet.dart';
-import '../widgets/wiki_link_picker.dart';
 import 'package:flutter/services.dart';
 import '../../providers/history_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -42,8 +41,6 @@ import '../../models/note_model.dart';
 import '../../models/idea_model.dart';
 import '../widgets/checklist_view.dart';
 import '../../models/template_model.dart';
-import '../widgets/wiki_text_view.dart';
-import '../widgets/journal_body_view.dart';
 import '../widgets/markdown_body_view.dart';
 import '../widgets/universal_search_picker.dart';
 import '../widgets/conflict_badge.dart';
@@ -81,50 +78,14 @@ import 'detail_views/person_detail_view.dart';
 import 'detail_views/note_detail_view.dart';
 import 'detail_views/mood_detail_view.dart';
 import 'detail_views/tracker_detail_view.dart';
+import '../../services/project_progress_cache.dart';
+import 'detail_sections/task_content_section.dart';
+import 'detail_sections/journal_entry_content_section.dart';
+import 'detail_sections/project_content_section.dart';
+import 'detail_sections/goal_content_section.dart';
+import 'detail_sections/idea_content_section.dart';
+import 'detail_sections/habit_content_section.dart';
 
-/// Helper class to cache computed project progress to avoid duplicate calculations
-class ProjectProgressCache {
-  static final Map<String, double> _cache = {};
-  static final Map<String, int> _linkedTaskCountCache = {};
-  static final Map<String, int> _completedTaskCountCache = {};
-  static final Map<String, List<Task>> _linkedTasksCache = {};
-
-  static List<Task> _getLinkedTasks(String projectId, Project project, List<Task> tasks) {
-    if (_linkedTasksCache.containsKey(projectId)) return _linkedTasksCache[projectId]!;
-    final linkedTasks = tasks.where((t) => project.taskLinks.contains(t.slug) || project.taskLinks.contains(t.id)).toList();
-    _linkedTasksCache[projectId] = linkedTasks;
-    return linkedTasks;
-  }
-
-  static double getProgress(String projectId, Project project, List<Task> tasks) {
-    if (_cache.containsKey(projectId)) return _cache[projectId]!;
-    final progress = KPIEngine.calculateProjectProgress(project, tasks);
-    _cache[projectId] = progress;
-    return progress;
-  }
-
-  static int getLinkedTaskCount(String projectId, Project project, List<Task> tasks) {
-    if (_linkedTaskCountCache.containsKey(projectId)) return _linkedTaskCountCache[projectId]!;
-    final linkedTasks = _getLinkedTasks(projectId, project, tasks);
-    _linkedTaskCountCache[projectId] = linkedTasks.length;
-    return linkedTasks.length;
-  }
-
-  static int getCompletedTaskCount(String projectId, Project project, List<Task> tasks) {
-    if (_completedTaskCountCache.containsKey(projectId)) return _completedTaskCountCache[projectId]!;
-    final linkedTasks = _getLinkedTasks(projectId, project, tasks);
-    final doneCount = linkedTasks.where((t) => t.isCompleted).length;
-    _completedTaskCountCache[projectId] = doneCount;
-    return doneCount;
-  }
-
-  static void clearCache() {
-    _cache.clear();
-    _linkedTaskCountCache.clear();
-    _completedTaskCountCache.clear();
-    _linkedTasksCache.clear();
-  }
-}
 
 class _PropRow {
   final String label;
@@ -934,172 +895,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     ];
   }
 
-  void _showStringPropertyPicker({
-    required BuildContext context,
-    required String title,
-    required String initialValue,
-    required void Function(String newValue) onSave,
-  }) {
-    final controller = TextEditingController(text: initialValue);
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppTheme.surfaceColor(context),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Editar $title', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: title,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Descartar', style: TextStyle(color: AppColors.textMuted)),
-            ),
-            TextButton(
-              onPressed: () {
-                onSave(controller.text);
-                Navigator.pop(context);
-              },
-              child: Text('Salvar', style: TextStyle(color: AppTheme.accentColor(context), fontWeight: FontWeight.w600)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showEnumPropertyPicker<T>({
-    required BuildContext context,
-    required String title,
-    required T initialValue,
-    required List<T> values,
-    required String Function(T) labelBuilder,
-    required void Function(T newValue) onSave,
-  }) {
-    T currentValue = initialValue;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              backgroundColor: AppTheme.surfaceColor(context),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: Text('Editar $title', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: values.map((val) {
-                    return RadioListTile<T>(
-                      title: Text(labelBuilder(val)),
-                      value: val,
-                      groupValue: currentValue,
-                      onChanged: (newVal) {
-                        if (newVal != null) {
-                          setState(() => currentValue = newVal);
-                        }
-                      },
-                      contentPadding: EdgeInsets.zero,
-                    );
-                  }).toList(),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Descartar', style: TextStyle(color: AppColors.textMuted)),
-                ),
-                TextButton(
-                  onPressed: () {
-                    onSave(currentValue);
-                    Navigator.pop(context);
-                  },
-                  child: Text('Salvar', style: TextStyle(color: AppTheme.accentColor(context), fontWeight: FontWeight.w600)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showBoolPropertyPicker({
-    required BuildContext context,
-    required String title,
-    required bool initialValue,
-    required void Function(bool newValue) onSave,
-  }) {
-    bool currentValue = initialValue;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              backgroundColor: AppTheme.surfaceColor(context),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: Text('Editar $title', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-              content: SwitchListTile(
-                title: Text(title),
-                value: currentValue,
-                onChanged: (val) => setState(() => currentValue = val),
-                contentPadding: EdgeInsets.zero,
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Descartar', style: TextStyle(color: AppColors.textMuted)),
-                ),
-                TextButton(
-                  onPressed: () {
-                    onSave(currentValue);
-                    Navigator.pop(context);
-                  },
-                  child: Text('Salvar', style: TextStyle(color: AppTheme.accentColor(context), fontWeight: FontWeight.w600)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  IconData _getSubtypeIcon(NoteSubtype subtype) {
-    switch (subtype) {
-      case NoteSubtype.text:
-        return Icons.notes_rounded;
-      case NoteSubtype.outline:
-        return Icons.account_tree_outlined;
-      case NoteSubtype.collection:
-        return Icons.grid_view_rounded;
-    }
-  }
-
-  void _showParentNotePicker(BuildContext context, Note note) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => WikiLinkPicker(
-        onSelected: (parentObj) {
-          ref.read(vaultProvider.notifier).updateObject(note.copyWith(parentNoteId: parentObj.id));
-        },
-        initialQuery: '',
-      ),
-    );
-  }
-
   void _shareNote(BuildContext context, Note note) {
     // Implementation for sharing the note
   }
@@ -1174,80 +969,15 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   List<Widget> _buildTypeSpecificContent(BuildContext context, WidgetRef ref) {
     if (object is Task) {
       final task = object as Task;
-      return [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (task.notes.isNotEmpty) ...[
-                  const Text(
-                    'Notes',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: AppTheme.cardDecoration(context),
-                    child: WikiTextView(
-                      text: task.notes.join('\n'),
-                      style: const TextStyle(fontSize: 15, height: 1.5),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-                if (task.dependsOn.isNotEmpty) ...[
-                  const Text(
-                    'Depende de (Bloqueantes)',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDependsOnList(context, ref, task.dependsOn),
-                  const SizedBox(height: 24),
-                ],
-                if (task.subtasks.isNotEmpty) ...[
-                  const Text(
-                    'Subtasks',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildSubtaskList(context, ref, task.subtasks),
-                ] else ...[
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.account_tree_rounded, size: 16),
-                    label: const Text('Aplicar System (Via B)'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.accentColor(context),
-                      side: BorderSide(
-                        color: AppTheme.accentColor(context).withValues(alpha: 0.4),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () => _showApplySystemSheet(context, ref, task),
-                  ),
-                ],
-                // ── V2.8.3 Time Estimates vs Actuals ──
-                if (task.estimatedMinutes != null ||
-                    task.actualMinutes > 0 ||
-                    (task.pomodoroCount != null &&
-                        task.pomodoroCount! > 0)) ...[
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Tempo',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildTimeEstimateCard(context, task),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ];
+      return buildTaskContentSection(
+        context,
+        ref,
+        task,
+        () => _showApplySystemSheet(context, ref, task),
+        _buildDependsOnList,
+        _buildSubtaskList,
+        _buildTimeEstimateCard,
+      );
     }
 
     if (object is SystemDefinition) {
@@ -1269,347 +999,47 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     if (object is JournalEntry) {
       final entry = object as JournalEntry;
       final mood = _moodForEntry(entry);
-      final plainBody = MarkdownParser.getPlainTextFromBody(entry.body).trim();
-      return [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: Container(
-              decoration: AppTheme.cardDecoration(context),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppTheme.accentColor(context).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          mood?.emoji ??
-                              (entry.moodSlug != null
-                                  ? _fallbackMoodEmoji(entry.moodSlug!)
-                                  : '📝'),
-                          style: const TextStyle(fontSize: 22),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              DateFormat(
-                                'EEE, d MMM yyyy • HH:mm',
-                              ).format(entry.date),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textMutedColor(context),
-                              ),
-                            ),
-                            if (mood != null)
-                              Text(
-                                mood.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppTheme.accentColor(context),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (entry.title.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      entry.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  if (_isEditing)
-                    SizedBox(
-                      height: 360,
-                      child: RichTextEditor(
-                        content: entry.body,
-                        onChanged: (newVal) {
-                          final updated = entry.copyWith(body: newVal);
-                          ref
-                              .read(vaultProvider.notifier)
-                              .updateObject(updated);
-                          setState(() => object = updated);
-                        },
-                      ),
-                    )
-                  else if (plainBody.isEmpty)
-                    Text(
-                      'Sem texto nesta entry.',
-                      style: TextStyle(
-                        fontSize: 15,
-                        height: 1.5,
-                        color: AppTheme.textMutedColor(context),
-                      ),
-                    )
-                  else
-                    JournalBodyView(
-                      body: entry.body,
-                      style: const TextStyle(fontSize: 16, height: 1.6),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ];
+      return buildJournalEntryContentSection(
+        context,
+        ref,
+        entry,
+        mood,
+        _isEditing,
+        (newVal) {
+          final updated = entry.copyWith(body: newVal);
+          ref.read(vaultProvider.notifier).updateObject(updated);
+          setState(() => object = updated);
+        },
+        () => setState(() => _isEditing = !_isEditing),
+      );
     }
     if (object is Project) {
       final project = object as Project;
       final tasks = ref.watch(tasksProvider.select((tasks) => tasks.where((t) => t.organizers.any((o) => o.slug == project.slug)).toList()));
       final progress = ProjectProgressCache.getProgress(project.id, project, tasks);
       final doneCount = ProjectProgressCache.getCompletedTaskCount(project.id, project, tasks);
-
-      if (project.hasRotation) {
-        return [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (project.description != null &&
-                      project.description!.isNotEmpty) ...[
-                    const Text(
-                      'Descrição',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: AppTheme.cardDecoration(context),
-                      child: WikiTextView(
-                        text: project.description!,
-                        style: const TextStyle(fontSize: 15, height: 1.5),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                  _buildRotationTasksSection(context, ref, project, tasks),
-                  const SizedBox(height: 24),
-                  _buildSnapshotsSection(context, ref, project.id),
-                ],
-              ),
-            ),
-          ),
-        ];
-      }
-
       final linkedTasksCount = ProjectProgressCache.getLinkedTaskCount(project.id, project, tasks);
 
-      return [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: AppTheme.cardDecoration(context),
-                  child: Column(
-                    children: [
-                      Text(
-                        '${(progress * 100).toInt()}% Concluído',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.accentColor(context),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '$doneCount de $linkedTasksCount tarefas',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 24,
-                          backgroundColor: AppColors.surfaceVariant,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppTheme.accentColor(context),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (project.description != null &&
-                    project.description!.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Descrição',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: AppTheme.cardDecoration(context),
-                    child: WikiTextView(
-                      text: project.description!,
-                      style: const TextStyle(fontSize: 15, height: 1.5),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                _buildSnapshotsSection(context, ref, project.id),
-              ],
-            ),
-          ),
-        ),
-      ];
+      return buildProjectContentSection(
+        context,
+        ref,
+        project,
+        tasks,
+        progress,
+        doneCount,
+        linkedTasksCount,
+        _buildRotationTasksSection,
+        _buildSnapshotsSection,
+      );
     }
     if (object is Goal) {
-      final goal = object as Goal;
-      // Only watch providers if the goal has KPIs that need live calculation
-      final needsLiveData = goal.kpis.isNotEmpty;
-      
-      // Use .select() to narrow watches to only objects referenced by this goal's KPIs
-      final habits = needsLiveData 
-          ? ref.watch(habitsProvider.select((habits) => habits.where((h) => 
-              goal.kpis.any((k) => k.sourceType == KPISourceType.habit && k.sourceId == h.id)
-            ).toList()))
-          : <Habit>[];
-      final trackerRecords = needsLiveData 
-          ? ref.watch(trackingRecordsProvider.select((records) => records.where((r) => 
-              goal.kpis.any((k) => k.sourceType == KPISourceType.trackerField && k.sourceId == r.trackerId)
-            ).toList()))
-          : <TrackingRecord>[];
-      final entries = needsLiveData 
-          ? ref.watch(allEntriesProvider.select((entries) => entries.where((e) => 
-              goal.kpis.any((k) => k.sourceType == KPISourceType.entry)
-            ).toList()))
-          : <JournalEntry>[];
-      final moods = needsLiveData 
-          ? ref.watch(moodsProvider.select((moods) => moods.where((m) => 
-              goal.kpis.any((k) => k.sourceType == KPISourceType.others && 
-                  (k.calculationMode == 'mood_average' || k.calculationMode == 'mood_trend'))
-            ).toList()))
-          : <MoodDefinition>[];
-      final notes = needsLiveData 
-          ? ref.watch(notesProvider.select((notes) => notes.where((n) => 
-              goal.kpis.any((k) => k.sourceType == KPISourceType.collection && k.sourceId == n.id)
-            ).toList()))
-          : <Note>[];
-      final tasks = needsLiveData 
-          ? ref.watch(tasksProvider.select((tasks) => tasks.where((t) => 
-              goal.kpis.any((k) => k.sourceType == KPISourceType.subtasks && 
-                  (t.organizers.any((org) => org.slug == k.sourceId) || 
-                   t.dependsOn.contains('[[${k.sourceId}]]')))
-            ).toList()))
-          : <Task>[];
-
-      double total = 0;
-      double completed = 0;
-      for (final kpi in goal.kpis) {
-        total += 1;
-        final val = KPIEngine.calculateKPIValue(
-          kpi: kpi,
-          habits: habits,
-          trackerRecords: trackerRecords,
-          entries: entries,
-          moods: moods,
-          notes: notes,
-          tasks: tasks,
-        );
-        completed += (val / kpi.targetValue).clamp(0.0, 1.0);
-      }
-      final progress = total > 0 ? (completed / total) : 0.0;
-      final kpisDone = goal.kpis.where((k) => k.completed).length;
-
-      return [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: AppTheme.cardDecoration(context),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${(progress * 100).toInt()}%',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.accentColor(context),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 10,
-                          backgroundColor: AppColors.surfaceVariant,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppTheme.accentColor(context),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '$kpisDone de ${goal.kpis.length} KPIs atingidos',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Indicadores de Sucesso (KPIs)',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 16),
-                ...goal.kpis.map(
-                  (kpi) => _buildKPICard(context, ref, goal, kpi),
-                ),
-                const SizedBox(height: 24),
-                _buildSnapshotsSection(context, ref, goal.id),
-              ],
-            ),
-          ),
-        ),
-      ];
+      return buildGoalContentSection(
+        context,
+        ref,
+        object as Goal,
+        _buildKPICard,
+        _buildSnapshotsSection,
+      );
     }
     if (object is Resource) {
       return buildResourceContentSection(
@@ -1638,107 +1068,22 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
 
     if (object is Habit) {
-      final habit = object as Habit;
-      final linkedSliver = _buildHabitLinkedItemsSliver(context, ref, habit);
-      if (habit.isChecklistHabit) {
-        return [
-          _buildHabitChecklistSliver(context, ref, habit),
-          linkedSliver,
-        ];
-      }
-      return [
-        _buildHabitNormalSliver(context, ref, habit),
-        linkedSliver,
-      ];
+      return buildHabitContentSection(
+        context,
+        ref,
+        object as Habit,
+        _buildHabitLinkedItemsSliver,
+        _buildHabitChecklistSliver,
+        _buildHabitNormalSliver,
+      );
     }
     if (object is IdeaDefinition) {
-      final idea = object as IdeaDefinition;
-      final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
-      return [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Conteúdo',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: AppTheme.cardDecoration(context),
-                  child: idea.body.trim().isEmpty
-                      ? Text(
-                          'Sem conteúdo',
-                          style: TextStyle(
-                            fontStyle: FontStyle.italic,
-                            color: AppColors.textMuted.withValues(alpha: 0.4),
-                          ),
-                        )
-                      : WikiTextView(
-                          text: idea.body,
-                          style: const TextStyle(fontSize: 15, height: 1.5),
-                        ),
-                ),
-                if (idea.linkedSlugs.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Vínculos',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 12),
-                  ...idea.linkedSlugs.map((slug) {
-                    final linked = allObjects.cast<ContentObject?>().firstWhere(
-                      (o) =>
-                          o != null &&
-                          (o.slug == slug ||
-                              o.id == slug ||
-                              o.title == slug),
-                      orElse: () => null,
-                    );
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        tileColor: AppTheme.surfaceColor(context),
-                        leading: Icon(
-                          linked != null
-                              ? _typeIcon(linked.type)
-                              : Icons.link_rounded,
-                          color: AppTheme.accentColor(context),
-                        ),
-                        title: Text(
-                          linked?.title ?? slug,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
-                          linked?.type.toUpperCase() ?? 'LINK',
-                          style: const TextStyle(fontSize: 10),
-                        ),
-                        onTap: linked != null
-                            ? () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      UniversalDetailView(object: linked),
-                                ),
-                              )
-                            : null,
-                      ),
-                    );
-                  }),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ];
+      return buildIdeaContentSection(
+        context,
+        ref,
+        object as IdeaDefinition,
+        _typeIcon,
+      );
     }
     if (object is MoodDefinition) {
       return buildMoodContentSection(
@@ -1999,7 +1344,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
-  Widget _buildMentionRow(BuildContext context, ContentObject item) {
+  Widget _buildMentionRow(BuildContext context, dynamic item) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: ObjectActionWrapper(
@@ -4060,11 +3405,17 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     KPI kpi,
   ) {
     // Only watch providers that the specific KPI source type requires
-    final habits = kpi.dataSource.sourceType == DataSourceType.habit ? ref.watch(habitsProvider) : <Habit>[];
+    // Use .select() to narrow to the specific linked object when possible
+    final habits = kpi.dataSource.sourceType == DataSourceType.habit
+        ? ref.watch(habitsProvider.select((habits) => habits.where((h) => h.id == kpi.sourceId || h.slug == kpi.sourceId).toList()))
+        : <Habit>[];
     final trackerRecords = kpi.dataSource.sourceType == DataSourceType.trackerField ? ref.watch(trackingRecordsProvider) : <TrackingRecord>[];
     final entries = kpi.dataSource.sourceType == DataSourceType.entry ? ref.watch(allEntriesProvider) : <JournalEntry>[];
     final moods = <MoodDefinition>[]; // Mood-based KPIs not currently supported
-    final notes = kpi.dataSource.sourceType == DataSourceType.collection ? ref.watch(notesProvider) : <Note>[];
+    final notes = kpi.dataSource.sourceType == DataSourceType.collection
+        ? ref.watch(notesProvider.select((notes) => notes.where((n) => n.id == kpi.sourceId).toList()))
+        : <Note>[];
+    // subtasks and timeSpent need to scan ALL tasks to find those linked to the organizer
     final tasks = (kpi.dataSource.sourceType == DataSourceType.subtasks || kpi.dataSource.sourceType == DataSourceType.timeSpent) ? ref.watch(tasksProvider) : <Task>[];
 
     final currentValue = KPIEngine.calculateKPIValue(
@@ -4650,61 +4001,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
-
-  Future<void> _updateResourceRating(
-    WidgetRef ref,
-    Resource resource,
-    int rating,
-  ) async {
-    final updated = resource.copyWith(
-      rating: rating,
-      updatedAt: DateTime.now(),
-    );
-    await ref.read(resourcesProvider.notifier).updateResource(updated);
-    if (mounted) setState(() => object = updated);
-  }
-
-  Widget _buildRatingSection(
-    BuildContext context,
-    WidgetRef ref,
-    Resource resource,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Avaliação',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 12),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              5,
-              (i) => GestureDetector(
-                onTap: () => _updateResourceRating(ref, resource, i + 1),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Icon(
-                    Icons.star_rounded,
-                    size: 32,
-                    color: i < resource.rating
-                        ? AppColors.warning
-                        : AppColors.textMuted.withValues(alpha: 0.25),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
   }
 
   Widget _buildHighlightsSection(
