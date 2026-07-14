@@ -1649,17 +1649,19 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             if (row.trailing != null)
               row.trailing!
             else
-              Text(
-                row.value,
-                textAlign: TextAlign.right,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: valueColor,
-                  fontStyle: row.isEmpty ? FontStyle.italic : FontStyle.normal,
+              Flexible(
+                child: Text(
+                  row.value,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: valueColor,
+                    fontStyle: row.isEmpty ? FontStyle.italic : FontStyle.normal,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             if (row.onTap != null) ...[
               const SizedBox(width: 4),

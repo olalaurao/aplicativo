@@ -2267,7 +2267,6 @@ class VaultNotifier extends Notifier<void> {
   // 3.2 — Debounce rapid KPI recalculations (e.g. completing multiple habits
   // quickly triggers a single update 3 s after the last write).
   Timer? _kpiDebounce;
-  bool _isRecalculatingKPIs = false;
 
   @override
   void build() {
