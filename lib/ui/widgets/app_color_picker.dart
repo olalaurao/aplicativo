@@ -13,18 +13,16 @@ class AppColorPicker extends StatelessWidget {
   });
 
   static const List<Map<String, String>> defaultColors = [
-    {'name': 'Amber', 'hex': '#FFB000'},
-    {'name': 'Sky', 'hex': '#0EA5E9'},
-    {'name': 'Green', 'hex': '#22C55E'},
+    {'name': 'Red', 'hex': '#DC2626'},
     {'name': 'Orange', 'hex': '#F97316'},
+    {'name': 'Amber', 'hex': '#F59E0B'},
+    {'name': 'Lime', 'hex': '#84CC16'},
+    {'name': 'Green', 'hex': '#10B981'},
+    {'name': 'Cyan', 'hex': '#06B6D4'},
+    {'name': 'Blue', 'hex': '#3B82F6'},
     {'name': 'Purple', 'hex': '#8B5CF6'},
     {'name': 'Pink', 'hex': '#EC4899'},
-    {'name': 'Red', 'hex': '#EF4444'},
-    {'name': 'Blue', 'hex': '#3B82F6'},
-    {'name': 'Teal', 'hex': '#14B8A6'},
-    {'name': 'Indigo', 'hex': '#6366F1'},
-    {'name': 'Grey', 'hex': '#9CA3AF'},
-    {'name': 'Slate', 'hex': '#475569'},
+    {'name': 'Gray', 'hex': '#6B7280'},
   ];
 
   static String normalizeHex(String hex) {

@@ -411,11 +411,11 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
       case DialSegmentKind.pomodoroCompleted:
         return '🍅';
       case DialSegmentKind.timeBlock:
-        return '⏱️';
+        return ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.timeBlock, typeSignatures);
       case DialSegmentKind.reminder:
         return ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.reminder, typeSignatures);
       case DialSegmentKind.dayTheme:
-        return '🌅';
+        return ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.dayTheme, typeSignatures);
       case DialSegmentKind.sleep:
         return '😴';
     }

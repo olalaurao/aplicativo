@@ -143,6 +143,24 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
       route: '/time-blocks',
       inBottomBar: false,
     ),
+    NavigationItem(
+      section: NavSection.tasks,
+      label: 'Tasks',
+      route: '/tasks',
+      inBottomBar: false,
+    ),
+    NavigationItem(
+      section: NavSection.pillarsValues,
+      label: 'Values',
+      route: '/values',
+      inBottomBar: false,
+    ),
+    NavigationItem(
+      section: NavSection.routines,
+      label: 'Routines',
+      route: '/routines',
+      inBottomBar: false,
+    ),
   ];
 
   Future<void> _save() async {

@@ -12,6 +12,7 @@ import 'shopping_list_screen.dart';
 import 'vault_files_screen.dart';
 import 'object_conflicts_screen.dart';
 import 'day_theme_screen.dart';
+import 'pillars_screen.dart';
 import '../../providers/google_calendar_provider.dart';
 import '../widgets/navigation_shortcut_picker.dart';
 import '../../providers/vault_provider.dart';
@@ -211,6 +212,22 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const VaultFilesScreen(),
+                      ),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 8),
+                _buildMenuRow(
+                  context,
+                  'Pillars',
+                  Icons.account_balance,
+                  AppColors.habitPurple,
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PillarsScreen(),
                       ),
                     );
                   },

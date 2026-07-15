@@ -349,6 +349,7 @@ class Project extends Organizer {
     String? icon,
     String? state,
     String? priority,
+    String? statement,
     List<TimeRange>? timeRanges,
     int? energyLevel,
     List<String>? daysOfWeek,

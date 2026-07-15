@@ -15,6 +15,10 @@ import 'scheduler_picker.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../widgets/time_block_picker.dart';
+import '../widgets/property_row.dart';
+import '../widgets/form_section_card.dart';
+import '../widgets/discard_guard.dart';
+import '../widgets/app_color_picker.dart';
 
 class CreateHabitForm extends ConsumerStatefulWidget {
   final String? initialTitle;
@@ -67,19 +71,6 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
   // Alignment tracking (RA-P1-1)
   bool _trackAlignment = false;
   int? _flexibilityWindowMinutes;
-
-  static const _colorSwatches = [
-    '#DC2626',
-    '#F97316',
-    '#F59E0B',
-    '#22C55E',
-    '#14B8A6',
-    '#3B82F6',
-    '#6366F1',
-    '#8B5CF6',
-    '#EC4899',
-    '#6B7280',
-  ];
 
   @override
   void initState() {
@@ -173,32 +164,8 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
     final canSave = _canSave;
     final isDirty = _titleController.text.trim().isNotEmpty;
 
-    return PopScope(
-      canPop: !isDirty,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        final discard = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Descartar alterações?'),
-            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancelar'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: TextButton.styleFrom(foregroundColor: AppColors.error),
-                child: const Text('Descartar'),
-              ),
-            ],
-          ),
-        );
-        if ((discard ?? false) && context.mounted) {
-          Navigator.pop(context, result);
-        }
-      },
+    return DiscardGuard(
+      isDirty: isDirty,
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: CustomScrollView(
@@ -354,9 +321,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                   const SizedBox(height: 16),
 
                   if (_habitMode == HabitMode.pact) ...[
-                    Container(
-                      decoration: AppTheme.cardDecoration(context),
-                      padding: const EdgeInsets.all(16),
+                    FormSectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -425,11 +390,12 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                     height: 44,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
-                      itemCount: _colorSwatches.length,
+                      itemCount: AppColorPicker.defaultColors.length,
                       separatorBuilder: (_, _) => const SizedBox(width: 8),
                       itemBuilder: (context, index) {
-                        final hex = _colorSwatches[index];
-                        final color = _parseColor(hex);
+                        final colorInfo = AppColorPicker.defaultColors[index];
+                        final hex = colorInfo['hex']!;
+                        final color = AppColorPicker.parseHex(hex);
                         final selected = _selectedColor == hex;
                         return GestureDetector(
                           onTap: () => setState(() => _selectedColor = hex),
@@ -468,49 +434,26 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                   const SizedBox(height: 20),
 
                   // ─── Schedule Card ───
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        _propertyRow(
-                          'Frequency',
-                          _getScheduleSummary(),
-                          AppTheme.accentColor(context),
-                          _pickSchedule,
-                        ),
-                      ],
+                  FormSectionCard(
+                    child: PropertyRow(
+                      label: 'Frequency',
+                      value: _getScheduleSummary(),
+                      valueColor: AppTheme.accentColor(context),
+                      onTap: _pickSchedule,
                     ),
                   ),
                   const SizedBox(height: 12),
 
                   // ─── Input Type Card ───
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Input Type',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildInputTypeSelector(),
-                      ],
-                    ),
+                  FormSectionCard(
+                    title: 'Input Type',
+                    child: _buildInputTypeSelector(),
                   ),
 
                   const SizedBox(height: 12),
 
                   // ─── Negative Habit Toggle ───
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
+                  FormSectionCard(
                     child: Row(
                       children: [
                         const Expanded(
@@ -547,9 +490,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                   const SizedBox(height: 12),
 
                   // ─── Checklist Mode Toggle ───
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
+                  FormSectionCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -572,9 +513,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
 
                   // ─── Completion Unit Card ───
                   if (!_useChecklist)
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
+                  FormSectionCard(
                     child: Row(
                       children: [
                         const Expanded(
@@ -627,9 +566,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
 
                   // ─── Slots & Goal Card ───
                   if (!_useChecklist)
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
+                  FormSectionCard(
                     child: Column(
                       children: [
                         Row(
@@ -657,11 +594,11 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                           ],
                         ),
                         const Divider(height: 24),
-                        _propertyRow(
-                          'Goal',
-                          _getGoalLabel(),
-                          AppTheme.accentColor(context),
-                          _pickGoalType,
+                        PropertyRow(
+                          label: 'Goal',
+                          value: _getGoalLabel(),
+                          valueColor: AppTheme.accentColor(context),
+                          onTap: _pickGoalType,
                         ),
                         const Divider(height: 24),
                         OrganizerSelectorField(
@@ -669,11 +606,11 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                           onChanged: (val) => setState(() => _organizers = val),
                         ),
                         const Divider(height: 24),
-                        _propertyRow(
-                          'Linked Tracker',
-                          _linkedTrackerSlug ?? 'None',
-                          AppTheme.accentColor(context),
-                          _pickTracker,
+                        PropertyRow(
+                          label: 'Linked Tracker',
+                          value: _linkedTrackerSlug ?? 'None',
+                          valueColor: AppTheme.accentColor(context),
+                          onTap: _pickTracker,
                         ),
                         const Divider(height: 24),
                         TimeBlockPicker(
@@ -688,20 +625,11 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                   const SizedBox(height: 12),
 
                   // ─── Slots Detailed Card ───
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
+                  FormSectionCard(
+                    title: 'Slot Configuration',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Slot Configuration',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
                         ...List.generate(
                           _slots,
                           (index) => _buildSlotConfig(index),
@@ -714,9 +642,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
 
                   // Alignment tracking section (RA-P1-1)
                   if (_slots > 0 && _slotConfigs[0].time != null) ...[
-                    Container(
-                      decoration: AppTheme.cardDecoration(context),
-                      padding: const EdgeInsets.all(16),
+                    FormSectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -772,34 +698,21 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                     const SizedBox(height: 12),
                   ],
 
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
+                  FormSectionCard(
+                    title: 'Actions',
+                    trailing: IconButton(
+                      onPressed: _showAddActionSheet,
+                      icon: Icon(
+                        Icons.add_rounded,
+                        size: 20,
+                        color: AppTheme.accentColor(context),
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            const Text(
-                              'Actions',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              onPressed: _showAddActionSheet,
-                              icon: Icon(
-                                Icons.add_rounded,
-                                size: 20,
-                                color: AppTheme.accentColor(context),
-                              ),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
-                          ],
-                        ),
                         const SizedBox(height: 12),
                         if (_actions.isEmpty)
                           const Text(
@@ -840,35 +753,20 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                   const SizedBox(height: 12),
 
                   // ─── Description Card ───
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Description',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _descController,
-                          maxLines: 3,
-                          style: const TextStyle(fontSize: 14),
-                          decoration: const InputDecoration(
-                            hintText: 'Description',
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            filled: false,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                      ],
+                  FormSectionCard(
+                    title: 'Description',
+                    child: TextField(
+                      controller: _descController,
+                      maxLines: 3,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: const InputDecoration(
+                        hintText: 'Description',
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        filled: false,
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
                   ),
 
@@ -889,7 +787,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
             child: FilledButton(
               onPressed: canSave ? _saveHabit : null,
               style: FilledButton.styleFrom(
-                backgroundColor: _parseColor(_selectedColor),
+                backgroundColor: AppColorPicker.parseHex(_selectedColor),
                 disabledBackgroundColor: AppColors.textMuted.withValues(
                   alpha: 0.2,
                 ),
@@ -911,40 +809,6 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
 
   bool get _canSave =>
       _titleController.text.trim().isNotEmpty && _schedulers.isNotEmpty;
-
-  Widget _propertyRow(
-    String label,
-    String value,
-    Color valueColor,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: valueColor,
-            ),
-          ),
-          const SizedBox(width: 4),
-          const Icon(
-            Icons.chevron_right_rounded,
-            size: 18,
-            color: AppColors.textMuted,
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _stepper(int value, int min, int max, ValueChanged<int> onChanged) {
     return Row(
@@ -2200,13 +2064,5 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
         items: s.items,
       );
     });
-  }
-
-  Color _parseColor(String hex) {
-    try {
-      return Color(int.parse(hex.replaceAll('#', '0xFF')));
-    } catch (_) {
-      return AppTheme.accentColor(context);
-    }
   }
 }

@@ -32,6 +32,7 @@ import '../models/template_model.dart';
 import '../models/idea_model.dart';
 import '../models/inbox_model.dart';
 import '../models/pomodoro_session.dart';
+import '../models/pillar_model.dart';
 
 import '../models/sync_action.dart';
 import '../services/sync_queue_service.dart';
@@ -897,8 +898,17 @@ class OrganizersNotifier extends Notifier<List<Organizer>> {
     final timeBlocks = ref
         .watch(objectsByTypeProvider('timeBlock'))
         .cast<Organizer>();
+    final values = ref
+        .watch(objectsByTypeProvider('value'))
+        .cast<Organizer>();
+    final routines = ref
+        .watch(objectsByTypeProvider('routine'))
+        .cast<Organizer>();
+    final pillars = ref
+        .watch(objectsByTypeProvider('pillar'))
+        .cast<Organizer>();
 
-    return [...areas, ...projects, ...activities, ...people, ...labels, ...dayThemes, ...timeBlocks];
+    return [...areas, ...projects, ...activities, ...people, ...labels, ...dayThemes, ...timeBlocks, ...values, ...routines, ...pillars];
   }
 
   Future<void> addOrganizer(Organizer organizer) async {
@@ -1242,6 +1252,35 @@ class IdeasNotifier extends Notifier<List<IdeaDefinition>> {
 
 final ideasProvider = NotifierProvider<IdeasNotifier, List<IdeaDefinition>>(() {
   return IdeasNotifier();
+});
+
+class PillarsNotifier extends Notifier<List<Pillar>> {
+  @override
+  List<Pillar> build() {
+    return ref.watch(objectsByTypeProvider('pillar')).cast<Pillar>();
+  }
+
+  Future<void> addPillar(Pillar pillar) async {
+    state = [...state, pillar];
+    await ref.read(vaultProvider.notifier).createObject(pillar);
+  }
+
+  Future<void> updatePillar(Pillar pillar) async {
+    state = [
+      for (final item in state)
+        if (item.id == pillar.id) pillar else item,
+    ];
+    await ref.read(vaultProvider.notifier).updateObject(pillar);
+  }
+
+  Future<void> deletePillar(Pillar pillar) async {
+    state = state.where((item) => item.id != pillar.id).toList();
+    await ref.read(vaultProvider.notifier).deleteObject(pillar);
+  }
+}
+
+final pillarsProvider = NotifierProvider<PillarsNotifier, List<Pillar>>(() {
+  return PillarsNotifier();
 });
 
 class RemindersNotifier extends Notifier<List<Reminder>> {
@@ -2798,6 +2837,9 @@ class VaultNotifier extends Notifier<void> {
 
       case MetricType.kpi:
         // KPI values are calculated separately in CombinedAnalysisScreen
+        return null;
+      case MetricType.pillarTouch:
+        // Pillar touch values are calculated separately
         return null;
     }
   }

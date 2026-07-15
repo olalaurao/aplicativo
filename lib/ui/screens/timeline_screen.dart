@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../models/task_model.dart';
 import '../../models/journal_entry.dart';
 import '../../models/mood_model.dart';
@@ -15,6 +16,7 @@ import '../../models/habit_model.dart';
 import '../../models/resource_model.dart';
 import '../../models/project_model.dart';
 import 'universal_detail_view.dart';
+import '../utils/object_icons.dart';
 
 class TimelineScreen extends ConsumerStatefulWidget {
   const TimelineScreen({super.key});
@@ -369,36 +371,21 @@ class _TimelineScreenState extends ConsumerState<TimelineScreen> {
   }
 
   Widget _buildTypeIcon(ContentObject item) {
-    IconData icon;
-    Color color;
-    if (item is Task) {
-      icon = Icons.check_circle_outline_rounded;
-      color = AppColors.info;
-    } else if (item is Habit) {
-      icon = Icons.cached_rounded;
-      color = AppColors.habitGreen;
-    } else if (item is Project) {
-      icon = Icons.folder_copy_rounded;
-      color = AppTheme.accentColor(context);
-    } else if (item is Person) {
-      icon = Icons.person_rounded;
-      color = AppColors.info;
-    } else if (item is Resource) {
-      icon = Icons.local_library_rounded;
-      color = AppColors.warning;
-    } else {
-      icon = Icons.auto_stories_rounded;
-      color = AppColors.habitPurple;
-    }
-
+    final iconData = ObjectIcons.iconDataForTypeWithSignatures(item.type, ref.read(settingsProvider).typeSignatures);
     return Container(
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: AppTheme.accentColor(context).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Icon(icon, size: 18, color: color),
+      child: Center(
+        child: Icon(
+          iconData ?? ObjectIcons.defaultIconDataForType(item.type),
+          size: 18,
+          color: AppTheme.accentColor(context),
+        ),
+      ),
     );
   }
 

@@ -483,10 +483,16 @@ class _UniversalSearchPickerSheetState
           return 'Habit';
         case OrganizerType.tracker:
           return 'Tracker';
-      case OrganizerType.dayTheme:
-        return 'Day Theme';
-      case OrganizerType.timeBlock:
-        return 'Time Block';
+        case OrganizerType.dayTheme:
+          return 'Day Theme';
+        case OrganizerType.timeBlock:
+          return 'Time Block';
+        case OrganizerType.routine:
+          return 'Routine';
+        case OrganizerType.value:
+          return 'Value';
+      case OrganizerType.pillar:
+        return 'Pillar';
       }
     }
     switch (obj.type) {

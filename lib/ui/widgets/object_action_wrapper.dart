@@ -560,6 +560,12 @@ String _typeLabel(ContentObject object) {
         return 'Day Theme';
       case OrganizerType.timeBlock:
         return 'Time Block';
+      case OrganizerType.routine:
+        return 'Routine';
+      case OrganizerType.value:
+        return 'Value';
+      case OrganizerType.pillar:
+        return 'Pillar';
     }
   }
   if (object is Reminder) return 'Reminder';

@@ -13,6 +13,11 @@ import '../widgets/wiki_link_controller.dart';
 import '../widgets/rich_text_editor.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../widgets/date_picker_field.dart';
+import '../widgets/property_row.dart';
+import '../widgets/form_section_card.dart';
+import '../widgets/discard_guard.dart';
+import '../widgets/reminder_config_sheet.dart';
+import '../utils/notification_type_utils.dart';
 import '../forms/scheduler_picker.dart';
 import '../widgets/time_block_picker.dart';
 import '../../models/scheduler.dart';
@@ -185,34 +190,8 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     final isDirty = hasTitle || _notesContent.trim().isNotEmpty;
     final hasDateRange = _dateRange != null && _dateRange!.trim().isNotEmpty;
 
-    return PopScope(
-      canPop: !isDirty,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        final discard = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Descartar alterações?'),
-            content: const Text(
-              'Você possui alterações não salvas. Deseja sair mesmo assim?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancelar'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: TextButton.styleFrom(foregroundColor: AppColors.error),
-                child: const Text('Descartar'),
-              ),
-            ],
-          ),
-        );
-        if ((discard ?? false) && context.mounted) {
-          Navigator.pop(context, result);
-        }
-      },
+    return DiscardGuard(
+      isDirty: isDirty,
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: CustomScrollView(
@@ -314,32 +293,15 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                     const SizedBox(height: 20),
 
                     // ─── Status Selector (Card) ───
-                    Container(
-                      decoration: AppTheme.cardDecoration(context),
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Status',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildStageSegmentedControl(),
-                        ],
-                      ),
+                    FormSectionCard(
+                      title: 'Status',
+                      child: _buildStageSegmentedControl(),
                     ),
 
                     const SizedBox(height: 12),
 
                     // ─── Metadata Card ───
-                    Container(
-                      decoration: AppTheme.cardDecoration(context),
-                      padding: const EdgeInsets.all(16),
+                    FormSectionCard(
                       child: Column(
                         children: [
                           // Priority
@@ -405,38 +367,15 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                           ),
                           if (!_allDay) ...[
                             const Divider(height: 24),
-                            GestureDetector(
+                            PropertyRow(
+                              label: 'Time',
+                              value: _scheduledTime != null
+                                  ? _scheduledTime!.format(context)
+                                  : 'Set Time',
+                              valueColor: _scheduledTime != null
+                                  ? AppTheme.accentColor(context)
+                                  : AppColors.textMuted,
                               onTap: _pickTime,
-                              child: Row(
-                                children: [
-                                  const Text(
-                                    'Time',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  Text(
-                                    _scheduledTime != null
-                                        ? _scheduledTime!.format(context)
-                                        : 'Set Time',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: _scheduledTime != null
-                                          ? AppTheme.accentColor(context)
-                                          : AppColors.textMuted,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Icon(
-                                    Icons.chevron_right_rounded,
-                                    size: 18,
-                                    color: AppColors.textMuted,
-                                  ),
-                                ],
-                              ),
                             ),
                           ],
                           // Alignment tracking section (RA-P1-1)
@@ -491,34 +430,11 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                           ],
                           const Divider(height: 24),
                           // Duration
-                          GestureDetector(
+                          PropertyRow(
+                            label: 'Duration',
+                            value: '${_durationMinutes ?? 15} min',
+                            valueColor: AppTheme.accentColor(context),
                             onTap: _editDuration,
-                            child: Row(
-                              children: [
-                                const Text(
-                                  'Duration',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Text(
-                                  '${_durationMinutes ?? 15} min',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppTheme.accentColor(context),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                const Icon(
-                                  Icons.chevron_right_rounded,
-                                  size: 18,
-                                  color: AppColors.textMuted,
-                                ),
-                              ],
-                            ),
                           ),
                           const Divider(height: 24),
                           // Focus Relay section (RA-P1-3)
@@ -686,81 +602,36 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                           _buildReminderSection(),
                           const Divider(height: 24),
                           // Pomodoro Blocks
-                          GestureDetector(
+                          PropertyRow(
+                            label: 'Pomodoro Blocks',
+                            value: _pomodoroCount != null
+                                ? '$_pomodoroCount blocks'
+                                : 'None',
+                            valueColor: _pomodoroCount != null
+                                ? AppTheme.accentColor(context)
+                                : AppColors.textMuted,
                             onTap: _editPomodoros,
-                            child: Row(
-                              children: [
-                                const Text(
-                                  'Pomodoro Blocks',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Text(
-                                  _pomodoroCount != null
-                                      ? '$_pomodoroCount blocks'
-                                      : 'None',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: _pomodoroCount != null
-                                        ? AppTheme.accentColor(context)
-                                        : AppColors.textMuted,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                const Icon(
-                                  Icons.chevron_right_rounded,
-                                  size: 18,
-                                  color: AppColors.textMuted,
-                                ),
-                              ],
-                            ),
                           ),
                           const Divider(height: 24),
                           // Tempo Estimado
-                          GestureDetector(
+                          PropertyRow(
+                            label: 'Tempo Estimado',
+                            value: _estimatedMinutes != null
+                                ? '$_estimatedMinutes min'
+                                : 'Não estimado',
+                            valueColor: _estimatedMinutes != null
+                                ? AppTheme.accentColor(context)
+                                : AppColors.textMuted,
                             onTap: _editEstimatedTime,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'Tempo Estimado',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Text(
-                                  _estimatedMinutes != null
-                                      ? '$_estimatedMinutes min'
-                                      : 'Não estimado',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: _estimatedMinutes != null
-                                        ? AppTheme.accentColor(context)
-                                        : AppColors.textMuted,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                const Icon(
-                                  Icons.chevron_right_rounded,
-                                  size: 18,
-                                  color: AppColors.textMuted,
-                                ),
-                              ],
-                            ),
                           ),
                           const Divider(height: 24),
                           // Repeat / Scheduler
-                          GestureDetector(
+                          PropertyRow(
+                            label: 'Repeat',
+                            value: _scheduler != null ? 'On' : 'None',
+                            valueColor: _scheduler != null
+                                ? AppTheme.accentColor(context)
+                                : AppColors.textMuted,
                             onTap: _rotationFrequencyType !=
                                     RotationFrequencyType.none
                                 ? () {
@@ -773,34 +644,6 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                     );
                                   }
                                 : _pickScheduler,
-                            child: Row(
-                              children: [
-                                const Text(
-                                  'Repeat',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Text(
-                                  _scheduler != null ? 'On' : 'None',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: _scheduler != null
-                                        ? AppTheme.accentColor(context)
-                                        : AppColors.textMuted,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                const Icon(
-                                  Icons.chevron_right_rounded,
-                                  size: 18,
-                                  color: AppColors.textMuted,
-                                ),
-                              ],
-                            ),
                           ),
                           const Divider(height: 24),
                           TimeBlockPicker(
@@ -815,9 +658,8 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                     const SizedBox(height: 12),
 
                     // ─── Connections Card ───
-                    Container(
-                      decoration: AppTheme.cardDecoration(context),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                    FormSectionCard(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                       child: OrganizerSelectorField(
                         selectedOrganizers: _organizers,
                         onChanged: (val) => setState(() {
@@ -845,56 +687,33 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                     const SizedBox(height: 12),
 
                     // ─── Depends On Card ───
-                    Container(
-                      decoration: AppTheme.cardDecoration(context),
-                      padding: const EdgeInsets.all(16),
+                    FormSectionCard(
+                      title: 'Depende de (Bloqueantes)',
+                      trailing: IconButton(
+                        icon: const Icon(Icons.add, size: 20),
+                        onPressed: () async {
+                          final selected = await showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => UniversalSearchPickerSheet(
+                              title: 'Select blocking task',
+                              initialFilter: 'task',
+                              onSelected: (obj) => Navigator.pop(context, obj),
+                            ),
+                          );
+                          if (selected != null && selected is Task) {
+                            setState(() {
+                              if (!_dependsOn.contains(selected.slug)) {
+                                _dependsOn.add(selected.slug);
+                              }
+                            });
+                          }
+                        },
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'Depende de (Bloqueantes)',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                ),
-                              ),
-                              const Spacer(),
-                              IconButton(
-                                icon: Icon(
-                                  Icons.add_rounded,
-                                  color: AppTheme.accentColor(context),
-                                ),
-                                onPressed: () {
-                                  showModalBottomSheet(
-                                    context: context,
-                                    isScrollControlled: true,
-                                    backgroundColor: Colors.transparent,
-                                    builder: (context) =>
-                                        UniversalSearchPickerSheet(
-                                          title: 'Depende de',
-                                          initialFilter: 'task',
-                                          onSelected: (obj) {
-                                            if (!_dependsOn.contains(
-                                              obj.slug,
-                                            )) {
-                                              setState(
-                                                () => _dependsOn.add(obj.slug),
-                                              );
-                                            }
-                                            Navigator.pop(context);
-                                          },
-                                        ),
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
                           if (_dependsOn.isNotEmpty) const SizedBox(height: 8),
                           for (final slug in _dependsOn)
                             Padding(
@@ -955,42 +774,15 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                     const SizedBox(height: 12),
 
                     // ─── Subtasks Card ───
-                    Container(
-                      decoration: AppTheme.cardDecoration(context),
-                      padding: const EdgeInsets.all(16),
+                    FormSectionCard(
+                      title: 'Subtasks',
+                      trailing: IconButton(
+                        icon: const Icon(Icons.add, size: 20),
+                        onPressed: _addSubtask,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              const Text(
-                                'Subtasks',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const Spacer(),
-                              IconButton(
-                                onPressed: _addSessionHeader,
-                                icon: const Icon(
-                                  Icons.folder_open_rounded,
-                                  color: AppColors.textMuted,
-                                  size: 20,
-                                ),
-                                tooltip: 'New Section',
-                              ),
-                              IconButton(
-                                onPressed: _addSubtask,
-                                icon: Icon(
-                                  Icons.add_rounded,
-                                  color: AppTheme.accentColor(context),
-                                ),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                              ),
-                            ],
-                          ),
                           if (_subtasks.isNotEmpty) ...[
                             const SizedBox(height: 12),
                             _buildSubtaskReorderableList(),
@@ -1011,35 +803,20 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                     const SizedBox(height: 12),
 
                     // ─── Notes Card ───
-                    Container(
-                      decoration: AppTheme.cardDecoration(context),
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Notes',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            height: 200,
-                            child: RichTextEditor(
-                              content: _notesContent,
-                              onChanged: (val) {
-                                setState(() {
-                                  _notesContent = val;
-                                });
-                              },
-                              placeholder: 'Add details...',
-                              expands: true,
-                            ),
-                          ),
-                        ],
+                    FormSectionCard(
+                      title: 'Notes',
+                      child: SizedBox(
+                        height: 200,
+                        child: RichTextEditor(
+                          content: _notesContent,
+                          onChanged: (val) {
+                            setState(() {
+                              _notesContent = val;
+                            });
+                          },
+                          placeholder: 'Add details...',
+                          expands: true,
+                        ),
                       ),
                     ),
 
@@ -1242,66 +1019,26 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        GestureDetector(
+        PropertyRow(
+          label: 'Start Date',
+          value: _startDate != null
+              ? DateFormat('MMM d, yyyy').format(_startDate!)
+              : 'No Date',
+          valueColor: _startDate != null
+              ? AppTheme.accentColor(context)
+              : AppColors.textMuted,
           onTap: _pickStartDate,
-          child: Row(
-            children: [
-              const Text(
-                'Start Date',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-              ),
-              const Spacer(),
-              Text(
-                _startDate != null
-                    ? DateFormat('MMM d, yyyy').format(_startDate!)
-                    : 'No Date',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: _startDate != null
-                      ? AppTheme.accentColor(context)
-                      : AppColors.textMuted,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: AppColors.textMuted,
-              ),
-            ],
-          ),
         ),
         const Divider(height: 24),
-        GestureDetector(
+        PropertyRow(
+          label: 'Due Date',
+          value: _endDate != null
+              ? DateFormat('MMM d, yyyy').format(_endDate!)
+              : 'No Date',
+          valueColor: _endDate != null
+              ? AppTheme.accentColor(context)
+              : AppColors.textMuted,
           onTap: _pickDueDate,
-          child: Row(
-            children: [
-              const Text(
-                'Due Date',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-              ),
-              const Spacer(),
-              Text(
-                _endDate != null
-                    ? DateFormat('MMM d, yyyy').format(_endDate!)
-                    : 'No Date',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: _endDate != null
-                      ? AppTheme.accentColor(context)
-                      : AppColors.textMuted,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: AppColors.textMuted,
-              ),
-            ],
-          ),
         ),
         const SizedBox(height: 12),
         SingleChildScrollView(
@@ -1363,26 +1100,16 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         .where((post) => _socialRefs.contains('[[social/${post.socialSlug}]]'))
         .toList();
 
-    return Container(
-      decoration: AppTheme.cardDecoration(context),
-      padding: const EdgeInsets.all(16),
+    return FormSectionCard(
+      title: 'Referências',
+      trailing: IconButton(
+        icon: const Icon(Icons.add_link_rounded),
+        color: AppTheme.accentColor(context),
+        onPressed: _pickSocialReference,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Text(
-                'Referências',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.add_link_rounded),
-                color: AppTheme.accentColor(context),
-                onPressed: _pickSocialReference,
-              ),
-            ],
-          ),
           if (selectedPosts.isEmpty)
             const Text(
               'Nenhum post social vinculado',
@@ -1601,7 +1328,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                 child: Row(
                   children: [
                     Icon(
-                      _getNotificationIcon(reminder.type),
+                      NotificationTypeUtils.getIcon(reminder.type),
                       size: 16,
                       color: AppTheme.accentColor(context),
                     ),
@@ -1652,214 +1379,35 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     final existing = index != null ? _customReminders[index] : null;
     final bool hasTime = !_allDay && _scheduledTime != null;
 
-    int minutesBefore = existing?.minutesBefore ?? (hasTime ? 15 : 0);
-    int daysBefore = existing?.daysBefore ?? 0;
-    TimeOfDay timeOfDay = existing?.timeOfDay != null
-        ? TimeOfDay(
-            hour: int.tryParse(existing!.timeOfDay!.split(':')[0]) ?? 9,
-            minute: int.tryParse(existing.timeOfDay!.split(':')[1]) ?? 0,
-          )
-        : const TimeOfDay(hour: 9, minute: 0);
+    DateTime? parentDateTime;
+    if (hasTime && _scheduledTime != null && _startDate != null) {
+      parentDateTime = DateTime(
+        _startDate!.year,
+        _startDate!.month,
+        _startDate!.day,
+        _scheduledTime!.hour,
+        _scheduledTime!.minute,
+      );
+    }
 
-    NotificationType type = existing?.type ?? NotificationType.push;
-
-    final result = await showDialog<ReminderConfig>(
+    await showModalBottomSheet(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(
-            index != null ? 'Edit Reminder' : 'Add Reminder',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (hasTime) ...[
-                  const Text(
-                    'Time Before Event',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Days',
-                            isDense: true,
-                          ),
-                          controller: TextEditingController(
-                            text: daysBefore.toString(),
-                          ),
-                          onChanged: (v) => daysBefore = int.tryParse(v) ?? 0,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Minutes',
-                            isDense: true,
-                          ),
-                          controller: TextEditingController(
-                            text: minutesBefore.toString(),
-                          ),
-                          onChanged: (v) =>
-                              minutesBefore = int.tryParse(v) ?? 0,
-                        ),
-                      ),
-                    ],
-                  ),
-                ] else ...[
-                  const Text(
-                    'Days Before Event',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Days (0 = on day)',
-                      isDense: true,
-                    ),
-                    controller: TextEditingController(
-                      text: daysBefore.toString(),
-                    ),
-                    onChanged: (v) => daysBefore = int.tryParse(v) ?? 0,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Time of Day',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () async {
-                      final picked = await showTimePicker(
-                        context: context,
-                        initialTime: timeOfDay,
-                      );
-                      if (picked != null) {
-                        setDialogState(() => timeOfDay = picked);
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 16,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceVariant,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Text(
-                            timeOfDay.format(context),
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                          const Spacer(),
-                          const Icon(Icons.access_time_rounded, size: 20),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                const Text(
-                  'Notification Type',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: NotificationType.values.map((t) {
-                    final isSelected = type == t;
-                    return Column(
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            _getNotificationIcon(t),
-                            color: isSelected
-                                ? AppTheme.accentColor(context)
-                                : AppColors.textMuted,
-                          ),
-                          onPressed: () => setDialogState(() => type = t),
-                        ),
-                        Text(
-                          t.name.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                            color: isSelected
-                                ? AppTheme.accentColor(context)
-                                : AppColors.textMuted,
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final config = ReminderConfig(
-                  id:
-                      existing?.id ??
-                      DateTime.now().millisecondsSinceEpoch.toString(),
-                  type: type,
-                  notificationBody: 'Task: ${_titleController.text}',
-                );
-
-                if (hasTime) {
-                  config.minutesBefore = minutesBefore + (daysBefore * 24 * 60);
-                } else {
-                  config.daysBefore = daysBefore;
-                  config.timeOfDay =
-                      '${timeOfDay.hour.toString().padLeft(2, '0')}:${timeOfDay.minute.toString().padLeft(2, '0')}';
-                }
-                Navigator.pop(ctx, config);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ReminderConfigSheet(
+        onSave: (config) {
+          setState(() {
+            if (index != null) {
+              _customReminders[index] = config;
+            } else {
+              _customReminders.add(config);
+            }
+          });
+        },
+        parentDateTime: parentDateTime,
+        parentDateOnly: _startDate,
       ),
     );
-
-    if (result != null) {
-      setState(() {
-        if (index != null) {
-          _customReminders[index] = result;
-        } else {
-          _customReminders.add(result);
-        }
-      });
-    }
-  }
-
-  IconData _getNotificationIcon(NotificationType type) {
-    switch (type) {
-      case NotificationType.push:
-        return Icons.notifications_active_rounded;
-      case NotificationType.popup:
-        return Icons.picture_in_picture_alt_rounded;
-      case NotificationType.alarm:
-        return Icons.alarm_rounded;
-    }
   }
 
   void _saveTask() async {
@@ -2112,9 +1660,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     final groups = [...project.rotationGroups]
       ..sort((a, b) => a.order.compareTo(b.order));
 
-    return Container(
-      decoration: AppTheme.cardDecoration(context),
-      padding: const EdgeInsets.all(16),
+    return FormSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

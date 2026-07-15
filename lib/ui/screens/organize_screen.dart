@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../models/organizer_model.dart';
 import '../theme.dart';
 import 'organizer_detail_screen.dart';
@@ -10,9 +11,11 @@ import '../../models/content_object.dart';
 import '../../models/goal_model.dart';
 import '../../models/habit_model.dart';
 import '../../models/tracker_model.dart';
+import '../../models/pillar_model.dart';
 import 'universal_detail_view.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../widgets/overdue_section.dart';
+import '../utils/object_icons.dart';
 
 class OrganizeScreen extends ConsumerStatefulWidget {
   const OrganizeScreen({super.key});
@@ -111,6 +114,9 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
     BuildContext context,
     List<Organizer> organizers,
   ) {
+    final settings = ref.watch(settingsProvider);
+    final typeSignatures = settings.typeSignatures;
+    
     final allObjects = ref.watch(allObjectsProvider).value ?? [];
     final allGoals = allObjects.whereType<Goal>().toList();
     final goals = allGoals
@@ -133,16 +139,25 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
         )
         .toList();
 
+    final allPillars = organizers
+        .where((o) => o.organizerType == OrganizerType.pillar)
+        .toList();
+    final pillars = allPillars
+        .where(
+          (o) => o.title.toLowerCase().contains(_searchQuery.toLowerCase()),
+        )
+        .toList();
+
     final sections = <_OrganizerSection>[
       _OrganizerSection(
         'Areas',
-        Icons.layers_outlined,
+        ObjectIcons.iconDataForTypeWithSignatures('area', typeSignatures) ?? Icons.layers_outlined,
         AppTheme.accentColor(context),
         organizers.where((o) => o.organizerType == OrganizerType.area).toList(),
       ),
       _OrganizerSection(
         'Projetos',
-        Icons.folder_outlined,
+        ObjectIcons.iconDataForTypeWithSignatures('project', typeSignatures) ?? Icons.folder_outlined,
         AppColors.info,
         organizers
             .where((o) => o.organizerType == OrganizerType.project)
@@ -150,25 +165,31 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
       ),
       _OrganizerSection(
         'Goals',
-        Icons.track_changes_rounded,
+        ObjectIcons.iconDataForTypeWithSignatures('goal', typeSignatures) ?? Icons.track_changes_rounded,
         AppColors.habitOrange,
         goals,
       ),
       _OrganizerSection(
         'Habits',
-        Icons.loop_rounded,
+        ObjectIcons.iconDataForTypeWithSignatures('habit', typeSignatures) ?? Icons.loop_rounded,
         AppColors.habitGreen,
         habits,
       ),
       _OrganizerSection(
         'Trackers',
-        Icons.analytics_outlined,
+        ObjectIcons.iconDataForTypeWithSignatures('tracker', typeSignatures) ?? Icons.analytics_outlined,
         AppTheme.accentColor(context),
         trackers,
       ),
       _OrganizerSection(
+        'Pillars',
+        ObjectIcons.iconDataForTypeWithSignatures('pillar', typeSignatures) ?? Icons.account_balance,
+        AppColors.habitPurple,
+        pillars,
+      ),
+      _OrganizerSection(
         'Activities',
-        Icons.sports_outlined,
+        ObjectIcons.iconDataForTypeWithSignatures('activity', typeSignatures) ?? Icons.sports_outlined,
         AppColors.habitGreen,
         organizers
             .where((o) => o.organizerType == OrganizerType.activity)
@@ -176,7 +197,7 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
       ),
       _OrganizerSection(
         'People',
-        Icons.people_outline_rounded,
+        ObjectIcons.iconDataForTypeWithSignatures('person', typeSignatures) ?? Icons.people_outline_rounded,
         AppColors.habitPink,
         organizers
             .where((o) => o.organizerType == OrganizerType.person)
@@ -184,10 +205,50 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
       ),
       _OrganizerSection(
         'Labels',
-        Icons.label_outline_rounded,
+        ObjectIcons.iconDataForTypeWithSignatures('label', typeSignatures) ?? Icons.label_outline_rounded,
         AppTheme.textSecondaryColor(context),
         organizers
             .where((o) => o.organizerType == OrganizerType.label)
+            .toList(),
+      ),
+      _OrganizerSection(
+        'Tasks',
+        ObjectIcons.iconDataForTypeWithSignatures('task', typeSignatures) ?? Icons.check_circle_outline,
+        AppColors.habitBlue,
+        organizers
+            .where((o) => o.organizerType == OrganizerType.task)
+            .toList(),
+      ),
+      _OrganizerSection(
+        'Day Themes',
+        ObjectIcons.iconDataForTypeWithSignatures('day_theme', typeSignatures) ?? Icons.wb_sunny_outlined,
+        AppColors.warning,
+        organizers
+            .where((o) => o.organizerType == OrganizerType.dayTheme)
+            .toList(),
+      ),
+      _OrganizerSection(
+        'Time Blocks',
+        ObjectIcons.iconDataForTypeWithSignatures('time_block', typeSignatures) ?? Icons.timer_outlined,
+        AppColors.info,
+        organizers
+            .where((o) => o.organizerType == OrganizerType.timeBlock)
+            .toList(),
+      ),
+      _OrganizerSection(
+        'Values',
+        ObjectIcons.iconDataForTypeWithSignatures('value', typeSignatures) ?? Icons.star_outline,
+        AppColors.habitOrange,
+        organizers
+            .where((o) => o.organizerType == OrganizerType.value)
+            .toList(),
+      ),
+      _OrganizerSection(
+        'Routines',
+        ObjectIcons.iconDataForTypeWithSignatures('routine', typeSignatures) ?? Icons.repeat_rounded,
+        AppColors.habitPurple,
+        organizers
+            .where((o) => o.organizerType == OrganizerType.routine)
             .toList(),
       ),
     ];
@@ -509,6 +570,12 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
   }
 
   IconData _typeIcon(OrganizerType type) {
+    // Use Object Identification icons if available, otherwise fallback to hardcoded icons
+    final settings = ref.read(settingsProvider);
+    final iconData = ObjectIcons.iconDataForTypeWithSignatures(type.name, settings.typeSignatures);
+    if (iconData != null) return iconData;
+    
+    // Fallback to hardcoded icons
     switch (type) {
       case OrganizerType.area:
         return Icons.layers_outlined;
@@ -532,6 +599,12 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
         return Icons.wb_sunny_outlined;
       case OrganizerType.timeBlock:
         return Icons.timer_outlined;
+      case OrganizerType.routine:
+        return Icons.repeat_rounded;
+      case OrganizerType.value:
+        return Icons.star_outline;
+      case OrganizerType.pillar:
+        return Icons.account_balance;
     }
   }
 }

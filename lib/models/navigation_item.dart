@@ -23,6 +23,9 @@ enum NavSection {
   social,
   dayThemes,
   timeBlocks,
+  tasks,
+  pillarsValues,
+  routines,
 }
 
 class NavigationItem {
@@ -139,6 +142,12 @@ class NavigationItem {
         return active ? Icons.wb_sunny_rounded : Icons.wb_sunny_outlined;
       case NavSection.timeBlocks:
         return active ? Icons.access_time_rounded : Icons.access_time_outlined;
+      case NavSection.tasks:
+        return active ? Icons.check_circle_rounded : Icons.check_circle_outline_rounded;
+      case NavSection.pillarsValues:
+        return active ? Icons.star_rounded : Icons.star_outline_rounded;
+      case NavSection.routines:
+        return active ? Icons.sync_rounded : Icons.sync_outlined;
     }
   }
 

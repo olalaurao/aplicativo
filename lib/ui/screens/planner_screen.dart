@@ -10,7 +10,9 @@ import '../../models/kpi_model.dart';
 import '../../models/mood_model.dart';
 import '../../models/note_model.dart';
 import '../../models/organizer_model.dart';
+import '../../models/routine_model.dart';
 import '../../models/shared_types.dart';
+import '../widgets/routine_execution_sheet.dart';
 import '../theme.dart';
 import '../../models/journal_entry.dart';
 import '../../models/tracker_model.dart';
@@ -109,7 +111,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   bool _isTimeline = true;
   late DateTime _selectedDate;
   final ScrollController _scrollController = ScrollController();
-  bool _showOverdue = true;
   bool _showJumpToNowFab = false;
   int _gridGranularity = 30; // 15, 30, or 60 minutes
   bool _showBacklogPanel = false;
@@ -366,6 +367,11 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             ),
             pinned: true,
             actions: [
+              // Day theme emojis
+              if (activeTheme != null)
+                _buildDayThemeEmojiButton(activeTheme),
+              // Overdue button
+              _buildOverdueButton(),
               IconButton(
                 icon: Icon(Icons.inbox_rounded, color: AppTheme.accentColor(context)),
                 tooltip: 'Backlog / Sem data',
@@ -426,8 +432,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                     if (_viewMode == 0) ...[
                       const SizedBox(height: 12),
                       _buildDateStrip(),
-                      const SizedBox(height: 8),
-                      _buildOverdueToggle(),
                     ],
                   ],
                 ),
@@ -436,13 +440,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
           ),
 
           if (_viewMode == 0) ...[
-            if (_isSameDay(_selectedDate, DateTime.now()) && _showOverdue)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: OverdueSection(),
-                ),
-              ),
             _isTimeline
                 ? SliverToBoxAdapter(
                     child: Padding(
@@ -598,9 +595,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     final allObjects = ref.read(allObjectsProvider).value ?? [];
     final tasks = allObjects.whereType<Task>().toList();
     final routines = allObjects
-        .whereType<Note>()
+        .whereType<Routine>()
         .where(
-          (note) => note.subtype == NoteSubtype.text && note.showInPlanner,
+          (routine) => routine.showInPlanner,
         )
         .toList();
     final backlog = tasks
@@ -864,49 +861,133 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     );
   }
 
-  Widget _buildOverdueToggle() {
+  Widget _buildOverdueButton() {
     final overdueCount = ref.watch(overdueCountProvider);
     if (overdueCount == 0) return const SizedBox.shrink();
     
-    return GestureDetector(
-      onTap: () => setState(() => _showOverdue = !_showOverdue),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: _showOverdue 
-              ? AppColors.error.withValues(alpha: 0.1)
-              : AppColors.surfaceVariant,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: _showOverdue 
-                ? AppColors.error.withValues(alpha: 0.3)
-                : Colors.transparent,
+    return IconButton(
+      icon: const Icon(
+        Icons.warning_amber_rounded,
+        color: AppColors.error,
+      ),
+      tooltip: 'Atrasados ($overdueCount)',
+      onPressed: () => _showOverduePopup(),
+    );
+  }
+
+  void _showOverduePopup() {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceVariantColor(context),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: AppColors.error,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Atrasados',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: const OverdueSection(),
+                ),
+              ),
+            ],
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.warning_amber_rounded,
-              color: AppColors.error,
-              size: 16,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'Atrasados ($overdueCount)',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: _showOverdue ? AppColors.error : AppColors.textSecondary,
+      ),
+    );
+  }
+
+  Widget _buildDayThemeEmojiButton(Organizer theme) {
+    final emoji = theme.icon ?? '📅';
+    return IconButton(
+      icon: Text(
+        emoji,
+        style: const TextStyle(fontSize: 20),
+      ),
+      tooltip: theme.title,
+      onPressed: () => _showDayThemePopup(theme),
+    );
+  }
+
+  void _showDayThemePopup(Organizer theme) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    theme.icon ?? '📅',
+                    style: const TextStyle(fontSize: 32),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          theme.title,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Dias: ${theme.daysOfWeek.join(", ")}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textMutedColor(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              _showOverdue ? Icons.expand_less : Icons.expand_more,
-              size: 16,
-              color: _showOverdue ? AppColors.error : AppColors.textSecondary,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -966,8 +1047,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       sliver: SliverList(
         delegate: SliverChildListDelegate([
-          if (_isSameDay(_selectedDate, DateTime.now()))
-            const OverdueSection(),
           const Text(
             'Day Blocks',
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
@@ -2024,10 +2103,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     final allObjects = ref.read(allObjectsProvider).value ?? [];
     final tasks = allObjects.whereType<Task>().toList();
     final routines = allObjects
-        .whereType<Note>()
+        .whereType<Routine>()
         .where(
-          // TODO: NoteSubtype.routine was removed per spec. We now check note.showInPlanner for notes of type text.
-          (note) => note.subtype == NoteSubtype.text && note.showInPlanner,
+          (routine) => routine.showInPlanner,
         )
         .toList();
     final backlog = tasks
@@ -2116,12 +2194,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     );
   }
 
-  Widget _buildRoutineItem(Note note) {
+  Widget _buildRoutineItem(Routine routine) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
       leading: const Icon(Icons.repeat_rounded, color: AppColors.info),
       title: Text(
-        note.title,
+        routine.title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(fontWeight: FontWeight.w600),
@@ -2133,16 +2211,25 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       ),
       onTap: () {
         Navigator.pop(context);
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => UniversalDetailView(object: note)),
-        );
+        showRoutineExecutionSheet(context, routine);
       },
+      trailing: IconButton(
+        icon: const Icon(Icons.info_outline, size: 18),
+        onPressed: () {
+          Navigator.pop(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => UniversalDetailView(object: routine)),
+          );
+        },
+      ),
     );
   }
 
   Widget _buildWeekView(List<Task> tasks, List<Habit> habits) {
-    final timeBlocks = ref.watch(timeBlocksProvider.select((blocks) => blocks.where((b) => b.organizerType == OrganizerType.timeBlock).toList()));
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final timeBlocks = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.timeBlock).toList();
     final startOfWeek = DateTime.now().subtract(
       Duration(days: DateTime.now().weekday - 1),
     );
@@ -2156,6 +2243,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             tasks: tasks,
             habits: habits,
             startOfWeek: startOfWeek,
+            dayThemes: dayThemes,
+            timeBlocks: timeBlocks,
             onTaskTap: (task, date) {
               Navigator.push(
                 context,
@@ -2208,6 +2297,15 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     
     final moodDefinitions = ref.watch(moodsProvider);
     
+    // Get day theme for selected date
+    const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final dayName = weekDayNames[_selectedDate.weekday - 1];
+    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final activeTheme = dayThemes.cast<Organizer?>().firstWhere(
+      (theme) => theme != null && theme.daysOfWeek.contains(dayName),
+      orElse: () => null,
+    );
+    
     final snapshot = DayDialAggregator.aggregateForDate(
       date: _selectedDate,
       tasks: tasks,
@@ -2226,6 +2324,15 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       sliver: SliverToBoxAdapter(
         child: Column(
           children: [
+            if (activeTheme != null)
+              GestureDetector(
+                onTap: () => _showDayThemePopup(activeTheme),
+                child: Text(
+                  activeTheme.icon ?? '📅',
+                  style: const TextStyle(fontSize: 32),
+                ),
+              ),
+            if (activeTheme != null) const SizedBox(height: 8),
             DayDialWidget(
               snapshot: snapshot,
               selectedDate: _selectedDate,
@@ -2522,6 +2629,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
     final daysInMonth = lastDayOfMonth.day;
     final firstWeekday = firstDayOfMonth.weekday; // 1=Mon, 7=Sun
+    
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     return SliverPadding(
       padding: const EdgeInsets.all(20),
@@ -2542,6 +2653,13 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
               (t) => t.deadline != null && _isSameDay(t.deadline!, date),
             );
             final isToday = _isSameDay(date, DateTime.now());
+            
+            // Find active day theme for this day
+            final dayName = weekDayNames[date.weekday - 1];
+            final activeTheme = dayThemes.cast<Organizer?>().firstWhere(
+              (theme) => theme != null && theme.daysOfWeek.contains(dayName),
+              orElse: () => null,
+            );
 
             return InkWell(
               onTap: () => _showDayDetailsSheet(date, tasks, habits),
@@ -2559,6 +2677,16 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    if (activeTheme != null)
+                      GestureDetector(
+                        onTap: () => _showDayThemePopup(activeTheme),
+                        child: Text(
+                          activeTheme.icon ?? '📅',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      )
+                    else
+                      const SizedBox(height: 14),
                     Text(
                       day.toString(),
                       style: TextStyle(
@@ -2920,7 +3048,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
           children: [
             Row(
               children: [
-                Text(ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.task, ref.read(settingsProvider).typeSignatures), style: const TextStyle(fontSize: 24)),
+                Builder(
+                  builder: (context) {
+                    final iconData = ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.task, ref.read(settingsProvider).typeSignatures);
+                    return Icon(iconData ?? Icons.check_circle_outline, size: 24, color: AppTheme.accentColor(context));
+                  },
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(

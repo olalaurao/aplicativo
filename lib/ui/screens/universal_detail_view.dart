@@ -5,6 +5,7 @@ import '../../services/notification_service.dart';
 import '../widgets/reminder_config_sheet.dart';
 import 'package:flutter/services.dart';
 import '../../providers/history_provider.dart';
+import '../../providers/settings_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
@@ -21,12 +22,14 @@ import '../../models/project_model.dart';
 import '../../models/tracker_model.dart';
 import '../../models/snapshot_model.dart';
 import '../../models/organizer_model.dart';
+import '../../models/routine_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/kpi_model.dart';
 import '../../providers/pomodoro_provider.dart';
 import '../../services/kpi_engine.dart';
 import '../../services/markdown_parser.dart';
 import '../../services/scheduler_service.dart';
+import '../utils/object_icons.dart';
 import '../../providers/vault_provider.dart';
 import 'pomodoro_screen.dart';
 import '../theme.dart';
@@ -73,6 +76,7 @@ import 'detail_sections/note_detail_section.dart';
 import 'detail_sections/person_detail_section.dart';
 import 'detail_sections/journal_entry_detail_section.dart';
 import 'detail_sections/idea_detail_section.dart';
+import 'detail_sections/routine_detail_section.dart';
 import 'detail_views/resource_detail_view.dart';
 import 'detail_views/person_detail_view.dart';
 import 'detail_views/note_detail_view.dart';
@@ -879,6 +883,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     } else if (object is JournalEntry) {
       final mood = _moodForEntry(object as JournalEntry);
       cards.addAll(buildJournalEntryPropertyCards(object as JournalEntry, mood));
+    } else if (object is Routine) {
+      cards.addAll(buildRoutinePropertyCards(object as Routine, ref, context));
     } else {
       cards.addAll(_buildDefaultDateCards(context));
     }
@@ -1115,6 +1121,20 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         _buildNoteViewer,
         _buildNoteListItem,
       );
+    }
+    if (object is Routine) {
+      return [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: buildRoutineContentSection(
+              object as Routine,
+              ref,
+              context,
+            ),
+          ),
+        ),
+      ];
     }
     return [];
   }
@@ -3325,6 +3345,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         return 'Day Theme';
       case OrganizerType.timeBlock:
         return 'Time Block';
+      case OrganizerType.routine:
+        return 'Routine';
+      case OrganizerType.value:
+        return 'Value';
+      case OrganizerType.pillar:
+        return 'Pillar';
       }
     }
     switch (obj.type) {
@@ -3379,6 +3405,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   }
 
   IconData _typeIcon(String type) {
+    // Use Object Identification icons if available, otherwise fallback to hardcoded icons
+    final settings = ref.read(settingsProvider);
+    final iconData = ObjectIcons.iconDataForTypeWithSignatures(type, settings.typeSignatures);
+    if (iconData != null) return iconData;
+    
+    // Fallback to hardcoded icons
     switch (type) {
       case 'task':
         return Icons.check_circle_outline;

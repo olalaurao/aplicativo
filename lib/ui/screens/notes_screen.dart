@@ -299,7 +299,14 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           padding: const EdgeInsets.all(12),
           decoration: AppTheme.cardDecoration(context),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_noteEmoji(note), style: const TextStyle(fontSize: 20)),
+            Builder(
+              builder: (context) {
+                final iconData = _noteIconData(note);
+                if (iconData != null)
+                  return Icon(iconData, size: 20, color: AppTheme.accentColor(context));
+                return Text(_noteEmoji(note), style: const TextStyle(fontSize: 20));
+              },
+            ),
             const SizedBox(height: 8),
             Text(note.title, maxLines: 2, overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
@@ -311,6 +318,13 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                 style: TextStyle(fontSize: 9, color: AppTheme.textMutedColor(context))),
             ]),
           ]))));
+  }
+
+  IconData? _noteIconData(dynamic note) {
+    final iconData = ObjectIcons.iconDataForType('note', ref);
+    if (note.noteType == 'outline') return ObjectIcons.defaultIconDataForNoteSubtype('outline');
+    if (note.noteType == 'collection') return ObjectIcons.defaultIconDataForNoteSubtype('collection');
+    return iconData;
   }
 
   String _noteEmoji(dynamic note) {

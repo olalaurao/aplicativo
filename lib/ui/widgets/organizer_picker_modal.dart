@@ -86,6 +86,12 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
         return 'Day Theme';
       case OrganizerType.timeBlock:
         return 'Time Block';
+      case OrganizerType.routine:
+        return 'Routine';
+      case OrganizerType.value:
+        return 'Value';
+      case OrganizerType.pillar:
+        return 'Pillar';
       }
     }
     switch (obj.type) {

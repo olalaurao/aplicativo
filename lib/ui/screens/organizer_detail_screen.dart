@@ -8,6 +8,7 @@ import '../../models/note_model.dart';
 import '../../models/social_post.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/wiki_link_resolver_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../theme.dart';
 import '../utils/object_icons.dart';
 import '../widgets/object_action_wrapper.dart';
@@ -1084,6 +1085,12 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
   }
 
   IconData _typeIcon(OrganizerType type) {
+    // Use Object Identification icons if available, otherwise fallback to hardcoded icons
+    final settings = ref.read(settingsProvider);
+    final iconData = ObjectIcons.iconDataForTypeWithSignatures(type.name, settings.typeSignatures);
+    if (iconData != null) return iconData;
+    
+    // Fallback to hardcoded icons
     switch (type) {
       case OrganizerType.area:
         return Icons.layers_outlined;
@@ -1107,6 +1114,12 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         return Icons.wb_sunny_outlined;
       case OrganizerType.timeBlock:
         return Icons.timer_outlined;
+      case OrganizerType.routine:
+        return Icons.repeat_rounded;
+      case OrganizerType.value:
+        return Icons.star_outline;
+      case OrganizerType.pillar:
+        return Icons.account_balance;
     }
   }
 

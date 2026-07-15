@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/task_model.dart';
 import '../../models/habit_model.dart';
+import '../../models/organizer_model.dart';
 import '../theme.dart';
 
 class WeekTimeGrid extends ConsumerWidget {
@@ -11,6 +12,8 @@ class WeekTimeGrid extends ConsumerWidget {
   final DateTime startOfWeek;
   final Function(Task, DateTime)? onTaskTap;
   final Function(Habit)? onHabitTap;
+  final List<Organizer>? dayThemes;
+  final List<Organizer>? timeBlocks;
 
   const WeekTimeGrid({
     super.key,
@@ -19,6 +22,8 @@ class WeekTimeGrid extends ConsumerWidget {
     required this.startOfWeek,
     this.onTaskTap,
     this.onHabitTap,
+    this.dayThemes,
+    this.timeBlocks,
   });
 
   @override
@@ -42,10 +47,31 @@ class WeekTimeGrid extends ConsumerWidget {
                 ...List.generate(7, (index) {
                   final date = startOfWeek.add(Duration(days: index));
                   final isToday = _isSameDay(date, now);
+                  final dayName = dayNames[index];
+                  
+                  // Find active day theme for this day
+                  Organizer? activeTheme;
+                  if (dayThemes != null) {
+                    activeTheme = dayThemes!.firstWhere(
+                      (theme) => theme.daysOfWeek.contains(dayName),
+                      orElse: () => null as Organizer,
+                    );
+                  }
+                  
                   return Expanded(
                     child: Center(
                       child: Column(
                         children: [
+                          if (activeTheme != null)
+                            GestureDetector(
+                              onTap: () => _showDayThemePopup(context, activeTheme!),
+                              child: Text(
+                                activeTheme.icon ?? '📅',
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                            )
+                          else
+                            const SizedBox(height: 16),
                           Text(
                             dayNames[index],
                             style: TextStyle(
@@ -107,6 +133,7 @@ class WeekTimeGrid extends ConsumerWidget {
                               hour,
                               tasks,
                               habits,
+                              timeBlocks,
                             ),
                           );
                         }),
@@ -128,6 +155,7 @@ class WeekTimeGrid extends ConsumerWidget {
     int hour,
     List<Task> tasks,
     List<Habit> habits,
+    List<Organizer>? timeBlocks,
   ) {
     // Find tasks scheduled for this hour on this day
     final hourTasks = tasks.where((task) {
@@ -155,7 +183,25 @@ class WeekTimeGrid extends ConsumerWidget {
       return false;
     }).toList();
 
-    if (hourTasks.isEmpty && hourHabits.isEmpty) {
+    // Find time blocks for this hour on this day
+    final hourTimeBlocks = <Organizer>[];
+    if (timeBlocks != null) {
+      const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      final dayName = weekDayNames[date.weekday - 1];
+      
+      for (final block in timeBlocks) {
+        if (!block.daysOfWeek.contains(dayName)) continue;
+        
+        for (final range in block.timeRanges) {
+          if (hour >= range.startHour && hour < range.endHour) {
+            hourTimeBlocks.add(block);
+            break;
+          }
+        }
+      }
+    }
+
+    if (hourTasks.isEmpty && hourHabits.isEmpty && hourTimeBlocks.isEmpty) {
       return Container(
         decoration: BoxDecoration(
           border: Border(
@@ -176,11 +222,49 @@ class WeekTimeGrid extends ConsumerWidget {
       ),
       child: Stack(
         children: [
+          if (hourTimeBlocks.isNotEmpty)
+            ...hourTimeBlocks.take(1).map((block) => _buildMiniTimeBlock(context, block)),
           if (hourTasks.isNotEmpty)
             ...hourTasks.take(2).map((task) => _buildMiniTaskBlock(context, task)),
           if (hourHabits.isNotEmpty)
             ...hourHabits.take(1).map((habit) => _buildMiniHabitBlock(context, habit)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMiniTimeBlock(BuildContext context, Organizer block) {
+    final color = block.color != null && block.color!.startsWith('#')
+        ? Color(int.parse(block.color!.replaceAll('#', '0xFF')))
+        : AppColors.info;
+    
+    return GestureDetector(
+      onTap: () => _showDayThemePopup(context, block),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xs),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(AppBorderRadius.xs),
+          border: Border.all(color: color, width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (block.icon != null)
+              Text(block.icon!, style: const TextStyle(fontSize: 10)),
+            if (block.icon != null) const SizedBox(width: 4),
+            Text(
+              block.title,
+              style: TextStyle(
+                color: color,
+                fontSize: AppTextSize.xs,
+                fontWeight: FontWeight.bold,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -233,5 +317,57 @@ class WeekTimeGrid extends ConsumerWidget {
 
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  void _showDayThemePopup(BuildContext context, Organizer theme) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    theme.icon ?? '📅',
+                    style: const TextStyle(fontSize: 32),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          theme.title,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Dias: ${theme.daysOfWeek.join(", ")}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textMutedColor(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -44,7 +44,11 @@ Sourced from a batch of real usage notes (WhatsApp messages, late June 2026). Pu
 
 ---
 
-## CHANGELOG — V5.2 → V5.3
+## CHANGELOG — V5.3 → V5.4
+
+- **Material Icons System (new):** Object type icons changed from emojis to Material Design icons. TypeSignature now includes `iconName` field for Material icon selection. MaterialIconSet provides 100+ curated Material icons organized by category. IconPicker widget allows visual icon selection via grid. ObjectIcons extended with `iconDataForType()` and `defaultIconDataForType()` methods. All screens (organizers, timeline, planner, notes, universal detail view) updated to use Material icons with emoji fallback for compatibility. Users can customize icons per object type via Settings → Object Identification.
+- **Routine Organizer (new):** New `OrganizerType.routine` for schedulable routines with items and execution history. Routine extends Organizer with `items` (List<RoutineItem> referencing any vault object via WikiLink), `executionHistory` (List<RoutineExecution> tracking when routine was run and item completion status), `showInPlanner` flag, and optional `moodTrigger`. RoutineItem supports required flag and order. RoutineExecution tracks item completions, optional notes, and mood before/after. RoutineExecutionService handles habit sync (bidirectional toggle updates habit directly) and completion flow with dialog for incomplete items ("leave open" vs "mark all done"). Planner displays routines with `showInPlanner=true`. CreateRoutineForm provides item management with universal search picker, drag & drop reordering, scheduler integration, and mood trigger dropdown. RoutineExecutionSheet provides modal UI for executing routines with item checkboxes, habit sync toggle, and completion flow.
+- **Mood Trigger for Routines (new):** MoodRoutineService suggests routines based on current mood quadrant (Red/Yellow/Green/Blue). When user logs mood in journal entry, matching routines are automatically suggested via bottom sheet. Routine's `moodTrigger` field accepts quadrant names (red, yellow, green, blue) or descriptive names (high_energy_low_pleasantness, etc.). Integration with CreateEntryForm shows routine suggestions after mood selection.
 
 - **Rotation System (new):** Projects now support rotation-based zone cycling with `rotationGroups` (array of RotationGroup objects with name, emoji, colorHex, periodDays, order), `rotationStartDate`, and computed `rotationCycleLengthDays`. RotationService computes active status, day of period, occurrence number, and upcoming groups. New screens: RotationOverviewScreen (shows current zone and upcoming schedule) and RotationZoneDetailScreen (zone-specific task list). Tasks can be assigned to rotation groups via `rotationGroupId`, `rotationFrequencyType` (none/daily/oncePerPeriod/everyNRotations), `rotationEveryN`, `rotationLastCompletedAtOccurrence`, and `rotationDailyCompletions` map.
 - **Alignment Tracking (new):** Tasks and Habits now support alignment tracking (planned vs actual timing). Task gains `flexibilityWindowMinutes` (null = off) and `isAlignmentTrackable` getter. HabitSlot gains `isAlignmentTrackable` via parent Habit. AlignmentService logs `AlignmentLogEntry` records with itemId, date, plannedTime, actualTime, deltaMinutes, and computed state (early/aligned/drifting/missed). Alignment states are stored in daily notes as ```alignment``` blocks and surfaced via AlignmentInsightsPanel.
@@ -535,6 +539,253 @@ OrganizerSelectorField(
 // Do not implement your own organizer selection field
 ```
 
+#### PropertyRow (`lib/ui/widgets/property_row.dart`)
+Use for ALL label-value rows with optional tap interaction:
+
+```dart
+// ✅ CORRECT
+PropertyRow(
+  label: 'Due Date',
+  value: 'Jan 15, 2024',
+  onTap: () => _pickDate(),
+  leadingIcon: Icons.calendar_today_rounded,
+)
+
+// ❌ WRONG
+Row(
+  children: [
+    Text('Due Date'),
+    const Spacer(),
+    GestureDetector(
+      onTap: _pickDate,
+      child: Text('Jan 15, 2024'),
+    ),
+  ],
+)
+```
+
+#### FormSectionCard (`lib/ui/widgets/form_section_card.dart`)
+Use for ALL card-like sections in forms:
+
+```dart
+// ✅ CORRECT
+FormSectionCard(
+  title: 'Basic Information',
+  trailing: IconButton(
+    icon: Icon(Icons.add),
+    onPressed: _addItem,
+  ),
+  child: Column(
+    children: [
+      // form fields
+    ],
+  ),
+)
+
+// ❌ WRONG
+Container(
+  decoration: AppTheme.cardDecoration(context),
+  padding: const EdgeInsets.all(16),
+  child: Column(
+    children: [
+      Row(
+        children: [
+          Text('Basic Information'),
+          const Spacer(),
+          IconButton(...),
+        ],
+      ),
+      const SizedBox(height: 8),
+      // form fields
+    ],
+  ),
+)
+```
+
+#### DiscardGuard (`lib/ui/widgets/discard_guard.dart`)
+Use for ALL forms with unsaved changes protection:
+
+```dart
+// ✅ CORRECT
+return DiscardGuard(
+  isDirty: isDirty,
+  child: Scaffold(
+    body: YourFormContent(),
+  ),
+)
+
+// ❌ WRONG
+return PopScope(
+  canPop: !isDirty,
+  onPopInvokedWithResult: (didPop, result) async {
+    if (didPop) return;
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Discard changes?'),
+        // ... dialog content
+      ),
+    );
+    if (discard ?? false && context.mounted) {
+      Navigator.pop(context);
+    }
+  },
+  child: Scaffold(...),
+)
+```
+
+#### confirmAndDelete (`lib/ui/utils/confirm_delete.dart`)
+Use for ALL delete confirmations with undo support:
+
+```dart
+// ✅ CORRECT
+import '../ui/utils/confirm_delete.dart';
+
+final confirmed = await confirmAndDelete(
+  context,
+  title: 'Delete this task?',
+  onUndo: () => _undoDelete(),
+);
+
+// ❌ WRONG
+final confirmed = await showDialog<bool>(
+  context: context,
+  builder: (_) => AlertDialog(
+    title: Text('Delete?'),
+    actions: [
+      TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel')),
+      TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete')),
+    ],
+  ),
+);
+```
+
+#### TemplatePickerSheet (`lib/ui/widgets/template_picker_sheet.dart`)
+Use for ALL template selection modals:
+
+```dart
+// ✅ CORRECT
+await TemplatePickerSheet.show(
+  context,
+  objectType: 'task',
+  onTemplateSelected: (template) {
+    _applyTemplate(template);
+  },
+)
+
+// ❌ WRONG
+// Do not implement your own template picker
+```
+
+#### ReminderConfigSheet (`lib/ui/widgets/reminder_config_sheet.dart`)
+Use for ALL reminder configuration:
+
+```dart
+// ✅ CORRECT
+await ReminderConfigSheet.show(
+  context,
+  onSave: (config) => setState(() => _reminder = config),
+  parentDateTime: task.scheduledTime,
+  parentDateOnly: task.dueDate,
+)
+
+// ❌ WRONG
+// Do not implement your own reminder configuration dialog
+```
+
+#### AppColorPicker (`lib/ui/widgets/app_color_picker.dart`)
+Use for ALL color selection in forms:
+
+```dart
+// ✅ CORRECT
+AppColorPicker(
+  value: _selectedColor,
+  onChanged: (color) => setState(() => _selectedColor = color),
+)
+
+// ❌ WRONG
+// Do not implement your own color picker with hardcoded color arrays
+```
+
+#### NumberStepper (`lib/ui/widgets/number_stepper.dart`)
+Use for ALL number increment/decrement controls:
+
+```dart
+// ✅ CORRECT
+NumberStepper(
+  value: _count,
+  min: 1,
+  max: 10,
+  onChanged: (value) => setState(() => _count = value),
+)
+
+// ❌ WRONG
+Row(
+  children: [
+    IconButton(onPressed: () => setState(() => _count--), icon: Icon(Icons.remove)),
+    Text(_count.toString()),
+    IconButton(onPressed: () => setState(() => _count++), icon: Icon(Icons.add)),
+  ],
+)
+```
+
+#### CountBadge (`lib/ui/widgets/count_badge.dart`)
+Use for ALL notification count badges:
+
+```dart
+// ✅ CORRECT
+CountBadge(
+  count: _unreadCount,
+  color: AppColors.error,
+)
+
+// ❌ WRONG
+Container(
+  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+  decoration: BoxDecoration(
+    color: Colors.red,
+    borderRadius: BorderRadius.circular(10),
+  ),
+  child: Text(_unreadCount.toString()),
+)
+```
+
+#### SectionDivider (`lib/ui/widgets/section_divider.dart`)
+Use for ALL section dividers:
+
+```dart
+// ✅ CORRECT
+SectionDivider(label: 'Upcoming')
+
+// ❌ WRONG
+Divider(height: 24)
+```
+
+#### showNumberInputDialog (`lib/ui/utils/number_input_dialog.dart`)
+Use for ALL number input dialogs:
+
+```dart
+// ✅ CORRECT
+final value = await showNumberInputDialog(
+  context,
+  title: 'Set quantity',
+  initialValue: _quantity,
+  min: 1,
+  max: 100,
+)
+
+// ❌ WRONG
+final controller = TextEditingController(text: _quantity.toString());
+final value = await showDialog<int>(
+  context: context,
+  builder: (_) => AlertDialog(
+    title: Text('Set quantity'),
+    content: TextField(controller: controller, keyboardType: TextInputType.number),
+    actions: [...],
+  ),
+)
+```
+
 ### 19.3 Themeable Properties
 
 The `AppThemeConfig` now supports the following themeable properties:
@@ -565,6 +816,97 @@ final updatedTheme = AppThemeConfig(
   cardElevation: activeTheme.cardElevation,         // ← Preserve
   useShadows: activeTheme.useShadows,               // ← Preserve
 );
+```
+
+### 19.4 Reusable Component Guidelines
+
+**ALWAYS use existing reusable components before creating inline UI.** This ensures UI consistency and reduces maintenance burden.
+
+#### Available Reusable Components
+
+**Form Components** (`lib/ui/widgets/`):
+- `PropertyRow` - Label-value row with optional tap action
+- `FormSectionCard` - Standard card container for form sections
+- `DiscardGuard` - PopScope wrapper for unsaved changes protection
+- `DatePickerField` - Reusable date picker with consistent UI
+- `AppColorPicker` - Unified color selection with default palette
+- `NumberStepper` - Increment/decrement number input
+- `TemplatePickerSheet` - Modal sheet for template selection
+- `ReminderConfigSheet` - Modal sheet for reminder configuration
+- `CreateFormScaffold` - Unified form layout with save button and discard guard
+
+**Utility Components** (`lib/ui/widgets/`):
+- `CountBadge` - Badge for displaying counts
+- `SectionDivider` - Horizontal divider with optional label
+- `showNumberInputDialog` - Dialog for numerical input
+
+**Utility Functions** (`lib/ui/utils/`):
+- `NotificationTypeUtils.getIcon()` - Get icon for notification type
+- `NotificationTypeUtils.getLabel()` - Get label for notification type
+
+#### When to Create a New Reusable Component
+
+Create a new reusable component when:
+1. The UI pattern appears in **3 or more places** in the codebase
+2. The component has **configurable behavior** (not just static content)
+3. The component represents a **common user interaction** (date picking, color selection, etc.)
+4. The component would benefit from **centralized styling** and theming
+
+**Do NOT create reusable components for:**
+- One-off UI patterns used only once
+- Simple static layouts that are context-specific
+- Components that would require excessive configuration parameters
+
+#### Component Creation Checklist
+
+Before creating a new reusable component:
+1. ✅ Search existing components to ensure no duplicate exists
+2. ✅ Check if the pattern appears in 3+ locations
+3. ✅ Design a simple, focused API (avoid over-parameterization)
+4. ✅ Use design system constants (`AppColors`, `AppSpacing`, `AppBorderRadius`)
+5. ✅ Add documentation comments with usage examples
+6. ✅ Update this guidelines.md file with the new component
+7. ✅ Update agents.md with the component in the widgets directory structure
+
+#### Migration Guidelines
+
+When refactoring inline UI to use reusable components:
+1. Identify the inline pattern
+2. Check if a reusable component exists
+3. If yes, adopt the existing component
+4. If no, create the reusable component first, then adopt it
+5. Test visual and functional parity
+6. Update documentation
+
+**Example migration - Date Picker:**
+
+❌ **Before (inline):**
+```dart
+InkWell(
+  onTap: () async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) setState(() => _selectedDate = picked);
+  },
+  child: TextField(
+    controller: TextEditingController(text: _selectedDate?.toString() ?? ''),
+    decoration: InputDecoration(labelText: 'Date'),
+    readOnly: true,
+  ),
+)
+```
+
+✅ **After (reusable):**
+```dart
+DatePickerField(
+  label: 'Date',
+  selectedDate: _selectedDate,
+  onDateChanged: (date) => setState(() => _selectedDate = date),
+)
 ```
 
 ---
@@ -619,6 +961,9 @@ Organizer types (Place removed in V5):
 7. Tracker (a Tracker is also an Organizer)
 8. Label (flexible tag, no hierarchy)
 9. Person (named person)
+10. Day Theme (time-based theme with scheduler)
+11. Time Block (time-based energy mapping)
+12. Routine (schedulable routine with items and execution history)
 
 Hierarchy: Area > Activity > Project > [Tasks, Habits, Trackers, Labels, People]
 
@@ -663,93 +1008,151 @@ Every object type declares a **minimum required-properties list** (specified per
 
 ### 1.5 Universal Type Icons
 
-Every object type has a **default icon/emoji**, used consistently in: list rows (leading position), chips, pickers, the Command Center, breadcrumbs, and the Universal Frontmatter icon field. Individual objects may override their type's default via the `icon` property.
+Every object type has a **default Material icon**, used consistently in: list rows (leading position), chips, pickers, the Command Center, breadcrumbs, and the Universal Frontmatter icon field. Individual objects may override their type's default via the `icon` property.
+
+**Material Icons System (new in V5.4):**
+
+The app uses Material Design icons instead of emojis for object type representation. Users can customize icons for each object type via Object Identification (Settings → Object Identification).
 
 | Type | Default icon |
 |---|---|
-| Entry (standard) | 📓 |
-| Entry (field_note) | ⚡ (or category-specific — see Part 2) |
-| Entry (pmn) | 📋 |
-| Task | ✅ |
-| Goal | 🧭 |
-| Habit | 🔁 |
-| Habit (pact) | 🧪 |
-| Tracker | 📊 |
-| Note (text) | 📝 |
-| Note (outline) | 🗂 |
-| Note (collection) | 🗃 |
-| Event | 📅 |
-| Reminder | 🔔 |
-| System | ⚙️ |
-| Social Post | 🔗 |
-| Idea | 💡 |
-| Inbox Item | 📥 |
-| Shopping List | 🛒 |
-| Template | 🧩 |
-| Area | 🏔 |
-| Project | 🎯 |
-| Activity | 🔄 |
-| Label | 🏷 |
-| Person | 👤 |
+| Entry (standard) | Icons.menu_book |
+| Entry (field_note) | Icons.bolt (or category-specific — see Part 2) |
+| Entry (pmn) | Icons.description |
+| Task | Icons.check_circle_outline |
+| Goal | Icons.flag |
+| Habit | Icons.refresh |
+| Habit (pact) | Icons.science |
+| Tracker | Icons.bar_chart |
+| Note (text) | Icons.description |
+| Note (outline) | Icons.view_list |
+| Note (collection) | Icons.folder |
+| Event | Icons.calendar_today |
+| Reminder | Icons.notifications |
+| System | Icons.settings |
+| Social Post | Icons.share |
+| Idea | Icons.lightbulb |
+| Inbox Item | Icons.inbox |
+| Shopping List | Icons.shopping_cart |
+| Template | Icons.dashboard |
+| Area | Icons.layers |
+| Project | Icons.folder |
+| Activity | Icons.sports |
+| Label | Icons.label |
+| Person | Icons.person |
+| Day Theme | Icons.wb_sunny |
+| Time Block | Icons.access_time |
+| Value | Icons.diamond |
+| Pillar | Icons.account_balance |
+| Routine | Icons.repeat |
+| Mood Definition | Icons.sentiment_satisfied |
+| Daily Note | Icons.menu_book |
+| Analysis | Icons.analytics |
+| Wellbeing Indicator | Icons.favorite |
+| Action | Icons.bolt |
 
-### 1.6 Configurable Emoji System (new in V5.3)
+### 1.6 Configurable Icon System (new in V5.4)
 
-**User-configurable emojis:** Every object type's emoji is customizable via Object Identification (Settings → Object Identification). Users can personalize the emoji for each type to match their preferences.
+**User-configurable Material icons:** Every object type's icon is customizable via Object Identification (Settings → Object Identification). Users can personalize the Material icon for each type to match their preferences from a curated set of 100+ Material icons.
 
 **How it works:**
 
 1. **TypeSignature** (in `lib/models/shared_types.dart`):
    - Defines how to identify an object type (markerType, markerValue)
-   - Includes `emoji` field for custom icon
+   - Includes `iconName` field for custom Material icon (optional)
+   - Includes `emoji` field for fallback emoji (optional, for compatibility)
    - Stored in `settings.typeSignatures` (SharedPreferences)
 
-2. **ObjectIcons** (in `lib/ui/utils/object_icons.dart`):
-   - `emojiForType(type, ref)` - returns user-configured emoji from settings
-   - `defaultIconForType(type)` - returns default emoji (fallback)
-   - `defaultIconForNoteSubtype(subtype)` - emojis for Note subtypes
-   - `defaultIconForHabitMode(mode)` - emojis for Habit modes
-   - `defaultIconForEntryType(entryType)` - emojis for Entry types
+2. **MaterialIconSet** (in `lib/ui/utils/material_icon_set.dart`):
+   - Provides 100+ Material icons organized by category
+   - `getIcon(name)` - returns IconData by icon name
+   - `iconNames` - sorted list of available icon names
 
-3. **type_signatures_screen.dart**:
-   - UI for editing emojis and identifiers
-   - Shows current emoji for each type
-   - "Emoji" field in edit dialog (2-character limit)
+3. **ObjectIcons** (in `lib/ui/utils/object_icons.dart`):
+   - `iconDataForType(type, ref)` - returns user-configured IconData from settings
+   - `iconDataForTypeWithSignatures(type, typeSignatures)` - same but with explicit signatures
+   - `defaultIconDataForType(type)` - returns default IconData (fallback)
+   - `defaultIconDataForNoteSubtype(subtype)` - IconData for Note subtypes
+   - `emojiForType(type, ref)` - returns fallback emoji (for compatibility)
+   - `defaultIconForType(type)` - returns default emoji (fallback)
+
+4. **IconPicker** (in `lib/ui/widgets/icon_picker.dart`):
+   - UI for selecting Material icons from grid
+   - Shows all available icons with visual preview
+   - Highlights selected icon
+
+5. **type_signatures_screen.dart**:
+   - UI for editing icons and identifiers
+   - Shows current Material icon for each type (or emoji fallback)
+   - "Icon" field in edit dialog opens IconPicker
+   - "Emoji (fallback)" field for compatibility
 
 **Usage rules:**
 
-**✅ CORRECT — Use configurable emojis:**
+**✅ CORRECT — Use configurable Material icons:**
 ```dart
 // In any Consumer widget
 import '../utils/object_icons.dart';
 
-// Get configured emoji (with fallback to default)
-final emoji = ObjectIcons.emojiForType('task', ref);
-Text(emoji, style: const TextStyle(fontSize: 20));
+// Get configured IconData (with fallback to default)
+final iconData = ObjectIcons.iconDataForType('task', ref);
+if (iconData != null) {
+  Icon(iconData, size: 20, color: AppTheme.accentColor(context));
+} else {
+  // Fallback to emoji if no icon configured
+  Text(ObjectIcons.emojiForType('task', ref), style: const TextStyle(fontSize: 20));
+}
 
 // For specific subtypes
-final noteEmoji = ObjectIcons.defaultIconForNoteSubtype('outline');
+final noteIcon = ObjectIcons.defaultIconDataForNoteSubtype('outline');
 ```
 
-**❌ WRONG — Hardcoded emojis:**
+**❌ WRONG — Hardcoded icons/emojis:**
 ```dart
-// Never use hardcoded emojis in UI
+// Never use hardcoded icons/emojis in UI for object types
+Icon(Icons.check_circle_outline, size: 20);
 Text('✅', style: const TextStyle(fontSize: 20));
-Text('🔄', style: const TextStyle(fontSize: 20));
 ```
 
-**When to use `ObjectIcons.emojiForType()`:**
+**When to use `ObjectIcons.iconDataForType()`:**
 - Showing type icon in lists (Tasks, Notes, etc.)
 - Showing icon in chips/badges of type
 - Showing icon in pickers/selectors
 - Any place where object type is visually identified
+- Organizer screens (organizer_detail_screen, organize_screen)
+- Universal detail view
+- Timeline, planner, and other list views
 
-**When to use hardcoded emojis:**
-- Specific subtype emoji (e.g., Note subtypes)
-- Contextual emoji (e.g., mood picker, status badges)
+**When to use hardcoded icons:**
+- Specific subtype icons (e.g., Note subtypes via `defaultIconDataForNoteSubtype`)
+- Contextual icons (navigation, actions, status)
 - Does not represent an object type
 
-**Default emojis (fallback):**
-If user hasn't configured an emoji, the system uses the defaults listed in section 1.5 above.
+**Fallback behavior:**
+If user hasn't configured an icon, the system uses the default Material icons listed in section 1.5 above. If for some reason IconData is not available, the system falls back to the emoji system for compatibility.
+
+**Icon categories available:**
+- Common/Tasks (check_circle, task, assignment, etc.)
+- Journal/Notes (book, menu_book, description, note, article)
+- Habits (refresh, autorenew, repeat, loop)
+- Goals (flag, emoji_events, stars, track_changes)
+- Projects (folder, folder_open, work, briefcase)
+- Events/Calendar (calendar_today, event, schedule, alarm)
+- Ideas (lightbulb, tips_and_updates, psychology, auto_awesome)
+- People (person, people, groups, contacts)
+- Areas/Organizers (layers, category, label, tag)
+- Activities (sports, directions_run, fitness_center, timer)
+- Resources (library_books, local_library, movie, music_note)
+- System (settings, tune, build, construction)
+- Social (share, public, link, language)
+- Shopping (shopping_cart, shopping_bag, store)
+- Pillars/Values (account_balance, diamond, favorite, star)
+- Actions (bolt, flash_on, power, battery_charging_full)
+- Trackers (bar_chart, insert_chart, show_chart, analytics)
+- Reminders (notifications, notifications_active, alarm_on)
+- Inbox (inbox, mail, drafts, email)
+- Templates (dashboard, view_module, grid_view, widgets)
+- Time (access_time, schedule, update, history)
 
 ---
 
@@ -1168,6 +1571,60 @@ There is no separate "Reminder Configuration" object type distinct from this —
 **Properties:** `id`, `type: template`, `title`, `template_type` (freeform string matching any content-object type, e.g. `entry`, `task`, `note`, `habit`, `tracker`, `goal`), `body`, `frontmatter_defaults` (a map of any properties valid for `template_type`, pre-filled on use), `organizers`.
 
 **Usage:** FAB → any creation form → "Use a template" (when templates exist for that type) → picker of matching Templates → form opens pre-filled with `frontmatter_defaults` and `body`.
+
+---
+
+### OBJECT 15: PILLAR *(new in V5.3)*
+
+**Purpose:** Aspirational "why" — a life area or value you want to stay connected to. Pillars have a touch log for tracking when you engage with them (e.g., "Health" pillar touched when you exercise, "Family" pillar touched when you spend quality time together).
+
+**Required properties:** `title`, `color`.
+
+**Properties:** `id`, `type: pillar`, `title`, `why` (optional — the deeper meaning this pillar represents), `color` (hex), `icon` (optional emoji override), `touch_log` (array of PillarTouch records with `date`, `action_id` (optional), `note` (optional)), `organizers`, `categories`, `tags`, `aliases`, `created_at`, `updated_at`, `archived`, `pinned`.
+
+**Helper methods:**
+- `lastTouch` — returns the most recent touch date, or null if never touched
+- `touchesInLast(days)` — returns count of touches in the last N days
+- `addTouch(date, actionId?, note?)` — adds a new touch record
+
+**Storage:** `pillars/SLUG.md` in the vault.
+
+**Default emoji:** 🏛️
+
+**Default color:** #8B5CF6
+
+---
+
+### OBJECT 16: VALUE *(new in V5.3)*
+
+**Purpose:** An Organizer subtype representing a core value or principle. Unlike other organizers (Area, Project, Activity), a Value has a `statement` field — a short anchor phrase that captures the essence of the value (e.g., "Honesty above all", "Growth through discomfort").
+
+**Required properties:** `title`, `organizer_type: value`, `statement`.
+
+**Properties:** Inherits all Organizer properties. Adds:
+- `statement` — the anchor phrase for this value (e.g., "Less is more", "People first")
+
+**Storage:** `organizers/values/SLUG.md` in the vault (user-configurable via Object Identification).
+
+**Default emoji:** 💎
+
+**Note:** Value is an Organizer subtype, not a separate content object type. It uses `organizer_type: value` to distinguish itself from other organizers.
+
+---
+
+### OBJECT 17: ACTION MENU ITEM *(new in V5.3)*
+
+**Purpose:** A reusable action template that can be linked to Habits, Pillars, or other objects. Action Menu Items define energy requirements (how much energy the action needs and how much it gives) and priority, making them useful for context-aware suggestions (e.g., low-energy actions when you're tired).
+
+**Required properties:** `title`, `energy_level`, `energy_cost`, `priority`.
+
+**Properties:** `id`, `type: action`, `title`, `energy_level` (enum: low, mid, high — how much energy this action provides), `energy_cost` (enum: low, mid, high — how much energy this action requires), `priority` (TaskPriority enum: none, low, medium, high), `icon` (optional emoji override), `organizers`, `categories`, `tags`, `aliases`, `created_at`, `updated_at`, `archived`, `pinned`.
+
+**Storage:** `actions/SLUG.md` in the vault.
+
+**Default emoji:** 🔋
+
+**Usage:** Can be linked to Pillars (as `action_id` in PillarTouch), Habits (as suggested actions), or used in context-aware action menus based on current energy state.
 
 ---
 
@@ -1799,6 +2256,15 @@ vault/
 ├── daily/                  ← Daily notes + PMN
 ├── analyses/               ← Combined Analysis definitions
 ├── moods/                  ← Mood definition files (created lazily)
+├── pillars/                ← Pillar definitions
+├── actions/                ← Action Menu Item definitions
+├── organizers/
+│   ├── values/             ← Value organizer definitions
+│   ├── areas/
+│   ├── projects/
+│   ├── activities/
+│   ├── day_themes/
+│   └── time_blocks/
 ├── _attachments/
 ├── _deleted/                ← purged after 30 days
 ├── _conflicts/               ← purged after 30 days
@@ -1834,7 +2300,7 @@ reminders: []
 ```
 task | habit | tracker | goal | note | entry | event | reminder | system | social_post
 | mood_definition | area | project | activity | label | person | idea | inbox
-| shopping_list | template | daily_note | analysis
+| shopping_list | template | daily_note | analysis | pillar | value | action
 ```
 
 *(`calendar_session` removed — folded into `event`. `place` removed entirely.)*

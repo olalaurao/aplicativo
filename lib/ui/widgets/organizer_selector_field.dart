@@ -11,9 +11,12 @@ import '../../models/organizer_model.dart';
 import '../../models/people_model.dart';
 import '../../models/resource_model.dart';
 import '../../models/project_model.dart';
+import '../../models/pillar_model.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../services/search_service.dart';
 import '../theme.dart';
+import '../utils/object_icons.dart';
 import 'app_chip.dart';
 
 class OrganizerSelectorField extends ConsumerWidget {
@@ -248,6 +251,12 @@ class OrganizerSelectorField extends ConsumerWidget {
                         ) {
                           setModalState(() => selectedFilter = val);
                         }),
+                        _buildFilterChip('pillar', 'Pilares', selectedFilter, (val) {
+                          setModalState(() => selectedFilter = val);
+                        }),
+                        _buildFilterChip('value', 'Valores', selectedFilter, (val) {
+                          setModalState(() => selectedFilter = val);
+                        }),
                       ],
                     ),
                   ),
@@ -282,15 +291,9 @@ class OrganizerSelectorField extends ConsumerWidget {
                                 (o) => o.slug == obj.id || o.slug == obj.slug,
                               );
                               return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: AppTheme.accentColor(context).withValues(
-                                    alpha: 0.1,
-                                  ),
-                                  child: Icon(
-                                    _getIconForType(obj.type),
-                                    size: 18,
-                                    color: AppTheme.accentColor(context),
-                                  ),
+                                leading: Text(
+                                  _getEmojiForType(obj.type, ref),
+                                  style: const TextStyle(fontSize: 20),
                                 ),
                                 title: Text(
                                   obj.title,
@@ -442,6 +445,16 @@ class OrganizerSelectorField extends ConsumerWidget {
         'label': 'Label',
         'icon': Icons.label_outlined,
       },
+      {
+        'type': 'pillar',
+        'label': 'Pillar',
+        'icon': Icons.account_balance_outlined,
+      },
+      {
+        'type': 'value',
+        'label': 'Value (Organizer)',
+        'icon': Icons.diamond_outlined,
+      },
     ];
 
     showModalBottomSheet<void>(
@@ -551,6 +564,20 @@ class OrganizerSelectorField extends ConsumerWidget {
                           status: ResourceStatus.toConsume,
                           createdAt: DateTime.now(),
                         );
+                      } else if (t['type'] == 'pillar') {
+                        newObj = Pillar(
+                          id: id,
+                          title: title,
+                          color: '#8B5CF6',
+                          createdAt: DateTime.now(),
+                        );
+                      } else if (t['type'] == 'value') {
+                        newObj = Organizer(
+                          id: id,
+                          title: title,
+                          organizerType: OrganizerType.value,
+                          createdAt: DateTime.now(),
+                        );
                       } else {
                         newObj = Note(
                           id: id,
@@ -584,29 +611,8 @@ class OrganizerSelectorField extends ConsumerWidget {
     );
   }
 
-  IconData _getIconForType(String type) {
-    switch (type) {
-      case 'project':
-        return Icons.rocket_launch_rounded;
-      case 'person':
-        return Icons.person_rounded;
-      case 'area':
-        return Icons.category_rounded;
-      case 'task':
-        return Icons.check_circle_outline_rounded;
-      case 'goal':
-        return Icons.flag_rounded;
-      case 'habit':
-        return Icons.repeat_rounded;
-      case 'tracker':
-        return Icons.bar_chart_rounded;
-      case 'resource':
-        return Icons.menu_book_rounded;
-      case 'note':
-        return Icons.description_rounded;
-      default:
-        return Icons.link_rounded;
-    }
+  String _getEmojiForType(String type, WidgetRef ref) {
+    return ObjectIcons.emojiForTypeWithSignatures(type, ref.read(settingsProvider).typeSignatures);
   }
 
   String _getTypeLabel(ContentObject obj) {
@@ -630,10 +636,16 @@ class OrganizerSelectorField extends ConsumerWidget {
           return 'Habit';
         case OrganizerType.tracker:
           return 'Tracker';
-      case OrganizerType.dayTheme:
-        return 'Day Theme';
-      case OrganizerType.timeBlock:
-        return 'Time Block';
+        case OrganizerType.value:
+          return 'Value';
+        case OrganizerType.dayTheme:
+          return 'Day Theme';
+        case OrganizerType.timeBlock:
+          return 'Time Block';
+        case OrganizerType.routine:
+          return 'Routine';
+      case OrganizerType.pillar:
+        return 'Pillar';
       }
     }
     switch (obj.type) {
@@ -649,6 +661,10 @@ class OrganizerSelectorField extends ConsumerWidget {
         return 'Resource';
       case 'person':
         return 'Person';
+      case 'pillar':
+        return 'Pillar';
+      case 'action':
+        return 'Action';
       default:
         return obj.type;
     }

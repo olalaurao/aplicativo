@@ -727,7 +727,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       case OrganizerType.dayTheme:
         return 'Tema do Dia';
       case OrganizerType.timeBlock:
-        return 'Bloco de Tempo';
+        return 'Time Block';
+      case OrganizerType.routine:
+        return 'Routine';
+      case OrganizerType.value:
+        return 'Valor';
+      case OrganizerType.pillar:
+        return 'Pilar';
       }
     }
     switch (obj.type) {

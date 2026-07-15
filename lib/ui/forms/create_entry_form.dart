@@ -15,6 +15,10 @@ import '../theme.dart';
 import '../widgets/organizer_picker_modal.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/mood_picker_sheet.dart';
+import '../../services/mood_routine_service.dart';
+import '../../models/routine_model.dart';
+import '../../models/mood_model.dart';
+import '../widgets/routine_execution_sheet.dart';
 
 class CreateEntryForm extends ConsumerStatefulWidget {
   final String? initialTitle;
@@ -441,10 +445,113 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
             setState(() {
               _moodSlug = moodSlug;
             });
+
+            // Show routine suggestions based on mood
+            _showRoutineSuggestions(moodSlug, moods);
           },
         );
       },
     );
+  }
+
+  void _showRoutineSuggestions(String moodSlug, List<dynamic> moods) {
+    final allObjects = ref.read(allObjectsProvider).value ?? [];
+    final selectedMood = moods
+        .where((m) => m.id == moodSlug || m.slug == moodSlug)
+        .firstOrNull;
+
+    if (selectedMood == null || selectedMood is! MoodDefinition) return;
+
+    final suggestedRoutines = MoodRoutineService.getRoutinesForMood(
+      selectedMood,
+      allObjects,
+    );
+
+    if (suggestedRoutines.isEmpty) return;
+
+    // Show routine suggestions
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (context) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.textMuted.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Text(
+                      '${selectedMood.emoji} Routine Suggestions',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Divider(height: 1),
+
+              // Routine list
+              Flexible(
+                child: ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  shrinkWrap: true,
+                  itemCount: suggestedRoutines.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final routine = suggestedRoutines[index];
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.repeat_rounded, color: AppColors.info),
+                        title: Text(routine.title),
+                        subtitle: routine.items.isNotEmpty
+                            ? Text('${routine.items.length} items')
+                            : null,
+                        trailing: const Icon(Icons.play_arrow_rounded),
+                        onTap: () {
+                          Navigator.pop(context);
+                          showRoutineExecutionSheet(context, routine);
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      );
+    });
   }
 
   Future<void> _pickOrganizers() async {

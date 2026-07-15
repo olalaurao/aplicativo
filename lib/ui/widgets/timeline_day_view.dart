@@ -297,10 +297,20 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                       final durationMinutes =
                           item.endMinutes - item.startMinutes;
 
+                      // Clamp values to prevent overflow
+                      final clampedStartHour = startHour.clamp(0, 23);
+                      final clampedStartMinute = startMinute.clamp(0, 59);
+                      final clampedDuration = durationMinutes.clamp(5, 24 * 60); // Min 5min, Max 24h
+
                       final topOffset =
-                          (startHour * hourHeight) +
-                          (startMinute / 60 * hourHeight);
-                      final height = (durationMinutes / 60 * hourHeight);
+                          (clampedStartHour * hourHeight) +
+                          (clampedStartMinute / 60 * hourHeight);
+                      final height = (clampedDuration / 60 * hourHeight);
+
+                      // Skip items that are completely outside the visible area
+                      if (topOffset + height < 0 || topOffset > 24 * hourHeight) {
+                        return const SizedBox.shrink();
+                      }
 
                       final double colWidth =
                           availableWidth / item.totalColumnsInGroup;

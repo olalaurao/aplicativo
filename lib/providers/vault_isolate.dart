@@ -28,6 +28,8 @@ import '../models/idea_model.dart';
 import '../models/event_model.dart';
 import '../models/pomodoro_session.dart';
 import '../models/reminder_model.dart';
+import '../models/pillar_model.dart';
+import '../models/action_menu_item_model.dart';
 
 /// Data class that holds the parameters needed to parse the vault in an isolate.
 class VaultIsolateParams {
@@ -348,6 +350,7 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                   type == 'time_block' ||
                   type == 'dayTheme' ||
                   type == 'timeBlock' ||
+                  type == 'value' ||
                   (type == 'task' && relativePath.startsWith('organizers/')) ||
                   (type == 'goal' && relativePath.startsWith('organizers/')) ||
                   (type == 'habit' && relativePath.startsWith('organizers/')) ||
@@ -425,6 +428,12 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                   body,
                   relativePath,
                 );
+              } else if (type == 'pillar') {
+                obj = Pillar.fromMarkdown(frontmatter, body)
+                  ..obsidianPath = relativePath;
+              } else if (type == 'action') {
+                obj = ActionMenuItem.fromMarkdown(frontmatter, body)
+                  ..obsidianPath = relativePath;
               } else if (type == 'template') {
                 obj = TemplateDefinition.fromMap(
                   frontmatter,

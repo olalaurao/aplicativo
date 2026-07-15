@@ -6,12 +6,13 @@ import '../models/event_model.dart';
 import '../models/habit_model.dart';
 import '../models/pomodoro_session.dart';
 import '../models/reminder_model.dart';
+import '../models/organizer_model.dart';
 import '../models/shared_types.dart';
 import '../services/scheduler_service.dart';
 import '../ui/theme.dart';
 import '../ui/utils/object_icons.dart';
 
-enum TodayItemKind { entry, task, event, habitSlot, pomodoro, trackerRecord, reminder }
+enum TodayItemKind { entry, task, event, habitSlot, pomodoro, trackerRecord, reminder, timeBlock }
 enum TodayItemOrigin { created, scheduled }
 
 class TodayItem {
@@ -183,6 +184,32 @@ class TodayAggregatorService {
             title: obj.title,
             emoji: ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.reminder, typeSignatures),
             color: AppColors.warning,
+            isCompletable: false,
+            isCompleted: false,
+            isPlayable: false,
+            source: obj,
+          ));
+        }
+      } else if (obj is Organizer && obj.organizerType == OrganizerType.timeBlock) {
+        const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        final dayName = weekDayNames[date.weekday - 1];
+        
+        if (obj.daysOfWeek.contains(dayName) && obj.timeRanges.isNotEmpty) {
+          final range = obj.timeRanges.first;
+          final ts = DateTime(date.year, date.month, date.day, range.startHour, range.startMinute);
+          
+          final color = obj.color != null && obj.color!.startsWith('#')
+              ? Color(int.parse(obj.color!.replaceAll('#', '0xFF')))
+              : AppColors.info;
+          
+          items.add(TodayItem(
+            id: obj.id,
+            kind: TodayItemKind.timeBlock,
+            origin: TodayItemOrigin.scheduled,
+            timestamp: ts,
+            title: obj.title,
+            emoji: obj.icon ?? ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.timeBlock, typeSignatures),
+            color: color,
             isCompletable: false,
             isCompleted: false,
             isPlayable: false,

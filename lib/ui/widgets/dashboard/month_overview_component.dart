@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../models/dashboard_block.dart';
+import '../../../models/organizer_model.dart';
 import '../../../providers/today_provider.dart';
+import '../../../providers/vault_provider.dart';
 import '../../theme.dart';
 
 class MonthOverviewComponent extends ConsumerStatefulWidget {
@@ -45,6 +47,11 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
     
     final int numDays = endDate.difference(startDate).inDays + 1;
     final days = List.generate(numDays, (i) => startDate.add(Duration(days: i)));
+    
+    // Get day themes
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     return Container(
       decoration: AppTheme.cardDecoration(context),
@@ -129,6 +136,13 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
                     final items = ref.watch(todayItemsProvider(date));
                     final visibleItems = items.take(maxChipsPerCell).toList();
                     final hasMore = items.length > maxChipsPerCell;
+                    
+                    // Find active day theme for this day
+                    final dayName = weekDayNames[date.weekday - 1];
+                    final activeTheme = dayThemes.cast<Organizer?>().firstWhere(
+                      (theme) => theme != null && theme.daysOfWeek.contains(dayName),
+                      orElse: () => null,
+                    );
 
                     return InkWell(
                       onTap: () => context.push('/planner?date=${DateFormat('yyyy-MM-dd').format(date)}'),
@@ -140,7 +154,16 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
                         ),
                         child: Column(
                           children: [
-                            const SizedBox(height: 2),
+                            if (activeTheme != null && isCurrentMonth)
+                              GestureDetector(
+                                onTap: () => _showDayThemePopup(context, activeTheme),
+                                child: Text(
+                                  activeTheme.icon ?? '📅',
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                              )
+                            else
+                              const SizedBox(height: 10),
                             Text(
                               '${date.day}',
                               style: Theme.of(context).textTheme.bodySmall!.copyWith(
@@ -207,6 +230,58 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showDayThemePopup(BuildContext context, Organizer theme) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    theme.icon ?? '📅',
+                    style: const TextStyle(fontSize: 32),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          theme.title,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Dias: ${theme.daysOfWeek.join(", ")}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

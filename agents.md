@@ -63,7 +63,10 @@ lib/
 │   ├── note_model.dart          # Note (Text, Outline, Collection)
 │   ├── reminder_model.dart      # Reminder
 │   ├── scheduler.dart           # Scheduler (11 repeat types)
-│   ├── organizer_model.dart     # OrganizerReference
+│   ├── organizer_model.dart     # OrganizerReference, Organizer (incl. Value subtype)
+│   ├── routine_model.dart       # Routine, RoutineItem, RoutineExecution
+│   ├── pillar_model.dart        # Pillar, PillarTouch, EnergyLevel
+│   ├── action_menu_item_model.dart # ActionMenuItem
 │   ├── kpi_model.dart           # KPI (8+ source types)
 │   ├── people_model.dart        # Person
 │   ├── resource_model.dart      # Resource
@@ -84,9 +87,12 @@ lib/
 │   ├── google_drive_sync_service.dart # Push/pull Google Drive
 │   ├── scheduler_service.dart   # Cálculo de próximas ocorrências
 │   ├── notification_service.dart# Agendamento de alarmes/notificações
+│   ├── routine_execution_service.dart # Execução de rotinas com sync de hábitos
+│   ├── mood_routine_service.dart # Sugestão de rotinas baseadas em humor
 │   ├── kpi_engine.dart          # Cálculo de KPIs
 │   ├── search_service.dart      # Busca full-text no vault
 │   ├── widget_service.dart      # Bridge para widgets nativos Android/iOS
+│   ├── timeline_aggregator_service.dart # Agregação de timeline reutilizável
 │   └── ...
 └── ui/
     ├── theme.dart               # AppTheme, AppColors — design system central
@@ -105,7 +111,8 @@ lib/
 │   │   ├── idea_detail_section.dart
 │   │   ├── mood_detail_section.dart
 │   │   ├── tracker_detail_section.dart
-│   │   └── resource_detail_section.dart
+│   │   ├── resource_detail_section.dart
+│   │   └── pillar_detail_section.dart
     │   ├── journal_screen.dart  # Timeline de journal entries
     │   └── ...                  # 33 screens no total
     ├── forms/                   # Formulários de criação/edição
@@ -113,15 +120,26 @@ lib/
     │   ├── create_habit_form.dart    # (~40KB)
     │   ├── create_entry_form.dart    # (~32KB)
     │   ├── create_entry_form.dart    # (~32KB)
+    │   ├── create_pillar_form.dart   # Formulário de criação de Pillar
     │   ├── scheduler_picker.dart     # (~21KB) — 11 repeat types
     │   └── ...                       # 17 forms no total
     ├── widgets/                 # Componentes reutilizáveis
     │   ├── property_grid.dart       # PropertyCard, PropertyGrid, PropertyCardState
     │   ├── timeline_day_view.dart    # Visualização de timeline
+    │   ├── object_timeline_feed.dart # Feed de timeline reutilizável
     │   ├── rich_text_editor.dart     # Editor rich text
     │   ├── wiki_link_picker.dart     # Picker de WikiLinks [[]]
     │   ├── habit_detail_sheet.dart   # Sheet de detalhes de hábito
-    │   └── ...                       # 29 widgets no total
+    │   ├── property_row.dart         # PropertyRow - label-value row com tap opcional
+    │   ├── form_section_card.dart    # FormSectionCard - card padrão para forms
+    │   ├── discard_guard.dart        # DiscardGuard - proteção de alterações não salvas
+    │   ├── template_picker_sheet.dart # TemplatePickerSheet - seleção de templates
+    │   ├── reminder_config_sheet.dart # ReminderConfigSheet - configuração de lembretes
+    │   ├── app_color_picker.dart     # AppColorPicker - seleção de cores unificada
+    │   ├── number_stepper.dart       # NumberStepper - controle de incremento/decremento
+    │   ├── count_badge.dart          # CountBadge - badge de contagem
+    │   ├── section_divider.dart      # SectionDivider - divisor de seções
+    │   └── ...                       # 40+ widgets no total
     ├── components/              # Componentes menores (botões, chips)
     └── shell/                   # Shell de navegação (bottom bar)
 ```
@@ -173,6 +191,7 @@ O `universal_detail_view.dart` foi modularizado em arquivos separados por tipo d
 - `mood_detail_section.dart` - `buildMoodPropertyCards()`
 - `tracker_detail_section.dart` - `buildTrackerPropertyCards()`
 - `resource_detail_section.dart` - `buildResourcePropertyCards()`
+- `routine_detail_section.dart` - `buildRoutinePropertyCards()`
 
 ### Regras de Import para Detail Sections
 
@@ -511,6 +530,7 @@ O `VaultNotifier` (~54KB) é o **coração do aplicativo**. Ele:
 | Organizer (Label) | `organizers/labels/SLUG.md` | `organizerListProvider` → filter | `Organizer` | 🏷️ |
 | Organizer (Day Theme) | `organizers/day_themes/SLUG.md` | `organizerListProvider` → filter | `Organizer` | 🌅 |
 | Organizer (Time Block) | `organizers/time_blocks/SLUG.md` | `organizerListProvider` → filter | `Organizer` | ⏱️ |
+| Organizer (Routine) | `organizers/routines/SLUG.md` | `allObjectsProvider` → filter | `Routine` | 🔄 |
 | Event | `events/SLUG.md` | `allObjectsProvider` → filter | `Event` | 📅 |
 | Idea | `ideas/SLUG.md` | `allObjectsProvider` → filter | `Idea` | 💡 |
 | System | `systems/SLUG.md` | `allObjectsProvider` → filter | `System` | ⚙️ |
@@ -789,6 +809,97 @@ GestureDetector(
     if (time != null) setState(() => _time = time);
   },
   child: TextField(...),
+)
+```
+
+#### 7.8.9 Componentes Reutilizáveis - Diretrizes de Criação
+
+**SEMPRE use componentes reutilizáveis existentes antes de criar UI inline.** Isso garante consistência de UI e reduz o custo de manutenção.
+
+#### Componentes Reutilizáveis Disponíveis
+
+**Componentes de Form** (`lib/ui/widgets/`):
+- `PropertyRow` - Linha label-valor com ação de tap opcional
+- `FormSectionCard` - Card padrão para seções de formulário
+- `DiscardGuard` - Wrapper PopScope para proteção de alterações não salvas
+- `DatePickerField` - Seletor de data reutilizável com UI consistente
+- `AppColorPicker` - Seleção de cor unificada com paleta padrão
+- `NumberStepper` - Input numérico com incremento/decremento
+- `TemplatePickerSheet` - Modal sheet para seleção de templates
+- `ReminderConfigSheet` - Modal sheet para configuração de lembretes
+- `CreateFormScaffold` - Layout de formulário unificado com botão save e discard guard
+
+**Componentes de Utilidade** (`lib/ui/widgets/`):
+- `CountBadge` - Badge para exibir contagens
+- `SectionDivider` - Divisor horizontal com label opcional
+- `showNumberInputDialog` - Dialog para input numérico
+
+**Funções de Utilidade** (`lib/ui/utils/`):
+- `NotificationTypeUtils.getIcon()` - Obter ícone para tipo de notificação
+- `NotificationTypeUtils.getLabel()` - Obter label para tipo de notificação
+
+#### Quando Criar um Novo Componente Reutilizável
+
+Crie um novo componente reutilizável quando:
+1. O padrão de UI aparece em **3 ou mais lugares** no código
+2. O componente tem **comportamento configurável** (não apenas conteúdo estático)
+3. O componente representa uma **interação comum do usuário** (seleção de data, cor, etc.)
+4. O componente se beneficiaria de **estilização centralizada** e theming
+
+**NÃO crie componentes reutilizáveis para:**
+- Padrões de UI one-off usados apenas uma vez
+- Layouts estáticos simples que são específicos do contexto
+- Componentes que exigiriam parâmetros de configuração excessivos
+
+#### Checklist de Criação de Componentes
+
+Antes de criar um novo componente reutilizável:
+1. ✅ Pesquise componentes existentes para garantir que não haja duplicata
+2. ✅ Verifique se o padrão aparece em 3+ locais
+3. ✅ Projete uma API simples e focada (evite super-parametrização)
+4. ✅ Use constantes do design system (`AppColors`, `AppSpacing`, `AppBorderRadius`)
+5. ✅ Adicione comentários de documentação com exemplos de uso
+6. ✅ Atualize este arquivo agents.md com o novo componente
+7. ✅ Atualize guidelines.md com documentação do novo componente
+
+#### Diretrizes de Migração
+
+Ao refatorar UI inline para usar componentes reutilizáveis:
+1. Identifique o padrão inline
+2. Verifique se existe um componente reutilizável
+3. Se sim, adote o componente existente
+4. Se não, crie o componente reutilizável primeiro, depois adote-o
+5. Teste a paridade visual e funcional
+6. Atualize a documentação
+
+**Exemplo de migração - Seletor de Data:**
+
+❌ **Antes (inline):**
+```dart
+InkWell(
+  onTap: () async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) setState(() => _selectedDate = picked);
+  },
+  child: TextField(
+    controller: TextEditingController(text: _selectedDate?.toString() ?? ''),
+    decoration: InputDecoration(labelText: 'Date'),
+    readOnly: true,
+  ),
+)
+```
+
+✅ **Depois (reutilizável):**
+```dart
+DatePickerField(
+  label: 'Date',
+  selectedDate: _selectedDate,
+  onDateChanged: (date) => setState(() => _selectedDate = date),
 )
 ```
 
@@ -1601,6 +1712,32 @@ Exemplo real encontrado neste projeto:
 
 - Use a chave persistida `vaultPath` ao sincronizar o destino dos crash reports.
 - A exportação agregada da tela de diagnósticos deve continuar simples e rápida, priorizando cópia consolidada para área de transferência.
+
+---
+
+## Complementos — Pilares, Valores & Timeline (sessão 2026-07)
+
+### Pillar & Value
+- Pillar é um `ContentObject` próprio (tipo `pillar`), sem `state`/`deadline` — só `archived`. Nunca renderizar como "sequência quebrada"; estatísticas são sempre afirmativas ("tocado N dias", "última vez: há N dias").
+- Value é `OrganizerType.value` — reaproveita a classe `Organizer` existente, ganha só o campo `statement`. Não tem touch log nem action menu.
+- Ambos aparecem automaticamente em Object Identification assim que registrados em `_defaultSignatures()` — não precisa de tela nova.
+
+### Action Menu Items
+- Cada ação é seu próprio `ContentObject` (tipo `action`), não embutido no Pilar.
+- Usa `organizers` para se ligar a 1+ Pilares/Valores.
+- Action Menu na tela do Pilar é uma visualização derivada (`backlinksProvider(pillar.id).whereType<ActionMenuItem>()`).
+- Campos: `energyLevel` (quando usar), `energyCost` (quanto consome), `priority` (reusa TaskPriority).
+
+### Timeline
+- `ObjectTimelineFeed` é o único widget de timeline daqui pra frente. Não criar nova lógica de agrupamento-por-dia em nenhuma tela nova — sempre `ObjectTimelineFeed`.
+- Emoji de qualquer item da timeline vem **sempre** de `ObjectIcons.emojiForType()` — nunca `Icons.*` hardcoded nem switch duplicado por tela.
+- Distinção criado/editado/programado/aconteceu é sempre `TodayItemOrigin` — não inventar uma segunda enum equivalente.
+- Glyph de origem: 🕐 criado, ✏️ editado, 📅 programado, ⚡ aconteceu.
+- Antes de remover `timeline_screen.dart`, confirmar no `go_router`/`navigation_provider.dart` se alguma rota ainda aponta pra ele. Status atual: Usado — rota `/timeline` existe em navigation_provider.dart.
+
+### Bug Fixes Aplicados
+- `organizer_selector_field.dart`: migrado de `Icons.*` hardcoded para `ObjectIcons.emojiForType()`. Corrigido bug no `_getTypeLabel()` que fazia switch em valores inexistentes de `OrganizerType`.
+- `timeline_screen.dart`: migrado para `ObjectIcons.emojiForType()`.
 
 ---
 

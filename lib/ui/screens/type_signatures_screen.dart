@@ -6,6 +6,8 @@ import '../../providers/settings_provider.dart';
 import '../../providers/vault_provider.dart';
 import '../../models/shared_types.dart';
 import '../theme.dart';
+import '../widgets/icon_picker.dart';
+import '../utils/material_icon_set.dart';
 
 class TypeSignaturesScreen extends ConsumerWidget {
   const TypeSignaturesScreen({super.key});
@@ -58,10 +60,17 @@ class TypeSignaturesScreen extends ConsumerWidget {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    sig.emoji,
-                    style: const TextStyle(fontSize: 20),
-                  ),
+                  if (sig.iconName != null)
+                    Icon(
+                      MaterialIconSet.getIcon(sig.iconName!),
+                      size: 20,
+                      color: AppTheme.accentColor(context),
+                    )
+                  else
+                    Text(
+                      sig.emoji,
+                      style: const TextStyle(fontSize: 20),
+                    ),
                   const SizedBox(width: 8),
                   IconButton(
                     icon: Icon(
@@ -120,6 +129,12 @@ class TypeSignaturesScreen extends ConsumerWidget {
         return 'Label';
       case 'organizer':
         return 'Organizer';
+      case 'pillar':
+        return 'Pillar';
+      case 'value':
+        return 'Value';
+      case 'action':
+        return 'Action';
       default:
         return type;
     }
@@ -144,6 +159,7 @@ class TypeSignaturesScreen extends ConsumerWidget {
   ) {
     final valueController = TextEditingController(text: sig.markerValue);
     final emojiController = TextEditingController(text: sig.emoji);
+    String? selectedIconName = sig.iconName;
     MarkerType selectedMarker = sig.markerType;
 
     showDialog(
@@ -154,10 +170,46 @@ class TypeSignaturesScreen extends ConsumerWidget {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              InkWell(
+                onTap: () async {
+                  final result = await showDialog<String>(
+                    context: context,
+                    builder: (context) => IconPicker(
+                      selectedIconName: selectedIconName,
+                      onIconSelected: (icon) {
+                        Navigator.pop(context, icon);
+                      },
+                    ),
+                  );
+                  if (result != null) {
+                    setState(() => selectedIconName = result);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        selectedIconName != null ? MaterialIconSet.getIcon(selectedIconName!) : Icons.help_outline,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(selectedIconName ?? 'Select icon'),
+                      const Spacer(),
+                      const Icon(Icons.arrow_drop_down),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               TextField(
                 controller: emojiController,
                 decoration: const InputDecoration(
-                  labelText: 'Emoji',
+                  labelText: 'Emoji (fallback)',
                   hintText: '📝',
                 ),
                 maxLength: 2,
@@ -208,6 +260,7 @@ class TypeSignaturesScreen extends ConsumerWidget {
                   markerType: selectedMarker,
                   markerValue: newValue,
                   emoji: newEmoji,
+                  iconName: selectedIconName,
                 );
                 if (selectedMarker == MarkerType.folder &&
                     newValue.isNotEmpty &&

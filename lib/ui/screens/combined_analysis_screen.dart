@@ -17,6 +17,7 @@ import '../../models/journal_entry.dart';
 import '../../models/goal_model.dart';
 import '../../models/kpi_model.dart';
 import '../../models/shared_types.dart';
+import '../../models/pillar_model.dart';
 import '../../services/kpi_engine.dart';
 import '../theme.dart';
 import '../widgets/quartzo_chart.dart';
@@ -766,6 +767,8 @@ class _CombinedAnalysisScreenState
         return _getPomodoroValueForDate(date);
       case MetricType.kpi:
         return _getKPIValueForDate(source.id, date);
+      case MetricType.pillarTouch:
+        return _getPillarTouchValueForDate(source.id, date);
     }
   }
 
@@ -964,6 +967,26 @@ class _CombinedAnalysisScreenState
         }
       }
       return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  double? _getPillarTouchValueForDate(String pillarId, DateTime date) {
+    try {
+      final pillars = ref.read(pillarsProvider);
+      final pillar = pillars.firstWhere(
+        (p) => p.id == pillarId,
+        orElse: () => pillars.first,
+      );
+      
+      final touches = pillar.touchLog.where(
+        (t) => t.date.year == date.year &&
+               t.date.month == date.month &&
+               t.date.day == date.day,
+      ).length;
+      
+      return touches == 0 ? null : touches.toDouble();
     } catch (_) {
       return null;
     }
@@ -1534,6 +1557,7 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
     final trackers = ref.read(trackersProvider);
     final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
     final goals = allObjects.whereType<Goal>().toList();
+    final pillars = ref.read(pillarsProvider);
 
     showModalBottomSheet(
       context: context,
@@ -1787,6 +1811,42 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
                   ),
                 )),
               ],
+
+              // Pillars Header
+              if (pillars.isNotEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'PILARES',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ),
+                ...pillars.map(
+                  (p) => _buildPickerItem(
+                    ctx,
+                    icon: Icons.account_balance_rounded,
+                    color: AppColors.habitPurple,
+                    title: p.title,
+                    subtitle: 'Frequência de toques no pilar',
+                    onTap: () {
+                      _onSourceSelected(
+                        MetricSource(
+                          type: MetricType.pillarTouch,
+                          id: p.id,
+                          label: p.title,
+                          color: AppColors.habitPurple,
+                        ),
+                      );
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -1914,6 +1974,8 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
         return Icons.timer_outlined;
       case MetricType.kpi:
         return Icons.show_chart_rounded;
+      case MetricType.pillarTouch:
+        return Icons.account_balance_rounded;
     }
   }
 
@@ -1933,6 +1995,8 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
         return 'Foco (Pomodoro)';
       case MetricType.kpi:
         return 'KPI';
+      case MetricType.pillarTouch:
+        return 'Pillar Touch';
     }
   }
 

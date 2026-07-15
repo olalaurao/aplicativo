@@ -16,6 +16,9 @@ enum OrganizerType {
   person,
   dayTheme,
   timeBlock,
+  value,
+  routine,
+  pillar,
 }
 
 class Organizer extends ContentObject {
@@ -27,6 +30,7 @@ class Organizer extends ContentObject {
   String? icon;
   String? state; // active | paused | completed (for project type)
   String? priority; // none | low | medium | high (for project type)
+  String? statement; // For value type - the anchor phrase
   List<TimeRange> timeRanges; // For timeBlock
   int? energyLevel; // For timeBlock
   List<String> daysOfWeek; // For dayTheme
@@ -44,6 +48,7 @@ class Organizer extends ContentObject {
     this.icon,
     this.state,
     this.priority,
+    this.statement,
     this.timeRanges = const [],
     this.energyLevel,
     this.daysOfWeek = const [],
@@ -78,6 +83,7 @@ class Organizer extends ContentObject {
     if (icon != null) frontmatter['icon'] = icon;
     if (state != null) frontmatter['state'] = state;
     if (priority != null) frontmatter['priority'] = priority;
+    if (statement != null) frontmatter['statement'] = statement;
     if (timeRanges.isNotEmpty) {
       frontmatter['time_ranges'] = timeRanges.map((tr) => tr.toMap()).toList();
     }
@@ -124,6 +130,7 @@ class Organizer extends ContentObject {
     organizer.icon = frontmatter['icon'] as String?;
     organizer.state = frontmatter['state'] as String?;
     organizer.priority = frontmatter['priority'] as String?;
+    organizer.statement = frontmatter['statement'] as String?;
 
     organizer.timeRanges =
         (frontmatter['time_ranges'] as List?)
@@ -158,6 +165,7 @@ class Organizer extends ContentObject {
     String? icon,
     String? state,
     String? priority,
+    String? statement,
     List<TimeRange>? timeRanges,
     int? energyLevel,
     List<String>? daysOfWeek,
@@ -180,6 +188,7 @@ class Organizer extends ContentObject {
       icon: icon ?? this.icon,
       state: state ?? this.state,
       priority: priority ?? this.priority,
+      statement: statement ?? this.statement,
       timeRanges: timeRanges ?? this.timeRanges,
       energyLevel: energyLevel ?? this.energyLevel,
       daysOfWeek: daysOfWeek ?? this.daysOfWeek,

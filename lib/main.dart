@@ -69,6 +69,9 @@ import 'ui/screens/week_timeline_screen.dart';
 import 'ui/screens/universal_detail_view.dart';
 import 'ui/screens/organizer_detail_screen.dart';
 import 'ui/screens/overdue_detail_screen.dart';
+import 'ui/screens/tasks_screen.dart';
+import 'ui/screens/values_screen.dart';
+import 'ui/screens/routines_screen.dart';
 import 'ui/forms/create_social_post_form.dart';
 import 'ui/widgets/pomodoro_floating_clock.dart';
 import 'ui/widgets/notification_popup_overlay.dart';
@@ -944,6 +947,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/time-blocks',
             builder: (context, state) => const DayThemeScreen(),
+          ),
+          GoRoute(
+            path: '/tasks',
+            builder: (context, state) => const TasksScreen(),
+          ),
+          GoRoute(
+            path: '/values',
+            builder: (context, state) => const ValuesScreen(),
+          ),
+          GoRoute(
+            path: '/routines',
+            builder: (context, state) => const RoutinesScreen(),
           ),
           GoRoute(
             path: '/overdue',

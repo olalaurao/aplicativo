@@ -11,6 +11,7 @@ enum MetricType {
   googleCalendar,
   pomodoro,
   kpi,
+  pillarTouch,
 }
 
 class MetricSource {
@@ -292,6 +293,8 @@ DataSourceReference? _toUnifiedDataSource({
         sourceId: id.isEmpty ? null : id,
       );
     case MetricType.googleCalendar:
+      return null;
+    case MetricType.pillarTouch:
       return null;
   }
 }

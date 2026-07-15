@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../widgets/timeline_card.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../services/markdown_parser.dart';
+import '../../services/timeline_aggregator_service.dart';
 
 import '../theme.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/journal_body_view.dart';
 import '../widgets/object_action_wrapper.dart';
+import '../widgets/object_timeline_feed.dart';
 import '../../models/journal_entry.dart';
 import '../../models/habit_model.dart';
 import '../../models/mood_model.dart';
@@ -308,12 +311,40 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
       }
     }
 
-    for (final items in groupedItems.values) {
-      items.sort((a, b) => _itemDate(b).compareTo(_itemDate(a)));
+    // Convert grouped items to TodayItems for ObjectTimelineFeed
+    final timelineItems = <TodayItem>[];
+    
+    for (final dateKey in groupedItems.keys) {
+      final items = groupedItems[dateKey]!;
+      for (final item in items) {
+        if (item is JournalEntry) {
+          timelineItems.add(TodayItem(
+            id: item.id,
+            title: item.title.isNotEmpty ? item.title : 'Journal Entry',
+            date: _journalEntryDisplayDate(item),
+            origin: TodayItemOrigin.happened,
+            kind: TodayItemKind.journalEntry,
+            objectId: item.id,
+            subtitle: item.body.isNotEmpty ? item.body.substring(0, 50) : null,
+          ));
+        } else if (item is Map) {
+          final habit = item['habit'] as Habit;
+          final record = item['record'] as CompletionRecord;
+          timelineItems.add(TodayItem(
+            id: '${habit.id}_${record.date.toIso8601String()}',
+            title: habit.title,
+            date: record.date,
+            origin: TodayItemOrigin.happened,
+            kind: TodayItemKind.habit,
+            objectId: habit.id,
+            subtitle: 'Completed (${record.completions}/${habit.dailyGoal})',
+          ));
+        }
+      }
     }
-
-    final sortedDates = groupedItems.keys.toList()
-      ..sort((a, b) => b.compareTo(a));
+    
+    // Sort timeline items by date descending
+    timelineItems.sort((a, b) => b.date.compareTo(a.date));
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -380,39 +411,30 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
             SliverToBoxAdapter(
               child: _buildPendingRemindersSummary(pendingReminders),
             ),
-          if (sortedDates.isEmpty)
+          if (timelineItems.isEmpty)
             SliverFillRemaining(hasScrollBody: false, child: _buildEmptyState())
           else
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final dateKey = sortedDates[index];
-                  final items = groupedItems[dateKey]!;
-                  final date = DateTime.parse(dateKey);
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildDateHeader(date),
-                      const SizedBox(height: 12),
-                      ...items.map((item) {
-                        if (item is JournalEntry) {
-                          return _buildJournalEntryCard(context, item);
-                        } else {
-                          final habit = item['habit'] as Habit;
-                          final record = item['record'] as CompletionRecord;
-                          return _buildHabitCompletionCard(
-                            context,
-                            habit,
-                            record,
-                          );
-                        }
-                      }),
-                      const SizedBox(height: 16),
-                    ],
-                  );
-                }, childCount: sortedDates.length),
+            SliverToBoxAdapter(
+              child: ObjectTimelineFeed(
+                items: timelineItems,
+                showDateSeparators: true,
+                typeSignatures: ref.watch(settingsProvider).typeSignatures,
+                itemBuilder: (context, ref, item) {
+                  // Map TodayItem back to original objects for custom rendering
+                  if (item.kind == TodayItemKind.journalEntry) {
+                    final entry = entries.firstWhere((e) => e.id == item.objectId, orElse: () => entries.first);
+                    return _buildJournalEntryCard(context, entry);
+                  } else if (item.kind == TodayItemKind.habit) {
+                    final habit = habits.firstWhere((h) => h.id == item.objectId, orElse: () => habits.first);
+                    final record = habit.completionHistory.firstWhere(
+                      (r) => r.date.toIso8601String().split('T').first == 
+                             item.date.toIso8601String().split('T').first,
+                      orElse: () => habit.completionHistory.first,
+                    );
+                    return _buildHabitCompletionCard(context, habit, record);
+                  }
+                  return const SizedBox.shrink();
+                },
               ),
             ),
           const SliverToBoxAdapter(child: SizedBox(height: 100)),

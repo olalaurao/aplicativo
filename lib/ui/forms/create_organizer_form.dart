@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/organizer_model.dart';
+import '../../models/routine_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/scheduler.dart';
 import '../../models/reminder_config.dart';
@@ -8,6 +9,7 @@ import '../../providers/vault_provider.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../theme.dart';
 import 'scheduler_picker.dart';
+import 'create_routine_form.dart';
 
 class CreateOrganizerForm extends ConsumerStatefulWidget {
   final OrganizerType? initialType;
@@ -21,6 +23,7 @@ class CreateOrganizerForm extends ConsumerStatefulWidget {
 
 class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
   final _titleController = TextEditingController();
+  final _statementController = TextEditingController();
   OrganizerType _type = OrganizerType.area;
   String _selectedColor = '#3B82F6';
   String? _parentId;
@@ -53,6 +56,7 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
     final organizer = widget.organizer;
     if (organizer != null) {
       _titleController.text = organizer.title;
+      _statementController.text = organizer.statement ?? '';
       _type = organizer.organizerType;
       _selectedColor = organizer.color ?? _selectedColor;
       _parentId = organizer.parentId;
@@ -68,6 +72,7 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
   @override
   void dispose() {
     _titleController.dispose();
+    _statementController.dispose();
     super.dispose();
   }
 
@@ -529,6 +534,52 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
                       ),
                   ],
 
+                  if (_type == OrganizerType.value) ...[
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Statement',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _statementController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'What does this value mean to you?',
+                        hintText: 'e.g., "I value honesty because it builds trust"',
+                        border: OutlineInputBorder(),
+                      ),
+                      textCapitalization: TextCapitalization.sentences,
+                    ),
+                  ],
+
+                  if (_type == OrganizerType.pillar) ...[
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Why',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _statementController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'What does this pillar represent to you?',
+                        hintText: 'e.g., "Health represents my physical and mental wellbeing"',
+                        border: OutlineInputBorder(),
+                      ),
+                      textCapitalization: TextCapitalization.sentences,
+                    ),
+                  ],
+
                   const SizedBox(height: 24),
                   const Text(
                     'Vincular Organizadores',
@@ -560,6 +611,20 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
   }
 
   void _saveOrganizer() {
+    // If type is routine, redirect to routine-specific form
+    if (_type == OrganizerType.routine) {
+      Navigator.pop(context);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CreateRoutineForm(
+            existingRoutine: widget.organizer as Routine?,
+          ),
+        ),
+      );
+      return;
+    }
+
     final existing = widget.organizer;
     final organizer = Organizer(
       id: existing?.id,
@@ -570,6 +635,7 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
       startDate: existing?.startDate,
       endDate: existing?.endDate,
       icon: existing?.icon,
+      statement: _statementController.text.trim().isEmpty ? null : _statementController.text.trim(),
       organizers: _organizers,
       daysOfWeek: _daysOfWeek,
       timeRanges: _timeRanges,

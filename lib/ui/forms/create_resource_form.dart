@@ -639,35 +639,12 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
   }
 
   Widget _buildReadDateRow() {
-    return Row(
-      children: [
-        const Text(
-          'Read Date',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-        ),
-        const Spacer(),
-        TextButton(
-          onPressed: () async {
-            final date = await showDatePicker(
-              context: context,
-              initialDate: _readDate ?? DateTime.now(),
-              firstDate: DateTime(2000),
-              lastDate: DateTime(2100),
-            );
-            if (date != null) setState(() => _readDate = date);
-          },
-          child: Text(
-            _readDate != null
-                ? "${_readDate!.day}/${_readDate!.month}/${_readDate!.year}"
-                : 'Select Date',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.accentColor(context),
-            ),
-          ),
-        ),
-      ],
+    return DatePickerField(
+      label: 'Read Date',
+      selectedDate: _readDate,
+      onDateChanged: (date) => setState(() => _readDate = date),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
     );
   }
 
