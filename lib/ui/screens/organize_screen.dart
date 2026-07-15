@@ -139,9 +139,7 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
         )
         .toList();
 
-    final allPillars = organizers
-        .where((o) => o.organizerType == OrganizerType.pillar)
-        .toList();
+    final allPillars = ref.watch(pillarsProvider);
     final pillars = allPillars
         .where(
           (o) => o.title.toLowerCase().contains(_searchQuery.toLowerCase()),
@@ -180,12 +178,6 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
         ObjectIcons.iconDataForTypeWithSignatures('tracker', typeSignatures) ?? Icons.analytics_outlined,
         AppTheme.accentColor(context),
         trackers,
-      ),
-      _OrganizerSection(
-        'Pillars',
-        ObjectIcons.iconDataForTypeWithSignatures('pillar', typeSignatures) ?? Icons.account_balance,
-        AppColors.habitPurple,
-        pillars,
       ),
       _OrganizerSection(
         'Activities',
@@ -603,8 +595,6 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
         return Icons.repeat_rounded;
       case OrganizerType.value:
         return Icons.star_outline;
-      case OrganizerType.pillar:
-        return Icons.account_balance;
     }
   }
 }

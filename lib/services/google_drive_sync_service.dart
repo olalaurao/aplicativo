@@ -259,7 +259,7 @@ class GoogleDriveSyncService {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
 
     final localConflictFile = drive.File()
-      ..name = '${fileName}_local_$timestamp.md'
+      ..name = '${_generateSafeFileName(fileName, 'local', timestamp)}.md'
       ..parents = [conflictsFolderId];
     final localBytes = utf8.encode(localContent);
     await _driveApi!.files.create(
@@ -269,7 +269,7 @@ class GoogleDriveSyncService {
     );
 
     final remoteConflictFile = drive.File()
-      ..name = '${fileName}_remote_$timestamp.md'
+      ..name = '${_generateSafeFileName(fileName, 'remote', timestamp)}.md'
       ..parents = [conflictsFolderId];
     final remoteBytes = utf8.encode(remoteContent);
     await _driveApi!.files.create(
@@ -526,5 +526,21 @@ class GoogleDriveSyncService {
       $fields: 'files(id, name, parents)',
     );
     return fileList.files ?? [];
+  }
+
+  String _generateSafeFileName(String basePath, String suffix, int timestamp) {
+    const maxFileNameLength = 150; // Safe limit for Android filesystems
+    final suffixWithTimestamp = '_${suffix}_$timestamp';
+    
+    if (basePath.length + suffixWithTimestamp.length <= maxFileNameLength) {
+      return '$basePath$suffixWithTimestamp';
+    }
+    
+    // If too long, truncate and add hash for uniqueness
+    final availableLength = maxFileNameLength - suffixWithTimestamp.length - 8; // 8 chars for hash
+    final truncatedPath = basePath.substring(0, availableLength.clamp(0, basePath.length));
+    final hash = basePath.hashCode.toRadixString(16);
+    
+    return '${truncatedPath}_$hash$suffixWithTimestamp';
   }
 }

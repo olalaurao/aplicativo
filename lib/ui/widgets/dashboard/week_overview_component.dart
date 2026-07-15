@@ -4,10 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../models/dashboard_block.dart';
 import '../../../models/organizer_model.dart';
+import '../../../models/shared_types.dart';
 import '../../../providers/today_provider.dart';
 import '../../../providers/vault_provider.dart';
+import '../../../providers/settings_provider.dart';
 import '../../theme.dart';
 import '../../navigation/object_navigation.dart';
+import '../../utils/object_icons.dart';
 
 class WeekOverviewComponent extends ConsumerStatefulWidget {
   final DashboardBlock block;
@@ -38,6 +41,7 @@ class _WeekOverviewComponentState extends ConsumerState<WeekOverviewComponent> {
     final today = DateTime(now.year, now.month, now.day);
     final weekStartsMonday = widget.block.metadata['weekStartsMonday'] as bool? ?? true;
     final maxItemsPerDay = widget.block.metadata['maxItemsPerDay'] as int? ?? 3;
+    final settings = ref.watch(settingsProvider);
 
     // Calculate start of week
     int daysToSubtract = today.weekday - (weekStartsMonday ? DateTime.monday : DateTime.sunday);
@@ -127,10 +131,11 @@ class _WeekOverviewComponentState extends ConsumerState<WeekOverviewComponent> {
                         children: [
                           if (activeTheme != null)
                             GestureDetector(
-                              onTap: () => _showDayThemePopup(context, activeTheme),
-                              child: Text(
-                                activeTheme.icon ?? '📅',
-                                style: const TextStyle(fontSize: 14),
+                              onTap: () => _showDayThemePopup(context, activeTheme, settings.typeSignatures),
+                              child: Icon(
+                                ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.dayTheme, settings.typeSignatures) ?? Icons.wb_sunny,
+                                size: 14,
+                                color: AppTheme.accentColor(context),
                               ),
                             )
                           else
@@ -180,7 +185,7 @@ class _WeekOverviewComponentState extends ConsumerState<WeekOverviewComponent> {
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Text(item.emoji, style: const TextStyle(fontSize: 10)),
+                                              Icon(item.iconData, size: 10, color: item.color),
                                               const SizedBox(width: 2),
                                               Expanded(
                                                 child: Text(
@@ -227,7 +232,7 @@ class _WeekOverviewComponentState extends ConsumerState<WeekOverviewComponent> {
     );
   }
 
-  void _showDayThemePopup(BuildContext context, Organizer theme) {
+  void _showDayThemePopup(BuildContext context, Organizer theme, Map<String, TypeSignature> typeSignatures) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -239,9 +244,10 @@ class _WeekOverviewComponentState extends ConsumerState<WeekOverviewComponent> {
             children: [
               Row(
                 children: [
-                  Text(
-                    theme.icon ?? '📅',
-                    style: const TextStyle(fontSize: 32),
+                  Icon(
+                    ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.dayTheme, typeSignatures) ?? Icons.wb_sunny,
+                    size: 32,
+                    color: AppTheme.accentColor(context),
                   ),
                   const SizedBox(width: 16),
                   Expanded(

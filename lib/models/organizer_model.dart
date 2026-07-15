@@ -18,7 +18,6 @@ enum OrganizerType {
   timeBlock,
   value,
   routine,
-  pillar,
 }
 
 class Organizer extends ContentObject {

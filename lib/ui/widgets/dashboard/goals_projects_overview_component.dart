@@ -16,14 +16,14 @@ import '../../utils/object_icons.dart';
 class _ProgressItem {
   final ContentObject source;
   final String title;
-  final String emoji;
+  final IconData iconData;
   final double? progress;
   final bool isGoal;
 
   _ProgressItem({
     required this.source,
     required this.title,
-    required this.emoji,
+    required this.iconData,
     required this.progress,
     required this.isGoal,
   });
@@ -55,7 +55,7 @@ class GoalsProjectsOverviewComponent extends ConsumerWidget {
         items.add(_ProgressItem(
           source: g,
           title: g.title,
-          emoji: g.icon ?? ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.goal, settings.typeSignatures),
+          iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.goal, settings.typeSignatures) ?? Icons.flag,
           progress: g.progress,
           isGoal: true,
         ));
@@ -72,7 +72,7 @@ class GoalsProjectsOverviewComponent extends ConsumerWidget {
         items.add(_ProgressItem(
           source: p,
           title: p.title,
-          emoji: p.icon ?? ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.project, settings.typeSignatures),
+          iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.project, settings.typeSignatures) ?? Icons.folder,
           progress: prog,
           isGoal: false,
         ));
@@ -148,7 +148,7 @@ class GoalsProjectsOverviewComponent extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Row(
                         children: [
-                          Text(item.emoji, style: const TextStyle(fontSize: 20)),
+                          Icon(item.iconData, size: 20, color: AppTheme.accentColor(context)),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(

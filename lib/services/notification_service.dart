@@ -341,12 +341,14 @@ class NotificationService with WidgetsBindingObserver {
     );
 
     // Immediate Channel
-    const immediateChannel = AndroidNotificationChannel(
+    final immediateChannel = AndroidNotificationChannel(
       'immediate_channel_v2',
       'Immediate Notifications',
       description: 'Ongoing or immediate notifications',
-      importance: Importance.low,
-      playSound: false,
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList(<int>[0, 200, 100, 200]),
     );
 
     const quickCaptureChannel = AndroidNotificationChannel(
@@ -590,11 +592,11 @@ class NotificationService with WidgetsBindingObserver {
       ],
     );
 
-    // iOS notification respects playSound flag
+    // iOS notification respects playSound flag - force true for all types
     final iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
-      presentSound: config.playSound,
+      presentSound: true, // Force sound for all notification types
       categoryIdentifier: 'reminder_category',
     );
 
@@ -776,10 +778,20 @@ class NotificationService with WidgetsBindingObserver {
     const androidDetails = AndroidNotificationDetails(
       'immediate_channel_v2',
       'Immediate Notifications',
-      importance: Importance.max,
+      importance: Importance.high,
       priority: Priority.high,
+      playSound: true,
+      enableVibration: true,
     );
-    const details = NotificationDetails(android: androidDetails);
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
     await _notifications.show(id, title, body, details, payload: payload);
   }
 

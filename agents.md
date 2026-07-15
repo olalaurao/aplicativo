@@ -257,9 +257,13 @@ final tasks = ref.watch(allObjectsProvider).whereType<Task>();
 
 **Project** usa `TaskPriority` para `projectPriority` (não existe `ProjectPriority`)
 
+**Pillar NÃO é um `Organizer`** (em `pillar_model.dart`): `Pillar` estende `ContentObject` diretamente, não `Organizer`. Isso importa porque `Value`, `Routine`, `Area`, `Project` etc. **são** implementados como `Organizer` com um `OrganizerType` específico — Pillar é a exceção. **Nunca** faça `objectsByTypeProvider('pillar').cast<Organizer>()` — isso quebra em runtime. `OrganizerType.pillar` não deve existir no enum `OrganizerType` (era resquício de uma versão anterior antes do Pilar virar `ContentObject` próprio); se reaparecer, é sinal de que alguém copiou o padrão de Value/Routine sem checar que Pillar segue um padrão diferente.
+
 ---
 
-## 8. SISTEMA DE EMOJIS — CONFIGURÁVEL
+## 8. SISTEMA DE ÍCONES — CONFIGURÁVEL
+
+> ⚠️ **ESTA SEÇÃO ESTÁ DESATUALIZADA.** O changelog V5.3→V5.4 de `guidelines.md` documenta que o sistema mudou de emoji (`String`) para **Material Icons** (`IconData`, via `MaterialIconSet` + `TypeSignature.iconName` + `ObjectIcons.iconDataForType()`/`defaultIconDataForType()`) — confirmado ao vivo em `lib/ui/utils/object_icons.dart`. Todo o conteúdo abaixo (§8.1–8.4, incluindo os exemplos de código com `emojiForType()`) descreve o sistema **antigo**. Precisa de uma revisão completa antes de ser usado como referência — não fiz essa reescrita agora porque é um escopo maior que o deste spec (Pilares/Valores), mas está aqui pra não ser confundido com o comportamento real do app.
 
 ### 8.1 Como Funciona
 
@@ -334,6 +338,10 @@ Se o usuário não configurar um emoji, o sistema usa estes padrões:
 | Inbox | 📥 |
 | Analysis | 📊 |
 | Mood Def | 😐 |
+| Pillar | `Icons.account_balance` (era emoji 🏛️ na convenção antiga) |
+| Value | `Icons.diamond` (era emoji 💎 na convenção antiga) |
+| Routine | `Icons.repeat` (era emoji 🔄 na convenção antiga) |
+| Action Menu Item | `Icons.bolt` (era emoji ⚡ na convenção antiga) |
 
 ### 8.4 Quando Usar Emojis Configuráveis
 
@@ -531,6 +539,9 @@ O `VaultNotifier` (~54KB) é o **coração do aplicativo**. Ele:
 | Organizer (Day Theme) | `organizers/day_themes/SLUG.md` | `organizerListProvider` → filter | `Organizer` | 🌅 |
 | Organizer (Time Block) | `organizers/time_blocks/SLUG.md` | `organizerListProvider` → filter | `Organizer` | ⏱️ |
 | Organizer (Routine) | `organizers/routines/SLUG.md` | `allObjectsProvider` → filter | `Routine` | 🔄 |
+| Pillar | `pillars/SLUG.md` | `pillarsProvider` | `Pillar` — **ContentObject próprio, NÃO Organizer** (ver §14.x abaixo) | 🏛️ |
+| Organizer (Value) | `organizers/values/SLUG.md` | `organizerListProvider` → filter | `Organizer` | 💎 |
+| Action Menu Item | `actions/SLUG.md` | `allObjectsProvider` → filter | `ActionMenuItem` | ⚡ |
 | Event | `events/SLUG.md` | `allObjectsProvider` → filter | `Event` | 📅 |
 | Idea | `ideas/SLUG.md` | `allObjectsProvider` → filter | `Idea` | 💡 |
 | System | `systems/SLUG.md` | `allObjectsProvider` → filter | `System` | ⚙️ |

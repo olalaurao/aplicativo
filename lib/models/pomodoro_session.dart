@@ -1,7 +1,7 @@
 import 'content_object.dart';
 
 enum PomodoroSessionState { scheduled, active, paused, completed, cancelled }
-enum PomodoroType { work, shortBreak, longBreak, custom }
+enum PomodoroType { work, shortBreak, longBreak, custom, stopwatch }
 
 class PomodoroSession extends ContentObject {
   String? linkedItemSlug;

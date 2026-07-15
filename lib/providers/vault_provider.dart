@@ -33,6 +33,7 @@ import '../models/idea_model.dart';
 import '../models/inbox_model.dart';
 import '../models/pomodoro_session.dart';
 import '../models/pillar_model.dart';
+import '../models/action_menu_item_model.dart';
 
 import '../models/sync_action.dart';
 import '../services/sync_queue_service.dart';
@@ -904,11 +905,8 @@ class OrganizersNotifier extends Notifier<List<Organizer>> {
     final routines = ref
         .watch(objectsByTypeProvider('routine'))
         .cast<Organizer>();
-    final pillars = ref
-        .watch(objectsByTypeProvider('pillar'))
-        .cast<Organizer>();
 
-    return [...areas, ...projects, ...activities, ...people, ...labels, ...dayThemes, ...timeBlocks, ...values, ...routines, ...pillars];
+    return [...areas, ...projects, ...activities, ...people, ...labels, ...dayThemes, ...timeBlocks, ...values, ...routines];
   }
 
   Future<void> addOrganizer(Organizer organizer) async {
@@ -1281,6 +1279,38 @@ class PillarsNotifier extends Notifier<List<Pillar>> {
 
 final pillarsProvider = NotifierProvider<PillarsNotifier, List<Pillar>>(() {
   return PillarsNotifier();
+});
+
+class ActionMenuItemsNotifier extends Notifier<List<ActionMenuItem>> {
+  @override
+  List<ActionMenuItem> build() {
+    return ref.watch(objectsByTypeProvider('action')).cast<ActionMenuItem>();
+  }
+
+  Future<void> addActionMenuItem(ActionMenuItem action) async {
+    state = [...state, action];
+    if (!action.categories.contains('[[actions]]')) {
+      action.categories.add('[[actions]]');
+    }
+    await ref.read(vaultProvider.notifier).createObject(action);
+  }
+
+  Future<void> updateActionMenuItem(ActionMenuItem action) async {
+    state = [
+      for (final item in state)
+        if (item.id == action.id) action else item,
+    ];
+    await ref.read(vaultProvider.notifier).updateObject(action);
+  }
+
+  Future<void> deleteActionMenuItem(ActionMenuItem action) async {
+    state = state.where((item) => item.id != action.id).toList();
+    await ref.read(vaultProvider.notifier).deleteObject(action);
+  }
+}
+
+final actionMenuItemsProvider = NotifierProvider<ActionMenuItemsNotifier, List<ActionMenuItem>>(() {
+  return ActionMenuItemsNotifier();
 });
 
 class RemindersNotifier extends Notifier<List<Reminder>> {
@@ -1697,10 +1727,13 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
     // 1. Run migrations on the main thread that require SharedPreferences/platform channels.
     // migrateDailyHabitCompletions uses SharedPreferences, so we keep it here.
     // Defer to microtask to avoid blocking initial UI render
+    // Otimização: executar migration apenas se não foi executada recentemente
     Future.microtask(() async {
-      await service.migrateDailyHabitCompletions(
-        ref.read(sharedPreferencesProvider),
-      );
+      final prefs = ref.read(sharedPreferencesProvider);
+      const migrationKey = 'daily_note_habits_migration_done';
+      if (prefs.getBool(migrationKey) != true) {
+        await service.migrateDailyHabitCompletions(prefs);
+      }
     });
 
     // 2. Offload listing, reading, parsing and post-processing to the background isolate.
@@ -2345,6 +2378,9 @@ class VaultNotifier extends Notifier<void> {
       'label' => 'organizers/labels',
       'dayTheme' || 'day_theme' => 'organizers/day_themes',
       'timeBlock' || 'time_block' => 'organizers/time_blocks',
+      'value' => 'organizers/values',
+      'routine' => 'organizers/routines',
+      'pillar' => 'pillars',
       _ => 'app',
     };
   }
@@ -3530,6 +3566,9 @@ class VaultNotifier extends Notifier<void> {
       'organizer' => 'organizers',
       'mood_definition' => 'moods',
       'combined_analysis' => 'analyses',
+      'value' => 'organizers/values',
+      'routine' => 'organizers/routines',
+      'pillar' => 'pillars',
       'wellbeing_indicator' => 'app',
       'snapshot' => 'snapshots',
       _ => 'app',

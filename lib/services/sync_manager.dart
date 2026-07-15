@@ -530,8 +530,8 @@ class SyncManager {
     final detectedAt = DateTime.now();
     final timestamp = detectedAt.millisecondsSinceEpoch;
     final safePath = relativePath.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
-    final localConflictPath = '_conflicts/${safePath}_local_$timestamp.md';
-    final remoteConflictPath = '_conflicts/${safePath}_remote_$timestamp.md';
+    final localConflictPath = '_conflicts/${_generateSafeFileName(safePath, 'local', timestamp)}.md';
+    final remoteConflictPath = '_conflicts/${_generateSafeFileName(safePath, 'remote', timestamp)}.md';
     await obsidian.writeFile(localConflictPath, localContent);
     await obsidian.writeFile(remoteConflictPath, remoteContent);
     await _ref
@@ -599,5 +599,21 @@ class SyncManager {
         }
       }
     }
+  }
+
+  String _generateSafeFileName(String basePath, String suffix, int timestamp) {
+    const maxFileNameLength = 150; // Safe limit for Android filesystems
+    final suffixWithTimestamp = '_${suffix}_$timestamp';
+    
+    if (basePath.length + suffixWithTimestamp.length <= maxFileNameLength) {
+      return '$basePath$suffixWithTimestamp';
+    }
+    
+    // If too long, truncate and add hash for uniqueness
+    final availableLength = maxFileNameLength - suffixWithTimestamp.length - 8; // 8 chars for hash
+    final truncatedPath = basePath.substring(0, availableLength.clamp(0, basePath.length));
+    final hash = basePath.hashCode.toRadixString(16);
+    
+    return '${truncatedPath}_$hash$suffixWithTimestamp';
   }
 }

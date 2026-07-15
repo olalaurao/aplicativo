@@ -21,7 +21,7 @@ class TodayItem {
   final TodayItemOrigin origin;
   final DateTime timestamp;
   final String title;
-  final String emoji;
+  final IconData iconData;
   final Color color;
   final bool isCompletable;
   final bool isCompleted;
@@ -34,7 +34,7 @@ class TodayItem {
     required this.origin,
     required this.timestamp,
     required this.title,
-    required this.emoji,
+    required this.iconData,
     required this.color,
     required this.isCompletable,
     required this.isCompleted,
@@ -63,7 +63,7 @@ class TodayAggregatorService {
             origin: TodayItemOrigin.created,
             timestamp: ts,
             title: obj.title.isNotEmpty ? obj.title : 'Journal Entry',
-            emoji: ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.entry, typeSignatures),
+            iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.entry, typeSignatures) ?? Icons.menu_book,
             color: AppColors.textPrimary,
             isCompletable: false,
             isCompleted: false,
@@ -89,7 +89,7 @@ class TodayAggregatorService {
             origin: TodayItemOrigin.scheduled,
             timestamp: ts,
             title: obj.title,
-            emoji: ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.task, typeSignatures),
+            iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.task, typeSignatures) ?? Icons.check_circle_outline,
             color: _getTaskColor(obj),
             isCompletable: true,
             isCompleted: obj.isCompleted,
@@ -113,7 +113,7 @@ class TodayAggregatorService {
             origin: TodayItemOrigin.scheduled,
             timestamp: ts,
             title: obj.title,
-            emoji: ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.event, typeSignatures),
+            iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.event, typeSignatures) ?? Icons.calendar_today,
             color: AppColors.accent,
             isCompletable: false,
             isCompleted: false,
@@ -146,7 +146,7 @@ class TodayAggregatorService {
               origin: TodayItemOrigin.scheduled,
               timestamp: ts,
               title: obj.title,
-              emoji: obj.icon ?? ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.habit, typeSignatures),
+              iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.habit, typeSignatures) ?? Icons.refresh,
               color: AppColors.accent,
               isCompletable: true,
               isCompleted: isCompleted,
@@ -165,7 +165,7 @@ class TodayAggregatorService {
             origin: TodayItemOrigin.created,
             timestamp: effectiveTime,
             title: obj.title,
-            emoji: '🍅',
+            iconData: Icons.timer,
             color: AppColors.accent,
             isCompletable: false,
             isCompleted: false,
@@ -182,7 +182,7 @@ class TodayAggregatorService {
             origin: TodayItemOrigin.scheduled,
             timestamp: obj.time,
             title: obj.title,
-            emoji: ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.reminder, typeSignatures),
+            iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.reminder, typeSignatures) ?? Icons.notifications,
             color: AppColors.warning,
             isCompletable: false,
             isCompleted: false,
@@ -208,7 +208,7 @@ class TodayAggregatorService {
             origin: TodayItemOrigin.scheduled,
             timestamp: ts,
             title: obj.title,
-            emoji: obj.icon ?? ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.timeBlock, typeSignatures),
+            iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.timeBlock, typeSignatures) ?? Icons.access_time,
             color: color,
             isCompletable: false,
             isCompleted: false,

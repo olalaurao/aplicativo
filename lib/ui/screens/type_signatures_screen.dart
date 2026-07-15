@@ -158,7 +158,6 @@ class TypeSignaturesScreen extends ConsumerWidget {
     TypeSignature sig,
   ) {
     final valueController = TextEditingController(text: sig.markerValue);
-    final emojiController = TextEditingController(text: sig.emoji);
     String? selectedIconName = sig.iconName;
     MarkerType selectedMarker = sig.markerType;
 
@@ -206,15 +205,6 @@ class TypeSignaturesScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              TextField(
-                controller: emojiController,
-                decoration: const InputDecoration(
-                  labelText: 'Emoji (fallback)',
-                  hintText: '📝',
-                ),
-                maxLength: 2,
-              ),
-              const SizedBox(height: 16),
               DropdownButtonFormField<MarkerType>(
                 initialValue: selectedMarker,
                 decoration: const InputDecoration(
@@ -254,12 +244,11 @@ class TypeSignaturesScreen extends ConsumerWidget {
             TextButton(
               onPressed: () async {
                 final newValue = valueController.text.trim();
-                final newEmoji = emojiController.text.trim();
                 final updatedSignature = TypeSignature(
                   objectType: sig.objectType,
                   markerType: selectedMarker,
                   markerValue: newValue,
-                  emoji: newEmoji,
+                  emoji: '',
                   iconName: selectedIconName,
                 );
                 if (selectedMarker == MarkerType.folder &&

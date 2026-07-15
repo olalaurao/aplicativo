@@ -953,7 +953,7 @@ Future<void> _updateDayDialWidget(
       return {
         'active': true,
         'color': hourSegments.first.colorHex,
-        'icon': hourSegments.first.emoji,
+        'icon': hourSegments.first.iconData?.codePoint.toString() ?? '',
       };
     });
 

@@ -557,29 +557,6 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
                     ),
                   ],
 
-                  if (_type == OrganizerType.pillar) ...[
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Why',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _statementController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'What does this pillar represent to you?',
-                        hintText: 'e.g., "Health represents my physical and mental wellbeing"',
-                        border: OutlineInputBorder(),
-                      ),
-                      textCapitalization: TextCapitalization.sentences,
-                    ),
-                  ],
-
                   const SizedBox(height: 24),
                   const Text(
                     'Vincular Organizadores',

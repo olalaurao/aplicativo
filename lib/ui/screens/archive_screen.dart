@@ -109,9 +109,9 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
               color: AppTheme.accentColor(context),
             ),
             onPressed: () {
-              // Restore logic
               obj.archived = false;
-              // ref.read(vaultProvider.notifier).updateObject(obj);
+              obj.updatedAt = DateTime.now();
+              ref.read(vaultProvider.notifier).updateObject(obj);
             },
           ),
           onTap: () => Navigator.push(

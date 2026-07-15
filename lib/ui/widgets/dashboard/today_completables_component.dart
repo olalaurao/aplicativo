@@ -103,7 +103,7 @@ class TodayCompletablesComponent extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Row(
                       children: [
-                        Text(item.emoji, style: const TextStyle(fontSize: 18)),
+                        Icon(item.iconData, size: 18, color: item.color),
                         const SizedBox(width: 8),
                         Container(
                           width: 6,
@@ -122,7 +122,7 @@ class TodayCompletablesComponent extends ConsumerWidget {
                               color: item.isCompleted ? AppColors.textMuted : AppColors.textPrimary,
                               fontWeight: FontWeight.w500,
                             ),
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),

@@ -120,7 +120,7 @@ class DayDialAggregator {
         end: end,
         title: event.title,
         colorHex: '#007AFF', // AppColors.info
-        emoji: ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.event, typeSignatures),
+        iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.event, typeSignatures) ?? Icons.calendar_today,
         isEditable: true,
         isResizable: true,
         sourceSlug: event.slug,
@@ -188,7 +188,7 @@ class DayDialAggregator {
           end: start.add(const Duration(minutes: 12)),
           title: habit.title,
           colorHex: habit.color ?? '#FF9500',
-          emoji: habit.icon ?? ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.habit, typeSignatures),
+          iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.habit, typeSignatures) ?? Icons.refresh,
           isEditable: true,
           isResizable: false,
           sourceSlug: habit.slug,
@@ -208,7 +208,7 @@ class DayDialAggregator {
         end: reminder.time.add(const Duration(minutes: 12)),
         title: reminder.title,
         colorHex: '#FFCC00',
-        emoji: ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.reminder, typeSignatures),
+        iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.reminder, typeSignatures) ?? Icons.notifications,
         isEditable: true,
         isResizable: false,
         sourceSlug: reminder.id,
@@ -307,7 +307,7 @@ class DayDialAggregator {
         markers.add(DialPointMarker(
           id: '${entry.slug}:${moodEntry.timestamp.toIso8601String()}',
           timestamp: moodEntry.timestamp,
-          emoji: def.emoji,
+          iconData: Icons.sentiment_satisfied,
           label: def.label,
           sourceSlug: entry.slug,
         ));

@@ -2,11 +2,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../models/pillar_model.dart';
 import '../theme.dart';
 import '../forms/create_pillar_form.dart';
 import 'universal_detail_view.dart';
 import '../widgets/object_action_wrapper.dart';
+import '../utils/object_icons.dart';
 
 class PillarsScreen extends ConsumerStatefulWidget {
   const PillarsScreen({super.key});
@@ -105,7 +107,7 @@ class _PillarsScreenState extends ConsumerState<PillarsScreen> {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
-              Icons.account_balance,
+              ObjectIcons.iconDataForType('pillar', ref) ?? Icons.account_balance,
               color: Color(int.parse(pillar.color.replaceFirst('#', '0xFF'))),
               size: 20,
             ),
@@ -145,7 +147,7 @@ class _PillarsScreenState extends ConsumerState<PillarsScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.account_balance,
+            ObjectIcons.iconDataForType('pillar', ref) ?? Icons.account_balance,
             size: 64,
             color: AppTheme.accentColor(context).withValues(alpha: 0.3),
           ),

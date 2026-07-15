@@ -141,7 +141,7 @@ class TodayTimelineComponent extends ConsumerWidget {
                             Expanded(
                               child: Row(
                                 children: [
-                                  Text(item.emoji, style: const TextStyle(fontSize: 16)),
+                                  Icon(item.iconData, size: 16, color: item.color),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(

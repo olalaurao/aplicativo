@@ -77,6 +77,7 @@ import 'detail_sections/person_detail_section.dart';
 import 'detail_sections/journal_entry_detail_section.dart';
 import 'detail_sections/idea_detail_section.dart';
 import 'detail_sections/routine_detail_section.dart';
+import 'detail_sections/pillar_detail_section.dart';
 import 'detail_views/resource_detail_view.dart';
 import 'detail_views/person_detail_view.dart';
 import 'detail_views/note_detail_view.dart';
@@ -885,6 +886,28 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       cards.addAll(buildJournalEntryPropertyCards(object as JournalEntry, mood));
     } else if (object is Routine) {
       cards.addAll(buildRoutinePropertyCards(object as Routine, ref, context));
+    } else if (object is Pillar) {
+      cards.addAll(buildPillarPropertyCards(object as Pillar));
+      return [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+            child: buildPillarActionButtons(context, ref, object as Pillar),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: _CollapsiblePropertiesSection(
+            title: 'PROPERTIES',
+            child: PropertyGrid(cards: cards),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+            child: buildPillarTimelineSection(context, ref, object as Pillar),
+          ),
+        ),
+      ];
     } else {
       cards.addAll(_buildDefaultDateCards(context));
     }
@@ -3349,8 +3372,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         return 'Routine';
       case OrganizerType.value:
         return 'Value';
-      case OrganizerType.pillar:
-        return 'Pillar';
       }
     }
     switch (obj.type) {

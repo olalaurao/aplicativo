@@ -129,6 +129,7 @@ class _UniversalSearchPickerSheetState
                 _filterChip('note', 'Notes'),
                 _filterChip('idea', 'Ideas'),
                 _filterChip('resource', 'Resources'),
+                _filterChip('action', 'Actions'),
                 _filterChip('social_post', 'Posts'),
                 _filterChip('person', 'People'),
               ],
@@ -491,8 +492,6 @@ class _UniversalSearchPickerSheetState
           return 'Routine';
         case OrganizerType.value:
           return 'Value';
-      case OrganizerType.pillar:
-        return 'Pillar';
       }
     }
     switch (obj.type) {

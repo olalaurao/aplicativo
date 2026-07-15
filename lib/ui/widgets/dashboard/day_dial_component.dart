@@ -247,7 +247,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
         itemBuilder: (context, index) {
           final segment = sortedSegments[index];
           final timeStr = DateFormat('HH:mm').format(segment.start);
-          final emoji = _getEmojiForSegment(segment, typeSignatures);
+          final emoji = _getIconForSegment(segment, typeSignatures);
           final segColor = Color(int.parse(segment.colorHex.replaceAll('#', '0xFF')));
           
           // Check if segment is completable (task or habit)
@@ -302,9 +302,10 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(
+                  Icon(
                     emoji,
-                    style: const TextStyle(fontSize: 14),
+                    size: 14,
+                    color: segColor,
                   ),
                   const SizedBox(width: 8),
                   Container(
@@ -396,28 +397,26 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
     );
   }
 
-  String _getEmojiForSegment(DialSegment segment, Map<String, TypeSignature> typeSignatures) {
-    if (segment.emoji != null) return segment.emoji!;
-    
-    // Fallback emojis based on segment kind using ObjectIcons
+  IconData _getIconForSegment(DialSegment segment, Map<String, TypeSignature> typeSignatures) {
+    // Fallback icons based on segment kind using ObjectIcons
     switch (segment.kind) {
       case DialSegmentKind.taskPlanned:
-        return ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.task, typeSignatures);
+        return ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.task, typeSignatures) ?? Icons.check_circle_outline;
       case DialSegmentKind.habitSlot:
-        return ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.habit, typeSignatures);
+        return ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.habit, typeSignatures) ?? Icons.refresh;
       case DialSegmentKind.event:
-        return ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.event, typeSignatures);
+        return ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.event, typeSignatures) ?? Icons.calendar_today;
       case DialSegmentKind.pomodoroPlanned:
       case DialSegmentKind.pomodoroCompleted:
-        return '🍅';
+        return Icons.timer;
       case DialSegmentKind.timeBlock:
-        return ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.timeBlock, typeSignatures);
+        return ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.timeBlock, typeSignatures) ?? Icons.access_time;
       case DialSegmentKind.reminder:
-        return ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.reminder, typeSignatures);
+        return ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.reminder, typeSignatures) ?? Icons.notifications;
       case DialSegmentKind.dayTheme:
-        return ObjectIcons.emojiForTypeWithSignatures(ObjectTypes.dayTheme, typeSignatures);
+        return ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.dayTheme, typeSignatures) ?? Icons.wb_sunny;
       case DialSegmentKind.sleep:
-        return '😴';
+        return Icons.bedtime;
     }
   }
 }

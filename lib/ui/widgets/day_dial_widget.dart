@@ -357,7 +357,7 @@ class _DayDialPainter extends CustomPainter {
         end: dragPreviewEnd!,
         title: draggedSegment!.title,
         colorHex: draggedSegment!.colorHex,
-        emoji: draggedSegment!.emoji,
+        iconData: draggedSegment!.iconData,
         isEditable: draggedSegment!.isEditable,
         isResizable: draggedSegment!.isResizable,
         layer: draggedSegment!.layer,
@@ -371,7 +371,7 @@ class _DayDialPainter extends CustomPainter {
       final mRadius = radius - 8;
       final x = center.dx + mRadius * cos(angle);
       final y = center.dy + mRadius * sin(angle);
-      _drawIcon(canvas, m.emoji, x, y, 12);
+      _drawIcon(canvas, m.iconData, x, y, 12);
     }
 
     // Current time indicator
@@ -437,10 +437,10 @@ class _DayDialPainter extends CustomPainter {
 
     if (s.kind == DialSegmentKind.habitSlot || s.kind == DialSegmentKind.reminder) {
       // Draw as a point
-      if (s.emoji != null) {
+      if (s.iconData != null) {
         final x = center.dx + ringRadius * cos(startAngle);
         final y = center.dy + ringRadius * sin(startAngle);
-        _drawIcon(canvas, s.emoji!, x, y, 14);
+        _drawIcon(canvas, s.iconData!, x, y, 14);
       }
     } else {
       canvas.drawArc(
@@ -453,9 +453,9 @@ class _DayDialPainter extends CustomPainter {
     }
   }
 
-  void _drawIcon(Canvas canvas, String iconName, double x, double y, double size) {
+  void _drawIcon(Canvas canvas, IconData iconData, double x, double y, double size) {
     final textPainter = TextPainter(
-      text: TextSpan(text: iconName, style: TextStyle(fontSize: size)),
+      text: TextSpan(text: String.fromCharCode(iconData.codePoint), style: TextStyle(fontSize: size, fontFamily: 'MaterialIcons')),
       textDirection: ui.TextDirection.ltr,
     );
     textPainter.layout();

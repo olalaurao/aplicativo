@@ -1,4 +1,5 @@
 // lib/models/day_dial_model.dart
+import 'package:flutter/material.dart';
 
 /// The category of a dial segment — drives color, icon fallback, and
 /// whether the segment is user-editable (draggable/resizable).
@@ -23,7 +24,7 @@ class DialSegment {
   final DateTime end;           // always > start; midnight-spanning allowed
   final String title;
   final String colorHex;        // resolved concrete color
-  final String? emoji;          // habit icon, mood emoji, etc. — null for events/blocks
+  final IconData? iconData;     // habit icon, mood icon, etc. — null for events/blocks
   final String? sourceSlug;     // the underlying object's slug/id, for tap-to-open
   final bool isEditable;        // true only for taskPlanned, pomodoroPlanned, reminder, event (if local), habitSlot
   final bool isResizable;       // subset of isEditable
@@ -36,7 +37,7 @@ class DialSegment {
     required this.end,
     required this.title,
     required this.colorHex,
-    this.emoji,
+    this.iconData,
     this.sourceSlug,
     required this.isEditable,
     required this.isResizable,
@@ -48,14 +49,14 @@ class DialSegment {
 class DialPointMarker {
   final String id;
   final DateTime timestamp;
-  final String emoji;
+  final IconData iconData;
   final String label;           // mood label, for tooltip/detail sheet
   final String? sourceSlug;     // JournalEntry slug, for tap-to-open
 
   DialPointMarker({
     required this.id,
     required this.timestamp,
-    required this.emoji,
+    required this.iconData,
     required this.label,
     this.sourceSlug,
   });

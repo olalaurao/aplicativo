@@ -362,10 +362,10 @@ class _WeekTimelineScreenState extends ConsumerState<WeekTimelineScreen> {
             else
               const SizedBox(width: 24),
             const SizedBox(width: 8),
-            // Emoji
+            // Icon
             SizedBox(
               width: 20,
-              child: Text(item.emoji, style: const TextStyle(fontSize: 16)),
+              child: Icon(item.iconData, size: 16, color: item.color),
             ),
             const SizedBox(width: 8),
             // Time (only if not midnight/untimed)

@@ -564,8 +564,6 @@ String _typeLabel(ContentObject object) {
         return 'Routine';
       case OrganizerType.value:
         return 'Value';
-      case OrganizerType.pillar:
-        return 'Pillar';
     }
   }
   if (object is Reminder) return 'Reminder';

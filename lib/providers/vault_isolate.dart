@@ -84,10 +84,11 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
     final yamlErrors = <Map<String, String>>[];
 
     // 1. Fetch markdown files using cached getAllMarkdownFiles for better performance
-    final mdFiles = await service.getAllMarkdownFiles();
+    // Use forceRefresh=false to leverage cache when possible
+    final mdFiles = await service.getAllMarkdownFiles(forceRefresh: false);
 
-    // 2. Read and parse files in parallel batches (max 250 concurrent I/O ops for better throughput)
-    const batchSize = 250;
+    // 2. Read and parse files in parallel batches (max 100 concurrent I/O ops for better stability)
+    const batchSize = 100;
     final Map<String, Map<String, dynamic>> dailyMap = {};
 
     for (int i = 0; i < mdFiles.length; i += batchSize) {
@@ -351,6 +352,7 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                   type == 'dayTheme' ||
                   type == 'timeBlock' ||
                   type == 'value' ||
+                  type == 'routine' ||
                   (type == 'task' && relativePath.startsWith('organizers/')) ||
                   (type == 'goal' && relativePath.startsWith('organizers/')) ||
                   (type == 'habit' && relativePath.startsWith('organizers/')) ||

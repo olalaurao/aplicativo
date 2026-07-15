@@ -732,8 +732,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         return 'Routine';
       case OrganizerType.value:
         return 'Valor';
-      case OrganizerType.pillar:
-        return 'Pilar';
       }
     }
     switch (obj.type) {

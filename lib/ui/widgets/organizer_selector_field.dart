@@ -644,8 +644,6 @@ class OrganizerSelectorField extends ConsumerWidget {
           return 'Time Block';
         case OrganizerType.routine:
           return 'Routine';
-      case OrganizerType.pillar:
-        return 'Pillar';
       }
     }
     switch (obj.type) {

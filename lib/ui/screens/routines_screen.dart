@@ -20,8 +20,9 @@ class _RoutinesScreenState extends ConsumerState<RoutinesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allOrganizers = ref.watch(organizersProvider);
-    final routines = allOrganizers
+    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final routines = allObjects
+        .whereType<Organizer>()
         .where((o) => o.organizerType == OrganizerType.routine)
         .where((o) => o.title.toLowerCase().contains(_searchQuery.toLowerCase()))
         .toList();

@@ -90,8 +90,6 @@ Future<List<OrganizerReference>?> showOrganizerPickerModal(
         return 'Routine';
       case OrganizerType.value:
         return 'Value';
-      case OrganizerType.pillar:
-        return 'Pillar';
       }
     }
     switch (obj.type) {

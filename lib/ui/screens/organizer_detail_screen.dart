@@ -1118,8 +1118,6 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         return Icons.repeat_rounded;
       case OrganizerType.value:
         return Icons.star_outline;
-      case OrganizerType.pillar:
-        return Icons.account_balance;
     }
   }
 

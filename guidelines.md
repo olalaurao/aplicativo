@@ -46,6 +46,8 @@ Sourced from a batch of real usage notes (WhatsApp messages, late June 2026). Pu
 
 ## CHANGELOG — V5.3 → V5.4
 
+- **Pillars, Values & Action Menu Items — audit pass (2026-07):** verified live against `main` after Pillar/Value/Action Menu Item were implemented. Confirmed working: `Pillar` (Content Object, touch log, no completion state), `Value` (Organizer subtype with `statement`), `ActionMenuItem` (standalone, reusable, links to Pillars/Values via `organizers`). Found one live P0 bug (`OrganizersNotifier` casts Pillar objects to `Organizer`, which crashes — Pillar is not an Organizer subtype) and several gaps (no UI to create an Action Menu Item or attach one to a Pillar; no UI to log a `PillarTouch` at all; Pillar's timeline isn't wired to the existing `ObjectTimelineFeed`/`backlinksProvider`; Routine has no parsing dispatch and silently fails to load). Full ticket breakdown in `quartzo_pilares_valores_spec.md`.
+
 - **Material Icons System (new):** Object type icons changed from emojis to Material Design icons. TypeSignature now includes `iconName` field for Material icon selection. MaterialIconSet provides 100+ curated Material icons organized by category. IconPicker widget allows visual icon selection via grid. ObjectIcons extended with `iconDataForType()` and `defaultIconDataForType()` methods. All screens (organizers, timeline, planner, notes, universal detail view) updated to use Material icons with emoji fallback for compatibility. Users can customize icons per object type via Settings → Object Identification.
 - **Routine Organizer (new):** New `OrganizerType.routine` for schedulable routines with items and execution history. Routine extends Organizer with `items` (List<RoutineItem> referencing any vault object via WikiLink), `executionHistory` (List<RoutineExecution> tracking when routine was run and item completion status), `showInPlanner` flag, and optional `moodTrigger`. RoutineItem supports required flag and order. RoutineExecution tracks item completions, optional notes, and mood before/after. RoutineExecutionService handles habit sync (bidirectional toggle updates habit directly) and completion flow with dialog for incomplete items ("leave open" vs "mark all done"). Planner displays routines with `showInPlanner=true`. CreateRoutineForm provides item management with universal search picker, drag & drop reordering, scheduler integration, and mood trigger dropdown. RoutineExecutionSheet provides modal UI for executing routines with item checkboxes, habit sync toggle, and completion flow.
 - **Mood Trigger for Routines (new):** MoodRoutineService suggests routines based on current mood quadrant (Red/Yellow/Green/Blue). When user logs mood in journal entry, matching routines are automatically suggested via bottom sheet. Routine's `moodTrigger` field accepts quadrant names (red, yellow, green, blue) or descriptive names (high_energy_low_pleasantness, etc.). Integration with CreateEntryForm shows routine suggestions after mood selection.
@@ -948,6 +950,8 @@ By default, every object the app creates lives in a single flat, user-configurab
 12. Inbox Item *(newly documented in V5)*
 13. Shopping List *(newly documented in V5; absorbs Shopping Item)*
 14. Template *(newly documented in V5)*
+15. Pillar *(new in V5.4)* — identity/direction object with **no completion state**: the user's recurring "why," touched daily via logged `PillarTouch` entries, never marked done/failed. Distinct from Goal (which has `state`/deadline) and from Habit (whose streak can "break"). See Part 2.
+16. Action Menu Item *(new in V5.4)* — a standalone, reusable "thing I can do right now," tagged with an energy level (when to use it) and an energy cost (how much it costs), linked to one or more Pillars/Values/Goals via `organizers`. Not embedded in Pillar — deliberately generic so any object can offer an action menu, not just Pillars. See Part 2.
 
 **ORGANIZER OBJECTS** — structural containers. Every content object can belong to multiple organizers simultaneously. Organizers have their own Timeline aggregating all associated content.
 
@@ -964,6 +968,9 @@ Organizer types (Place removed in V5):
 10. Day Theme (time-based theme with scheduler)
 11. Time Block (time-based energy mapping)
 12. Routine (schedulable routine with items and execution history)
+13. Value *(new in V5.4)* — a small, static identity anchor (e.g. "I value connection"), rarely more than a handful at a time. Unlike Area/Project, a Value is never itself a container you file things "under" in the Planner sense — it's purely a classification/reflection tag other objects (especially Pillars) point back to. Carries a `statement` field (the anchor phrase) in addition to the base Organizer fields.
+
+**Pillar is NOT an Organizer**, despite conceptually sitting in a similar "things other objects link to" role — it's implemented as its own Content Object (see item 15 above) because it needs richer behavior (touch log, reminders) than the Organizer base class models. Do not add `OrganizerType.pillar`; if you see it, it's dead code from an earlier design pass and should be removed (see Part 2, Pillar).
 
 Hierarchy: Area > Activity > Project > [Tasks, Habits, Trackers, Labels, People]
 
@@ -1576,22 +1583,25 @@ There is no separate "Reminder Configuration" object type distinct from this —
 
 ### OBJECT 15: PILLAR *(new in V5.3)*
 
-**Purpose:** Aspirational "why" — a life area or value you want to stay connected to. Pillars have a touch log for tracking when you engage with them (e.g., "Health" pillar touched when you exercise, "Family" pillar touched when you spend quality time together).
+**Purpose:** Aspirational "why" — a life area or value you want to stay connected to. Pillars have a touch log for tracking when you engage with them (e.g., "Health" pillar touched when you exercise, "Family" pillar touched when you spend quality time together). **Pillars have no completion state** — unlike Goal (`state`: active/completed/cancelled) or Habit (streak that can "break"), a Pillar is only ever touched or not; there is no success/failure semantics anywhere in this object.
 
 **Required properties:** `title`, `color`.
 
-**Properties:** `id`, `type: pillar`, `title`, `why` (optional — the deeper meaning this pillar represents), `color` (hex), `icon` (optional emoji override), `touch_log` (array of PillarTouch records with `date`, `action_id` (optional), `note` (optional)), `organizers`, `categories`, `tags`, `aliases`, `created_at`, `updated_at`, `archived`, `pinned`.
+**Properties:** `id`, `type: pillar`, `title`, `why` (optional — the deeper meaning this pillar represents), `color` (hex), `icon` (optional icon override), `touch_log` (array of PillarTouch records with `date`, `action_id` (optional), `note` (optional)), `organizers`, `categories`, `tags`, `aliases`, `created_at`, `updated_at`, `archived`, `pinned`.
 
-**Helper methods:**
-- `lastTouch` — returns the most recent touch date, or null if never touched
-- `touchesInLast(days)` — returns count of touches in the last N days
-- `addTouch(date, actionId?, note?)` — adds a new touch record
+**Helper methods (verified against `pillar_model.dart`, 2026-07):**
+- `lastTouch` — getter, returns the most recent touch date, or null if never touched
+- `touchesInLast(int days)` — returns count of touches in the last N days
+
+**Not yet implemented** (docs previously described this as existing — it does not, as of the last code read): there is no `addTouch()` convenience method on `Pillar` itself, and **no UI anywhere yet creates a `PillarTouch`** — the model can represent a touch, but nothing in the app produces one. This is the single most important open gap for this object; see the implementation ticket doc `quartzo_pilares_valores_spec.md`, Ticket 5.
 
 **Storage:** `pillars/SLUG.md` in the vault.
 
-**Default emoji:** 🏛️
+**Default icon:** `Icons.account_balance` (Material Icon system, Part 1.5 — not an emoji; earlier drafts of this doc said "🏛️," which described the pre-V5.4 emoji convention).
 
 **Default color:** #8B5CF6
+
+**Known issue (see implementation ticket doc, Ticket 1):** `OrganizerType.pillar` still exists in the `OrganizerType` enum (`organizer_model.dart`) as dead code from an earlier design pass, before Pillar became its own Content Object. **Pillar does not extend `Organizer`** — any code that does `objectsByTypeProvider('pillar').cast<Organizer>()` will crash at runtime. `OrganizerType.pillar` should be removed from the enum.
 
 ---
 
@@ -1606,7 +1616,7 @@ There is no separate "Reminder Configuration" object type distinct from this —
 
 **Storage:** `organizers/values/SLUG.md` in the vault (user-configurable via Object Identification).
 
-**Default emoji:** 💎
+**Default icon:** `Icons.diamond` (Material Icon system, Part 1.5).
 
 **Note:** Value is an Organizer subtype, not a separate content object type. It uses `organizer_type: value` to distinguish itself from other organizers.
 
@@ -1622,9 +1632,9 @@ There is no separate "Reminder Configuration" object type distinct from this —
 
 **Storage:** `actions/SLUG.md` in the vault.
 
-**Default emoji:** 🔋
+**Default icon:** `Icons.bolt` (Material Icon system, Part 1.5 — this doc previously said "🔋," which was never correct even under the old emoji convention; verified against `object_icons.dart`, which registers `ObjectTypes.action => Icons.bolt`).
 
-**Usage:** Can be linked to Pillars (as `action_id` in PillarTouch), Habits (as suggested actions), or used in context-aware action menus based on current energy state.
+**Usage:** Can be linked to Pillars (as `action_id` in PillarTouch), Habits (as suggested actions), or used in context-aware action menus based on current energy state. **As of the last code read, no create/edit UI exists for this type yet** — the model and parsing are done, but there's no form to create an Action Menu Item, and `create_pillar_form.dart` doesn't offer a way to attach one to a Pillar. See `quartzo_pilares_valores_spec.md`, Ticket 4.
 
 ---
 
@@ -1881,6 +1891,8 @@ DataSource series for mood use the unified `DataSourceReference` (Part 1.4) with
 **Missing-data rendering (new in V5.1):** a day with no recorded value for a given tracker field must **not** be plotted as `0`. The line chart shows a genuine gap — no point is drawn for that day, and the line itself breaks (does not draw a segment through the missing day) and resumes cleanly at the next day that has data. This applies per-series independently: one series can have a gap on a day while another series on the same chart has data and renders normally.
 
 Everything else (dual-axis normalization, value_mapping for categorical tracker fields, calendar heatmap, insight card) is unchanged from V4.
+
+**Pillar Touch series (new in V5.4, currently a stub):** `MetricType.pillarTouch` exists in the live `analysis_model.dart` enum and is wired into `combined_analysis_screen.dart`'s picker and value-lookup switch, but `_getValueForDate` currently returns `null` for it unconditionally — no data is actually plotted yet. The intended behavior once implemented: one point per day equal to the count of `PillarTouch` entries on that day for the selected Pillar (mirrors the Habit completion-count series). This has little practical value until Pillar touch-logging actually exists in the UI (see Part 2, Object 15, and `quartzo_pilares_valores_spec.md` Tickets 4–5) — there's currently no way for a user to create a `PillarTouch` at all, so the series would always be empty even once wired up.
 
 ---
 
@@ -2264,7 +2276,8 @@ vault/
 │   ├── projects/
 │   ├── activities/
 │   ├── day_themes/
-│   └── time_blocks/
+│   ├── time_blocks/
+│   └── routines/           ← Routine organizer definitions (folder not yet created by _ensureVaultFolders as of the last code read — see quartzo_pilares_valores_spec.md, Ticket 3)
 ├── _attachments/
 ├── _deleted/                ← purged after 30 days
 ├── _conflicts/               ← purged after 30 days
@@ -2300,7 +2313,7 @@ reminders: []
 ```
 task | habit | tracker | goal | note | entry | event | reminder | system | social_post
 | mood_definition | area | project | activity | label | person | idea | inbox
-| shopping_list | template | daily_note | analysis | pillar | value | action
+| shopping_list | template | daily_note | analysis | pillar | value | action | routine
 ```
 
 *(`calendar_session` removed — folded into `event`. `place` removed entirely.)*
@@ -2379,6 +2392,12 @@ sleep:
 | Area / Activity / Label / Person | `app/*.md` | `area`/`activity`/`label`/`person` | Yes |
 | Combined Analysis | `analyses/SLUG.md` | `analysis` | Yes |
 | PomodoroSession | Embedded in daily note | via `## Pomodoros` | Via daily note |
+| Pillar | `pillars/SLUG.md` | `pillar` | Yes (via `backlinksProvider`; **not** a `organizerListProvider` member — see Part 2, Object 15) |
+| Value | `organizers/values/SLUG.md` | `organizer` (`organizer_type: value`) | Yes |
+| Action Menu Item | `actions/SLUG.md` | `action` | Yes |
+| Routine | `organizers/routines/SLUG.md` (folder not yet auto-created — Ticket 3) | `organizer` (`organizer_type: routine`) | Yes — **parsing dispatch missing as of the last code read**: `vault_isolate.dart`'s type-dispatch chain has no `type == 'routine'` branch, so Routine files currently fail to load back from disk. See `quartzo_pilares_valores_spec.md`, Ticket 2. |
+
+**Flag — this table's `Location` column may be stale for rows above this note:** the live `_defaultFolderForSignature` (`vault_provider.dart`) actually routes most types to dedicated per-type folders (`goals/`, `tasks/`, `organizers/areas/`, etc.), matching the ASCII folder tree earlier in this Part, not the flat `app/*.md` shown for many rows above. Whether that's this table needing a fix, or the live code needing to migrate to the flat model this table describes, wasn't resolved as part of this pass — flagging rather than silently picking one. The four new rows just added use the real, verified-live folder locations.
 
 *(No Place row — removed entirely.)*
 

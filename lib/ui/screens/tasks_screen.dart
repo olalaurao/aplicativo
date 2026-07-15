@@ -2,9 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/vault_provider.dart';
-import '../../models/organizer_model.dart';
+import '../../models/task_model.dart';
 import '../theme.dart';
-import '../forms/create_organizer_form.dart';
+import '../forms/create_task_form.dart';
 import 'universal_detail_view.dart';
 import '../widgets/object_action_wrapper.dart';
 
@@ -20,11 +20,18 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allOrganizers = ref.watch(organizersProvider);
-    final tasks = allOrganizers
-        .where((o) => o.organizerType == OrganizerType.task)
-        .where((o) => o.title.toLowerCase().contains(_searchQuery.toLowerCase()))
-        .toList();
+    final allObjectsAsync = ref.watch(allObjectsProvider);
+    final tasks = allObjectsAsync.when(
+      data: (objects) {
+        final taskObjects = objects.whereType<Task>().toList();
+        if (_searchQuery.isEmpty) return taskObjects;
+        return taskObjects
+            .where((t) => t.title.toLowerCase().contains(_searchQuery.toLowerCase()))
+            .toList();
+      },
+      loading: () => [],
+      error: (_, __) => [],
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -52,9 +59,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const CreateOrganizerForm(
-                    initialType: OrganizerType.task,
-                  ),
+                  builder: (_) => const CreateTaskForm(),
                 ),
               );
             },
@@ -93,7 +98,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     );
   }
 
-  Widget _buildTaskTile(BuildContext context, Organizer task) {
+  Widget _buildTaskTile(BuildContext context, Task task) {
     return ObjectActionWrapper(
       object: task,
       child: Container(
@@ -104,6 +109,15 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             task.title,
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
+          subtitle: task.stage != null
+              ? Text(
+                  task.stage.toString().split('.').last.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textMutedColor(context),
+                  ),
+                )
+              : null,
           trailing: Icon(
             Icons.chevron_right_rounded,
             size: 20,
@@ -141,7 +155,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           const SizedBox(height: 4),
           if (_searchQuery.isEmpty)
             Text(
-              'Create task organizers to organize your content',
+              'Create tasks to track your work and progress',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppTheme.textMutedColor(context),

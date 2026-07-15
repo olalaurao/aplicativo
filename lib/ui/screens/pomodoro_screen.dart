@@ -148,9 +148,11 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                           height: 240,
                           child: CustomPaint(
                             painter: _PomodoroRingPainter(
-                              progress: state.totalSeconds <= 0
-                                  ? 0
-                                  : state.remainingSeconds / state.totalSeconds,
+                              progress: state.currentType == PomodoroType.stopwatch
+                                  ? 1.0 // Full ring for stopwatch mode
+                                  : (state.totalSeconds <= 0
+                                      ? 0
+                                      : state.remainingSeconds / state.totalSeconds),
                               phaseColor: _phaseColor(state.currentType),
                             ),
                             child: Center(child: _buildCountdownText(state)),
@@ -159,26 +161,27 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
 
                         const SizedBox(height: 40),
 
-                        // Session Dots
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(state.sessionsToLongBreak, (
-                            i,
-                          ) {
-                            final completed = i < state.completedSessions;
-                            final isCurrent =
-                                i == state.completedSessions &&
-                                state.currentType == PomodoroType.work;
-                            final dot = _sessionDot(
-                              completed: completed,
-                              isCurrent: isCurrent,
-                              color: _phaseColor(state.currentType),
-                            );
-                            return isCurrent
-                                ? ScaleTransition(scale: _pulseAnim, child: dot)
-                                : dot;
-                          }),
-                        ),
+                        // Session Dots (hide in stopwatch mode)
+                        if (state.currentType != PomodoroType.stopwatch)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(state.sessionsToLongBreak, (
+                              i,
+                            ) {
+                              final completed = i < state.completedSessions;
+                              final isCurrent =
+                                  i == state.completedSessions &&
+                                  state.currentType == PomodoroType.work;
+                              final dot = _sessionDot(
+                                completed: completed,
+                                isCurrent: isCurrent,
+                                color: _phaseColor(state.currentType),
+                              );
+                              return isCurrent
+                                  ? ScaleTransition(scale: _pulseAnim, child: dot)
+                                  : dot;
+                            }),
+                          ),
 
                         const SizedBox(height: 24),
 
@@ -208,6 +211,10 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                               '90/20 min',
                               90,
                               PomodoroType.work,
+                            ),
+                            _stopwatchButton(
+                              context,
+                              ref,
                             ),
                           ],
                         ),
@@ -896,6 +903,10 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
         label = 'PERSONALIZADO';
         color = AppColors.info;
         break;
+      case PomodoroType.stopwatch:
+        label = 'CRONÔMETRO';
+        color = AppColors.info;
+        break;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -1071,12 +1082,70 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     );
   }
 
+  Widget _stopwatchButton(
+    BuildContext context,
+    WidgetRef ref,
+  ) {
+    final state = ref.watch(pomodoroProvider);
+    final isSelected = state.currentType == PomodoroType.stopwatch;
+
+    return OutlinedButton(
+      onPressed: state.isRunning
+          ? null
+          : () {
+              ref.read(pomodoroProvider.notifier).startStopwatch(
+                id: state.currentItemId,
+                title: state.currentItemTitle,
+              );
+              HapticFeedback.lightImpact();
+            },
+      style: OutlinedButton.styleFrom(
+        foregroundColor: isSelected ? Colors.white : AppColors.info,
+        backgroundColor: isSelected
+            ? AppColors.info
+            : AppColors.surfaceVariant.withValues(alpha: 0.3),
+        side: BorderSide(
+          color: isSelected
+              ? AppColors.info
+              : AppColors.divider.withValues(alpha: 0.1),
+          width: 1.5,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.timer_outlined,
+            size: 14,
+            color: isSelected ? Colors.white : AppColors.info,
+          ),
+          const SizedBox(width: 4),
+          const Text(
+            'Cronômetro',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCountdownText(PomodoroState state) {
+    final displaySeconds = state.currentType == PomodoroType.stopwatch
+        ? state.elapsedSeconds
+        : state.remainingSeconds;
+    final statusText = state.currentType == PomodoroType.stopwatch
+        ? (state.isRunning ? 'CRONOMETRANDO' : 'PAUSADO')
+        : (state.isRunning ? 'FOCUSING' : 'PAUSED');
+    
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          _formatTime(state.remainingSeconds),
+          _formatTime(displaySeconds),
           style: TextStyle(
             fontSize: 64,
             fontWeight: FontWeight.w800,
@@ -1085,7 +1154,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
           ),
         ),
         Text(
-          state.isRunning ? 'FOCUSING' : 'PAUSED',
+          statusText,
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
@@ -1128,6 +1197,8 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
         return const Color(0xFF60A5FA);
       case PomodoroType.custom:
         return AppColors.info;
+      case PomodoroType.stopwatch:
+        return AppColors.accent;
     }
   }
 
@@ -1745,6 +1816,8 @@ class _PomodoroSetupSheetState extends ConsumerState<_PomodoroSetupSheet> {
         return 'Pausa Longa';
       case PomodoroType.custom:
         return 'Personalizado';
+      case PomodoroType.stopwatch:
+        return 'Cronômetro';
     }
   }
 }

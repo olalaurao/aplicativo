@@ -114,6 +114,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   bool _showJumpToNowFab = false;
   int _gridGranularity = 30; // 15, 30, or 60 minutes
   bool _showBacklogPanel = false;
+  bool _showActionsPanel = false;
 
   @override
   void initState() {
@@ -367,59 +368,21 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             ),
             pinned: true,
             actions: [
-              // Day theme emojis
-              if (activeTheme != null)
-                _buildDayThemeEmojiButton(activeTheme),
-              // Overdue button
-              _buildOverdueButton(),
               IconButton(
-                icon: Icon(Icons.inbox_rounded, color: AppTheme.accentColor(context)),
-                tooltip: 'Backlog / Sem data',
-                onPressed: () => setState(() => _showBacklogPanel = !_showBacklogPanel),
-              ),
-              if (_viewMode == 0 && _isTimeline)
-                IconButton(
-                  icon: Icon(Icons.grid_view_rounded, color: AppTheme.textMutedColor(context)),
-                  tooltip: 'Grid density',
-                  onPressed: () {
-                    setState(() {
-                      if (_gridGranularity == 30) {
-                        _gridGranularity = 15;
-                      } else if (_gridGranularity == 15) {
-                        _gridGranularity = 60;
-                      } else {
-                        _gridGranularity = 30;
-                      }
-                    });
-                  },
+                icon: Icon(
+                  _showActionsPanel ? Icons.expand_less : Icons.expand_more,
+                  color: AppTheme.accentColor(context),
                 ),
-              if (_viewMode == 0)
-                IconButton(
-                  icon: Icon(
-                    _isTimeline
-                        ? Icons.view_list_rounded
-                        : Icons.view_timeline_rounded,
-                    size: 22,
-                    color: AppTheme.textMutedColor(context),
-                  ),
-                  tooltip: _isTimeline ? 'Ver como lista' : 'Ver como timeline',
-                  onPressed: () => setState(() => _isTimeline = !_isTimeline),
-                ),
-              IconButton(
-                icon: Icon(Icons.today_rounded, color: AppTheme.accentColor(context)),
-                onPressed: () {
-                  setState(() {
-                    _selectedDate = DateTime.now();
-                    _viewMode = 0;
-                  });
-                  WidgetsBinding.instance.addPostFrameCallback(
-                    (_) => _scrollToNow(animate: true),
-                  );
-                },
+                tooltip: 'Ações',
+                onPressed: () => setState(() => _showActionsPanel = !_showActionsPanel),
               ),
             ],
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(_viewMode == 0 ? 180 : 60),
+              preferredSize: Size.fromHeight(
+                _showActionsPanel 
+                    ? (_viewMode == 0 ? 240 : 120)
+                    : (_viewMode == 0 ? 180 : 60),
+              ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
@@ -429,6 +392,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildViewToggle(),
+                    if (_showActionsPanel) ...[
+                      const SizedBox(height: 12),
+                      _buildActionsPanel(activeTheme),
+                    ],
                     if (_viewMode == 0) ...[
                       const SizedBox(height: 12),
                       _buildDateStrip(),
@@ -576,6 +543,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             _buildMonthView(tasks, habits)
           else if (_viewMode == 3)
             _buildDialView(tasks, habits, googleEvents),
+
+          if (_showBacklogPanel)
+            SliverToBoxAdapter(child: _buildBacklogPanel()),
 
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
@@ -765,6 +735,77 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             ),
           );
         }),
+      ),
+    );
+  }
+
+  Widget _buildActionsPanel(Organizer? activeTheme) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceVariantColor(context),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          // Day theme emojis
+          if (activeTheme != null)
+            _buildDayThemeEmojiButton(activeTheme),
+          // Overdue button
+          _buildOverdueButton(),
+          // Backlog button
+          IconButton(
+            icon: Icon(Icons.inbox_rounded, color: AppTheme.accentColor(context)),
+            tooltip: 'Backlog / Sem data',
+            onPressed: () => setState(() => _showBacklogPanel = !_showBacklogPanel),
+          ),
+          // Grid density button
+          if (_viewMode == 0 && _isTimeline)
+            IconButton(
+              icon: Icon(Icons.grid_view_rounded, color: AppTheme.textMutedColor(context)),
+              tooltip: 'Grid density',
+              onPressed: () {
+                setState(() {
+                  if (_gridGranularity == 30) {
+                    _gridGranularity = 15;
+                  } else if (_gridGranularity == 15) {
+                    _gridGranularity = 60;
+                  } else {
+                    _gridGranularity = 30;
+                  }
+                });
+              },
+            ),
+          // View toggle button
+          if (_viewMode == 0)
+            IconButton(
+              icon: Icon(
+                _isTimeline
+                    ? Icons.view_list_rounded
+                    : Icons.view_timeline_rounded,
+                size: 22,
+                color: AppTheme.textMutedColor(context),
+              ),
+              tooltip: _isTimeline ? 'Ver como lista' : 'Ver como timeline',
+              onPressed: () => setState(() => _isTimeline = !_isTimeline),
+            ),
+          // Today button
+          IconButton(
+            icon: Icon(Icons.today_rounded, color: AppTheme.accentColor(context)),
+            tooltip: 'Hoje',
+            onPressed: () {
+              setState(() {
+                _selectedDate = DateTime.now();
+                _viewMode = 0;
+              });
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => _scrollToNow(animate: true),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

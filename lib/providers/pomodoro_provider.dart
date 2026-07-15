@@ -30,6 +30,7 @@ class PomodoroState {
   final String? currentItemTitle;
   final int completedSessions;
   final int sessionsToLongBreak;
+  final int elapsedSeconds; // For stopwatch mode
   
   // Relay mode fields (RA-P1-4)
   final List<RelayStep>? relaySteps;
@@ -46,6 +47,7 @@ class PomodoroState {
     this.currentItemTitle,
     this.completedSessions = 0,
     this.sessionsToLongBreak = 4,
+    this.elapsedSeconds = 0, // For stopwatch mode
     this.relaySteps,
     this.currentRelayIndex = 0,
     this.isRelayMode = false,
@@ -61,6 +63,7 @@ class PomodoroState {
     String? currentItemTitle,
     int? completedSessions,
     int? sessionsToLongBreak,
+    int? elapsedSeconds,
     List<RelayStep>? relaySteps,
     int? currentRelayIndex,
     bool? isRelayMode,
@@ -75,6 +78,7 @@ class PomodoroState {
       currentItemTitle: currentItemTitle ?? this.currentItemTitle,
       completedSessions: completedSessions ?? this.completedSessions,
       sessionsToLongBreak: sessionsToLongBreak ?? this.sessionsToLongBreak,
+      elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
       relaySteps: relaySteps ?? this.relaySteps,
       currentRelayIndex: currentRelayIndex ?? this.currentRelayIndex,
       isRelayMode: isRelayMode ?? this.isRelayMode,
@@ -127,6 +131,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
           ),
           currentItemId: fm['currentItemId'],
           currentItemTitle: fm['currentItemTitle'],
+          elapsedSeconds: fm['elapsedSeconds'] ?? 0,
         );
       }
     }
@@ -174,6 +179,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       'currentType': state.currentType.name,
       'currentItemId': state.currentItemId,
       'currentItemTitle': state.currentItemTitle,
+      'elapsedSeconds': state.elapsedSeconds,
       'lastUpdate': DateTime.now().toIso8601String(),
     };
     final content = generateMarkdown(fm, '# Pomodoro Current State');
@@ -253,6 +259,20 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       currentType: PomodoroType.custom,
       currentItemId: id,
       currentItemTitle: title,
+    );
+    _persistState();
+  }
+
+  void startStopwatch({String? id, String? title}) {
+    _timer?.cancel();
+    state = state.copyWith(
+      isRunning: false,
+      remainingSeconds: 0,
+      totalSeconds: 0,
+      currentType: PomodoroType.stopwatch,
+      currentItemId: id,
+      currentItemTitle: title,
+      elapsedSeconds: 0,
     );
     _persistState();
   }
@@ -347,34 +367,63 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     state = state.copyWith(isRunning: true);
 
     // Start Background Service
-    PomodoroBackgroundService.start(state.remainingSeconds);
+    if (state.currentType == PomodoroType.stopwatch) {
+      PomodoroBackgroundService.start(0); // No countdown for stopwatch
+    } else {
+      PomodoroBackgroundService.start(state.remainingSeconds);
+    }
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (state.remainingSeconds > 0) {
-        state = state.copyWith(remainingSeconds: state.remainingSeconds - 1);
-
-        // Update widget every 10 seconds or when starting
-        if (state.remainingSeconds % 10 == 0 ||
-            state.remainingSeconds == state.totalSeconds - 1) {
-          final minutes = state.remainingSeconds ~/ 60;
-          final seconds = state.remainingSeconds % 60;
+      if (state.currentType == PomodoroType.stopwatch) {
+        // Stopwatch mode: count up
+        state = state.copyWith(elapsedSeconds: state.elapsedSeconds + 1);
+        
+        // 5-minute reminder vibration
+        if (state.elapsedSeconds % 300 == 0 && state.elapsedSeconds > 0) {
+          _vibrateReminder();
+          _sendReminderNotification();
+        }
+        
+        // Update widget every 10 seconds
+        if (state.elapsedSeconds % 10 == 0) {
+          final minutes = state.elapsedSeconds ~/ 60;
+          final seconds = state.elapsedSeconds % 60;
           final timeStr =
               '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
           WidgetService.updatePomodoro(
-            state.currentItemTitle ?? 'Session de Focus',
+            state.currentItemTitle ?? 'Stopwatch',
             timeStr,
           );
-          _updateWeeklyWidget();
           _persistState();
         }
       } else {
-        stop();
-        _completeSession();
-        _notifyPhaseEnd();
-        
-        // RA-P1-4: Auto-advance relay step if in relay mode
-        if (state.isRelayMode) {
-          _advanceRelayStep();
+        // Countdown mode
+        if (state.remainingSeconds > 0) {
+          state = state.copyWith(remainingSeconds: state.remainingSeconds - 1);
+
+          // Update widget every 10 seconds or when starting
+          if (state.remainingSeconds % 10 == 0 ||
+              state.remainingSeconds == state.totalSeconds - 1) {
+            final minutes = state.remainingSeconds ~/ 60;
+            final seconds = state.remainingSeconds % 60;
+            final timeStr =
+                '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+            WidgetService.updatePomodoro(
+              state.currentItemTitle ?? 'Session de Focus',
+              timeStr,
+            );
+            _updateWeeklyWidget();
+            _persistState();
+          }
+        } else {
+          stop();
+          _completeSession();
+          _notifyPhaseEnd();
+          
+          // RA-P1-4: Auto-advance relay step if in relay mode
+          if (state.isRelayMode) {
+            _advanceRelayStep();
+          }
         }
       }
     });
@@ -400,6 +449,10 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
         title = 'Session Completed';
         body = 'Your custom timer is done.';
         break;
+      case PomodoroType.stopwatch:
+        title = 'Cronômetro Stopped';
+        body = 'Stopwatch session completed.';
+        break;
     }
 
     NotificationService().showImmediateNotification(
@@ -416,6 +469,19 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
         await Future.delayed(const Duration(milliseconds: 220));
       }
     }
+  }
+
+  Future<void> _vibrateReminder() async {
+    HapticFeedback.mediumImpact();
+  }
+
+  void _sendReminderNotification() {
+    final minutes = state.elapsedSeconds ~/ 60;
+    NotificationService().showImmediateNotification(
+      id: 101,
+      title: 'Foco contínuo',
+      body: 'Você está focado em "${state.currentItemTitle ?? "esta tarefa"}" há $minutes minutos',
+    );
   }
 
   void stop() {
@@ -447,10 +513,17 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
 
   void reset() {
     _timer?.cancel();
-    state = state.copyWith(
-      isRunning: false,
-      remainingSeconds: state.totalSeconds,
-    );
+    if (state.currentType == PomodoroType.stopwatch) {
+      state = state.copyWith(
+        isRunning: false,
+        elapsedSeconds: 0,
+      );
+    } else {
+      state = state.copyWith(
+        isRunning: false,
+        remainingSeconds: state.totalSeconds,
+      );
+    }
     PomodoroBackgroundService.stop();
     _persistState();
   }
@@ -476,7 +549,9 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
 
   Future<void> _completeSession({bool forceSave = false}) async {
     final now = DateTime.now();
-    final elapsedSeconds = state.totalSeconds - state.remainingSeconds;
+    final elapsedSeconds = state.currentType == PomodoroType.stopwatch
+        ? state.elapsedSeconds
+        : state.totalSeconds - state.remainingSeconds;
     final elapsedMinutes = elapsedSeconds ~/ 60;
 
     final session = PomodoroSession(
@@ -485,16 +560,16 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       date: now.subtract(Duration(seconds: elapsedSeconds)),
       linkedItemSlug: state.currentItemId,
       blocksCompleted: state.currentType == PomodoroType.work && state.remainingSeconds == 0 ? 1 : 0,
-      minutesWorked: state.currentType == PomodoroType.work ? elapsedMinutes : 0,
-      minutesBreak: state.currentType != PomodoroType.work ? elapsedMinutes : 0,
-      state: state.remainingSeconds == 0 ? PomodoroSessionState.completed : PomodoroSessionState.cancelled,
+      minutesWorked: (state.currentType == PomodoroType.work || state.currentType == PomodoroType.stopwatch) ? elapsedMinutes : 0,
+      minutesBreak: state.currentType != PomodoroType.work && state.currentType != PomodoroType.stopwatch ? elapsedMinutes : 0,
+      state: state.remainingSeconds == 0 || state.currentType == PomodoroType.stopwatch ? PomodoroSessionState.completed : PomodoroSessionState.cancelled,
     );
     state = state.copyWith(history: [session, ...state.history]);
     await _persistHistory();
     _updateWeeklyWidget();
 
     // Save to Vault (Daily Note)
-    if (state.remainingSeconds == 0 || (forceSave && elapsedSeconds > 60)) {
+    if (state.remainingSeconds == 0 || state.currentType == PomodoroType.stopwatch || (forceSave && elapsedSeconds > 60)) {
       await _saveToDailyNote(session);
       await _updateLinkedObjectMetrics(session);
     }

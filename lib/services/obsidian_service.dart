@@ -18,11 +18,28 @@ class ObsidianService {
   DateTime? _allMarkdownFilesCacheTimestamp;
   final Map<String, MapEntry<List<File>, DateTime>> _folderCache = {};
   static const _cacheValidDuration = Duration(minutes: 5);
+  
+  // Cache incremental: armazena timestamps de modificação para carregar apenas arquivos alterados
+  final Map<String, DateTime> _fileModificationCache = {};
+  DateTime? _lastFullScanTime;
 
   void invalidateFileCache() {
     _allMarkdownFilesCache = null;
     _allMarkdownFilesCacheTimestamp = null;
     _folderCache.clear();
+    _fileModificationCache.clear();
+    _lastFullScanTime = null;
+  }
+  
+  /// Invalida cache apenas para arquivos específicos (mais eficiente que invalidação total)
+  void invalidateFileCacheForPath(String relativePath) {
+    _fileModificationCache.remove(relativePath);
+    // Se muitos arquivos foram invalidados, limpar cache completamente
+    if (_fileModificationCache.length > 1000) {
+      _allMarkdownFilesCache = null;
+      _allMarkdownFilesCacheTimestamp = null;
+      _fileModificationCache.clear();
+    }
   }
 
   String get vaultPath => vaultDir?.path ?? '';
@@ -72,6 +89,7 @@ class ObsidianService {
       'organizers/day_themes',
       'organizers/time_blocks',
       'organizers/values',
+      'organizers/routines',
       'pillars',
       'actions',
       '_attachments',
@@ -142,7 +160,8 @@ class ObsidianService {
       await file.parent.create(recursive: true);
     }
     await file.writeAsString(content, encoding: utf8);
-    invalidateFileCache();
+    // Otimização: invalidar apenas o arquivo específico em vez de todo o cache
+    invalidateFileCacheForPath(relativePath);
   }
 
   Future<void> syncCollectionToBase(Note note) async {
@@ -451,7 +470,8 @@ class ObsidianService {
     if (await file.exists()) {
       await file.delete();
     }
-    invalidateFileCache();
+    // Otimização: invalidar apenas o arquivo específico
+    invalidateFileCacheForPath(relativePath);
   }
 
   Future<void> moveFile(String fromRelativePath, String toRelativePath) async {
@@ -467,7 +487,9 @@ class ObsidianService {
       await target.delete();
     }
     await source.rename(target.path);
-    invalidateFileCache();
+    // Otimização: invalidar apenas os arquivos específicos
+    invalidateFileCacheForPath(fromRelativePath);
+    invalidateFileCacheForPath(toRelativePath);
   }
 
   // Phase 1.2 additions
@@ -485,24 +507,50 @@ class ObsidianService {
       return _allMarkdownFilesCache!;
     }
     if (vaultDir == null) return [];
+    
+    // Otimização: usar listSync para scan mais rápido em vez de await for
     final files = <File>[];
-    await for (final entity in vaultDir!.list(
-      recursive: true,
-      followLinks: false,
-    )) {
-      if (entity is File && entity.path.endsWith('.md')) {
-        final path = entity.path.replaceAll('\\', '/');
-        if (path.contains('/_attachments/') ||
-            path.contains('/_deleted/') ||
-            path.contains('/_conflicts/') ||
-            path.contains('/_backups/')) {
-          continue;
+    try {
+      final entities = vaultDir!.listSync(
+        recursive: true,
+        followLinks: false,
+      );
+      
+      for (final entity in entities) {
+        if (entity is File && entity.path.endsWith('.md')) {
+          final path = entity.path.replaceAll('\\', '/');
+          if (path.contains('/_attachments/') ||
+              path.contains('/_deleted/') ||
+              path.contains('/_conflicts/') ||
+              path.contains('/_backups/')) {
+            continue;
+          }
+          files.add(entity);
         }
-        files.add(entity);
+      }
+    } catch (e) {
+      debugPrint('Error scanning vault directory: $e');
+      // Fallback para método async se sync falhar
+      await for (final entity in vaultDir!.list(
+        recursive: true,
+        followLinks: false,
+      )) {
+        if (entity is File && entity.path.endsWith('.md')) {
+          final path = entity.path.replaceAll('\\', '/');
+          if (path.contains('/_attachments/') ||
+              path.contains('/_deleted/') ||
+              path.contains('/_conflicts/') ||
+              path.contains('/_backups/')) {
+            continue;
+          }
+          files.add(entity);
+        }
       }
     }
+    
     _allMarkdownFilesCache = files;
     _allMarkdownFilesCacheTimestamp = now;
+    _lastFullScanTime = now;
     return files;
   }
 
