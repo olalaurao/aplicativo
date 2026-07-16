@@ -23,6 +23,7 @@ import '../../models/tracker_model.dart';
 import '../../models/snapshot_model.dart';
 import '../../models/organizer_model.dart';
 import '../../models/routine_model.dart';
+import '../../models/pillar_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/kpi_model.dart';
 import '../../providers/pomodoro_provider.dart';

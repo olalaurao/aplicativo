@@ -180,6 +180,12 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
         trackers,
       ),
       _OrganizerSection(
+        'Pillars',
+        ObjectIcons.iconDataForTypeWithSignatures('pillar', typeSignatures) ?? Icons.account_balance,
+        AppColors.habitPurple,
+        pillars,
+      ),
+      _OrganizerSection(
         'Activities',
         ObjectIcons.iconDataForTypeWithSignatures('activity', typeSignatures) ?? Icons.sports_outlined,
         AppColors.habitGreen,
@@ -322,7 +328,8 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
     if (organizers.isEmpty &&
         goals.isEmpty &&
         habits.isEmpty &&
-        trackers.isEmpty) {
+        trackers.isEmpty &&
+        pillars.isEmpty) {
       widgets.add(
         SliverFillRemaining(
           hasScrollBody: false,
@@ -455,6 +462,7 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
     if (item is Goal) itemColorStr = item.color;
     if (item is Habit) itemColorStr = item.color;
     if (item is TrackerDefinition) itemColorStr = item.color;
+    if (item is Pillar) itemColorStr = item.color;
 
     return ObjectActionWrapper(
       object: item,

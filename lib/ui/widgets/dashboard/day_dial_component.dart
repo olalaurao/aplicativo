@@ -220,8 +220,17 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
       children: legendEntries.take(6).map((entry) => Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: entry.color, shape: BoxShape.circle)),
-          const SizedBox(width: 4),
+          if (entry.icon != null) ...[
+            Icon(
+              entry.icon,
+              size: 12,
+              color: entry.color,
+            ),
+            const SizedBox(width: 4),
+          ] else ...[
+            Container(width: 8, height: 8, decoration: BoxDecoration(color: entry.color, shape: BoxShape.circle)),
+            const SizedBox(width: 4),
+          ],
           Text(
             '${entry.categoryLabel} ${entry.totalHours.toStringAsFixed(1)}h',
             style: Theme.of(context).textTheme.bodySmall,
@@ -302,11 +311,21 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(
-                    emoji,
-                    size: 14,
-                    color: segColor,
-                  ),
+                  if (emoji != null)
+                    Icon(
+                      emoji,
+                      size: 14,
+                      color: segColor,
+                    )
+                  else
+                    Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: segColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                   const SizedBox(width: 8),
                   Container(
                     width: 8,
@@ -399,24 +418,45 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
 
   IconData _getIconForSegment(DialSegment segment, Map<String, TypeSignature> typeSignatures) {
     // Fallback icons based on segment kind using ObjectIcons
+    IconData? icon;
     switch (segment.kind) {
       case DialSegmentKind.taskPlanned:
-        return ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.task, typeSignatures) ?? Icons.check_circle_outline;
+        icon = ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.task, typeSignatures);
+        break;
       case DialSegmentKind.habitSlot:
-        return ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.habit, typeSignatures) ?? Icons.refresh;
+        icon = ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.habit, typeSignatures);
+        break;
       case DialSegmentKind.event:
-        return ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.event, typeSignatures) ?? Icons.calendar_today;
+        icon = ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.event, typeSignatures);
+        break;
       case DialSegmentKind.pomodoroPlanned:
       case DialSegmentKind.pomodoroCompleted:
-        return Icons.timer;
+        icon = Icons.timer;
+        break;
       case DialSegmentKind.timeBlock:
-        return ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.timeBlock, typeSignatures) ?? Icons.access_time;
+        icon = ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.timeBlock, typeSignatures);
+        break;
       case DialSegmentKind.reminder:
-        return ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.reminder, typeSignatures) ?? Icons.notifications;
+        icon = ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.reminder, typeSignatures);
+        break;
       case DialSegmentKind.dayTheme:
-        return ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.dayTheme, typeSignatures) ?? Icons.wb_sunny;
+        icon = ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.dayTheme, typeSignatures);
+        break;
       case DialSegmentKind.sleep:
-        return Icons.bedtime;
+        icon = Icons.bedtime;
+        break;
     }
+    
+    // Fallback to default icons if null
+    return icon ?? switch (segment.kind) {
+      DialSegmentKind.taskPlanned => Icons.check_circle_outline,
+      DialSegmentKind.habitSlot => Icons.refresh,
+      DialSegmentKind.event => Icons.calendar_today,
+      DialSegmentKind.pomodoroPlanned || DialSegmentKind.pomodoroCompleted => Icons.timer,
+      DialSegmentKind.timeBlock => Icons.access_time,
+      DialSegmentKind.reminder => Icons.notifications,
+      DialSegmentKind.dayTheme => Icons.wb_sunny,
+      DialSegmentKind.sleep => Icons.bedtime,
+    };
   }
 }

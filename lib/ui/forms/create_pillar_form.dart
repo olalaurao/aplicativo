@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../models/pillar_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/action_menu_item_model.dart';
+import '../../models/content_object.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import '../widgets/wiki_link_controller.dart';
@@ -37,6 +38,7 @@ class _CreatePillarFormState extends ConsumerState<CreatePillarForm> {
   String? _selectedIcon;
   List<OrganizerReference> _organizers = [];
   List<ActionMenuItem> _linkedActions = [];
+  late final List<String> _originalLinkedActionIds;
 
   static const _colorSwatches = [
     '#DC2626',
@@ -73,6 +75,9 @@ class _CreatePillarFormState extends ConsumerState<CreatePillarForm> {
           org.type == 'pillar' && org.slug == widget.existingPillar!.slug
         )
       ).toList();
+      _originalLinkedActionIds = _linkedActions.map((a) => a.id).toList();
+    } else {
+      _originalLinkedActionIds = [];
     }
   }
 
@@ -83,15 +88,8 @@ class _CreatePillarFormState extends ConsumerState<CreatePillarForm> {
     super.dispose();
   }
 
-  Future<void> _save() async {
-    if (_titleController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Title is required')),
-      );
-      return;
-    }
-
-    final pillar = Pillar(
+  Pillar _buildDraftPillar() {
+    return Pillar(
       id: widget.existingPillar?.id,
       title: _titleController.text.trim(),
       why: _whyController.text.trim().isEmpty ? null : _whyController.text.trim(),
@@ -103,6 +101,17 @@ class _CreatePillarFormState extends ConsumerState<CreatePillarForm> {
       updatedAt: DateTime.now(),
       obsidianPath: widget.existingPillar?.obsidianPath ?? '',
     );
+  }
+
+  Future<void> _save() async {
+    if (_titleController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Title is required')),
+      );
+      return;
+    }
+
+    final pillar = _buildDraftPillar();
 
     try {
       if (widget.existingPillar != null) {
@@ -110,6 +119,9 @@ class _CreatePillarFormState extends ConsumerState<CreatePillarForm> {
       } else {
         await ref.read(pillarsProvider.notifier).addPillar(pillar);
       }
+
+      await _syncActionMenuLinks(pillar);
+
       if (mounted) context.pop();
     } catch (e) {
       if (mounted) {
@@ -139,32 +151,34 @@ class _CreatePillarFormState extends ConsumerState<CreatePillarForm> {
           children: [
             FormSectionCard(
               title: 'Basic Info',
-              children: [
-                _buildTitleField(),
-                const SizedBox(height: 16),
-                _buildWhyField(),
-              ],
+              child: Column(
+                children: [
+                  _buildTitleField(),
+                  const SizedBox(height: 16),
+                  _buildWhyField(),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             FormSectionCard(
               title: 'Appearance',
-              children: [
-                _buildColorPicker(),
-                const SizedBox(height: 16),
-                _buildIconPicker(),
-              ],
+              child: Column(
+                children: [
+                  _buildColorPicker(),
+                  const SizedBox(height: 16),
+                  _buildIconPicker(),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             _buildActionMenuSection(),
             const SizedBox(height: 16),
             FormSectionCard(
               title: 'Organizers',
-              children: [
-                OrganizerSelectorField(
-                  selectedOrganizers: _organizers,
-                  onChanged: (value) => setState(() => _organizers = value),
-                ),
-              ],
+              child: OrganizerSelectorField(
+                selectedOrganizers: _organizers,
+                onChanged: (value) => setState(() => _organizers = value),
+              ),
             ),
           ],
         ),
@@ -214,7 +228,7 @@ class _CreatePillarFormState extends ConsumerState<CreatePillarForm> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: Colors.grey.shade300),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -309,7 +323,7 @@ class _CreatePillarFormState extends ConsumerState<CreatePillarForm> {
         const SizedBox(height: 12),
         _buildEnergyLevelGroup(EnergyLevel.low, 'Low Energy'),
         const SizedBox(height: 8),
-        _buildEnergyLevelGroup(EnergyLevel.medium, 'Medium Energy'),
+        _buildEnergyLevelGroup(EnergyLevel.mid, 'Medium Energy'),
         const SizedBox(height: 8),
         _buildEnergyLevelGroup(EnergyLevel.high, 'High Energy'),
       ],
@@ -332,7 +346,7 @@ class _CreatePillarFormState extends ConsumerState<CreatePillarForm> {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: Colors.grey.shade300),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
@@ -365,8 +379,6 @@ class _CreatePillarFormState extends ConsumerState<CreatePillarForm> {
   }
 
   Future<void> _showActionPicker(EnergyLevel level) async {
-    final pillarSlug = _titleController.text.trim().toLowerCase().replaceAll(' ', '-');
-    
     final selected = await showModalBottomSheet<ContentObject>(
       context: context,
       isScrollControlled: true,
@@ -379,21 +391,57 @@ class _CreatePillarFormState extends ConsumerState<CreatePillarForm> {
     );
 
     if (selected != null && selected is ActionMenuItem) {
-      // Link the action to this pillar
-      final updatedAction = selected.copyWith(
-        organizers: [
-          ...selected.organizers,
-          OrganizerReference(type: 'pillar', slug: pillarSlug, title: _titleController.text.trim()),
-        ],
-      );
-      
-      await ref.read(actionMenuItemsProvider.notifier).updateActionMenuItem(updatedAction);
-      
       setState(() {
-        if (!_linkedActions.any((a) => a.id == updatedAction.id)) {
-          _linkedActions.add(updatedAction);
+        if (!_linkedActions.any((a) => a.id == selected.id)) {
+          _linkedActions.add(selected);
         }
       });
+    }
+  }
+
+  Future<void> _syncActionMenuLinks(Pillar savedPillar) async {
+    final notifier = ref.read(actionMenuItemsProvider.notifier);
+    final allActions = ref.read(actionMenuItemsProvider);
+    final currentIds = _linkedActions.map((a) => a.id).toSet();
+    final originalIds = _originalLinkedActionIds.toSet();
+
+    final ref_ = OrganizerReference(
+      type: 'pillar',
+      slug: savedPillar.slug,
+      title: savedPillar.title,
+    );
+
+    // Add or update links for actions currently in the list
+    for (final action in _linkedActions) {
+      final hasCorrectRef = action.organizers.any(
+        (o) => o.type == 'pillar' && o.slug == savedPillar.slug,
+      );
+      if (!hasCorrectRef) {
+        // Remove any old pillar references for this action (only if it was originally linked)
+        final cleaned = action.organizers
+            .where((o) => !(o.type == 'pillar' && o.slug != savedPillar.slug && originalIds.contains(action.id)))
+            .toList();
+        await notifier.updateActionMenuItem(
+          action.copyWith(organizers: [...cleaned, ref_]),
+        );
+      }
+    }
+
+    // Remove links for actions that were removed from the list
+    final removedIds = originalIds.difference(currentIds);
+    for (final id in removedIds) {
+      final action = allActions.cast<ActionMenuItem?>().firstWhere(
+        (a) => a?.id == id,
+        orElse: () => null,
+      );
+      if (action == null) continue;
+      await notifier.updateActionMenuItem(
+        action.copyWith(
+          organizers: action.organizers
+              .where((o) => !(o.type == 'pillar' && o.slug == savedPillar.slug))
+              .toList(),
+        ),
+      );
     }
   }
 }

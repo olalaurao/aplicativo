@@ -29,6 +29,12 @@ subprojects {
             kotlinOptions.jvmTarget = "1.8"
         }
     }
+
+    if (name == "home_widget") {
+        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+            kotlinOptions.jvmTarget = "11"
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {

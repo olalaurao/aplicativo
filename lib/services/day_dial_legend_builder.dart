@@ -7,12 +7,14 @@ class DialLegendEntry {
   final Color color;
   final double totalHours;
   final int itemCount;
+  final IconData? icon;
 
   const DialLegendEntry({
     required this.categoryLabel,
     required this.color,
     required this.totalHours,
     required this.itemCount,
+    this.icon,
   });
 }
 
@@ -38,6 +40,7 @@ List<DialLegendEntry> buildDialLegend(List<DialSegment> segments) {
       color: _parseColor(e.value.first.colorHex),
       totalHours: totalMinutes / 60.0,
       itemCount: e.value.length,
+      icon: _iconForKind(e.value.first.kind),
     );
   }).toList()
     ..sort((a, b) => b.totalHours.compareTo(a.totalHours));   // biggest chunks of the day first
@@ -69,4 +72,17 @@ Color _parseColor(String colorString) {
     return Color(int.parse(colorString.replaceFirst('#', '0xFF')));
   }
   return Colors.grey;
+}
+
+IconData _iconForKind(DialSegmentKind kind) {
+  return switch (kind) {
+    DialSegmentKind.event => Icons.calendar_today,
+    DialSegmentKind.timeBlock => Icons.access_time,
+    DialSegmentKind.taskPlanned => Icons.check_circle_outline,
+    DialSegmentKind.pomodoroPlanned || DialSegmentKind.pomodoroCompleted => Icons.timer,
+    DialSegmentKind.dayTheme => Icons.wb_sunny,
+    DialSegmentKind.sleep => Icons.bedtime,
+    DialSegmentKind.habitSlot => Icons.refresh,
+    DialSegmentKind.reminder => Icons.notifications,
+  };
 }

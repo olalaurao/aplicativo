@@ -28,6 +28,7 @@ import '../widgets/day_dial_widget.dart';
 import '../utils/object_icons.dart';
 
 import '../../services/day_dial_aggregator.dart';
+import '../../services/day_dial_legend_builder.dart';
 import '../../services/scheduler_service.dart';
 import '../../providers/google_calendar_provider.dart';
 import 'package:googleapis/calendar/v3.dart' as google_calendar;
@@ -2337,6 +2338,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     ).toList();
     
     final moodDefinitions = ref.watch(moodsProvider);
+    final settings = ref.watch(settingsProvider);
+    final typeSignatures = settings.typeSignatures;
     
     // Get day theme for selected date
     const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -2358,13 +2361,22 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       timeBlocks: timeBlocks,
       journalEntries: journalEntries,
       moodCatalog: moodDefinitions,
+      typeSignatures: typeSignatures,
     );
+
+    final showLegendSetting = settings.showDayDialLegend;
 
     return SliverPadding(
       padding: const EdgeInsets.all(20),
       sliver: SliverToBoxAdapter(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (snapshot.nextUpcoming != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+                child: _buildNextUpcoming(snapshot.nextUpcoming!, DateTime.now()),
+              ),
             if (activeTheme != null)
               GestureDetector(
                 onTap: () => _showDayThemePopup(activeTheme),
@@ -2374,32 +2386,217 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 ),
               ),
             if (activeTheme != null) const SizedBox(height: 8),
-            DayDialWidget(
-              snapshot: snapshot,
-              selectedDate: _selectedDate,
-              onHourTap: (hour) {
-                setState(() {
-                  _viewMode = 0;
-                  _isTimeline = true;
-                });
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  const hourHeight = 80.0;
-                  const sliverHeaderEstimate = 190.0;
-                  final viewport = MediaQuery.of(context).size.height;
-                  final targetOffset = sliverHeaderEstimate +
-                      (hour * hourHeight) -
-                      (viewport / 3);
-                  if (_scrollController.hasClients) {
-                    _scrollController.animateTo(
-                      targetOffset,
-                      duration: const Duration(milliseconds: 500),
-                      curve: Curves.easeInOut,
+            SizedBox(
+              height: 280,
+              child: DayDialWidget(
+                snapshot: snapshot,
+                selectedDate: _selectedDate,
+                onHourTap: (hour) {
+                  setState(() {
+                    _viewMode = 0;
+                    _isTimeline = true;
+                  });
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    const hourHeight = 80.0;
+                    const sliverHeaderEstimate = 190.0;
+                    final viewport = MediaQuery.of(context).size.height;
+                    final targetOffset = sliverHeaderEstimate +
+                        (hour * hourHeight) -
+                        (viewport / 3);
+                    if (_scrollController.hasClients) {
+                      _scrollController.animateTo(
+                        targetOffset,
+                        duration: const Duration(milliseconds: 500),
+                        curve: Curves.easeInOut,
+                      );
+                    }
+                  });
+                },
+                onSegmentTap: (segment) {
+                  if (segment.sourceSlug == null) return;
+                  final objIndex = allObjects.indexWhere((o) => o.id == segment.sourceSlug || o.slug == segment.sourceSlug);
+                  if (objIndex != -1) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => UniversalDetailView(object: allObjects[objIndex])),
                     );
                   }
-                });
-              },
-              onSegmentTap: (segment) {
-                if (segment.sourceSlug == null) return;
+                },
+                onSegmentMove: (segment, newStart) => _persistMove(segment, newStart),
+                onSegmentResize: (segment, newEnd) => _persistResize(segment, newEnd),
+              ),
+            ),
+            if (showLegendSetting)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 12, 0, 24),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Schedule',
+                          style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            showLegendSetting ? Icons.visibility : Icons.visibility_off,
+                            size: 18,
+                            color: AppColors.textMuted,
+                          ),
+                          onPressed: () {
+                            ref.read(settingsProvider.notifier).updateDayDialLegend(!showLegendSetting);
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _buildDialLegend(snapshot.segments),
+                    const SizedBox(height: 12),
+                    _buildDialChronologicalList(snapshot.segments, allObjects, typeSignatures),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNextUpcoming(DialSegment next, DateTime now) {
+    final diff = next.start.difference(now);
+    String timeText;
+    if (diff.isNegative) {
+      timeText = 'Now — ${next.title}';
+    } else if (diff.inMinutes < 60) {
+      timeText = 'in ${diff.inMinutes}m — ${next.title}';
+    } else {
+      final h = diff.inHours;
+      final m = diff.inMinutes % 60;
+      timeText = 'in ${h}h ${m}m — ${next.title}';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.accentColor(context).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.access_time,
+            size: 14,
+            color: AppTheme.accentColor(context),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              timeText,
+              style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppTheme.accentColor(context),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDialLegend(List<DialSegment> segments) {
+    final legendEntries = buildDialLegend(segments);
+    
+    if (legendEntries.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    return Wrap(
+      spacing: 12,
+      runSpacing: 6,
+      children: legendEntries.take(6).map((entry) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (entry.icon != null) ...[
+            Icon(
+              entry.icon,
+              size: 12,
+              color: entry.color,
+            ),
+            const SizedBox(width: 4),
+          ] else ...[
+            Container(width: 8, height: 8, decoration: BoxDecoration(color: entry.color, shape: BoxShape.circle)),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            '${entry.categoryLabel} ${entry.totalHours.toStringAsFixed(1)}h',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      )).toList(),
+    );
+  }
+
+  Widget _buildDialChronologicalList(List<DialSegment> segments, List<dynamic> allObjects, Map<String, TypeSignature> typeSignatures) {
+    if (segments.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    // Sort by start time
+    final sortedSegments = List<DialSegment>.from(segments)..sort((a, b) => a.start.compareTo(b.start));
+    
+    return SizedBox(
+      height: 200,
+      child: ListView.builder(
+        itemCount: sortedSegments.length,
+        itemBuilder: (context, index) {
+          final segment = sortedSegments[index];
+          final timeStr = DateFormat('HH:mm').format(segment.start);
+          final emoji = _getIconForSegment(segment, typeSignatures);
+          final segColor = Color(int.parse(segment.colorHex.replaceAll('#', '0xFF')));
+          
+          // Check if segment is completable (task or habit)
+          final isCompletable = segment.kind == DialSegmentKind.taskPlanned || 
+                                segment.kind == DialSegmentKind.habitSlot;
+          
+          // Check if segment is playable (task)
+          final isPlayable = segment.kind == DialSegmentKind.taskPlanned;
+          
+          // Find completion status
+          bool isCompleted = false;
+          if (segment.kind == DialSegmentKind.taskPlanned && segment.sourceSlug != null) {
+            final task = allObjects.whereType<Task>().firstWhere(
+              (t) => t.slug == segment.sourceSlug,
+              orElse: () => allObjects.whereType<Task>().firstWhere(
+                (t) => t.id == segment.sourceSlug,
+                orElse: () => Task(id: '', title: '', stage: TaskStage.todo),
+              ),
+            );
+            isCompleted = task.stage == TaskStage.finalized;
+          } else if (segment.kind == DialSegmentKind.habitSlot && segment.sourceSlug != null) {
+            final habit = allObjects.whereType<Habit>().firstWhere(
+              (h) => h.slug == segment.sourceSlug,
+              orElse: () => allObjects.whereType<Habit>().firstWhere(
+                (h) => h.id == segment.sourceSlug,
+                orElse: () => Habit(id: '', title: '', color: '', slots: []),
+              ),
+            );
+            final today = DateTime.now();
+            isCompleted = habit.completionHistory.any((c) => 
+              c.date.year == today.year && c.date.month == today.month && c.date.day == today.day);
+          }
+          
+          return InkWell(
+            onTap: () {
+              if (segment.sourceSlug != null) {
                 final objIndex = allObjects.indexWhere((o) => o.id == segment.sourceSlug || o.slug == segment.sourceSlug);
                 if (objIndex != -1) {
                   Navigator.push(
@@ -2407,23 +2604,160 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                     MaterialPageRoute(builder: (_) => UniversalDetailView(object: allObjects[objIndex])),
                   );
                 }
-              },
-              onSegmentMove: (segment, newStart) => _persistMove(segment, newStart),
-              onSegmentResize: (segment, newEnd) => _persistResize(segment, newEnd),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Tap on an hour to navigate to that time in the timeline view',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppTheme.textMutedColor(context),
-                fontSize: 12,
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 50,
+                    child: Text(
+                      timeStr,
+                      style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    emoji,
+                    size: 14,
+                    color: segColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: segColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      segment.title,
+                      style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: isCompleted ? AppColors.textMuted : AppColors.textPrimary,
+                        decoration: isCompleted ? TextDecoration.lineThrough : null,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (isPlayable)
+                    IconButton(
+                      icon: const Icon(Icons.play_arrow_rounded, color: AppColors.accent, size: 18),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      onPressed: () {
+                        ref.read(pomodoroProvider.notifier).setCurrentItem(segment.sourceSlug, segment.title);
+                        ref.read(pomodoroProvider.notifier).start();
+                      },
+                      tooltip: 'Start Pomodoro',
+                    ),
+                  if (isCompletable)
+                    Checkbox(
+                      value: isCompleted,
+                      onChanged: (checked) {
+                        if (checked == null) return;
+                        HapticFeedback.lightImpact();
+                        
+                        if (segment.kind == DialSegmentKind.taskPlanned && segment.sourceSlug != null) {
+                          final task = allObjects.whereType<Task>().firstWhere(
+                            (t) => t.slug == segment.sourceSlug,
+                            orElse: () => allObjects.whereType<Task>().firstWhere(
+                              (t) => t.id == segment.sourceSlug,
+                              orElse: () => Task(id: '', title: '', stage: TaskStage.todo),
+                            ),
+                          );
+                          ref.read(vaultProvider.notifier).updateObject(
+                            task.copyWith(stage: checked ? TaskStage.finalized : TaskStage.todo),
+                          );
+                        } else if (segment.kind == DialSegmentKind.habitSlot && segment.sourceSlug != null) {
+                          final habit = allObjects.whereType<Habit>().firstWhere(
+                            (h) => h.slug == segment.sourceSlug,
+                            orElse: () => allObjects.whereType<Habit>().firstWhere(
+                              (h) => h.id == segment.sourceSlug,
+                              orElse: () => Habit(id: '', title: '', color: '', slots: []),
+                            ),
+                          );
+                          final today = DateTime.now();
+                          final history = List<CompletionRecord>.from(habit.completionHistory);
+                          if (checked) {
+                            history.add(CompletionRecord(
+                              date: today,
+                              completions: 1,
+                              successful: true,
+                              completedAt: DateTime.now(),
+                            ));
+                          } else {
+                            history.removeWhere((c) => 
+                              c.date.year == today.year && c.date.month == today.month && c.date.day == today.day);
+                          }
+                          ref.read(vaultProvider.notifier).updateObject(
+                            habit.copyWith(completionHistory: history),
+                          );
+                        }
+                      },
+                      activeColor: AppColors.success,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                ],
               ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
+  }
+
+  IconData _getIconForSegment(DialSegment segment, Map<String, TypeSignature> typeSignatures) {
+    // Fallback icons based on segment kind using ObjectIcons
+    IconData? icon;
+    switch (segment.kind) {
+      case DialSegmentKind.taskPlanned:
+        icon = ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.task, typeSignatures);
+        break;
+      case DialSegmentKind.habitSlot:
+        icon = ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.habit, typeSignatures);
+        break;
+      case DialSegmentKind.event:
+        icon = ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.event, typeSignatures);
+        break;
+      case DialSegmentKind.pomodoroPlanned:
+      case DialSegmentKind.pomodoroCompleted:
+        icon = Icons.timer;
+        break;
+      case DialSegmentKind.timeBlock:
+        icon = ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.timeBlock, typeSignatures);
+        break;
+      case DialSegmentKind.reminder:
+        icon = ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.reminder, typeSignatures);
+        break;
+      case DialSegmentKind.dayTheme:
+        icon = ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.dayTheme, typeSignatures);
+        break;
+      case DialSegmentKind.sleep:
+        icon = Icons.bedtime;
+        break;
+    }
+    
+    // Fallback to default icons if null
+    return icon ?? switch (segment.kind) {
+      DialSegmentKind.taskPlanned => Icons.check_circle_outline,
+      DialSegmentKind.habitSlot => Icons.refresh,
+      DialSegmentKind.event => Icons.calendar_today,
+      DialSegmentKind.pomodoroPlanned || DialSegmentKind.pomodoroCompleted => Icons.timer,
+      DialSegmentKind.timeBlock => Icons.access_time,
+      DialSegmentKind.reminder => Icons.notifications,
+      DialSegmentKind.dayTheme => Icons.wb_sunny,
+      DialSegmentKind.sleep => Icons.bedtime,
+    };
   }
 
   void _persistMove(DialSegment segment, DateTime newStart) {

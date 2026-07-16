@@ -5,12 +5,12 @@ import 'package:flutter/services.dart';
 import '../../../models/pillar_model.dart';
 import '../../../models/action_menu_item_model.dart';
 import '../../../models/content_object.dart';
-import '../../providers/vault_provider.dart';
-import '../../providers/settings_provider.dart';
+import '../../../providers/vault_provider.dart';
+import '../../../providers/settings_provider.dart';
 import '../../widgets/property_grid.dart';
 import '../../widgets/object_timeline_feed.dart';
 import '../../utils/object_icons.dart';
-import '../../services/timeline_aggregator_service.dart';
+import '../../../services/timeline_aggregator_service.dart';
 
 /// Pillar-specific property cards for universal detail view
 List<PropertyCard> buildPillarPropertyCards(Pillar pillar) {
@@ -94,10 +94,10 @@ Widget buildPillarActionButtons(BuildContext context, WidgetRef ref, Pillar pill
           const SizedBox(width: 8),
           Expanded(
             child: _EnergyButton(
-              level: EnergyLevel.medium,
+              level: EnergyLevel.mid,
               label: 'Medium',
               color: Colors.orange,
-              onPressed: () => _registerTouch(context, ref, pillar, EnergyLevel.medium),
+              onPressed: () => _registerTouch(context, ref, pillar, EnergyLevel.mid),
             ),
           ),
           const SizedBox(width: 8),
@@ -149,7 +149,7 @@ class _EnergyButton extends StatelessWidget {
   }
 }
 
-Future<void> _registerTouch(
+  Future<void> _registerTouch(
   BuildContext context,
   WidgetRef ref,
   Pillar pillar,

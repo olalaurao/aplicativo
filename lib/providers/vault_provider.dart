@@ -2353,6 +2353,7 @@ class VaultNotifier extends Notifier<void> {
     if (object is MoodDefinition) return 'mood_definition';
     if (object is CombinedAnalysis) return 'combined_analysis';
     if (object is WellbeingIndicator) return 'wellbeing_indicator';
+    if (object is Pillar) return 'pillar';
     // TimeBlock and DayTheme are now Organizer.
     if (object is TemplateDefinition) return 'template';
     if (object is Organizer) {
