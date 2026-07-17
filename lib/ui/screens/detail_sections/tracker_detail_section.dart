@@ -11,7 +11,7 @@ List<PropertyCard> buildTrackerPropertyCards(TrackerDefinition tracker) {
   cards.add(PropertyCard(
     icon: Icons.category,
     label: 'Tipo',
-    value: tracker.type.name.toUpperCase(),
+    value: tracker.isHealthTracker ? 'Health Tracker' : 'Tracker',
   ));
   cards.add(PropertyCard(
     icon: Icons.calendar_today,

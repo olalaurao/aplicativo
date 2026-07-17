@@ -92,6 +92,7 @@ class ObsidianService {
       'organizers/routines',
       'pillars',
       'actions',
+      'pomodoros',
       '_attachments',
       '_deleted',
       '_conflicts',
@@ -231,11 +232,25 @@ class ObsidianService {
         );
       }
 
-      await for (final entity in collectionDir.list(followLinks: false)) {
-        if (entity is! File || !entity.path.endsWith('.md')) continue;
-        final fileName = entity.path.replaceAll('\\', '/').split('/').last;
-        if (!itemFileNames.contains(fileName)) {
-          await entity.delete();
+      try {
+        // Use listSync for faster file deletion
+        final entities = collectionDir.listSync(followLinks: false);
+        for (final entity in entities) {
+          if (entity is! File || !entity.path.endsWith('.md')) continue;
+          final fileName = entity.path.replaceAll('\\', '/').split('/').last;
+          if (!itemFileNames.contains(fileName)) {
+            await entity.delete();
+          }
+        }
+      } catch (e) {
+        debugPrint('Error listing collection dir for cleanup: $e');
+        // Fallback to async
+        await for (final entity in collectionDir.list(followLinks: false)) {
+          if (entity is! File || !entity.path.endsWith('.md')) continue;
+          final fileName = entity.path.replaceAll('\\', '/').split('/').last;
+          if (!itemFileNames.contains(fileName)) {
+            await entity.delete();
+          }
         }
       }
 
@@ -393,16 +408,50 @@ class ObsidianService {
     if (!await dir.exists()) return [];
 
     final files = <File>[];
-    await for (final entity in dir.list(recursive: true, followLinks: false)) {
-      if (entity is File && entity.path.endsWith('.md')) {
-        final path = entity.path.replaceAll('\\', '/');
-        if (path.contains('/_attachments/') ||
-            path.contains('/_diagnostics/') ||
-            path.contains('/crash_reports/') ||
-            (!includeDeleted && path.contains('/_deleted/'))) {
-          continue;
+    try {
+      // Use listSync for faster directory scanning
+      final entities = dir.listSync(
+        recursive: true,
+        followLinks: false,
+      );
+      
+      for (final entity in entities) {
+        if (entity is File && entity.path.endsWith('.md')) {
+          final path = entity.path.replaceAll('\\', '/');
+          if (path.contains('/_attachments/') ||
+              path.contains('/_diagnostics/') ||
+              path.contains('/crash_reports/') ||
+              path.contains('/_cache/') ||
+              (!includeDeleted && path.contains('/_deleted/'))) {
+            continue;
+          }
+          // Filter out timestamped backup files (e.g., 2026-07-14_23-49-18_226_filename.md)
+          final fileName = path.split('/').last;
+          if (RegExp(r'^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_').hasMatch(fileName)) {
+            continue;
+          }
+          files.add(entity);
         }
-        files.add(entity);
+      }
+    } catch (e) {
+      debugPrint('Error scanning folder $folderName with listSync: $e');
+      // Fallback to async if sync fails
+      await for (final entity in dir.list(recursive: true, followLinks: false)) {
+        if (entity is File && entity.path.endsWith('.md')) {
+          final path = entity.path.replaceAll('\\', '/');
+          if (path.contains('/_attachments/') ||
+              path.contains('/_diagnostics/') ||
+              path.contains('/crash_reports/') ||
+              path.contains('/_cache/') ||
+              (!includeDeleted && path.contains('/_deleted/'))) {
+            continue;
+          }
+          final fileName = path.split('/').last;
+          if (RegExp(r'^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_').hasMatch(fileName)) {
+            continue;
+          }
+          files.add(entity);
+        }
       }
     }
     _folderCache[cacheKey] = MapEntry(files, now);
@@ -430,7 +479,8 @@ class ObsidianService {
           final path = event.path.replaceAll('\\', '/');
           if (path.contains('/_attachments/') ||
               path.contains('/_deleted/') ||
-              path.contains('/_backups/')) {
+              path.contains('/_backups/') ||
+              path.contains('/_cache/')) {
             return;
           }
           buffer.add(event);
@@ -522,7 +572,8 @@ class ObsidianService {
           if (path.contains('/_attachments/') ||
               path.contains('/_deleted/') ||
               path.contains('/_conflicts/') ||
-              path.contains('/_backups/')) {
+              path.contains('/_backups/') ||
+              path.contains('/_cache/')) {
             continue;
           }
           files.add(entity);
@@ -540,7 +591,8 @@ class ObsidianService {
           if (path.contains('/_attachments/') ||
               path.contains('/_deleted/') ||
               path.contains('/_conflicts/') ||
-              path.contains('/_backups/')) {
+              path.contains('/_backups/') ||
+              path.contains('/_cache/')) {
             continue;
           }
           files.add(entity);
@@ -648,5 +700,26 @@ class ObsidianService {
     }
 
     await prefs.setBool(migrationKey, true);
+  }
+
+  Future<List<File>> searchRawMarkdownFiles(Set<String> searchKeys) async {
+    final files = await getAllMarkdownFiles();
+    final results = <File>[];
+    for (final file in files) {
+      try {
+        final content = await file.readAsString(encoding: utf8);
+        final lowerContent = content.toLowerCase();
+        if (searchKeys.any((key) =>
+            lowerContent.contains('[[$key]]') ||
+            lowerContent.contains('[[$key|') ||
+            lowerContent.contains('[[moods/$key]]') ||
+            lowerContent.contains('[[moods/$key|'))) {
+          results.add(file);
+        }
+      } catch (e) {
+        debugPrint('Error reading file for search ${file.path}: $e');
+      }
+    }
+    return results;
   }
 }

@@ -252,11 +252,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                                   right: 8,
                                 ),
                                 child: Text(
-                                  widget.gridGranularity == 60 
-                                      ? '${index.toString().padLeft(2, '0')}:00'
-                                      : widget.gridGranularity == 30
-                                          ? '${index.toString().padLeft(2, '0')}:00'
-                                          : '${index.toString().padLeft(2, '0')}:00',
+                                  '${index.toString().padLeft(2, '0')}:00',
                                   textAlign: TextAlign.right,
                                   style: TextStyle(
                                     fontSize: 11,
@@ -963,6 +959,24 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          if (!isTiny)
+                            IconButton(
+                              icon: const Icon(
+                                Icons.play_arrow_rounded,
+                                color: AppColors.accent,
+                              ),
+                              iconSize: isShort ? 20 : 24,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              onPressed: () {
+                                ref.read(pomodoroProvider.notifier).setCurrentItem(
+                                  task.id,
+                                  task.title,
+                                );
+                                ref.read(pomodoroProvider.notifier).start();
+                                context.push('/pomodoro');
+                              },
+                            ),
                           if (!isShort &&
                               !isTiny &&
                               task.subtasks.isNotEmpty) ...[

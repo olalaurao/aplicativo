@@ -7,7 +7,9 @@ import '../../providers/vault_provider.dart';
 import '../../models/shared_types.dart';
 import '../theme.dart';
 import '../widgets/icon_picker.dart';
+import '../widgets/app_color_picker.dart';
 import '../utils/material_icon_set.dart';
+import '../utils/object_icons.dart';
 
 class TypeSignaturesScreen extends ConsumerWidget {
   const TypeSignaturesScreen({super.key});
@@ -60,6 +62,29 @@ class TypeSignaturesScreen extends ConsumerWidget {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Color swatch
+                  if (sig.colorHex != null && sig.colorHex!.isNotEmpty)
+                    Container(
+                      width: 14,
+                      height: 14,
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: AppColorPicker.parseHex(sig.colorHex!),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.textMuted.withValues(alpha: 0.4), width: 1),
+                      ),
+                    )
+                  else
+                    Container(
+                      width: 14,
+                      height: 14,
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: ObjectIcons.defaultColorForType(type),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.textMuted.withValues(alpha: 0.4), width: 1),
+                      ),
+                    ),
                   if (sig.iconName != null)
                     Icon(
                       MaterialIconSet.getIcon(sig.iconName!),
@@ -160,16 +185,19 @@ class TypeSignaturesScreen extends ConsumerWidget {
     final valueController = TextEditingController(text: sig.markerValue);
     String? selectedIconName = sig.iconName;
     MarkerType selectedMarker = sig.markerType;
+    String selectedColorHex = sig.colorHex ?? '';
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           title: Text('Edit ${_translateType(sig.objectType)}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              InkWell(
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ── Icon picker ──
+                InkWell(
                 onTap: () async {
                   final result = await showDialog<String>(
                     context: context,
@@ -205,6 +233,15 @@ class TypeSignaturesScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              // ── Color picker ──
+              AppColorPicker(
+                value: selectedColorHex.isEmpty
+                    ? AppColorPicker.normalizeHex('#9CA3AF')
+                    : selectedColorHex,
+                onChanged: (hex) => setState(() => selectedColorHex = hex),
+              ),
+              const SizedBox(height: 16),
+              // ── Marker type ──
               DropdownButtonFormField<MarkerType>(
                 initialValue: selectedMarker,
                 decoration: const InputDecoration(
@@ -236,6 +273,7 @@ class TypeSignaturesScreen extends ConsumerWidget {
               ),
             ],
           ),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -250,6 +288,7 @@ class TypeSignaturesScreen extends ConsumerWidget {
                   markerValue: newValue,
                   emoji: '',
                   iconName: selectedIconName,
+                  colorHex: selectedColorHex.isEmpty ? null : selectedColorHex,
                 );
                 if (selectedMarker == MarkerType.folder &&
                     newValue.isNotEmpty &&

@@ -20,18 +20,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allObjectsAsync = ref.watch(allObjectsProvider);
-    final tasks = allObjectsAsync.when(
-      data: (objects) {
-        final taskObjects = objects.whereType<Task>().toList();
-        if (_searchQuery.isEmpty) return taskObjects;
-        return taskObjects
-            .where((t) => t.title.toLowerCase().contains(_searchQuery.toLowerCase()))
-            .toList();
-      },
-      loading: () => [],
-      error: (_, __) => [],
-    );
+    final taskObjects = ref.watch(tasksListProvider);
+    final tasks = _searchQuery.isEmpty 
+        ? taskObjects 
+        : taskObjects.where((t) => t.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
 
     return Scaffold(
       appBar: AppBar(

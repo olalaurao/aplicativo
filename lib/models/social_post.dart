@@ -86,21 +86,12 @@ class SocialPost extends ContentObject {
           .replaceAll('.md', '');
     }
     final fallbackTitle = title.trim().isEmpty ? url : title;
-    final base = '${platform.name}-$fallbackTitle'
-        .toLowerCase()
-        .trim()
-        .replaceAll(RegExp(r'\s+'), '-')
-        .replaceAll(RegExp(r'[^a-z0-9-]'), '')
-        .replaceAll(RegExp(r'-+'), '-')
-        .replaceAll(RegExp(r'^-+|-+$'), '');
-    final readable = base.isEmpty ? '${platform.name}-post' : base;
-    final trimmed = readable.length > 48
-        ? readable.substring(0, 48).replaceAll(RegExp(r'-+$'), '')
-        : readable;
+    final base = '${platform.name}-$fallbackTitle';
+    final clean = ContentObject.sanitizeFileNameForObsidian(base, maxLength: 48).toLowerCase();
     final suffix = id.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
     final shortId = suffix.length > 8 ? suffix.substring(0, 8) : suffix;
-    if (shortId.isEmpty || trimmed.endsWith('-$shortId')) return trimmed;
-    return '$trimmed-$shortId';
+    if (shortId.isEmpty || clean.endsWith('-$shortId')) return clean;
+    return '$clean-$shortId';
   }
 
   String get legacySocialSlug {
@@ -124,10 +115,13 @@ class SocialPost extends ContentObject {
   @override
   String toMarkdown() {
     final frontmatter = toBaseMap();
+    frontmatter['title'] = ContentObject.sanitizeYamlText(title, maxLength: 80);
     frontmatter['url'] = url;
     frontmatter['platform'] = platform.name;
     frontmatter['media_type'] = mediaType.name;
-    if (_hasText(caption)) frontmatter['caption'] = caption;
+    if (_hasText(caption)) {
+      frontmatter['caption'] = ContentObject.sanitizeYamlText(caption!, maxLength: 200);
+    }
     if (_hasText(creator)) frontmatter['creator'] = creator;
     if (_hasText(authorHandle)) frontmatter['author_handle'] = authorHandle;
     if (_hasText(authorName)) frontmatter['author_name'] = authorName;

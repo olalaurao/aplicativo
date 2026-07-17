@@ -73,6 +73,7 @@ class Resource extends ContentObject {
   @override
   String toMarkdown() {
     final frontmatter = toBaseMap();
+    frontmatter['title'] = ContentObject.sanitizeYamlText(title, maxLength: 80);
     final aliasesForMarkdown = List<String>.from(aliases);
     final original = titleOriginal?.trim();
     if (original != null &&
@@ -88,15 +89,19 @@ class Resource extends ContentObject {
     frontmatter['status'] = status.name;
     frontmatter['rating'] = rating;
     frontmatter['priority'] = priority.name;
-    if (author != null) frontmatter['author'] = author;
+    if (author != null) frontmatter['author'] = ContentObject.sanitizeYamlText(author!, maxLength: 80);
     if (year != null) frontmatter['year'] = year;
     if (pages != null) frontmatter['pages'] = pages;
-    if (category != null) frontmatter['category'] = category;
+    if (category != null) frontmatter['category'] = ContentObject.sanitizeYamlText(category!, maxLength: 80);
     if (isbnOriginal != null) frontmatter['isbn'] = isbnOriginal;
-    if (titlePtBr != null) frontmatter['title_pt_br'] = titlePtBr;
-    if (titleOriginal != null) frontmatter['title_original'] = titleOriginal;
-    if (publisher != null) frontmatter['publisher'] = publisher;
-    if (language != null) frontmatter['language'] = language;
+    if (titlePtBr != null) {
+      frontmatter['title_pt_br'] = ContentObject.sanitizeYamlText(titlePtBr!, maxLength: 80);
+    }
+    if (titleOriginal != null) {
+      frontmatter['title_original'] = ContentObject.sanitizeYamlText(titleOriginal!, maxLength: 80);
+    }
+    if (publisher != null) frontmatter['publisher'] = ContentObject.sanitizeYamlText(publisher!, maxLength: 80);
+    if (language != null) frontmatter['language'] = ContentObject.sanitizeYamlText(language!, maxLength: 40);
     if (googleBooksId != null) frontmatter['google_books_id'] = googleBooksId;
     if (imdbId != null) frontmatter['imdb_id'] = imdbId;
     if (readDate != null) {

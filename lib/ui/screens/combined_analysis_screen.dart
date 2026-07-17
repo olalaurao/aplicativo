@@ -975,17 +975,16 @@ class _CombinedAnalysisScreenState
   double? _getPillarTouchValueForDate(String pillarId, DateTime date) {
     try {
       final pillars = ref.read(pillarsProvider);
-      final pillar = pillars.firstWhere(
-        (p) => p.id == pillarId,
-        orElse: () => pillars.first,
-      );
-      
+      final matches = pillars.where((p) => p.id == pillarId);
+      if (matches.isEmpty) return null;
+      final pillar = matches.first;
+
       final touches = pillar.touchLog.where(
         (t) => t.date.year == date.year &&
                t.date.month == date.month &&
                t.date.day == date.day,
       ).length;
-      
+
       return touches == 0 ? null : touches.toDouble();
     } catch (_) {
       return null;
@@ -1996,7 +1995,7 @@ class _AnalysisFormSheetState extends ConsumerState<_AnalysisFormSheet> {
       case MetricType.kpi:
         return 'KPI';
       case MetricType.pillarTouch:
-        return 'Pillar Touch';
+        return 'Toque no Pilar';
     }
   }
 

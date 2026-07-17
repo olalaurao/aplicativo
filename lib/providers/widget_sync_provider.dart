@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:googleapis/calendar/v3.dart' as calendar;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'overdue_provider.dart';
 import '../models/content_object.dart';
@@ -29,7 +30,6 @@ import '../models/shared_types.dart';
 import '../services/scheduler_service.dart';
 import '../services/widget_service.dart';
 import '../services/day_dial_aggregator.dart';
-import '../ui/utils/object_icons.dart';
 import 'dashboard_provider.dart';
 import 'pomodoro_provider.dart';
 import 'vault_provider.dart';
@@ -75,7 +75,8 @@ final widgetSyncProvider = Provider<void>((ref) {
   );
   final googleEvents = googleEventsAsync;
 
-  final prefs = ref.watch(sharedPreferencesProvider.select((data) => data.getInt('calendarWidgetOffset') ?? 0));
+  final sharedPrefs = ref.watch(sharedPreferencesProvider.select((data) => data));
+  final prefs = sharedPrefs.getInt('calendarWidgetOffset') ?? 0;
   final offset = prefs;
   final overdueItems = ref.watch(overdueProvider.select((data) => data));
 
@@ -89,6 +90,7 @@ final widgetSyncProvider = Provider<void>((ref) {
         googleEvents,
         offset,
         overdueItems,
+        sharedPrefs,
       );
     });
   }
@@ -130,6 +132,7 @@ Future<void> forceWidgetSync(ProviderContainer container) async {
       googleEvents,
       offset,
       overdueItems,
+      prefs,
     );
   } catch (e, st) {
     debugPrint('[WidgetSync] forceWidgetSync failed: $e\n$st');
@@ -144,6 +147,7 @@ Future<void> _updateAllWidgets(
   List<calendar.Event> googleEvents,
   int offset, [
   List<OverdueItem> overdueItems = const [],
+  SharedPreferences? prefs,
 ]) async {
   try {
     final calendar = _buildCalendarSnapshot(
@@ -153,6 +157,14 @@ Future<void> _updateAllWidgets(
       offset,
       overdueItems,
     );
+    final monthSnapshot = _buildMonthSnapshot(
+      allObjects,
+      settings,
+      googleEvents,
+      prefs?.getInt('monthWidgetOffset') ?? 0,
+      prefs?.getInt('monthWidgetMaxChips') ?? 3,
+      prefs?.getStringList('monthWidgetVisibleKinds') ?? ['task', 'habit', 'reminder', 'google_calendar'],
+    );
     final shopping = _buildShoppingSnapshot(allObjects);
     final pomodoro = _buildPomodoroSnapshot(pomodoroHistory);
     final tasks = _buildTasksSnapshot(allObjects, settings);
@@ -161,6 +173,13 @@ Future<void> _updateAllWidgets(
       shopping: shopping,
       pomodoro: pomodoro,
       tasks: tasks,
+    );
+    
+    await WidgetService.updateMonthWidget(
+      title: monthSnapshot['selectedTitle'] as String,
+      subtitle: monthSnapshot['selectedSubtitle'] as String,
+      days: (monthSnapshot['days'] as List).cast<Map<String, String>>(),
+      monthGrid: (monthSnapshot['monthGrid'] as List).cast<Map<String, dynamic>>(),
     );
     
     // Update note widget with pinned note
@@ -385,6 +404,111 @@ Map<String, dynamic> _buildCalendarSnapshot(
       'monthGrid': monthGrid,
     };
   }
+}
+
+Map<String, dynamic> _buildMonthSnapshot(
+  List<ContentObject> objects,
+  AppSettings settings,
+  List<calendar.Event> googleEvents,
+  int offset,
+  int maxChips,
+  List<String> visibleKinds,
+) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final tasks = objects.whereType<Task>().toList();
+  final habits = objects.whereType<Habit>().toList();
+  final reminders = objects.whereType<Reminder>().toList();
+  final organizerObjects = objects
+      .where(
+        (object) =>
+            object is Organizer ||
+            object is Goal ||
+            object.type == 'project' ||
+            object.type == 'person',
+      )
+      .toList();
+
+  final dayThemes = organizerObjects
+      .where((o) => (o is Organizer) && o.organizerType == OrganizerType.dayTheme)
+      .toList();
+
+  const dayHeaders = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+  const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  final focusMonth = DateTime(today.year, today.month + offset, 1);
+  final firstWeekday = focusMonth.weekday % 7; 
+
+  final gridStart = focusMonth.subtract(Duration(days: firstWeekday));
+  final monthGrid = List.generate(42, (i) {
+    final date = gridStart.add(Duration(days: i));
+    final isCurrentMonth = date.month == focusMonth.month && date.year == focusMonth.year;
+    
+    var dayItems = isCurrentMonth
+        ? _dayItems(
+            date,
+            tasks,
+            habits,
+            reminders,
+            organizerObjects,
+            googleEvents,
+            settings,
+          )
+        : <Map<String, dynamic>>[];
+
+    // Filter by visibleKinds
+    dayItems = dayItems.where((item) {
+      final type = item['type'] as String? ?? '';
+      return visibleKinds.contains(type);
+    }).toList();
+
+    final pillItems = dayItems.take(maxChips).map((item) {
+      return {
+        'title': _truncate(item['title'] as String? ?? '', 6),
+        'color': _typeColor(item['type'] as String? ?? ''),
+      };
+    }).toList();
+
+    final moreCount = dayItems.length > maxChips ? dayItems.length - maxChips : 0;
+
+    String themeIcon = '';
+    if (isCurrentMonth) {
+      final dayName = weekDayNames[date.weekday - 1];
+      final activeTheme = dayThemes.cast<Organizer?>().firstWhere(
+        (theme) => theme != null && theme.daysOfWeek.contains(dayName),
+        orElse: () => null,
+      );
+      if (activeTheme != null) {
+        themeIcon = activeTheme.icon ?? '📅';
+      }
+    }
+
+    return {
+      'dayNum': '${date.day}',
+      'isCurrentMonth': isCurrentMonth,
+      'isToday': _isSameDay(date, today),
+      'dateStr': _dateKey(date),
+      'themeIcon': themeIcon,
+      'pills': pillItems,
+      'items': dayItems,
+      'moreCount': moreCount,
+    };
+  });
+
+  final dayHeadersList = List.generate(7, (i) {
+    return {'dayHeader': dayHeaders[i]};
+  });
+
+  final monthName = DateFormat('MMMM yyyy', 'pt_BR').format(focusMonth);
+  final titleStr = _capitalize(monthName);
+
+  return {
+    'title': 'Mês',
+    'selectedTitle': titleStr,
+    'selectedSubtitle': '',
+    'days': dayHeadersList,
+    'monthGrid': monthGrid,
+  };
 }
 
 String _truncate(String s, int maxLen) {

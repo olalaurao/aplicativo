@@ -3,22 +3,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/mood_model.dart';
 import '../../../models/journal_entry.dart';
-import '../../../models/content_object.dart';
 import '../../../providers/vault_provider.dart';
 import '../../theme.dart';
-import '../../widgets/object_action_wrapper.dart';
 import '../../widgets/quartzo_chart.dart';
-import '../universal_detail_view.dart';
 
 /// MoodDefinition-specific content section for universal detail view
 List<Widget> buildMoodContentSection(
   BuildContext context,
   WidgetRef ref,
   MoodDefinition mood,
-  Widget Function(List<JournalEntry>) buildMoodFrequencyChart,
+  Widget Function(List<JournalEntry>, Color) buildMoodFrequencyChart,
   Widget Function(BuildContext, dynamic) buildMentionRow,
 ) {
   final moodEntries = ref.watch(allEntriesProvider.select((entries) => entries.where((e) => e.moodSlug == mood.id).toList()..sort((a, b) => b.date.compareTo(a.date))));
+
+  final moodColor = (() {
+    final hex = mood.color.replaceAll('#', '0xFF');
+    final val = int.tryParse(hex);
+    return val != null ? Color(val) : null;
+  })();
 
   return [
     SliverToBoxAdapter(
@@ -36,7 +39,10 @@ List<Widget> buildMoodContentSection(
               height: 180,
               decoration: AppTheme.cardDecoration(context),
               padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-              child: buildMoodFrequencyChart(moodEntries),
+              child: buildMoodFrequencyChart(
+                moodEntries,
+                moodColor ?? AppTheme.accentColor(context),
+              ),
             ),
             const SizedBox(height: 24),
             const Text(
@@ -51,7 +57,7 @@ List<Widget> buildMoodContentSection(
               padding: const EdgeInsets.all(16),
               child: QuartzoChart(
                 type: ChartType.heatmap,
-                color: AppColors.habitPurple,
+                color: moodColor ?? AppColors.habitPurple,
                 data: List.generate(30, (i) {
                   final date = DateTime.now().subtract(
                     Duration(days: 29 - i),

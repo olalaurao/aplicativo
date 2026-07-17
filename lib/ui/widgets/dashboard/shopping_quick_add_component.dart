@@ -100,15 +100,20 @@ class _ShoppingQuickAddComponentState extends ConsumerState<ShoppingQuickAddComp
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.add_shopping_cart_rounded, color: AppColors.textMuted, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      widget.block.title.isNotEmpty ? widget.block.title : 'Quick Add — Shopping',
-                      style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16),
-                    ),
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(Icons.add_shopping_cart_rounded, color: AppColors.textMuted, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          widget.block.title.isNotEmpty ? widget.block.title : 'Quick Add — Shopping',
+                          style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 if (targetList != null)
                   InkWell(

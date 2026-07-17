@@ -80,6 +80,14 @@ abstract class ContentObject {
     };
   }
 
+  Map<String, dynamic> toSyncPayload() {
+    return {
+      ...toBaseMap(),
+      'obsidian_path': obsidianPath,
+      'slug': slug,
+    };
+  }
+
   void loadBaseMap(Map<String, dynamic> map, {String? fallbackId}) {
     id = map['id']?.toString() ?? fallbackId ?? id;
     title = map['title'] as String? ?? title;
@@ -153,6 +161,68 @@ abstract class ContentObject {
   DateTime? get baseTime => null;
 
   String get displayType => type.toUpperCase();
+
+  static String sanitizeFileNameForObsidian(String value, {int maxLength = 64}) {
+    const accents = {
+      'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a',
+      'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
+      'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i',
+      'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o',
+      'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u',
+      'ç': 'c', 'ñ': 'n',
+      'À': 'a', 'Á': 'a', 'Â': 'a', 'Ã': 'a', 'Ä': 'a',
+      'È': 'e', 'É': 'e', 'Ê': 'e', 'Ë': 'e',
+      'Ì': 'i', 'Í': 'i', 'Î': 'i', 'Ï': 'i',
+      'Ò': 'o', 'Ó': 'o', 'Ô': 'o', 'Õ': 'o', 'Ö': 'o',
+      'Ù': 'u', 'Ú': 'u', 'Û': 'u', 'Ü': 'u',
+      'Ç': 'c', 'Ñ': 'n',
+    };
+    
+    // Replace accents
+    var clean = value.split('').map((c) => accents[c] ?? c).join();
+    
+    // Remove emojis and non-alphanumeric/spaces/hyphens/underscores
+    clean = clean.replaceAll(RegExp(r'[^a-zA-Z0-9\s\-_]'), '');
+    
+    // Replace spaces with hyphens
+    clean = clean.trim().replaceAll(RegExp(r'\s+'), '-').replaceAll(RegExp(r'-+'), '-');
+    
+    // Limit length
+    if (clean.length > maxLength) {
+      clean = clean.substring(0, maxLength).replaceAll(RegExp(r'-+$'), '');
+    }
+    
+    return clean.isEmpty ? 'unnamed' : clean;
+  }
+
+  static String sanitizeYamlText(String value, {int maxLength = 100}) {
+    const accents = {
+      'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a',
+      'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
+      'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i',
+      'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o',
+      'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u',
+      'ç': 'c', 'ñ': 'n',
+      'À': 'A', 'Á': 'A', 'Â': 'A', 'Ã': 'A', 'Ä': 'A',
+      'È': 'E', 'É': 'E', 'Ê': 'E', 'Ë': 'E',
+      'Ì': 'I', 'Í': 'I', 'Î': 'I', 'Ï': 'I',
+      'Ò': 'O', 'Ó': 'O', 'Ô': 'O', 'Õ': 'O', 'Ö': 'O',
+      'Ù': 'U', 'Ú': 'U', 'Û': 'U', 'Ü': 'U',
+      'Ç': 'C', 'Ñ': 'N',
+    };
+    
+    // Replace accents
+    var clean = value.split('').map((c) => accents[c] ?? c).join();
+    
+    // Keep only ASCII printable characters, removing control codes, emojis, and special chars
+    clean = clean.replaceAll(RegExp(r'[^\x20-\x7E\s]'), '');
+    
+    clean = clean.trim();
+    if (clean.length > maxLength) {
+      clean = clean.substring(0, maxLength).trim();
+    }
+    return clean;
+  }
 }
 
 String? displayTitleFromValue(String? value, {String? id}) {
@@ -352,4 +422,49 @@ class NewPagePlaceholder extends ContentObject {
 
   @override
   String toMarkdown() => '';
+}
+
+/// Lightweight wrapper for raw Obsidian markdown files that aren't
+/// recognized as a typed ContentObject. Used only for backlinks display.
+class RawMarkdownFile extends ContentObject {
+  final String body;
+
+  RawMarkdownFile({
+    required super.title,
+    required this.body,
+    required super.obsidianPath,
+  });
+
+  @override
+  String get type => 'raw_markdown';
+
+  @override
+  String toMarkdown() => body;
+
+  ContentObject copyWith({
+    String? title,
+    List<OrganizerReference>? organizers,
+    List<String>? categories,
+    List<String>? tags,
+    List<String>? aliases,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? obsidianPath,
+    bool? archived,
+    bool? pinned,
+    int? order,
+    List<ReminderConfig>? reminders,
+    List<String>? links,
+    String? statement,
+    List? timeRanges,
+    int? energyLevel,
+    List? daysOfWeek,
+    dynamic scheduler,
+  }) {
+    return RawMarkdownFile(
+      title: title ?? this.title,
+      body: body,
+      obsidianPath: obsidianPath ?? this.obsidianPath,
+    );
+  }
 }

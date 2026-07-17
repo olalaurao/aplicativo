@@ -20,6 +20,10 @@ class _DeletedFilesScreenState extends ConsumerState<DeletedFilesScreen> {
   @override
   void initState() {
     super.initState();
+    _refreshFiles();
+  }
+
+  void _refreshFiles() {
     final service = ref.read(obsidianServiceProvider);
     _filesFuture = service.getFilesInFolder('_deleted');
   }
@@ -75,9 +79,8 @@ class _DeletedFilesScreenState extends ConsumerState<DeletedFilesScreen> {
                       if (mounted) {
                         setState(() {
                           _refreshKey++;
-                          final service = ref.read(obsidianServiceProvider);
-                          _filesFuture = service.getFilesInFolder('_deleted');
                         });
+                        _refreshFiles();
                       }
                     },
                     child: const Text('Restore'),

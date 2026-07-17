@@ -389,7 +389,7 @@ class SyncManager {
             relativePath: relPath,
             localHash: localHash,
             remoteHash: localHash,
-            baseHash: baseHash ?? localHash,
+            baseHash: baseHash,
             remoteFileId: remoteFile.id,
             localModifiedAt: await localFile.lastModified(),
           );
@@ -561,8 +561,39 @@ class SyncManager {
     if (action.objectType == 'daily_note') {
       return 'daily/${action.objectId}.md';
     }
-    // For all other types, use the flat app/ folder (V5)
-    return 'app/${action.objectId}.md';
+    
+    // Check if the path is explicitly specified in the payload (saved during enqueueAction)
+    final payloadPath = action.payload['obsidian_path'] as String?;
+    if (payloadPath != null && payloadPath.isNotEmpty) {
+      return payloadPath;
+    }
+
+    final type = action.objectType;
+    final folder = switch (type) {
+      'mood_definition' => 'moods',
+      'combined_analysis' => 'analyses',
+      'goal' => 'goals',
+      'task' => 'tasks',
+      'habit' => 'habits',
+      'tracker_definition' => 'trackers',
+      'note' => 'notes',
+      'resource' => 'resources',
+      'person' => 'organizers/people',
+      'project' => 'organizers/projects',
+      'area' => 'organizers/areas',
+      'activity' => 'organizers/activities',
+      'label' => 'organizers/labels',
+      'dayTheme' || 'day_theme' => 'organizers/day_themes',
+      'timeBlock' || 'time_block' => 'organizers/time_blocks',
+      'value' => 'organizers/values',
+      'routine' => 'organizers/routines',
+      'pillar' => 'pillars',
+      'pomodoro_session' => 'pomodoros',
+      _ => 'app',
+    };
+    
+    final slug = action.payload['slug'] as String? ?? action.objectId;
+    return '$folder/$slug.md';
   }
 
   Future<String?> _relativePathForAction(SyncAction action) async {
@@ -573,7 +604,14 @@ class SyncManager {
     final object = allObjects
         .where((candidate) => candidate.id == action.objectId)
         .firstOrNull;
-    return object?.obsidianPath;
+    if (object != null) return object.obsidianPath;
+
+    // Fallback: check if the path is explicitly specified in the payload
+    final payloadPath = action.payload['obsidian_path'] as String?;
+    if (payloadPath != null && payloadPath.isNotEmpty) {
+      return payloadPath;
+    }
+    return null;
   }
 
   Future<void> _refreshNotificationsFromLocalVault() async {

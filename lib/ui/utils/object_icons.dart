@@ -25,7 +25,6 @@ class ObjectIcons {
   }
 
   /// Returns the default emoji icon for a given object type.
-  /// Based on guidelines.md Part 1.5 Universal Type Icons table.
   static String defaultIconForType(String type) {
     return switch (type) {
       ObjectTypes.entry => '📓',
@@ -149,6 +148,62 @@ class ObjectIcons {
       'outline' => Icons.view_list,
       'collection' => Icons.folder,
       _ => Icons.description,
+    };
+  }
+
+  // ── Color helpers ──────────────────────────────────────────────────────────
+
+  /// Returns the configured color for [type] from settings, or a default.
+  static Color colorForType(String type, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    return colorForTypeWithSignatures(type, settings.typeSignatures);
+  }
+
+  /// Returns the configured color for [type] from [typeSignatures], or the
+  /// hardcoded default for that type.
+  static Color colorForTypeWithSignatures(
+    String type,
+    Map<String, TypeSignature> typeSignatures,
+  ) {
+    final sig = typeSignatures[type];
+    if (sig != null && sig.colorHex != null && sig.colorHex!.isNotEmpty) {
+      return _parseHex(sig.colorHex!);
+    }
+    return defaultColorForType(type);
+  }
+
+  /// Parses a '#RRGGBB' hex string to a [Color]. Falls back to gray.
+  static Color _parseHex(String hex) {
+    final clean = hex.trim().replaceAll('#', '');
+    if (clean.length == 6) {
+      try {
+        return Color(int.parse('0xFF$clean'));
+      } catch (_) {}
+    } else if (clean.length == 8) {
+      try {
+        return Color(int.parse('0x$clean'));
+      } catch (_) {}
+    }
+    return const Color(0xFF9CA3AF); // fallback gray
+  }
+
+  /// Default semantic color per object type — used when no custom color is set.
+  static Color defaultColorForType(String type) {
+    return switch (type) {
+      ObjectTypes.task     => const Color(0xFF3B82F6), // blue
+      ObjectTypes.habit    => const Color(0xFF10B981), // green
+      ObjectTypes.goal     => const Color(0xFFF59E0B), // amber
+      ObjectTypes.event    => const Color(0xFF8B5CF6), // purple
+      ObjectTypes.reminder => const Color(0xFFF97316), // orange
+      ObjectTypes.entry    => const Color(0xFF6B7280), // muted gray
+      ObjectTypes.note     => const Color(0xFF6B7280),
+      ObjectTypes.idea     => const Color(0xFFF59E0B), // amber
+      ObjectTypes.project  => const Color(0xFF3B82F6), // blue
+      ObjectTypes.area     => const Color(0xFF06B6D4), // cyan
+      ObjectTypes.person   => const Color(0xFFEC4899), // pink
+      ObjectTypes.tracker  => const Color(0xFF8B5CF6), // purple
+      ObjectTypes.timeBlock => const Color(0xFF06B6D4), // cyan/info
+      _ => const Color(0xFF9CA3AF), // neutral gray
     };
   }
 }

@@ -64,7 +64,7 @@ class TodayAggregatorService {
             timestamp: ts,
             title: obj.title.isNotEmpty ? obj.title : 'Journal Entry',
             iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.entry, typeSignatures) ?? Icons.menu_book,
-            color: AppColors.textPrimary,
+            color: ObjectIcons.colorForTypeWithSignatures(ObjectTypes.entry, typeSignatures),
             isCompletable: false,
             isCompleted: false,
             isPlayable: false,
@@ -90,7 +90,7 @@ class TodayAggregatorService {
             timestamp: ts,
             title: obj.title,
             iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.task, typeSignatures) ?? Icons.check_circle_outline,
-            color: _getTaskColor(obj),
+            color: _getTaskColor(obj, typeSignatures),
             isCompletable: true,
             isCompleted: obj.isCompleted,
             isPlayable: true,
@@ -114,7 +114,7 @@ class TodayAggregatorService {
             timestamp: ts,
             title: obj.title,
             iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.event, typeSignatures) ?? Icons.calendar_today,
-            color: AppColors.accent,
+            color: ObjectIcons.colorForTypeWithSignatures(ObjectTypes.event, typeSignatures),
             isCompletable: false,
             isCompleted: false,
             isPlayable: obj.pomodoro != null,
@@ -147,7 +147,7 @@ class TodayAggregatorService {
               timestamp: ts,
               title: obj.title,
               iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.habit, typeSignatures) ?? Icons.refresh,
-              color: AppColors.accent,
+              color: ObjectIcons.colorForTypeWithSignatures(ObjectTypes.habit, typeSignatures),
               isCompletable: true,
               isCompleted: isCompleted,
               isPlayable: false,
@@ -166,7 +166,7 @@ class TodayAggregatorService {
             timestamp: effectiveTime,
             title: obj.title,
             iconData: Icons.timer,
-            color: AppColors.accent,
+            color: ObjectIcons.colorForTypeWithSignatures(ObjectTypes.timeBlock, typeSignatures),
             isCompletable: false,
             isCompleted: false,
             isPlayable: false,
@@ -183,7 +183,7 @@ class TodayAggregatorService {
             timestamp: obj.time,
             title: obj.title,
             iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.reminder, typeSignatures) ?? Icons.notifications,
-            color: AppColors.warning,
+            color: ObjectIcons.colorForTypeWithSignatures(ObjectTypes.reminder, typeSignatures),
             isCompletable: false,
             isCompleted: false,
             isPlayable: false,
@@ -233,7 +233,13 @@ class TodayAggregatorService {
     return items;
   }
 
-  Color _getTaskColor(Task task) {
+  Color _getTaskColor(Task task, Map<String, TypeSignature> typeSignatures) {
+    // If user has configured a custom task color, use it for all priorities.
+    final sig = typeSignatures[ObjectTypes.task];
+    if (sig != null && sig.colorHex != null && sig.colorHex!.isNotEmpty) {
+      return ObjectIcons.colorForTypeWithSignatures(ObjectTypes.task, typeSignatures);
+    }
+    // Otherwise fall back to priority-based colors.
     if (task.stage == TaskStage.finalized) return AppColors.success;
     switch (task.priority) {
       case TaskPriority.high:
@@ -243,7 +249,7 @@ class TodayAggregatorService {
       case TaskPriority.low:
         return AppColors.priorityLow;
       default:
-        return AppColors.textMuted;
+        return ObjectIcons.defaultColorForType(ObjectTypes.task);
     }
   }
 }

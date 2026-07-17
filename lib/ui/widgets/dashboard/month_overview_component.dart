@@ -31,26 +31,32 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    
-    final maxChipsPerCell = widget.block.metadata['maxChipsPerCell'] as int? ?? 4;
+
+    final maxChipsPerCell = widget.block.metadata['maxChipsPerCell'] as int? ?? 2;
+
+    // Item-kind filter: list of TodayItemKind.name strings; null/empty = show all
+    final rawKinds = widget.block.metadata['visibleKinds'];
+    final Set<String>? visibleKinds = (rawKinds is List && rawKinds.isNotEmpty)
+        ? rawKinds.map((e) => e.toString()).toSet()
+        : null;
 
     // Build grid data
     final firstDayOfMonth = DateTime(_currentMonth.year, _currentMonth.month, 1);
     final lastDayOfMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 0);
-    
+
     // Calendar starts on Sunday
     int daysBefore = firstDayOfMonth.weekday % 7;
     int daysAfter = 6 - (lastDayOfMonth.weekday % 7);
-    
+
     final startDate = firstDayOfMonth.subtract(Duration(days: daysBefore));
     final endDate = lastDayOfMonth.add(Duration(days: daysAfter));
-    
+
     final int numDays = endDate.difference(startDate).inDays + 1;
     final days = List.generate(numDays, (i) => startDate.add(Duration(days: i)));
-    
+
     // Get day themes
-    final allObjects = ref.watch(allObjectsProvider).value ?? [];
-    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final organizers = ref.watch(organizersListProvider);
+    final dayThemes = organizers.where((o) => o.organizerType == OrganizerType.dayTheme).toList();
     const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     return Container(
@@ -59,41 +65,37 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // ── Header: [icon] [< Month Year >] ──────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
             child: Row(
               children: [
                 Icon(Icons.calendar_view_month_rounded, color: AppColors.textMuted, size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  widget.block.title.isNotEmpty ? widget.block.title : 'This Month',
-                  style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16),
+                IconButton(
+                  icon: const Icon(Icons.chevron_left_rounded),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  onPressed: () => setState(() {
+                    _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+                  }),
                 ),
-                const Spacer(),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.chevron_left_rounded),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      onPressed: () => setState(() {
-                        _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
-                      }),
-                    ),
-                    Text(
-                      DateFormat('MMMM yyyy', 'en_US').format(_currentMonth),
-                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.chevron_right_rounded),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      onPressed: () => setState(() {
-                        _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
-                      }),
-                    ),
-                  ],
+                Expanded(
+                  child: Text(
+                    DateFormat('MMMM yyyy', 'en_US').format(_currentMonth),
+                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right_rounded),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  onPressed: () => setState(() {
+                    _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+                  }),
                 ),
               ],
             ),
@@ -117,115 +119,112 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
                   }),
                 ),
                 const SizedBox(height: 8),
-                // Grid
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 7,
-                    childAspectRatio: 1.2,
-                    crossAxisSpacing: 2,
-                    mainAxisSpacing: 2,
-                  ),
-                  itemCount: days.length,
-                  itemBuilder: (context, index) {
-                    final date = days[index];
-                    final isCurrentMonth = date.month == _currentMonth.month;
-                    final isToday = date.year == today.year && date.month == today.month && date.day == today.day;
-                    
-                    final items = ref.watch(todayItemsProvider(date));
-                    final visibleItems = items.take(maxChipsPerCell).toList();
-                    final hasMore = items.length > maxChipsPerCell;
-                    
-                    // Find active day theme for this day
-                    final dayName = weekDayNames[date.weekday - 1];
-                    final activeTheme = dayThemes.cast<Organizer?>().firstWhere(
-                      (theme) => theme != null && theme.daysOfWeek.contains(dayName),
-                      orElse: () => null,
-                    );
+                // Grid — built as static Column/Rows to avoid nested scroll semantics issues
+                ...List.generate((days.length / 7).ceil(), (weekIndex) {
+                  final weekDays = days.skip(weekIndex * 7).take(7).toList();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: weekDays.map((date) {
+                        final isCurrentMonth = date.month == _currentMonth.month;
+                        final isToday = date.year == today.year && date.month == today.month && date.day == today.day;
 
-                    return InkWell(
-                      onTap: () => context.push('/planner?date=${DateFormat('yyyy-MM-dd').format(date)}'),
-                      borderRadius: BorderRadius.circular(4),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isToday ? AppColors.accent.withValues(alpha: 0.1) : Colors.transparent,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Column(
-                          children: [
-                            if (activeTheme != null && isCurrentMonth)
-                              GestureDetector(
-                                onTap: () => _showDayThemePopup(context, activeTheme),
-                                child: Text(
-                                  activeTheme.icon ?? '📅',
-                                  style: const TextStyle(fontSize: 10),
-                                ),
-                              )
-                            else
-                              const SizedBox(height: 10),
-                            Text(
-                              '${date.day}',
-                              style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                                color: isToday 
-                                  ? AppColors.accent 
-                                  : (isCurrentMonth ? AppColors.textPrimary : AppColors.textMuted.withValues(alpha: 0.5)),
-                                fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            if (isCurrentMonth)
-                              Expanded(
-                                child: ListView(
-                                  shrinkWrap: true,
-                                  physics: const ClampingScrollPhysics(),
-                                  padding: EdgeInsets.zero,
-                                  children: [
-                                    ...visibleItems.map((item) => Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 0.5),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: item.color.withValues(alpha: 0.2),
-                                          borderRadius: BorderRadius.circular(2),
-                                        ),
-                                        child: Text(
-                                          item.title.length > 8 ? '${item.title.substring(0, 8)}...' : item.title,
-                                          style: TextStyle(
-                                            fontSize: 7,
-                                            color: item.color,
-                                            overflow: TextOverflow.ellipsis,
+                        final allItems = ref.watch(todayItemsProvider(date));
+                        // Apply kind filter
+                        final filteredItems = visibleKinds == null
+                            ? allItems
+                            : allItems.where((item) => visibleKinds.contains(item.kind.name)).toList();
+
+                        final visibleItems = filteredItems.take(maxChipsPerCell).toList();
+                        final hasMore = filteredItems.length > maxChipsPerCell;
+
+                          // Find active day theme for this day
+                          final dayName = weekDayNames[date.weekday - 1];
+                          final activeTheme = dayThemes.cast<Organizer?>().firstWhere(
+                            (theme) => theme != null && theme.daysOfWeek.contains(dayName),
+                            orElse: () => null,
+                          );
+
+                          return Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 1),
+                              child: GestureDetector(
+                                key: ValueKey(date.toIso8601String()),
+                                onTap: () => context.push('/planner?date=${DateFormat('yyyy-MM-dd').format(date)}'),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: isToday ? AppColors.accent.withValues(alpha: 0.1) : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      if (activeTheme != null && isCurrentMonth)
+                                        GestureDetector(
+                                          onTap: () => _showDayThemePopup(context, activeTheme),
+                                          child: Text(
+                                            activeTheme.icon ?? '📅',
+                                            style: const TextStyle(fontSize: 10),
+                                            textAlign: TextAlign.center,
                                           ),
-                                          maxLines: 1,
+                                        )
+                                      else
+                                        const SizedBox(height: 10),
+                                      Text(
+                                        '${date.day}',
+                                        textAlign: TextAlign.center,
+                                        style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                                          color: isToday
+                                            ? AppColors.accent
+                                            : (isCurrentMonth ? AppColors.textPrimary : AppColors.textMuted.withValues(alpha: 0.5)),
+                                          fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
                                         ),
                                       ),
-                                    )),
-                                    if (hasMore)
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 1),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Container(
+                                      const SizedBox(height: 2),
+                                      if (isCurrentMonth) ...[
+                                        ...visibleItems.map((item) => Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 0.5),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: item.color.withValues(alpha: 0.2),
+                                              borderRadius: BorderRadius.circular(2),
+                                            ),
+                                            child: Text(
+                                              item.title.length > 8 ? '${item.title.substring(0, 8)}...' : item.title,
+                                              style: TextStyle(
+                                                fontSize: 7,
+                                                color: item.color,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              maxLines: 1,
+                                            ),
+                                          ),
+                                        )),
+                                        if (hasMore)
+                                          Center(
+                                            child: Container(
                                               width: 4,
                                               height: 4,
+                                              margin: const EdgeInsets.symmetric(vertical: 1),
                                               decoration: const BoxDecoration(
                                                 color: AppColors.textMuted,
                                                 shape: BoxShape.circle,
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                      ),
-                                  ],
+                                          ),
+                                      ],
+                                    ],
+                                  ),
                                 ),
                               ),
-                          ],
-                        ),
+                            ),
+                          );
+                        }).toList(),
                       ),
-                    );
-                  },
-                ),
+                  );
+                }),
               ],
             ),
           ),
@@ -264,7 +263,7 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Dias: ${theme.daysOfWeek.join(", ")}',
+                          'Days: ${theme.daysOfWeek.join(", ")}',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppColors.textMuted,

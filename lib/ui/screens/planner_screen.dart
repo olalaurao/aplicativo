@@ -107,7 +107,8 @@ class PlannerScreen extends ConsumerStatefulWidget {
   ConsumerState<PlannerScreen> createState() => _PlannerScreenState();
 }
 
-class _PlannerScreenState extends ConsumerState<PlannerScreen> {
+class _PlannerScreenState extends ConsumerState<PlannerScreen>
+    with AutomaticKeepAliveClientMixin {
   int _viewMode = 0; // 0=Day, 1=Week, 2=Month, 3=Dial
   bool _isTimeline = true;
   late DateTime _selectedDate;
@@ -116,6 +117,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   int _gridGranularity = 30; // 15, 30, or 60 minutes
   bool _showBacklogPanel = false;
   bool _showActionsPanel = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -175,13 +179,14 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allObjects = ref.watch(allObjectsProvider).value ?? [];
-    final tasks = allObjects.whereType<Task>().toList();
-    final projects = ref.watch(projectsProvider);
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    final tasks = ref.watch(tasksListProvider);
+    final organizers = ref.watch(organizersListProvider);
+    final projects = ref.watch(projectsProvider.select((projects) => projects.toList()));
     final habits = ref.watch(habitsProvider.select((habits) => habits.where((h) => !h.isQuitting && !h.isNegative).toList()));
-    final people = ref.watch(peopleProvider);
-    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
-    final timeBlocks = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.timeBlock).toList();
+    final people = ref.watch(peopleProvider.select((people) => people.toList()));
+    final dayThemes = organizers.where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final timeBlocks = organizers.where((o) => o.organizerType == OrganizerType.timeBlock).toList();
     final googleEvents = ref.watch(googleCalendarEventsProvider(_selectedDate));
 
     final dayName = const [
@@ -690,7 +695,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   Widget _buildViewToggle() {
-    final labels = ['Day', 'Week', 'Month', 'Dial'];
+    const labels = ['Day', 'Week', 'Month', 'Dial'];
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surfaceVariantColor(context),
@@ -904,7 +909,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   Widget _buildOverdueButton() {
-    final overdueCount = ref.watch(overdueCountProvider);
+    final overdueCount = ref.watch(overdueCountProvider.select((count) => count));
     if (overdueCount == 0) return const SizedBox.shrink();
     
     return IconButton(
@@ -1043,9 +1048,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     List<TrackingRecord> records,
     AsyncValue<List<google_calendar.Event>> googleEvents,
   ) {
-    final allObjects = ref.watch(allObjectsProvider).value ?? [];
-    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
-    final timeBlocks = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.timeBlock).toList();
+    final organizers = ref.watch(organizersListProvider);
+    final dayThemes = organizers.where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final timeBlocks = organizers.where((o) => o.organizerType == OrganizerType.timeBlock).toList();
     const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final selectedDayName = weekDayNames[_selectedDate.weekday - 1];
     final activeThemeBlockIds = dayThemes
@@ -1755,8 +1760,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   Widget _buildTaskCard(Task task, {bool isHighEnergyBlock = false}) {
-    final allObjects = ref.watch(allObjectsProvider.select((async) => async.value ?? []));
-    final isBlocked = task.isBlocked(allObjects);
+    final tasks = ref.watch(tasksListProvider);
+    final isBlocked = task.isBlocked(tasks.cast<ContentObject>());
     final isBestTime =
         isHighEnergyBlock &&
         (task.priority == TaskPriority.high || task.duration >= 60);
@@ -2269,9 +2274,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   Widget _buildWeekView(List<Task> tasks, List<Habit> habits) {
-    final allObjects = ref.watch(allObjectsProvider).value ?? [];
-    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
-    final timeBlocks = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.timeBlock).toList();
+    final organizers = ref.watch(organizersListProvider);
+    final dayThemes = organizers.where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final timeBlocks = organizers.where((o) => o.organizerType == OrganizerType.timeBlock).toList();
     final startOfWeek = DateTime.now().subtract(
       Duration(days: DateTime.now().weekday - 1),
     );
@@ -2323,28 +2328,25 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     final allOrganizers = ref.watch(organizersProvider.select((orgs) => orgs.where((o) => o.organizerType == OrganizerType.timeBlock).toList()));
     final timeBlocks = allOrganizers;
     
-    final allObjectsAsync = ref.watch(allObjectsProvider.select((async) => async.valueOrNull ?? []));
-    final allObjects = allObjectsAsync;
+    final allObjects = ref.watch(allObjectsProvider.select((async) => async.valueOrNull ?? []));
     
-    final localEvents = allObjects.whereType<Event>().where((e) => _isSameDay(e.date, _selectedDate)).toList();
-    
-    final reminders = allObjects.whereType<Reminder>().where((r) => 
+    final reminders = ref.watch(aggregatedRemindersProvider).where((r) => 
       !r.isCompleted && 
       _isSameDay(r.time, _selectedDate)
     ).toList();
     
-    final journalEntries = allObjects.whereType<JournalEntry>().where((j) =>
+    final journalEntries = ref.watch(journalEntriesListProvider).where((j) =>
       _isSameDay(j.date, _selectedDate)
     ).toList();
     
-    final moodDefinitions = ref.watch(moodsProvider);
-    final settings = ref.watch(settingsProvider);
+    final moodDefinitions = ref.watch(moodsProvider.select((moods) => moods.toList()));
+    final settings = ref.watch(settingsProvider.select((s) => s));
     final typeSignatures = settings.typeSignatures;
     
     // Get day theme for selected date
     const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final dayName = weekDayNames[_selectedDate.weekday - 1];
-    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final dayThemes = allOrganizers.where((o) => o.organizerType == OrganizerType.dayTheme).toList();
     final activeTheme = dayThemes.cast<Organizer?>().firstWhere(
       (theme) => theme != null && theme.daysOfWeek.contains(dayName),
       orElse: () => null,
@@ -2356,7 +2358,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       habits: habits,
       pomodoroSessions: pomodoroSessions,
       googleEvents: events,
-      localEvents: localEvents,
+      localEvents: ref.watch(allObjectsProvider.select((async) => async.valueOrNull ?? [])).whereType<Event>().where((e) => _isSameDay(e.date, _selectedDate)).toList(),
       reminders: reminders,
       timeBlocks: timeBlocks,
       journalEntries: journalEntries,
@@ -2388,43 +2390,57 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             if (activeTheme != null) const SizedBox(height: 8),
             SizedBox(
               height: 280,
-              child: DayDialWidget(
-                snapshot: snapshot,
-                selectedDate: _selectedDate,
-                onHourTap: (hour) {
-                  setState(() {
-                    _viewMode = 0;
-                    _isTimeline = true;
-                  });
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    const hourHeight = 80.0;
-                    const sliverHeaderEstimate = 190.0;
-                    final viewport = MediaQuery.of(context).size.height;
-                    final targetOffset = sliverHeaderEstimate +
-                        (hour * hourHeight) -
-                        (viewport / 3);
-                    if (_scrollController.hasClients) {
-                      _scrollController.animateTo(
-                        targetOffset,
-                        duration: const Duration(milliseconds: 500),
-                        curve: Curves.easeInOut,
+              child: Builder(builder: (ctx) {
+                final settings = ref.watch(settingsProvider);
+                final isDark = Theme.of(ctx).brightness == Brightness.dark;
+                final hexStr = isDark ? settings.darkBackgroundColor : settings.backgroundColor;
+                Color dialBg = Theme.of(ctx).colorScheme.surface;
+                if (hexStr != null && hexStr.isNotEmpty) {
+                  final clean = hexStr.trim().replaceAll('#', '');
+                  if (clean.length == 6) {
+                    try { dialBg = Color(int.parse('0xFF$clean')); } catch (_) {}
+                  }
+                }
+                return DayDialWidget(
+                  snapshot: snapshot,
+                  selectedDate: _selectedDate,
+                  backgroundColor: dialBg,
+                  iconColor: Theme.of(ctx).colorScheme.onSurface,
+                  onHourTap: (hour) {
+                    setState(() {
+                      _viewMode = 0;
+                      _isTimeline = true;
+                    });
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      const hourHeight = 80.0;
+                      const sliverHeaderEstimate = 190.0;
+                      final viewport = MediaQuery.of(context).size.height;
+                      final targetOffset = sliverHeaderEstimate +
+                          (hour * hourHeight) -
+                          (viewport / 3);
+                      if (_scrollController.hasClients) {
+                        _scrollController.animateTo(
+                          targetOffset,
+                          duration: const Duration(milliseconds: 500),
+                          curve: Curves.easeInOut,
+                        );
+                      }
+                    });
+                  },
+                  onSegmentTap: (segment) {
+                    if (segment.sourceSlug == null) return;
+                    final objIndex = allObjects.indexWhere((o) => o.id == segment.sourceSlug || o.slug == segment.sourceSlug);
+                    if (objIndex != -1) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => UniversalDetailView(object: allObjects[objIndex])),
                       );
                     }
-                  });
-                },
-                onSegmentTap: (segment) {
-                  if (segment.sourceSlug == null) return;
-                  final objIndex = allObjects.indexWhere((o) => o.id == segment.sourceSlug || o.slug == segment.sourceSlug);
-                  if (objIndex != -1) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => UniversalDetailView(object: allObjects[objIndex])),
-                    );
-                  }
-                },
-                onSegmentMove: (segment, newStart) => _persistMove(segment, newStart),
-                onSegmentResize: (segment, newEnd) => _persistResize(segment, newEnd),
-              ),
+                  },
+                  onSegmentMove: (segment, newStart) => _persistMove(segment, newStart),
+                  onSegmentResize: (segment, newEnd) => _persistResize(segment, newEnd),
+                );
+              }),
             ),
             if (showLegendSetting)
               Padding(
@@ -3005,8 +3021,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     final daysInMonth = lastDayOfMonth.day;
     final firstWeekday = firstDayOfMonth.weekday; // 1=Mon, 7=Sun
     
-    final allObjects = ref.watch(allObjectsProvider).value ?? [];
-    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final organizers = ref.watch(organizersListProvider);
+    final dayThemes = organizers.where((o) => o.organizerType == OrganizerType.dayTheme).toList();
     const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     return SliverPadding(

@@ -57,7 +57,11 @@ const componentRegistry = <ComponentDefinition>[
     defaultTitle: 'This Month',
     description: 'Full calendar-month glance',
     icon: Icons.calendar_view_month_rounded,
-    defaultMetadata: {'maxChipsPerCell': 2},
+    defaultMetadata: {
+      'maxChipsPerCell': 2,
+      // null = show all kinds; set a list of TodayItemKind names to filter
+      'visibleKinds': null,
+    },
     allowMultipleInstances: false,
   ),
   ComponentDefinition(
@@ -80,5 +84,21 @@ const componentRegistry = <ComponentDefinition>[
     icon: Icons.checklist_rounded,
     defaultMetadata: {'maxItems': 8, 'includeEvents': false},
     allowMultipleInstances: false,
+  ),
+  ComponentDefinition(
+    type: BlockType.pinnedObject,
+    defaultTitle: 'Pinned Item',
+    description: 'Pin any note, task, person, or object to your dashboard',
+    icon: Icons.push_pin_rounded,
+    defaultMetadata: {'objectId': null, 'objectType': null, 'objectTitle': ''},
+    allowMultipleInstances: true,
+  ),
+  ComponentDefinition(
+    type: BlockType.trackerAnalysis,
+    defaultTitle: 'Tracker Analysis',
+    description: 'Chart and statistics for a specific tracker or mood',
+    icon: Icons.bar_chart_rounded,
+    defaultMetadata: {'trackerId': null, 'trackerTitle': '', 'chartType': 'bar', 'daysBack': 30},
+    allowMultipleInstances: true,
   ),
 ];

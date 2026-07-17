@@ -41,7 +41,54 @@ class PomodoroSession extends ContentObject {
   String get type => 'pomodoro_session';
 
   @override
-  String toMarkdown() => ''; // Not standalone, embedded in daily note
+  String toMarkdown() {
+    final frontmatter = toBaseMap();
+    frontmatter['task_title'] = title;
+    frontmatter['date'] = date.toIso8601String();
+    if (occurredAt != null) {
+      frontmatter['occurred_at'] = occurredAt!.toIso8601String();
+    }
+    if (linkedItemSlug != null) {
+      frontmatter['linked_item_slug'] = linkedItemSlug;
+    }
+    frontmatter['work_duration'] = workDuration;
+    frontmatter['short_break_duration'] = shortBreakDuration;
+    frontmatter['long_break_duration'] = longBreakDuration;
+    frontmatter['long_break_after_blocks'] = longBreakAfterBlocks;
+    frontmatter['blocks_completed'] = blocksCompleted;
+    frontmatter['minutes_worked'] = minutesWorked;
+    frontmatter['minutes_break'] = minutesBreak;
+    frontmatter['session_state'] = state.name;
+    return generateMarkdown(frontmatter, '');
+  }
+
+  factory PomodoroSession.fromMarkdown(
+    Map<String, dynamic> frontmatter,
+    String body,
+  ) {
+    final session = PomodoroSession(
+      id: frontmatter['id']?.toString(),
+      taskTitle: frontmatter['task_title']?.toString() ?? frontmatter['title']?.toString() ?? 'Focus Session',
+      date: DateTime.tryParse(frontmatter['date']?.toString() ?? '') ?? DateTime.now(),
+      occurredAt: DateTime.tryParse(frontmatter['occurred_at']?.toString() ?? ''),
+      linkedItemSlug: frontmatter['linked_item_slug']?.toString(),
+      workDuration: (frontmatter['work_duration'] as num? ?? 25).toInt(),
+      shortBreakDuration: (frontmatter['short_break_duration'] as num? ?? 5).toInt(),
+      longBreakDuration: (frontmatter['long_break_duration'] as num? ?? 20).toInt(),
+      longBreakAfterBlocks: (frontmatter['long_break_after_blocks'] as num? ?? 4).toInt(),
+      blocksCompleted: (frontmatter['blocks_completed'] as num? ?? 0).toInt(),
+      minutesWorked: (frontmatter['minutes_worked'] as num? ?? 0).toInt(),
+      minutesBreak: (frontmatter['minutes_break'] as num? ?? 0).toInt(),
+      state: PomodoroSessionState.values.firstWhere(
+        (s) => s.name == (frontmatter['session_state'] ?? frontmatter['state'])?.toString(),
+        orElse: () => PomodoroSessionState.completed,
+      ),
+      createdAt: DateTime.tryParse(frontmatter['created_at']?.toString() ?? ''),
+      updatedAt: DateTime.tryParse(frontmatter['updated_at']?.toString() ?? ''),
+    );
+    session.loadBaseMap(frontmatter);
+    return session;
+  }
 
   String toDailyNoteBlock() {
     final effectiveDate = occurredAt ?? date;
@@ -108,3 +155,4 @@ class PomodoroSession extends ContentObject {
     );
   }
 }
+

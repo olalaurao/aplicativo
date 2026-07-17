@@ -40,16 +40,18 @@ class RichTextEditorState extends ConsumerState<RichTextEditor>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _focusNode.addListener(() {
-      if (mounted) setState(() {});
-      _syncToolbarOverlay();
-    });
+    _focusNode.addListener(_onFocusChanged);
     _loadContent();
   }
 
   @override
   void didChangeMetrics() {
     _toolbarOverlay?.markNeedsBuild();
+  }
+
+  void _onFocusChanged() {
+    if (mounted) setState(() {});
+    _syncToolbarOverlay();
   }
 
   void _loadContent() {
@@ -112,6 +114,7 @@ class RichTextEditorState extends ConsumerState<RichTextEditor>
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _focusNode.removeListener(_onFocusChanged);
     _removeToolbarOverlay();
     WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
@@ -120,6 +123,7 @@ class RichTextEditorState extends ConsumerState<RichTextEditor>
   }
 
   void _syncToolbarOverlay() {
+    if (!mounted) return;
     if (_focusNode.hasFocus) {
       if (_toolbarOverlay != null) {
         _toolbarOverlay!.markNeedsBuild();
@@ -143,7 +147,11 @@ class RichTextEditorState extends ConsumerState<RichTextEditor>
         },
       );
 
-      Overlay.of(context, rootOverlay: true).insert(_toolbarOverlay!);
+      try {
+        Overlay.of(context, rootOverlay: true).insert(_toolbarOverlay!);
+      } catch (_) {
+        _toolbarOverlay = null;
+      }
     } else {
       _removeToolbarOverlay();
     }

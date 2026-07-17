@@ -18,6 +18,7 @@ import '../../models/task_model.dart';
 import '../../models/tracker_model.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/pomodoro_provider.dart';
 import '../../services/undo_service.dart';
 import '../forms/create_entry_form.dart';
 import '../forms/create_goal_form.dart';
@@ -32,6 +33,7 @@ import '../forms/create_tracker_form.dart';
 import '../theme.dart';
 import 'triple_check_sheet.dart';
 import 'universal_search_picker.dart';
+import '../screens/pomodoro_screen.dart';
 
 class ObjectActionWrapper extends ConsumerWidget {
   final ContentObject object;
@@ -136,6 +138,29 @@ Future<void> showObjectActionSheet(
               onTap: () {
                 Navigator.pop(sheetContext);
                 _openInObsidian(context, ref, object);
+              },
+            ),
+            if (_isLinkableObject(object))
+              ListTile(
+                leading: Icon(
+                  Icons.play_arrow_rounded,
+                  color: AppTheme.accentColor(context),
+                ),
+                title: const Text('Iniciar Pomodoro'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _startPomodoroForObject(context, ref, object);
+                },
+              ),
+            ListTile(
+              leading: Icon(
+                Icons.archive_outlined,
+                color: AppColors.textSecondary,
+              ),
+              title: const Text('Arquivar'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _confirmArchive(context, ref, object);
               },
             ),
             ListTile(
@@ -569,4 +594,71 @@ String _typeLabel(ContentObject object) {
   if (object is Reminder) return 'Reminder';
   if (object is TrackingRecord) return 'Record';
   return object.type;
+}
+
+bool _isLinkableObject(ContentObject object) {
+  return object is Task ||
+      object is Habit ||
+      object is Goal ||
+      object is Project ||
+      object is Note ||
+      object is Organizer;
+}
+
+void _startPomodoroForObject(
+  BuildContext context,
+  WidgetRef ref,
+  ContentObject object,
+) {
+  final notifier = ref.read(pomodoroProvider.notifier);
+  notifier.setCurrentItem(object.id, object.title);
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const PomodoroScreen()),
+  );
+}
+
+Future<void> _confirmArchive(
+  BuildContext context,
+  WidgetRef ref,
+  ContentObject object,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Arquivar item?'),
+      content: Text(
+        '"${object.title}" será arquivado e não aparecerá mais nas listas principais.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+          child: const Text('Arquivar'),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed != true || !context.mounted) return;
+
+  try {
+    await ref.read(vaultProvider.notifier).archiveObject(object);
+    if (!context.mounted) return;
+    UndoService.showUndoSnackbar(
+      context: context,
+      message: '${object.title} arquivado.',
+      onUndo: () => ref.read(vaultProvider.notifier).unarchiveObject(object),
+    );
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao arquivar: $e')),
+      );
+    }
+  }
 }

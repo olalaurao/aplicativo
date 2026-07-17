@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/project_model.dart';
 import '../../../models/task_model.dart';
+import '../../../models/kpi_model.dart' as kpi;
 import '../../widgets/wiki_text_view.dart';
 import '../../theme.dart';
-import '../universal_detail_view.dart';
 
 /// Project-specific content section for universal detail view
 List<Widget> buildProjectContentSection(
@@ -18,6 +18,7 @@ List<Widget> buildProjectContentSection(
   int linkedTasksCount,
   Widget Function(BuildContext, WidgetRef, Project, List<Task>) buildRotationTasksSection,
   Widget Function(BuildContext, WidgetRef, String) buildSnapshotsSection,
+  Widget Function(BuildContext, WidgetRef, Project, kpi.KPI) buildKPICard,
 ) {
   if (project.hasRotation) {
     return [
@@ -46,6 +47,17 @@ List<Widget> buildProjectContentSection(
                 const SizedBox(height: 24),
               ],
               buildRotationTasksSection(context, ref, project, tasks),
+              if (project.kpis.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                const Text(
+                  'Indicadores de Sucesso (KPIs)',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 16),
+                ...project.kpis.map(
+                  (k) => buildKPICard(context, ref, project, k),
+                ),
+              ],
               const SizedBox(height: 24),
               buildSnapshotsSection(context, ref, project.id),
             ],
@@ -114,6 +126,17 @@ List<Widget> buildProjectContentSection(
                   text: project.description!,
                   style: const TextStyle(fontSize: 15, height: 1.5),
                 ),
+              ),
+            ],
+            if (project.kpis.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              const Text(
+                'Indicadores de Sucesso (KPIs)',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 16),
+              ...project.kpis.map(
+                (k) => buildKPICard(context, ref, project, k),
               ),
             ],
             const SizedBox(height: 24),

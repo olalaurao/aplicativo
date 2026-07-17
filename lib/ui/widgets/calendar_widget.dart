@@ -189,7 +189,7 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          children: days.map((date) {
+          children: days.map<Widget>((date) {
             final isSelected = _sameDay(date, _selectedDay);
             final dayTasks = _tasksForDay(tasks, date);
             final dayHabits = habits.where((h) {
@@ -335,8 +335,6 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
                       : TaskStage.finalized,
                 );
                 ref.read(vaultProvider.notifier).updateObject(updated);
-                      ),
-                    );
               },
               child: Padding(
                 padding: const EdgeInsets.only(right: 10, top: 1),

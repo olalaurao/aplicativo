@@ -44,8 +44,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final allObjects = ref.watch(allObjectsProvider).value ?? [];
-    final habits = allObjects.whereType<Habit>().toList();
+    final habits = ref.watch(habitsListProvider);
     final activeHabits = habits
         .where((h) => h.status == HabitStatus.active && !h.archived)
         .toList();

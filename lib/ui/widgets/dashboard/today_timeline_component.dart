@@ -38,7 +38,7 @@ class TodayTimelineComponent extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Row(
               children: [
-                Icon(Icons.access_time_rounded, color: AppColors.textMuted, size: 20),
+                const Icon(Icons.access_time_rounded, color: AppColors.textMuted, size: 20),
                 const SizedBox(width: 8),
                 Text(
                   block.title.isNotEmpty ? block.title : 'Timeline do dia',
@@ -64,13 +64,10 @@ class TodayTimelineComponent extends ConsumerWidget {
               ),
             )
           else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: visibleItems.length,
-              padding: EdgeInsets.zero,
-              itemBuilder: (context, index) {
-                final item = visibleItems[index];
+            Column(
+              children: visibleItems.asMap().entries.map((entry) {
+                final index = entry.key;
+                final item = entry.value;
                 final isUntimed = item.timestamp.hour == 0 && item.timestamp.minute == 0 && item.timestamp.second == 0;
                 
                 // Agora header logic
@@ -90,6 +87,7 @@ class TodayTimelineComponent extends ConsumerWidget {
                 }
 
                 return Column(
+                  key: ValueKey(item.id),
                   children: [
                     if (showAgora)
                       Padding(
@@ -170,7 +168,7 @@ class TodayTimelineComponent extends ConsumerWidget {
                     ),
                   ],
                 );
-              },
+              }).toList(),
             ),
           if (hasMore)
             InkWell(

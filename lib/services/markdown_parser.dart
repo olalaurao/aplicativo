@@ -327,8 +327,10 @@ class MarkdownParser {
     // Resources are user-facing library cards, so keep the vault filename
     // aligned with the visible card title for easier Obsidian browsing.
     String filename = object.type == 'resource'
-        ? _sanitizeFileName(object.title)
-        : object.slug;
+        ? ContentObject.sanitizeFileNameForObsidian(object.title, maxLength: 64)
+        : (object.type == 'social_post'
+            ? ContentObject.sanitizeFileNameForObsidian(object.title.isEmpty ? object.id : object.title, maxLength: 64)
+            : object.slug);
     if (object.type == 'tracker_record' || object.type == 'combined_analysis') {
       final suffix = object.id.length > 8
           ? object.id.substring(0, 8)

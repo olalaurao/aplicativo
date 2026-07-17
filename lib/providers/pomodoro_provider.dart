@@ -568,8 +568,9 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     await _persistHistory();
     _updateWeeklyWidget();
 
-    // Save to Vault (Daily Note)
+    // Save to Vault (Standalone + Daily Note projection)
     if (state.remainingSeconds == 0 || state.currentType == PomodoroType.stopwatch || (forceSave && elapsedSeconds > 60)) {
+      await ref.read(vaultProvider.notifier).createObject(session);
       await _saveToDailyNote(session);
       await _updateLinkedObjectMetrics(session);
     }
@@ -600,7 +601,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     }
 
     // Keep KPI calculations up-to-date for goals/projects linked to planner objects.
-    ref.invalidate(allObjectsProvider);
+    // Note: updateObject already uses replaceObjectInMemory, so no need to invalidate here
   }
 
   Future<void> _saveToDailyNote(PomodoroSession session) async {
@@ -623,7 +624,6 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       ),
     );
     ref.invalidate(dailyNoteDataProvider(dateStr));
-    ref.invalidate(allObjectsProvider);
     ref.invalidate(allEntriesProvider);
   }
 
@@ -686,6 +686,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     
     state = state.copyWith(history: [session, ...state.history]);
     await _persistHistory();
+    await ref.read(vaultProvider.notifier).createObject(session);
     await _saveToDailyNote(session);
     await _updateLinkedObjectMetrics(session);
     

@@ -42,7 +42,8 @@ class SyncConflictsScreen extends ConsumerStatefulWidget {
   const SyncConflictsScreen({super.key});
 
   @override
-  ConsumerState<SyncConflictsScreen> createState() => _SyncConflictsScreenState();
+  ConsumerState<SyncConflictsScreen> createState() =>
+      _SyncConflictsScreenState();
 }
 
 class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
@@ -107,7 +108,11 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () => _resolveAll(context, conflicts, keepLocal: true),
+                            onPressed: () => _resolveAll(
+                              context,
+                              conflicts,
+                              keepLocal: true,
+                            ),
                             icon: const Icon(Icons.phone_android, size: 18),
                             label: const Text(
                               'Manter todos local',
@@ -118,7 +123,11 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () => _resolveAll(context, conflicts, keepLocal: false),
+                            onPressed: () => _resolveAll(
+                              context,
+                              conflicts,
+                              keepLocal: false,
+                            ),
                             icon: const Icon(Icons.cloud, size: 18),
                             label: const Text(
                               'Manter todos Drive',
@@ -215,11 +224,15 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
 
       for (final conflict in conflicts) {
         try {
-          final sourcePath = keepLocal ? conflict.localPath : conflict.remotePath;
+          final sourcePath = keepLocal
+              ? conflict.localPath
+              : conflict.remotePath;
           final chosenContent = await obsidian.readFile(sourcePath);
           if (chosenContent == null) {
             failed++;
-            debugPrint('Failed to resolve ${conflict.relativePath}: version not found');
+            debugPrint(
+              'Failed to resolve ${conflict.relativePath}: version not found',
+            );
             continue;
           }
 
@@ -232,7 +245,9 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
           );
           if (!uploaded) {
             failed++;
-            debugPrint('Failed to resolve ${conflict.relativePath}: upload failed');
+            debugPrint(
+              'Failed to resolve ${conflict.relativePath}: upload failed',
+            );
             continue;
           }
 
@@ -395,42 +410,92 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
                       ),
                     )
                   else
-                    Row(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed:
-                                snapshot.connectionState == ConnectionState.done
-                                ? () => _resolve(
-                                    context,
-                                    widget.conflict,
-                                    keepLocal: true,
-                                  )
-                                : null,
-                            child: const Text(
-                              'Manter local',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed:
+                                    snapshot.connectionState ==
+                                        ConnectionState.done
+                                    ? () => _resolve(
+                                        context,
+                                        widget.conflict,
+                                        keepLocal: true,
+                                      )
+                                    : null,
+                                child: const Text(
+                                  'Manter local',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed:
+                                    snapshot.connectionState ==
+                                        ConnectionState.done
+                                    ? () => _resolve(
+                                        context,
+                                        widget.conflict,
+                                        keepLocal: false,
+                                      )
+                                    : null,
+                                child: const Text(
+                                  'Manter Drive',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed:
-                                snapshot.connectionState == ConnectionState.done
-                                ? () => _resolve(
-                                    context,
-                                    widget.conflict,
-                                    keepLocal: false,
-                                  )
-                                : null,
-                            child: const Text(
-                              'Manter Drive',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextButton.icon(
+                                icon: const Icon(Icons.edit, size: 16),
+                                onPressed:
+                                    snapshot.connectionState ==
+                                        ConnectionState.done
+                                    ? () => _showEditDialog(
+                                        context,
+                                        widget.conflict,
+                                      )
+                                    : null,
+                                label: const Text(
+                                  'Editar manual',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextButton.icon(
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 16,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () =>
+                                    _deleteAndResolve(context, widget.conflict),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                ),
+                                label: const Text(
+                                  'Excluir arquivo',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -441,6 +506,222 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
         ],
       ),
     );
+  }
+
+  Future<void> _showEditDialog(
+    BuildContext context,
+    PersistedSyncConflict conflict,
+  ) async {
+    final obsidian = ref.read(obsidianServiceProvider);
+    final localContent = await obsidian.readFile(conflict.localPath) ?? '';
+    final remoteContent = await obsidian.readFile(conflict.remotePath) ?? '';
+
+    final controller = TextEditingController(
+      text:
+          '<<<<<<< LOCAL\n$localContent\n=======\n$remoteContent\n>>>>>>> DRIVE',
+    );
+
+    if (!context.mounted) return;
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          insetPadding: const EdgeInsets.all(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Editar Arquivo',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    maxLines: null,
+                    expands: true,
+                    textAlignVertical: TextAlignVertical.top,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      hintText: 'Edite o conteúdo do arquivo...',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancelar'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context, controller.text),
+                      child: const Text('Salvar e Resolver'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (result != null) {
+      if (!context.mounted) return;
+      await _resolveWithContent(context, conflict, result);
+    }
+  }
+
+  Future<void> _resolveWithContent(
+    BuildContext context,
+    PersistedSyncConflict conflict,
+    String content,
+  ) async {
+    setState(() => _isResolving = true);
+    HapticFeedback.mediumImpact();
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final obsidian = ref.read(obsidianServiceProvider);
+      final queue = ref.read(syncQueueServiceProvider);
+      final driveSync = ref.read(googleDriveSyncServiceProvider);
+      final authService = ref.read(auth.googleAuthServiceProvider);
+      final settings = ref.read(settingsProvider);
+
+      final client = await authService.ensureClient();
+      if (client == null) throw Exception('Google Drive não está conectado');
+
+      driveSync.init(client);
+      if (settings.driveSyncFolderId.isNotEmpty) {
+        await driveSync.useExistingVaultFolder(settings.driveSyncFolderId);
+      } else {
+        await driveSync.setupVaultFolder(settings.driveSyncFolder);
+      }
+
+      await obsidian.writeFile(conflict.relativePath, content);
+      final hash = driveSync.calculateHash(content);
+      final uploaded = await driveSync.syncFile(
+        conflict.relativePath,
+        content,
+        hash,
+      );
+      if (!uploaded) throw Exception('Não foi possível atualizar o Drive');
+
+      await queue.upsertFileSyncState(
+        relativePath: conflict.relativePath,
+        localHash: hash,
+        remoteHash: hash,
+        baseHash: hash,
+      );
+      await queue.removeConflict(conflict.relativePath);
+
+      ref
+          .read(syncConflictsProvider.notifier)
+          .removeConflict(conflict.relativePath);
+      ref.invalidate(persistedSyncConflictsProvider);
+      ref.invalidate(allObjectsProvider);
+
+      final remaining = await queue.getConflicts();
+      ref
+          .read(syncStatusProvider.notifier)
+          .setStatus(
+            remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
+          );
+
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Conflito resolvido com edição manual')),
+      );
+    } catch (e) {
+      debugPrint('Failed to resolve sync conflict manually: $e');
+      messenger.showSnackBar(SnackBar(content: Text('Erro: $e')));
+    } finally {
+      if (mounted) setState(() => _isResolving = false);
+    }
+  }
+
+  Future<void> _deleteAndResolve(
+    BuildContext context,
+    PersistedSyncConflict conflict,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir arquivo?'),
+        content: Text(
+          'Deseja excluir permanentemente o arquivo "${conflict.relativePath}" de ambos os lados? Esta ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isResolving = true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final queue = ref.read(syncQueueServiceProvider);
+      final obsidian = ref.read(obsidianServiceProvider);
+      final driveSync = ref.read(googleDriveSyncServiceProvider);
+      final authService = ref.read(auth.googleAuthServiceProvider);
+
+      final client = await authService.ensureClient();
+      if (client != null) {
+        driveSync.init(client);
+        final remoteFiles = await driveSync.fetchRemoteFiles();
+        final remoteFile = remoteFiles
+            .where((f) => f.name == conflict.relativePath)
+            .firstOrNull;
+        if (remoteFile != null && remoteFile.id != null) {
+          await driveSync.deleteFile(conflict.relativePath, remoteFile.id!);
+        }
+      }
+
+      await obsidian.deleteFile(conflict.relativePath);
+      await queue.removeFileSyncState(conflict.relativePath);
+      await queue.removeConflict(conflict.relativePath);
+
+      ref
+          .read(syncConflictsProvider.notifier)
+          .removeConflict(conflict.relativePath);
+      ref.invalidate(persistedSyncConflictsProvider);
+      ref.invalidate(allObjectsProvider);
+
+      final remaining = await queue.getConflicts();
+      ref
+          .read(syncStatusProvider.notifier)
+          .setStatus(
+            remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
+          );
+
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Arquivo excluído com sucesso')),
+      );
+    } catch (e) {
+      debugPrint('Failed to delete file and resolve conflict: $e');
+      messenger.showSnackBar(SnackBar(content: Text('Erro ao excluir: $e')));
+    } finally {
+      if (mounted) setState(() => _isResolving = false);
+    }
   }
 
   Future<void> _resolve(

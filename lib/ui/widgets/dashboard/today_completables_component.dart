@@ -48,11 +48,14 @@ class TodayCompletablesComponent extends ConsumerWidget {
                 Expanded(
                   child: Row(
                     children: [
-                      Icon(Icons.checklist_rounded, color: AppColors.textMuted, size: 20),
+                      const Icon(Icons.checklist_rounded, color: AppColors.textMuted, size: 20),
                       const SizedBox(width: 8),
-                      Text(
-                        block.title.isNotEmpty ? block.title : 'Hoje',
-                        style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
+                      Expanded(
+                        child: Text(
+                          block.title.isNotEmpty ? block.title : 'Hoje',
+                          style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
@@ -73,7 +76,7 @@ class TodayCompletablesComponent extends ConsumerWidget {
                   value: progress,
                   minHeight: 6,
                   backgroundColor: AppColors.surfaceVariant,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.success),
+                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.success),
                 ),
               ),
             ),
@@ -89,15 +92,11 @@ class TodayCompletablesComponent extends ConsumerWidget {
               ),
             )
           else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: visibleItems.length,
-              padding: EdgeInsets.zero,
-              itemBuilder: (context, index) {
-                final item = visibleItems[index];
-
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: visibleItems.map((item) {
                 return InkWell(
+                  key: ValueKey(item.id),
                   onTap: () => navigateToObject(context, item.source),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -173,7 +172,7 @@ class TodayCompletablesComponent extends ConsumerWidget {
                     ),
                   ),
                 );
-              },
+              }).toList(),
             ),
         ],
       ),

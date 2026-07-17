@@ -6,26 +6,23 @@ import '../../../models/content_object.dart';
 import '../../../providers/vault_provider.dart';
 import '../../theme.dart';
 import '../../widgets/object_action_wrapper.dart';
-import '../universal_detail_view.dart';
 import '../../widgets/rich_text_editor.dart';
 import '../../widgets/outline_editor.dart';
 import '../../widgets/collection_view.dart';
 import '../../widgets/checklist_view.dart';
 import '../../widgets/markdown_body_view.dart';
+import '../universal_detail_view.dart';
 
 /// Note-specific content section for universal detail view
 List<Widget> buildNoteContentSection(
   BuildContext context,
-  WidgetRef ref,
   Note note,
   bool isEditing,
+  List<Note> childNotes,
   Widget Function(BuildContext, Note) buildNoteEditor,
   Widget Function(BuildContext, Note) buildNoteViewer,
   Widget Function(BuildContext, Note) buildNoteListItem,
 ) {
-  final allObjects = ref.watch(allObjectsProvider).value ?? [];
-  final childNotes = allObjects.whereType<Note>().where((n) => n.parentNoteId == note.id).toList();
-
   return [
     SliverToBoxAdapter(
       child: Padding(
@@ -66,6 +63,7 @@ Widget buildNoteEditor(BuildContext context, WidgetRef ref, Note note) {
   switch (note.subtype) {
     case NoteSubtype.text:
       return RichTextEditor(
+        key: ValueKey('editor_${note.id}'),
         content: note.body,
         expands: false,
         onChanged: (v) {
@@ -75,6 +73,7 @@ Widget buildNoteEditor(BuildContext context, WidgetRef ref, Note note) {
       );
     case NoteSubtype.outline:
       return OutlineEditor(
+        key: ValueKey('editor_${note.id}'),
         initialContent: note.body,
         onChanged: (v) {
           final updated = note.copyWith(body: v);
@@ -83,6 +82,7 @@ Widget buildNoteEditor(BuildContext context, WidgetRef ref, Note note) {
       );
     case NoteSubtype.collection:
       return CollectionView(
+        key: ValueKey('editor_${note.id}'),
         content: note.body,
         onChanged: (v) {
           final updated = note.copyWith(body: v);
@@ -100,6 +100,7 @@ Widget buildNoteViewer(BuildContext context, WidgetRef ref, Note note) {
   switch (note.subtype) {
     case NoteSubtype.outline:
       return OutlineEditor(
+        key: ValueKey('viewer_${note.id}'),
         initialContent: note.body,
         onWikiLinkTap: (slug) => _navigateToSlug(context, ref, slug),
         onChanged: (v) {
@@ -108,9 +109,9 @@ Widget buildNoteViewer(BuildContext context, WidgetRef ref, Note note) {
         },
       );
     case NoteSubtype.collection:
-      return CollectionView(content: note.body);
+      return CollectionView(key: ValueKey('viewer_${note.id}'), content: note.body);
     case NoteSubtype.text:
-      return MarkdownBodyView(content: note.body);
+      return MarkdownBodyView(key: ValueKey('viewer_${note.id}'), content: note.body);
   }
 }
 

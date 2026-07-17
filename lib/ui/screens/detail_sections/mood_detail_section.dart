@@ -20,7 +20,7 @@ List<PropertyCard> buildMoodPropertyCards(MoodDefinition mood) {
   cards.add(PropertyCard(
     icon: Icons.category,
     label: 'Categoria',
-    value: mood.category,
+    value: mood.quadrant.name.toUpperCase(),
   ));
   cards.add(PropertyCard(
     icon: Icons.calendar_today,

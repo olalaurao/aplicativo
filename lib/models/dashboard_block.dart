@@ -11,6 +11,8 @@ enum BlockType {
   weekOverview,
   monthOverview,
   goalsProjectsOverview,
+  pinnedObject,      // Generic pinned ContentObject (any type)
+  trackerAnalysis,   // Chart/stats for a specific tracker or mood
   custom,
   // Legacy types preserved for backward compatibility during migration
   universal,

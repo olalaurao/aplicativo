@@ -13,6 +13,7 @@ import 'vault_files_screen.dart';
 import 'object_conflicts_screen.dart';
 import 'day_theme_screen.dart';
 import 'pillars_screen.dart';
+import 'widgets_management_screen.dart' as widgets_management_screen;
 import '../../providers/google_calendar_provider.dart';
 import '../widgets/navigation_shortcut_picker.dart';
 import '../../providers/vault_provider.dart';
@@ -98,7 +99,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                 _buildSectionHeader('Navigation & Content'),
                 if (_isEditingNav) ...[
                   Padding(
-                    padding: EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.only(bottom: 16),
                     child: Text(
                       'Drag to reorder. Eye icon pins to footer. Shortcuts can be deleted.',
                       style: TextStyle(
@@ -283,6 +284,20 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const AppearanceScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildMenuRow(
+                  context,
+                  'Widgets',
+                  Icons.widgets_outlined,
+                  AppColors.info,
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const widgets_management_screen.WidgetsManagementScreen(),
                       ),
                     );
                   },

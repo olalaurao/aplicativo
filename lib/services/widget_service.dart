@@ -18,6 +18,7 @@ class WidgetService {
   static const _noteProvider = 'QuartzoNoteWidgetProvider';
   // static const _checklistProvider = 'QuartzoChecklistWidgetProvider'; // Not implemented on Android
   static const _dayDialProvider = 'QuartzoDayDialWidgetProvider';
+  static const _monthProvider = 'QuartzoMonthWidgetProvider';
 
   static bool get _isSupportedPlatform => Platform.isAndroid || Platform.isIOS;
 
@@ -63,6 +64,21 @@ class WidgetService {
       'days': days,
     });
     await _updateCalendarProviders();
+  }
+
+  static Future<void> updateMonthWidget({
+    required String title,
+    required String subtitle,
+    required List<Map<String, String>> days,
+    required List<Map<String, dynamic>> monthGrid,
+  }) async {
+    await _saveJson('Quartzo_month', {
+      'selectedTitle': title,
+      'selectedSubtitle': subtitle,
+      'days': days,
+      'monthGrid': monthGrid,
+    });
+    await _update(_monthProvider);
   }
 
   static Future<void> updateNote({
@@ -140,6 +156,7 @@ class WidgetService {
       _update(_quickAddProvider),
       _update(_noteProvider),
       _update(_dayDialProvider),
+      _update(_monthProvider),
     ]);
   }
 

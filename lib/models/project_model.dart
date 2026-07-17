@@ -360,6 +360,7 @@ class Project extends Organizer {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? obsidianPath,
+    List<kpi.KPI>? kpis,
   }) {
     return Project(
       id: id,
@@ -375,6 +376,7 @@ class Project extends Organizer {
       description: description,
       primaryKpiId: primaryKpiId,
       secondaryKpiIds: secondaryKpiIds,
+      kpis: kpis ?? this.kpis,
       taskLinks: taskLinks,
       quickAccessLinks: quickAccessLinks,
       totalPomodoroTime: totalPomodoroTime,
@@ -435,6 +437,7 @@ class Project extends Organizer {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? obsidianPath,
+    List<kpi.KPI>? kpis,
   }) {
     return Project(
       id: id,
@@ -444,6 +447,7 @@ class Project extends Organizer {
       description: description ?? this.description,
       primaryKpiId: primaryKpiId ?? this.primaryKpiId,
       secondaryKpiIds: secondaryKpiIds ?? this.secondaryKpiIds,
+      kpis: kpis ?? this.kpis,
       taskLinks: taskLinks ?? this.taskLinks,
       quickAccessLinks: quickAccessLinks ?? this.quickAccessLinks,
       totalPomodoroTime: totalPomodoroTime ?? this.totalPomodoroTime,

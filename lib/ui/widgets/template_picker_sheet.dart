@@ -65,15 +65,13 @@ class TemplatePickerSheet extends ConsumerWidget {
                       t.title,
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    subtitle: t.description != null
-                        ? Text(
-                            t.description!,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
-                          )
-                        : null,
+                    subtitle: Text(
+                      'Tipo: ${t.templateType.toUpperCase()}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                     onTap: () {
                       onTemplateSelected(t);
                       Navigator.pop(context);

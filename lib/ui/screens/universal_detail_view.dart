@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../providers/history_provider.dart';
 import '../../providers/settings_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -48,7 +49,6 @@ import '../../models/template_model.dart';
 import '../widgets/markdown_body_view.dart';
 import '../widgets/universal_search_picker.dart';
 import '../widgets/conflict_badge.dart';
-import '../../providers/settings_provider.dart';
 import '../forms/create_task_form.dart';
 import '../forms/create_habit_form.dart';
 import '../forms/create_goal_form.dart';
@@ -91,7 +91,6 @@ import 'detail_sections/project_content_section.dart';
 import 'detail_sections/goal_content_section.dart';
 import 'detail_sections/idea_content_section.dart';
 import 'detail_sections/habit_content_section.dart';
-
 
 class _PropRow {
   final String label;
@@ -147,12 +146,16 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   @override
   Widget build(BuildContext context) {
     // Watch active object reactively from the provider - use .select() to only rebuild when this specific object changes
-    final currentObject = ref.watch(
-      allObjectsProvider.select((async) => async.valueOrNull?.cast<ContentObject?>().firstWhere(
-        (o) => o != null && o.id == object.id,
-        orElse: () => null,
-      ))
-    ) ?? object;
+    final currentObject =
+        ref.watch(
+          allObjectsProvider.select(
+            (async) => async.valueOrNull?.cast<ContentObject?>().firstWhere(
+              (o) => o != null && o.id == object.id,
+              orElse: () => null,
+            ),
+          ),
+        ) ??
+        object;
     // Safely update the cached reference after the frame — never during build
     if (!identical(currentObject, object)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -163,7 +166,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final mentionsAsync = ref.watch(backlinksProvider(currentObject.id));
     final conflictGroup = _conflictGroupFor(
       currentObject,
-      ref.watch(conflictingObjectsProvider),
+      ref.watch(conflictingObjectsProvider.select((conflicts) => conflicts)),
     );
 
     return Scaffold(
@@ -176,7 +179,13 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             pinned: true,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                } else {
+                  context.go('/');
+                }
+              },
             ),
             centerTitle: true,
             title: Text(
@@ -258,16 +267,23 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                                 Consumer(
                                   builder: (context, ref, _) {
                                     final linkedObj = ref.watch(
-                                      allObjectsProvider.select((async) => async.value?.cast<ContentObject?>().firstWhere(
-                                        (o) => o != null && o.id == refObj.slug,
-                                        orElse: () => null,
-                                      ))
+                                      allObjectsProvider.select(
+                                        (async) => async.value
+                                            ?.cast<ContentObject?>()
+                                            .firstWhere(
+                                              (o) =>
+                                                  o != null &&
+                                                  o.id == refObj.slug,
+                                              orElse: () => null,
+                                            ),
+                                      ),
                                     );
 
                                     return ListTile(
                                       leading: CircleAvatar(
-                                        backgroundColor: AppTheme.accentColor(context)
-                                            .withValues(alpha: 0.1),
+                                        backgroundColor: AppTheme.accentColor(
+                                          context,
+                                        ).withValues(alpha: 0.1),
                                         child: Icon(
                                           _typeIcon(refObj.type),
                                           size: 18,
@@ -665,7 +681,14 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       ],
       'project': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
       'person': ['edit', 'change_type', 'merge_note', 'delete'],
-      'resource': ['focus', 'edit', 'change_type', 'merge_note', 'archive', 'delete'],
+      'resource': [
+        'focus',
+        'edit',
+        'change_type',
+        'merge_note',
+        'archive',
+        'delete',
+      ],
       'entry': ['edit', 'change_type', 'save_template', 'delete', 'obsidian'],
       'goal': ['edit', 'change_type', 'merge_note', 'archive', 'delete'],
     };
@@ -868,12 +891,16 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
     if (object is Task) {
       cards.addAll(buildTaskPropertyCards(context, ref, object as Task));
-      cards.addAll(_buildLinkedGoogleEventPropertyCards(context, object as Task));
+      cards.addAll(
+        _buildLinkedGoogleEventPropertyCards(context, object as Task),
+      );
     } else if (object is Habit) {
       cards.addAll(buildHabitPropertyCards(object as Habit));
     } else if (object is Project) {
       cards.addAll(buildProjectPropertyCards(context, ref, object as Project));
-      cards.addAll(_buildLinkedGoogleEventPropertyCards(context, object as Project));
+      cards.addAll(
+        _buildLinkedGoogleEventPropertyCards(context, object as Project),
+      );
     } else if (object is Goal) {
       cards.addAll(buildGoalPropertyCards(context, ref, object as Goal));
     } else if (object is IdeaDefinition) {
@@ -884,7 +911,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       cards.addAll(buildPersonPropertyCards(context, ref, object as Person));
     } else if (object is JournalEntry) {
       final mood = _moodForEntry(object as JournalEntry);
-      cards.addAll(buildJournalEntryPropertyCards(object as JournalEntry, mood));
+      cards.addAll(
+        buildJournalEntryPropertyCards(object as JournalEntry, mood),
+      );
     } else if (object is Routine) {
       cards.addAll(buildRoutinePropertyCards(object as Routine, ref, context));
     } else if (object is Pillar) {
@@ -914,7 +943,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
 
     if (cards.isEmpty) return [];
-    
+
     return [
       SliverToBoxAdapter(
         child: _CollapsiblePropertiesSection(
@@ -944,14 +973,21 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     ];
   }
 
-  List<PropertyCard> _buildLinkedGoogleEventPropertyCards(BuildContext context, Object source) {
+  List<PropertyCard> _buildLinkedGoogleEventPropertyCards(
+    BuildContext context,
+    Object source,
+  ) {
     final rows = _buildLinkedGoogleEventRows(context, source);
-    return rows.map((item) => PropertyCard(
-      icon: item.icon ?? Icons.event,
-      label: item.label,
-      value: item.value,
-      onTap: item.onTap,
-    )).toList();
+    return rows
+        .map(
+          (item) => PropertyCard(
+            icon: item.icon ?? Icons.event,
+            label: item.label,
+            value: item.value,
+            onTap: item.onTap,
+          ),
+        )
+        .toList();
   }
 
   List<PropertyGridItem> _buildLinkedGoogleEventRows(
@@ -1045,11 +1081,28 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
     if (object is Project) {
       final project = object as Project;
-      final allObjects = ref.watch(allObjectsProvider).value ?? [];
-      final tasks = allObjects.whereType<Task>().where((t) => t.organizers.any((o) => o.slug == project.slug)).toList();
-      final progress = ProjectProgressCache.getProgress(project.id, project, tasks);
-      final doneCount = ProjectProgressCache.getCompletedTaskCount(project.id, project, tasks);
-      final linkedTasksCount = ProjectProgressCache.getLinkedTaskCount(project.id, project, tasks);
+      final allObjects =
+          ref.watch(allObjectsProvider.select((async) => async.valueOrNull)) ??
+          [];
+      final tasks = allObjects
+          .whereType<Task>()
+          .where((t) => t.organizers.any((o) => o.slug == project.slug))
+          .toList();
+      final progress = ProjectProgressCache.getProgress(
+        project.id,
+        project,
+        tasks,
+      );
+      final doneCount = ProjectProgressCache.getCompletedTaskCount(
+        project.id,
+        project,
+        tasks,
+      );
+      final linkedTasksCount = ProjectProgressCache.getLinkedTaskCount(
+        project.id,
+        project,
+        tasks,
+      );
 
       return buildProjectContentSection(
         context,
@@ -1061,6 +1114,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         linkedTasksCount,
         _buildRotationTasksSection,
         _buildSnapshotsSection,
+        _buildKPICard,
       );
     }
     if (object is Goal) {
@@ -1136,11 +1190,16 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       );
     }
     if (object is Note) {
+      final note = object as Note;
+      final allNotes = ref.watch(notesListProvider);
+      final childNotes = allNotes
+          .where((n) => n.parentNoteId == note.id)
+          .toList();
       return buildNoteContentSection(
         context,
-        ref,
-        object as Note,
+        note,
         _isEditing,
+        childNotes,
         _buildNoteEditor,
         _buildNoteViewer,
         _buildNoteListItem,
@@ -1151,11 +1210,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: buildRoutineContentSection(
-              object as Routine,
-              ref,
-              context,
-            ),
+            child: buildRoutineContentSection(object as Routine, ref, context),
           ),
         ),
       ];
@@ -1167,6 +1222,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     switch (note.subtype) {
       case NoteSubtype.text:
         return RichTextEditor(
+          key: ValueKey('editor_${note.id}'),
           content: note.body,
           expands: false,
           onChanged: (v) {
@@ -1177,6 +1233,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         );
       case NoteSubtype.outline:
         return OutlineEditor(
+          key: ValueKey('editor_${note.id}'),
           initialContent: note.body,
           onChanged: (v) {
             final updated = note.copyWith(body: v);
@@ -1186,6 +1243,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         );
       case NoteSubtype.collection:
         return CollectionView(
+          key: ValueKey('editor_${note.id}'),
           content: note.body,
           onChanged: (v) {
             final updated = note.copyWith(body: v);
@@ -1203,6 +1261,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     switch (note.subtype) {
       case NoteSubtype.outline:
         return OutlineEditor(
+          key: ValueKey('viewer_${note.id}'),
           initialContent: note.body,
           onWikiLinkTap: (slug) => _navigateToSlug(context, ref, slug),
           onChanged: (v) {
@@ -1212,9 +1271,15 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           },
         );
       case NoteSubtype.collection:
-        return CollectionView(content: note.body);
+        return CollectionView(
+          key: ValueKey('viewer_${note.id}'),
+          content: note.body,
+        );
       case NoteSubtype.text:
-        return MarkdownBodyView(content: note.body);
+        return MarkdownBodyView(
+          key: ValueKey('viewer_${note.id}'),
+          content: note.body,
+        );
     }
   }
 
@@ -1348,7 +1413,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
-  Widget _buildMoodFrequencyChart(List<JournalEntry> entries) {
+  Widget _buildMoodFrequencyChart(List<JournalEntry> entries, Color color) {
     if (entries.isEmpty) return const Center(child: Text('Not enough data'));
 
     // Group by day for last 14 days
@@ -1372,13 +1437,13 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           LineChartBarData(
             spots: spots,
             isCurved: true,
-            color: AppTheme.accentColor(context),
+            color: color,
             barWidth: 3,
             isStrokeCapRound: true,
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              color: AppTheme.accentColor(context).withValues(alpha: 0.1),
+              color: color.withValues(alpha: 0.1),
             ),
           ),
         ],
@@ -1395,12 +1460,39 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       child: ObjectActionWrapper(
         object: item,
         child: InkWell(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => UniversalDetailView(object: item),
-            ),
-          ),
+          onTap: () async {
+            if (item.type == 'raw_markdown') {
+              final vaultName = ref.read(settingsProvider).vaultName;
+              final path = item.obsidianPath;
+              if (path.isEmpty) return;
+              final encodedVault = Uri.encodeComponent(vaultName);
+              final cleanPath = path.endsWith('.md')
+                  ? path.substring(0, path.length - 3)
+                  : path;
+              final encodedFile = Uri.encodeComponent(cleanPath);
+              final uri = Uri.parse(
+                'obsidian://open?vault=$encodedVault&file=$encodedFile',
+              );
+              if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Obsidian not found. Please install the app.',
+                      ),
+                    ),
+                  );
+                }
+              }
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => UniversalDetailView(object: item),
+                ),
+              );
+            }
+          },
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.all(12),
@@ -1408,9 +1500,13 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             child: Row(
               children: [
                 Icon(
-                  _typeIcon(item.type),
+                  item.type == 'raw_markdown'
+                      ? Icons.description_outlined
+                      : _typeIcon(item.type),
                   size: 18,
-                  color: _typeColor(item.type),
+                  color: item.type == 'raw_markdown'
+                      ? AppColors.textSecondary
+                      : _typeColor(item.type),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1422,8 +1518,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     ),
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
+                Icon(
+                  item.type == 'raw_markdown'
+                      ? Icons.open_in_new_rounded
+                      : Icons.chevron_right_rounded,
                   size: 16,
                   color: AppColors.textMuted,
                 ),
@@ -1506,7 +1604,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   color: AppTheme.accentColor(context).withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: AppTheme.accentColor(context).withValues(alpha: 0.18),
+                    color: AppTheme.accentColor(
+                      context,
+                    ).withValues(alpha: 0.18),
                   ),
                 ),
                 child: Column(
@@ -1556,8 +1656,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       return CircleAvatar(
         radius: 22,
         backgroundColor: AppColors.surfaceVariant,
-        backgroundImage:
-            person.photo != null ? NetworkImage(person.photo!) : null,
+        backgroundImage: person.photo != null
+            ? NetworkImage(person.photo!)
+            : null,
         child: person.photo == null
             ? Text(
                 person.title.isNotEmpty
@@ -1612,7 +1713,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
         if (note.pinned) ...[
           const SizedBox(width: 8),
           const Text('📌', style: TextStyle(fontSize: 14)),
@@ -1688,7 +1792,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           children: [
             Text(
               row.label,
-              style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
             ),
             const Spacer(),
             if (row.trailing != null)
@@ -1702,7 +1809,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: valueColor,
-                    fontStyle: row.isEmpty ? FontStyle.italic : FontStyle.normal,
+                    fontStyle: row.isEmpty
+                        ? FontStyle.italic
+                        : FontStyle.normal,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1713,7 +1822,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               Icon(
                 Icons.chevron_right_rounded,
                 size: 16,
-                color: row.isOverdue ? AppColors.error : AppTheme.accentColor(context),
+                color: row.isOverdue
+                    ? AppColors.error
+                    : AppTheme.accentColor(context),
               ),
             ],
           ],
@@ -1742,7 +1853,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               const SizedBox(width: 4),
               Text(
                 label,
-                style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textMuted,
+                ),
               ),
             ],
           ),
@@ -1752,7 +1866,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: isEmpty ? AppColors.textMuted.withValues(alpha: 0.5) : null,
+              color: isEmpty
+                  ? AppColors.textMuted.withValues(alpha: 0.5)
+                  : null,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -1876,8 +1992,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       return const SizedBox.shrink();
     }
     return GestureDetector(
-      onTap: () =>
-          _onPropertyTap(context, ref, 'Status', _getStatus(obj)),
+      onTap: () => _onPropertyTap(context, ref, 'Status', _getStatus(obj)),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1899,7 +2014,11 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               ),
             ),
             const Spacer(),
-            Icon(Icons.chevron_right_rounded, color: _statusColor(obj), size: 16),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: _statusColor(obj),
+              size: 16,
+            ),
           ],
         ),
       ),
@@ -2353,7 +2472,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.accentColor(context)),
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.accentColor(context),
+            ),
             child: const Text('Mesclar'),
           ),
         ],
@@ -2434,7 +2555,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.accentColor(context)),
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.accentColor(context),
+            ),
             child: const Text('SALVAR'),
           ),
         ],
@@ -2468,18 +2591,19 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   void _saveAsSystem(BuildContext context, WidgetRef ref) {
     if (object is! Task) return;
     final task = object as Task;
-    
+
     // Convert Task subtasks to SystemSteps
-    final steps = task.subtasks.map((st) => SystemStep(
-      title: st.title,
-      substeps: [],
-    )).toList();
+    final steps = task.subtasks
+        .map((st) => SystemStep(title: st.title, substeps: []))
+        .toList();
 
     // Create a new SystemDefinition with pre-filled data
     final system = SystemDefinition(
       title: task.title,
       trigger: '',
-      estimatedMinutes: (task.estimatedMinutes ?? 0) > 0 ? task.estimatedMinutes! : 0,
+      estimatedMinutes: (task.estimatedMinutes ?? 0) > 0
+          ? task.estimatedMinutes!
+          : 0,
       steps: steps,
       description: task.notes.join('\n'),
     );
@@ -2517,11 +2641,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         'label': 'Resource',
         'icon': Icons.menu_book_outlined,
       },
-      {
-        'type': 'tracker',
-        'label': 'Tracker',
-        'icon': Icons.analytics_outlined,
-      },
+      {'type': 'tracker', 'label': 'Tracker', 'icon': Icons.analytics_outlined},
     ];
 
     showModalBottomSheet<void>(
@@ -2849,7 +2969,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     required IconData icon,
     required bool highlighted,
   }) {
-    final color = highlighted ? AppTheme.accentColor(context) : AppColors.textMuted;
+    final color = highlighted
+        ? AppTheme.accentColor(context)
+        : AppColors.textMuted;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -3084,12 +3206,14 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       onSelected: (value) async {
         final previousState = project.projectState;
         project.projectState = value;
-        
+
         // F2.12: If project is being completed and has a scheduler, create new project
-        if (previousState != ProjectState.completed && value == ProjectState.completed && project.scheduler != null) {
+        if (previousState != ProjectState.completed &&
+            value == ProjectState.completed &&
+            project.scheduler != null) {
           await _handleScheduledProjectRestart(context, ref, project);
         }
-        
+
         await ref.read(vaultProvider.notifier).updateObject(project);
       },
     );
@@ -3143,7 +3267,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Projeto "${newProject.title}" criado para ${DateFormat('dd/MM/yyyy').format(nextDate)}'),
+          content: Text(
+            'Projeto "${newProject.title}" criado para ${DateFormat('dd/MM/yyyy').format(nextDate)}',
+          ),
         ),
       );
     }
@@ -3365,14 +3491,14 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           return 'Habit';
         case OrganizerType.tracker:
           return 'Tracker';
-      case OrganizerType.dayTheme:
-        return 'Day Theme';
-      case OrganizerType.timeBlock:
-        return 'Time Block';
-      case OrganizerType.routine:
-        return 'Routine';
-      case OrganizerType.value:
-        return 'Value';
+        case OrganizerType.dayTheme:
+          return 'Day Theme';
+        case OrganizerType.timeBlock:
+          return 'Time Block';
+        case OrganizerType.routine:
+          return 'Routine';
+        case OrganizerType.value:
+          return 'Value';
       }
     }
     switch (obj.type) {
@@ -3429,9 +3555,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   IconData _typeIcon(String type) {
     // Use Object Identification icons if available, otherwise fallback to hardcoded icons
     final settings = ref.read(settingsProvider);
-    final iconData = ObjectIcons.iconDataForTypeWithSignatures(type, settings.typeSignatures);
+    final iconData = ObjectIcons.iconDataForTypeWithSignatures(
+      type,
+      settings.typeSignatures,
+    );
     if (iconData != null) return iconData;
-    
+
     // Fallback to hardcoded icons
     switch (type) {
       case 'task':
@@ -3458,23 +3587,45 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   Widget _buildKPICard(
     BuildContext context,
     WidgetRef ref,
-    Goal goal,
+    dynamic parent,
     KPI kpi,
   ) {
     // Only watch providers that the specific KPI source type requires
     // Use .select() to narrow to the specific linked object when possible
     final habits = kpi.dataSource.sourceType == DataSourceType.habit
-        ? ref.watch(habitsProvider.select((habits) => habits.where((h) => h.id == kpi.sourceId || h.slug == kpi.sourceId).toList()))
+        ? ref.watch(
+            habitsProvider.select(
+              (habits) => habits
+                  .where((h) => h.id == kpi.sourceId || h.slug == kpi.sourceId)
+                  .toList(),
+            ),
+          )
         : <Habit>[];
-    final trackerRecords = kpi.dataSource.sourceType == DataSourceType.trackerField ? ref.watch(trackingRecordsProvider) : <TrackingRecord>[];
-    final entries = kpi.dataSource.sourceType == DataSourceType.entry ? ref.watch(allEntriesProvider) : <JournalEntry>[];
+    final trackerRecords =
+        kpi.dataSource.sourceType == DataSourceType.trackerField
+        ? ref.watch(
+            trackingRecordsProvider.select((records) => records.toList()),
+          )
+        : <TrackingRecord>[];
+    final entries = kpi.dataSource.sourceType == DataSourceType.entry
+        ? ref.watch(allEntriesProvider.select((entries) => entries.toList()))
+        : <JournalEntry>[];
     final moods = <MoodDefinition>[]; // Mood-based KPIs not currently supported
-    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    final allObjects =
+        ref.watch(allObjectsProvider.select((async) => async.valueOrNull)) ??
+        [];
     final notes = kpi.dataSource.sourceType == DataSourceType.collection
-        ? allObjects.whereType<Note>().where((n) => n.id == kpi.sourceId).toList()
+        ? allObjects
+              .whereType<Note>()
+              .where((n) => n.id == kpi.sourceId)
+              .toList()
         : <Note>[];
     // subtasks and timeSpent need to scan ALL tasks to find those linked to the organizer
-    final tasks = (kpi.dataSource.sourceType == DataSourceType.subtasks || kpi.dataSource.sourceType == DataSourceType.timeSpent) ? allObjects.whereType<Task>().toList() : <Task>[];
+    final tasks =
+        (kpi.dataSource.sourceType == DataSourceType.subtasks ||
+            kpi.dataSource.sourceType == DataSourceType.timeSpent)
+        ? allObjects.whereType<Task>().toList()
+        : <Task>[];
 
     final currentValue = KPIEngine.calculateKPIValue(
       kpi: kpi,
@@ -3577,15 +3728,19 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => _incrementManualKpi(ref, goal, kpi, 1),
+                    onPressed: () => _incrementManualKpi(ref, parent, kpi, 1),
                     child: const Text('+1'),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () =>
-                        _showManualKpiIncrementDialog(context, ref, goal, kpi),
+                    onPressed: () => _showManualKpiIncrementDialog(
+                      context,
+                      ref,
+                      parent,
+                      kpi,
+                    ),
                     child: const Text('+N'),
                   ),
                 ),
@@ -3609,7 +3764,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 value: progress,
                 backgroundColor: AppColors.surfaceVariant,
                 valueColor: AlwaysStoppedAnimation<Color>(
-                  isComplete ? AppColors.success : AppTheme.accentColor(context),
+                  isComplete
+                      ? AppColors.success
+                      : AppTheme.accentColor(context),
                 ),
                 minHeight: 8,
               ),
@@ -3620,12 +3777,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
   }
 
-
-
   Future<void> _showManualKpiIncrementDialog(
     BuildContext context,
     WidgetRef ref,
-    Goal goal,
+    dynamic parent,
     KPI kpi,
   ) async {
     final controller = TextEditingController(text: '1');
@@ -3664,16 +3819,19 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     );
     controller.dispose();
     if (amount == null || amount <= 0) return;
-    await _incrementManualKpi(ref, goal, kpi, amount);
+    await _incrementManualKpi(ref, parent, kpi, amount);
   }
 
   Future<void> _incrementManualKpi(
     WidgetRef ref,
-    Goal goal,
+    dynamic parent,
     KPI kpi,
     double amount,
   ) async {
-    final updatedKpis = goal.kpis.map((candidate) {
+    final List<KPI> parentKpis = parent is Goal
+        ? parent.kpis
+        : (parent is Project ? parent.kpis : const []);
+    final updatedKpis = parentKpis.map((candidate) {
       if (candidate.id != kpi.id) return candidate;
       final nextValue = candidate.currentValue + amount;
       return KPI(
@@ -3694,9 +3852,15 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       );
     }).toList();
 
-    await ref
-        .read(vaultProvider.notifier)
-        .updateObject(goal.copyWith(kpis: updatedKpis));
+    if (parent is Goal) {
+      await ref
+          .read(vaultProvider.notifier)
+          .updateObject(parent.copyWith(kpis: updatedKpis));
+    } else if (parent is Project) {
+      await ref
+          .read(vaultProvider.notifier)
+          .updateObject(parent.copyWith(kpis: updatedKpis));
+    }
     HapticFeedback.lightImpact();
   }
 
@@ -3782,7 +3946,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 minHeight: 8,
                 backgroundColor: AppColors.surfaceVariant,
                 valueColor: AlwaysStoppedAnimation<Color>(
-                  isOvertime ? AppColors.warning : AppTheme.accentColor(context),
+                  isOvertime
+                      ? AppColors.warning
+                      : AppTheme.accentColor(context),
                 ),
               ),
             ),
@@ -3810,10 +3976,16 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   .replaceAll(']]', '')
                   .trim();
               final blockingTask = ref.watch(
-                allObjectsProvider.select((async) => async.value?.cast<ContentObject?>().firstWhere(
-                  (o) => o is Task && (o.slug == cleanRef || o.id == cleanRef),
-                  orElse: () => null,
-                ) as Task?)
+                allObjectsProvider.select(
+                  (async) =>
+                      async.value?.cast<ContentObject?>().firstWhere(
+                            (o) =>
+                                o is Task &&
+                                (o.slug == cleanRef || o.id == cleanRef),
+                            orElse: () => null,
+                          )
+                          as Task?,
+                ),
               );
 
               final isFinalized = blockingTask?.stage == TaskStage.finalized;
@@ -4079,10 +4251,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           children: [
             const Text(
               'Highlights',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -4102,52 +4271,54 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           ],
         ),
         const SizedBox(height: 12),
-        ...highlights.map((highlight) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: AppTheme.cardDecoration(context),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 3,
-                      height: double.infinity,
-                      decoration: BoxDecoration(
-                        color: AppTheme.accentColor(context),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
+        ...highlights.map(
+          (highlight) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: AppTheme.cardDecoration(context),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 3,
+                    height: double.infinity,
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentColor(context),
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          highlight.text,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontStyle: FontStyle.italic,
+                            height: 1.4,
+                          ),
+                        ),
+                        if (highlight.date != null) ...[
+                          const SizedBox(height: 4),
                           Text(
-                            highlight.text,
+                            highlight.date!,
                             style: const TextStyle(
-                              fontSize: 14,
-                              fontStyle: FontStyle.italic,
-                              height: 1.4,
+                              fontSize: 11,
+                              color: AppColors.textMuted,
                             ),
                           ),
-                          if (highlight.date != null) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              highlight.date!,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textMuted,
-                              ),
-                            ),
-                          ],
                         ],
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            )),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -4165,10 +4336,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           children: [
             const Text(
               'Sinopse',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             TextButton(
               onPressed: () => setState(() => _isEditing = !_isEditing),
@@ -4183,12 +4351,11 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           decoration: AppTheme.cardDecoration(context),
           child: _isEditing
               ? RichTextEditor(
+                  key: ValueKey('synopsis_${resource.id}'),
                   content: resource.synopsis ?? '',
                   onChanged: (newVal) {
                     final updated = resource.copyWith(synopsis: newVal);
-                    ref
-                        .read(vaultProvider.notifier)
-                        .updateObject(updated);
+                    ref.read(vaultProvider.notifier).updateObject(updated);
                     setState(() => object = updated);
                   },
                 )
@@ -4300,7 +4467,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   '$doneCount de $total tarefas',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-                const Text('hoje', style: TextStyle(color: AppColors.textMuted)),
+                const Text(
+                  'hoje',
+                  style: TextStyle(color: AppColors.textMuted),
+                ),
               ],
             ),
             const SizedBox(height: 20),
@@ -4324,7 +4494,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                       child: Row(
                         children: [
                           if (section.emoji != null) ...[
-                            Text(section.emoji!, style: const TextStyle(fontSize: 16)),
+                            Text(
+                              section.emoji!,
+                              style: const TextStyle(fontSize: 16),
+                            ),
                             const SizedBox(width: 6),
                           ],
                           Text(
@@ -4368,7 +4541,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                                 AnimatedSwitcher(
                                   duration: const Duration(milliseconds: 150),
                                   transitionBuilder: (child, anim) =>
-                                      ScaleTransition(scale: anim, child: child),
+                                      ScaleTransition(
+                                        scale: anim,
+                                        child: child,
+                                      ),
                                   child: Container(
                                     key: ValueKey(done),
                                     width: 44,
@@ -4379,7 +4555,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                                       height: 24,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
-                                        color: done ? habitColor : Colors.transparent,
+                                        color: done
+                                            ? habitColor
+                                            : Colors.transparent,
                                         border: Border.all(
                                           color: done
                                               ? habitColor
@@ -4459,7 +4637,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               rows: [
                 _PropRow(
                   label: 'Progresso',
-                  value: '${(habit.dailyGoal > 0 ? (habit.isCompletedToday ? 1.0 : 0.0) * 100 : 0).round()}%',
+                  value:
+                      '${(habit.dailyGoal > 0 ? (habit.isCompletedToday ? 1.0 : 0.0) * 100 : 0).round()}%',
                   trailing: SizedBox(
                     width: 44,
                     height: 44,
@@ -4581,8 +4760,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        decoration:
-                            done ? TextDecoration.lineThrough : TextDecoration.none,
+                        decoration: done
+                            ? TextDecoration.lineThrough
+                            : TextDecoration.none,
                         color: done ? AppColors.textMuted : null,
                       ),
                     ),
@@ -4615,7 +4795,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               'oncePerPeriod' =>
                 t.rotationFrequencyType == RotationFrequencyType.oncePerPeriod,
               'everyNRotations' =>
-                t.rotationFrequencyType == RotationFrequencyType.everyNRotations,
+                t.rotationFrequencyType ==
+                    RotationFrequencyType.everyNRotations,
               _ => true,
             };
           }).toList();
@@ -4642,8 +4823,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               ),
             ),
             TextButton(
-              onPressed: () =>
-                  navigateToRotationOverview(context, project.id),
+              onPressed: () => navigateToRotationOverview(context, project.id),
               child: const Text('Ver rotação completa'),
             ),
           ],
@@ -4760,9 +4940,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     } else if (task.rotationFrequencyType ==
         RotationFrequencyType.everyNRotations) {
       final next = RotationService.nextDueDateForEveryN(task, project);
-      trailing = next != null
-          ? '→ ${DateFormat('MMM').format(next)}'
-          : '→ —';
+      trailing = next != null ? '→ ${DateFormat('MMM').format(next)}' : '→ —';
     }
 
     return ListTile(
@@ -4772,20 +4950,14 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         height: 10,
         decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
       ),
-      title: Text(
-        task.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      title: Text(task.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: Text(
         trailing,
         style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
       ),
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => UniversalDetailView(object: task),
-        ),
+        MaterialPageRoute(builder: (_) => UniversalDetailView(object: task)),
       ),
     );
   }
@@ -4795,7 +4967,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     if (upcoming.isEmpty) return '';
     final next = upcoming.first;
     final allObjects = ref.read(allObjectsProvider).value ?? [];
-    final taskCount = allObjects.whereType<Task>()
+    final taskCount = allObjects
+        .whereType<Task>()
         .where((t) => t.rotationGroupId == next.group.id)
         .length;
     return 'Próxima rotação: ${next.group.emoji ?? ''} ${next.group.name} · '
@@ -5010,7 +5183,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
   Widget _buildBreadcrumbs(BuildContext context, WidgetRef ref) {
     // Removed object == null check because object is late and it causes dead code compiler crash
-    final history = ref.watch(historyProvider);
+    final history = ref.watch(
+      historyProvider.select((history) => history.toList()),
+    );
     if (history.length < 2) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
@@ -5296,19 +5471,17 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       final data = ref.watch(dailyNoteDataProvider(dateStr));
       final raw = data[linksKey];
       if (raw is! List || raw.isEmpty) continue;
-      final refs = raw
-          .map((item) {
-            final link = item.toString();
-            return VaultLinkRef.fromMap({
-              'link': link,
-              'display_title': link
-                  .replaceAll('[[', '')
-                  .replaceAll(']]', '')
-                  .split('^')
-                  .first,
-            });
-          })
-          .toList();
+      final refs = raw.map((item) {
+        final link = item.toString();
+        return VaultLinkRef.fromMap({
+          'link': link,
+          'display_title': link
+              .replaceAll('[[', '')
+              .replaceAll(']]', '')
+              .split('^')
+              .first,
+        });
+      }).toList();
       dayEntries.add((date: date, refs: refs));
     }
 
@@ -5359,10 +5532,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 children: [
                   const Text(
                     'Itens mais vinculados',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                   const Spacer(),
                   _linkChartDaysChip(7),
@@ -5405,7 +5575,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            onPressed: () => _openLinkedRef(context, ref, refItem),
+                            onPressed: () =>
+                                _openLinkedRef(context, ref, refItem),
                           );
                         }).toList(),
                       ),
@@ -5510,9 +5681,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       if (note != null) {
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => UniversalDetailView(object: note!),
-          ),
+          MaterialPageRoute(builder: (_) => UniversalDetailView(object: note!)),
         );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Linha: ${refItem.displayTitle}')),
@@ -5675,9 +5844,6 @@ class _SubtaskListViewState extends State<_SubtaskListView> {
   }
 }
 
-
-
-
 class _CollapsiblePropertiesSection extends StatefulWidget {
   final String title;
   final Widget child;
@@ -5688,10 +5854,12 @@ class _CollapsiblePropertiesSection extends StatefulWidget {
   });
 
   @override
-  State<_CollapsiblePropertiesSection> createState() => _CollapsiblePropertiesSectionState();
+  State<_CollapsiblePropertiesSection> createState() =>
+      _CollapsiblePropertiesSectionState();
 }
 
-class _CollapsiblePropertiesSectionState extends State<_CollapsiblePropertiesSection> {
+class _CollapsiblePropertiesSectionState
+    extends State<_CollapsiblePropertiesSection> {
   bool _isExpanded = false;
 
   @override
@@ -5706,11 +5874,7 @@ class _CollapsiblePropertiesSectionState extends State<_CollapsiblePropertiesSec
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-                Icon(
-                  Icons.tune_rounded,
-                  size: 16,
-                  color: AppColors.textMuted,
-                ),
+                Icon(Icons.tune_rounded, size: 16, color: AppColors.textMuted),
                 const SizedBox(width: 8),
                 Text(
                   widget.title,
@@ -5723,7 +5887,9 @@ class _CollapsiblePropertiesSectionState extends State<_CollapsiblePropertiesSec
                 ),
                 const Spacer(),
                 Icon(
-                  _isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                  _isExpanded
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
                   size: 20,
                   color: AppColors.textMuted,
                 ),
@@ -5751,10 +5917,7 @@ class _InPageSearchSheet extends StatefulWidget {
   final String content;
   final NoteSubtype subtype;
 
-  const _InPageSearchSheet({
-    required this.content,
-    required this.subtype,
-  });
+  const _InPageSearchSheet({required this.content, required this.subtype});
 
   @override
   State<_InPageSearchSheet> createState() => _InPageSearchSheetState();
@@ -5808,7 +5971,9 @@ class _InPageSearchSheetState extends State<_InPageSearchSheet> {
   void _previousMatch() {
     if (_matchIndices.isEmpty) return;
     setState(() {
-      _currentMatchIndex = (_currentMatchIndex - 1 + _matchIndices.length) % _matchIndices.length;
+      _currentMatchIndex =
+          (_currentMatchIndex - 1 + _matchIndices.length) %
+          _matchIndices.length;
     });
   }
 
@@ -5905,4 +6070,3 @@ class _InPageSearchSheetState extends State<_InPageSearchSheet> {
     return '...$context...';
   }
 }
-

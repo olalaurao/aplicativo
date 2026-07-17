@@ -265,7 +265,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                               ),
                               child: SafeArea(
                                 top: false,
-                                child: BottomNavigationBar(
+                              child: BottomNavigationBar(
                                   currentIndex: currentIndex,
                                   onTap: (int index) => _onItemTapped(
                                     index,
@@ -273,69 +273,51 @@ class _AppShellState extends ConsumerState<AppShell> {
                                     bottomBarItems,
                                   ),
                                   type: BottomNavigationBarType.fixed,
-                                  backgroundColor: Colors
-                                      .transparent, // Important for glass effect
+                                  backgroundColor: Colors.transparent,
                                   elevation: 0,
                                   selectedFontSize: 10,
                                   unselectedFontSize: 10,
                                   selectedItemColor: AppTheme.accentColor(context),
                                   unselectedItemColor: AppColors.textMuted,
-                                  items: bottomBarItems.map((item) {
-                                    final iconWidget = Icon(
-                                      item.icon,
-                                      size: 22,
+                                  items: () {
+                                    // Read counts ONCE outside the map to avoid ref.watch inside item builder
+                                    final inboxCnt = ref.watch(inboxCountProvider);
+                                    final overdueCnt = ref.watch(overdueCountProvider);
+                                    final isInboxInBottomBar = bottomBarItems.any(
+                                      (it) => it.section == NavSection.inbox,
                                     );
-                                    final activeIconWidget = Icon(
-                                      item.activeIcon,
-                                      size: 22,
-                                    );
-                                    final isInboxInBottomBar = bottomBarItems
-                                        .any(
-                                          (it) =>
-                                              it.section == NavSection.inbox,
-                                        );
-                                    final isMoreWithInboxBadge =
-                                        item.section == NavSection.more &&
-                                        !isInboxInBottomBar &&
-                                        ref.watch(inboxCountProvider) > 0;
-                                    final isPlannerWithOverdueBadge =
-                                        item.section == NavSection.planner &&
-                                        ref.watch(overdueCountProvider) > 0;
-                                    final count =
-                                        item.section == NavSection.inbox
-                                        ? ref.watch(inboxCountProvider)
-                                        : (isMoreWithInboxBadge
-                                              ? ref.watch(inboxCountProvider)
-                                              : (isPlannerWithOverdueBadge
-                                                    ? ref.watch(overdueCountProvider)
-                                                    : 0));
+                                    return bottomBarItems.map((item) {
+                                      final iconWidget = Icon(item.icon, size: 22);
+                                      final activeIconWidget = Icon(item.activeIcon, size: 22);
+                                      final isMoreWithInboxBadge =
+                                          item.section == NavSection.more &&
+                                          !isInboxInBottomBar &&
+                                          inboxCnt > 0;
+                                      final isPlannerWithOverdueBadge =
+                                          item.section == NavSection.planner && overdueCnt > 0;
+                                      final count = item.section == NavSection.inbox
+                                          ? inboxCnt
+                                          : (isMoreWithInboxBadge
+                                                ? inboxCnt
+                                                : (isPlannerWithOverdueBadge ? overdueCnt : 0));
 
-                                    return BottomNavigationBarItem(
-                                      icon: Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 4,
+                                      return BottomNavigationBarItem(
+                                        icon: Padding(
+                                          padding: const EdgeInsets.only(bottom: 4),
+                                          child: count > 0
+                                              ? Badge(label: Text(count.toString()), child: iconWidget)
+                                              : iconWidget,
                                         ),
-                                        child: count > 0
-                                            ? Badge(
-                                                label: Text(count.toString()),
-                                                child: iconWidget,
-                                              )
-                                            : iconWidget,
-                                      ),
-                                      activeIcon: Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 4,
+                                        activeIcon: Padding(
+                                          padding: const EdgeInsets.only(bottom: 4),
+                                          child: count > 0
+                                              ? Badge(label: Text(count.toString()), child: activeIconWidget)
+                                              : activeIconWidget,
                                         ),
-                                        child: count > 0
-                                            ? Badge(
-                                                label: Text(count.toString()),
-                                                child: activeIconWidget,
-                                              )
-                                            : activeIconWidget,
-                                      ),
-                                      label: item.label,
-                                    );
-                                  }).toList(),
+                                        label: item.label,
+                                      );
+                                    }).toList();
+                                  }(),
                                 ),
                               ),
                             ),
@@ -518,111 +500,110 @@ class _AppShellState extends ConsumerState<AppShell> {
 
           // Navigation Items
           Expanded(
-            child: ListView.builder(
-              itemCount: items.length,
-              padding: EdgeInsets.symmetric(horizontal: isSpacious ? 12 : 8),
-              itemBuilder: (context, index) {
-                final item = items[index];
-                final isSelected = index == currentIndex;
-                final isInbox = item.section == NavSection.inbox;
-                final isMore = item.section == NavSection.more;
-                final isPlanner = item.section == NavSection.planner;
-                final isInboxInItems = items.any(
-                  (it) => it.section == NavSection.inbox,
-                );
-                final isMoreWithInboxBadge =
-                    isMore &&
-                    !isInboxInItems &&
-                    ref.watch(inboxCountProvider) > 0;
-                final isPlannerWithOverdueBadge =
-                    isPlanner &&
-                    ref.watch(overdueCountProvider) > 0;
+            child: Builder(builder: (context) {
+              // Read counts OUTSIDE itemBuilder to prevent ref.watch inside ListView
+              final inboxCount = ref.watch(inboxCountProvider);
+              final overdueCount = ref.watch(overdueCountProvider);
+              final isInboxInItems = items.any((it) => it.section == NavSection.inbox);
 
-                final count = isInbox
-                    ? ref.watch(inboxCountProvider)
-                    : (isMoreWithInboxBadge
-                          ? ref.watch(inboxCountProvider)
-                          : (isPlannerWithOverdueBadge
-                                ? ref.watch(overdueCountProvider)
-                                : 0));
+              return ListView.builder(
+                itemCount: items.length,
+                padding: EdgeInsets.symmetric(horizontal: isSpacious ? 12 : 8),
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  final isSelected = index == currentIndex;
+                  final isInbox = item.section == NavSection.inbox;
+                  final isMore = item.section == NavSection.more;
+                  final isPlanner = item.section == NavSection.planner;
 
-                final iconWidget = Icon(
-                  isSelected ? item.activeIcon : item.icon,
-                  color: isSelected ? AppTheme.accentColor(context) : AppColors.textMuted,
-                  size: 24,
-                );
+                  final isMoreWithInboxBadge = isMore && !isInboxInItems && inboxCount > 0;
+                  final isPlannerWithOverdueBadge = isPlanner && overdueCount > 0;
 
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: InkWell(
-                    onTap: () => _onItemTapped(index, context, items),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: isSpacious ? 16 : 0,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppTheme.accentColor(context).withValues(alpha: 0.1)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: isSpacious
-                            ? MainAxisAlignment.start
-                            : MainAxisAlignment.center,
-                        children: [
-                          count > 0 && !isSpacious
-                              ? Badge(
-                                  label: Text(count.toString()),
-                                  child: iconWidget,
-                                )
-                              : iconWidget,
-                          if (isSpacious) ...[
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Text(
-                                item.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                  color: isSelected
-                                      ? AppTheme.accentColor(context)
-                                      : AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                            if (count > 0)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.accentColor(context),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
+                  final count = isInbox
+                      ? inboxCount
+                      : (isMoreWithInboxBadge
+                            ? inboxCount
+                            : (isPlannerWithOverdueBadge ? overdueCount : 0));
+
+                  final iconWidget = Icon(
+                    isSelected ? item.activeIcon : item.icon,
+                    color: isSelected ? AppTheme.accentColor(context) : AppColors.textMuted,
+                    size: 24,
+                  );
+
+                  return Padding(
+                    key: ValueKey(item.section),
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: InkWell(
+                      onTap: () => _onItemTapped(index, context, items),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: isSpacious ? 16 : 0,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppTheme.accentColor(context).withValues(alpha: 0.1)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: isSpacious
+                              ? MainAxisAlignment.start
+                              : MainAxisAlignment.center,
+                          children: [
+                            count > 0 && !isSpacious
+                                ? Badge(
+                                    label: Text(count.toString()),
+                                    child: iconWidget,
+                                  )
+                                : iconWidget,
+                            if (isSpacious) ...[
+                              const SizedBox(width: 16),
+                              Expanded(
                                 child: Text(
-                                  count.toString(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
+                                  item.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                    color: isSelected
+                                        ? AppTheme.accentColor(context)
+                                        : AppColors.textPrimary,
                                   ),
                                 ),
                               ),
+                              if (count > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.accentColor(context),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    count.toString(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              );
+            }),
           ),
 
           // History Button at Bottom

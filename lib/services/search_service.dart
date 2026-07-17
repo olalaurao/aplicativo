@@ -4,6 +4,8 @@ import '../models/journal_entry.dart';
 import '../models/note_model.dart';
 import '../models/goal_model.dart';
 import '../models/task_model.dart';
+import '../models/idea_model.dart';
+import '../models/resource_model.dart';
 
 class SearchService {
   List<ContentObject> search(
@@ -54,6 +56,8 @@ class SearchService {
         if (obj is Note) body = obj.body;
         if (obj is Goal) body = obj.description;
         if (obj is Task) body = obj.notes.join('\n');
+        if (obj is IdeaDefinition) body = obj.body;
+        if (obj is Resource) body = obj.synopsis;
 
         if (body != null && body.toLowerCase().contains(token)) {
           obj.snippet = _extractSnippet(body, token);

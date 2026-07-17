@@ -1,4 +1,5 @@
 // lib/ui/forms/create_pillar_form.dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +14,7 @@ import '../widgets/organizer_selector_field.dart';
 import '../widgets/universal_search_picker.dart';
 import '../widgets/icon_picker.dart';
 import '../widgets/form_section_card.dart';
+import '../widgets/discard_guard.dart';
 import '../utils/material_icon_set.dart';
 
 class CreatePillarForm extends ConsumerStatefulWidget {
@@ -88,6 +90,24 @@ class _CreatePillarFormState extends ConsumerState<CreatePillarForm> {
     super.dispose();
   }
 
+  bool get _isDirty {
+    final initialTitle = widget.existingPillar?.title ?? widget.initialTitle ?? '';
+    final initialWhy = widget.existingPillar?.why ?? '';
+    final initialColor = widget.existingPillar?.color ?? '#8B5CF6';
+    final initialIcon = widget.existingPillar?.icon;
+    final initialOrganizers = widget.existingPillar?.organizers ?? widget.initialOrganizers ?? [];
+
+    return _titleController.text.trim() != initialTitle ||
+        _whyController.text.trim() != initialWhy ||
+        _selectedColor != initialColor ||
+        _selectedIcon != initialIcon ||
+        !listEquals(_organizers, initialOrganizers) ||
+        !listEquals(
+          _linkedActions.map((a) => a.id).toList()..sort(),
+          _originalLinkedActionIds.toList()..sort(),
+        );
+  }
+
   Pillar _buildDraftPillar() {
     return Pillar(
       id: widget.existingPillar?.id,
@@ -134,7 +154,9 @@ class _CreatePillarFormState extends ConsumerState<CreatePillarForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return DiscardGuard(
+      isDirty: _isDirty,
+      child: Scaffold(
       appBar: AppBar(
         title: Text(widget.existingPillar != null ? 'Edit Pillar' : 'New Pillar'),
         actions: [
@@ -182,6 +204,7 @@ class _CreatePillarFormState extends ConsumerState<CreatePillarForm> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

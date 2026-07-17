@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/vault_provider.dart';
 import '../screens/universal_detail_view.dart';
 import '../theme.dart';
+import 'create_menu_sheet.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
@@ -24,9 +25,7 @@ class MarkdownBodyView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final allObjects = ref
-        .watch(allObjectsProvider)
-        .maybeWhen(data: (data) => data, orElse: () => []);
+    // We don't watch allObjectsProvider here to avoid unnecessary rebuilds.
 
     // Pre-process content to handle [[WikiLinks]] for Markdown
     // We convert [[Title]] to [Title](citrine://object/Title)
@@ -66,6 +65,7 @@ class MarkdownBodyView extends ConsumerWidget {
                 .replaceAll('.md', '')
                 .trim()
                 .toLowerCase();
+            final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
             final matchingObject = allObjects.where((o) {
               final title = o.title.trim().toLowerCase();
               final slug = o.slug.trim().toLowerCase();
@@ -78,7 +78,10 @@ class MarkdownBodyView extends ConsumerWidget {
             }).firstOrNull;
 
             if (matchingObject != null) {
-              context.push('/detail/${matchingObject.id}', extra: matchingObject);
+              context.push(
+                '/detail/${matchingObject.id}',
+                extra: matchingObject,
+              );
             } else {
               // Handle broken link
               _showCreateBrokenLinkDialog(context, objectTitle);
@@ -150,8 +153,12 @@ class MarkdownBodyView extends ConsumerWidget {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              // We'll need access to ref here or just use a generic way to show the sheet
-              // For now, let's just use the Navigator to a form
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => CreateMenuSheet(initialTitle: title),
+              );
             },
             child: const Text('CRIAR'),
           ),

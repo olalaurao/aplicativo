@@ -351,10 +351,13 @@ class _BootstrapAppState extends State<BootstrapApp> {
       if (currentDate != lastDate) {
         debugPrint(
           '[MidnightTimer] Day changed from $lastDate to $currentDate. '
-          'Invalidating vault and syncing widgets.',
+          'Invalidating date-dependent providers and syncing widgets.',
         );
         _lastCheckedDate = now;
-        widget.container.invalidate(vaultProvider);
+        // Invalidate only date-dependent providers instead of entire vault
+        final todayStr = currentDate.toIso8601String().split('T').first;
+        widget.container.invalidate(dailyNoteDataProvider(todayStr));
+        widget.container.invalidate(vaultProvider); // Still needed for habit streaks, overdue tasks, etc.
         unawaited(forceWidgetSync(widget.container));
       }
     });

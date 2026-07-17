@@ -104,6 +104,8 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
                 child: DayDialWidget(
                   snapshot: snapshot,
                   selectedDate: today,
+                  backgroundColor: _resolveDialBackground(context, settings),
+                  iconColor: Theme.of(context).colorScheme.onSurface,
                   onSegmentTap: (segment) {
                     if (segment.sourceSlug != null) {
                       context.push('/detail/${segment.sourceSlug}');
@@ -161,6 +163,21 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
         ),
       ),
     );
+  }
+
+  /// Resolves the dial background color from user settings (respects light/dark).
+  Color _resolveDialBackground(BuildContext context, AppSettings settings) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hexStr = isDark ? settings.darkBackgroundColor : settings.backgroundColor;
+    if (hexStr != null && hexStr.isNotEmpty) {
+      final clean = hexStr.trim().replaceAll('#', '');
+      if (clean.length == 6) {
+        try {
+          return Color(int.parse('0xFF$clean'));
+        } catch (_) {}
+      }
+    }
+    return Theme.of(context).colorScheme.surface;
   }
 
   Widget _buildNextUpcoming(BuildContext context, DialSegment next, DateTime now) {
@@ -291,6 +308,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
           }
           
           return InkWell(
+            key: ValueKey(segment.sourceSlug ?? index.toString()),
             onTap: () {
               if (segment.sourceSlug != null) {
                 context.push('/detail/${segment.sourceSlug}');

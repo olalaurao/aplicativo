@@ -28,8 +28,7 @@ class GoalsScreen extends ConsumerStatefulWidget {
 class _GoalsScreenState extends ConsumerState<GoalsScreen> {
   @override
   Widget build(BuildContext context) {
-    final allObjects = ref.watch(allObjectsProvider).value ?? [];
-    final goals = allObjects.whereType<Goal>().toList();
+    final goals = ref.watch(goalsListProvider);
     final activeGoals = goals
         .where((g) => g.state == GoalStatus.active && !g.archived)
         .toList();

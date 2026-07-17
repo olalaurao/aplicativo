@@ -636,8 +636,11 @@ class Habit extends ContentObject {
     for (final record in completionHistory) {
       final status = record.successful ? '[x]' : '[ ]';
       final valStr = record.value != null ? ' value:${record.value}' : '';
+      final timeStr = record.completedAt != null
+          ? ' completed_at:${record.completedAt!.toIso8601String()}'
+          : '';
       buffer.writeln(
-        '- $status ${record.date.toIso8601String().split('T').first} (${record.completions}/$dailyGoal)$valStr',
+        '- $status ${record.date.toIso8601String().split('T').first} (${record.completions}/$dailyGoal)$valStr$timeStr',
       );
     }
 
@@ -831,9 +834,18 @@ class Habit extends ContentObject {
           final value = valueMatch != null
               ? double.tryParse(valueMatch.group(1)!)
               : null;
+          final timeMatch = RegExp(r'completed_at:([^\s]+)').firstMatch(line);
+          final completedAt = timeMatch != null
+              ? DateTime.tryParse(timeMatch.group(1)!)
+              : null;
 
           habit.completionHistory.add(
-            CompletionRecord(date: date, successful: successful, value: value),
+            CompletionRecord(
+              date: date,
+              successful: successful,
+              value: value,
+              completedAt: completedAt,
+            ),
           );
         }
       }

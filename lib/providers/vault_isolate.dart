@@ -1,8 +1,8 @@
-import 'dart:io';
 import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import '../services/obsidian_service.dart';
 import '../services/markdown_parser.dart';
+import '../services/vault_cache_service.dart';
 import '../models/shared_types.dart';
 import '../models/content_object.dart';
 import '../models/task_model.dart';
@@ -41,6 +41,12 @@ class VaultIsolateParams {
   final String dailyNoteIdentifier;
   final String dailyNoteDateFormat;
 
+  /// Whether to run the entry-type migration scan. Should be `true` only
+  /// when the migration has NOT been marked as completed in SharedPreferences.
+  final bool runEntryTypeMigration;
+  
+  final String cacheDirectoryPath;
+
   VaultIsolateParams({
     required this.vaultName,
     required this.vaultPath,
@@ -49,6 +55,8 @@ class VaultIsolateParams {
     required this.dailyNoteFolder,
     required this.dailyNoteIdentifier,
     required this.dailyNoteDateFormat,
+    required this.cacheDirectoryPath,
+    this.runEntryTypeMigration = false,
   });
 }
 
@@ -74,8 +82,12 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
     // Initialize the vault inside the isolate using the resolved path.
     await service.initVault(params.vaultName, customPath: params.vaultPath);
 
-    // Run migrations inside the isolate to avoid main thread CPU block
-    await service.fixEntryTypeMigration();
+    // Run the entry-type migration only when the main thread determined it
+    // has not yet been completed (checked via SharedPreferences before spawning
+    // the isolate). This avoids a full duplicate file scan on every launch.
+    if (params.runEntryTypeMigration) {
+      await service.fixEntryTypeMigration();
+    }
 
     List<ContentObject> results = [];
     Map<String, List<Map<String, dynamic>>> dailyHabitCompletions = {};
@@ -86,6 +98,10 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
     // 1. Fetch markdown files using cached getAllMarkdownFiles for better performance
     // Use forceRefresh=false to leverage cache when possible
     final mdFiles = await service.getAllMarkdownFiles(forceRefresh: false);
+
+    // 1.5 Load cache
+    final cache = VaultCacheService.load(params.vaultPath, params.cacheDirectoryPath);
+    final updatedCache = <String, VaultCacheEntry>{};
 
     // 2. Read and parse files in parallel batches (max 100 concurrent I/O ops for better stability)
     const batchSize = 100;
@@ -101,8 +117,22 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
         batch.map((file) async {
           try {
             final relativePath = service.getRelativePath(file.path);
-            final content = await file.readAsString();
-            final frontmatter = MarkdownParser.parseFrontmatter(content, filePath: relativePath);
+            final stat = await file.stat();
+            final mtime = stat.modified.millisecondsSinceEpoch;
+            
+            final cached = cache[relativePath];
+            String content = '';
+            Map<String, dynamic> frontmatter = {};
+            String body = '';
+            
+            if (cached != null && cached.mtime == mtime) {
+              frontmatter = Map<String, dynamic>.from(cached.frontmatter);
+              body = cached.body;
+            } else {
+              content = await file.readAsString();
+              frontmatter = MarkdownParser.parseFrontmatter(content, filePath: relativePath);
+              body = MarkdownParser.extractBody(content);
+            }
             
             // Check for YAML parsing errors
             if (frontmatter['__yaml_error__'] == true) {
@@ -113,8 +143,6 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
               // Continue processing with empty frontmatter to avoid crashes
               frontmatter.clear();
             }
-            
-            final body = MarkdownParser.extractBody(content);
 
             final isDaily = _isDailyNoteIsolate(relativePath, frontmatter, params);
             final String? literalType = frontmatter['type']?.toString();
@@ -264,42 +292,6 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                       .toList();
                 }
 
-                final parsedDay = DateTime.tryParse(dateStr) ?? DateTime.now();
-                final pomodorosData = MarkdownParser.parsePomodoros(body);
-                for (final pom in pomodorosData) {
-                  final timeStr = pom['time'] as String? ?? '00:00';
-                  final title = pom['title'] as String? ?? 'Focus Session';
-                  final hours = int.tryParse(timeStr.split(':').first) ?? 0;
-                  final minutes = int.tryParse(timeStr.split(':').last) ?? 0;
-                  final sessionDate = DateTime(
-                    parsedDay.year,
-                    parsedDay.month,
-                    parsedDay.day,
-                    hours,
-                    minutes,
-                  );
-
-                  final blocks =
-                      int.tryParse(pom['blocks']?.toString() ?? '') ?? 0;
-                  final worked =
-                      int.tryParse(pom['worked']?.toString() ?? '') ?? 0;
-                  final breakTime =
-                      int.tryParse(pom['break']?.toString() ?? '') ?? 0;
-                  final linkedItem = pom['linked_item'] as String?;
-
-                  final session = PomodoroSession(
-                    id: 'pomodoro_${dateStr}_${timeStr.replaceAll(':', '_')}',
-                    taskTitle: title,
-                    date: sessionDate,
-                    linkedItemSlug: linkedItem,
-                    blocksCompleted: blocks,
-                    minutesWorked: worked,
-                    minutesBreak: breakTime,
-                    state: PomodoroSessionState.completed,
-                  );
-                  results.add(session);
-                }
-
                 // Store in dailyMap for the O(1) provider
                 dailyMap[dateStr] = {
                   'entries': journalEntries,
@@ -430,6 +422,9 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                   body,
                   relativePath,
                 );
+              } else if (type == 'pomodoro_session') {
+                obj = PomodoroSession.fromMarkdown(frontmatter, body)
+                  ..obsidianPath = relativePath;
               } else if (type == 'pillar') {
                 obj = Pillar.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
@@ -471,7 +466,15 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
               if (frontmatter['__needs_rewrite__'] == true) {
                 needsRewritePaths.add(relativePath);
               }
-                        }
+              
+              // Populate updated cache
+              updatedCache[relativePath] = VaultCacheEntry(
+                mtime: mtime,
+                type: type ?? 'unknown',
+                frontmatter: frontmatter,
+                body: body,
+              );
+            }
           } catch (e, st) {
             debugPrint('Error processing file ${file.path}: $e\n$st');
           }
@@ -583,6 +586,9 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
     // });
 
     final objects = finalResults;
+
+    // Save updated cache
+    VaultCacheService.save(params.vaultPath, params.cacheDirectoryPath, updatedCache);
 
     return ParsedVaultResult(
       objects: objects,

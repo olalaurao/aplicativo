@@ -344,15 +344,9 @@ String? _dimensionFromLegacy(
 
 bool _shouldOmitSourceId(KPISourceType sourceType) {
   switch (sourceType) {
-    case KPISourceType.subtasks:
-    case KPISourceType.entry:
-    case KPISourceType.timeSpent:
     case KPISourceType.manualQuantity:
       return true;
-    case KPISourceType.trackerField:
-    case KPISourceType.habit:
-    case KPISourceType.collection:
-    case KPISourceType.others:
+    default:
       return false;
   }
 }

@@ -51,8 +51,8 @@ class _WeekOverviewComponentState extends ConsumerState<WeekOverviewComponent> {
     final days = List.generate(7, (i) => startOfWeek.add(Duration(days: i)));
     
     // Get day themes
-    final allObjects = ref.watch(allObjectsProvider).value ?? [];
-    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final organizers = ref.watch(organizersListProvider);
+    final dayThemes = organizers.where((o) => o.organizerType == OrganizerType.dayTheme).toList();
     const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     return Container(
@@ -168,56 +168,54 @@ class _WeekOverviewComponentState extends ConsumerState<WeekOverviewComponent> {
                           if (items.isEmpty)
                             const Text('-', style: TextStyle(color: AppColors.textMuted))
                           else
-                            Expanded(
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  children: [
-                                    ...visibleItems.map((item) => Padding(
-                                      padding: const EdgeInsets.only(bottom: 4),
-                                      child: InkWell(
-                                        onTap: () => navigateToObject(context, item.source),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: item.color.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(item.iconData, size: 10, color: item.color),
-                                              const SizedBox(width: 2),
-                                              Expanded(
-                                                child: Text(
-                                                  item.title,
-                                                  style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                                                    fontSize: 10,
-                                                    color: item.color,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                ...visibleItems.map((item) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: InkWell(
+                                    key: ValueKey(item.id),
+                                    onTap: () => navigateToObject(context, item.source),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: item.color.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(item.iconData, size: 10, color: item.color),
+                                          const SizedBox(width: 2),
+                                          Expanded(
+                                            child: Text(
+                                              item.title,
+                                              style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                                                fontSize: 10,
+                                                color: item.color,
                                               ),
-                                            ],
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
-                                        ),
+                                        ],
                                       ),
-                                    )),
-                                    if (hasMore)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.surfaceVariant,
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          '+${items.length - maxItemsPerDay}',
-                                          style: Theme.of(context).textTheme.bodySmall!.copyWith(fontSize: 10),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
+                                    ),
+                                  ),
+                                )),
+                                if (hasMore)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surfaceVariant,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      '+${items.length - maxItemsPerDay}',
+                                      style: Theme.of(context).textTheme.bodySmall!.copyWith(fontSize: 10),
+                                    ),
+                                  ),
+                              ],
                             ),
                         ],
                       ),

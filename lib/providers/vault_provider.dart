@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../services/obsidian_service.dart';
 import '../services/markdown_parser.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/shared_types.dart';
 import '../models/content_object.dart';
 import '../models/task_model.dart';
@@ -185,6 +186,42 @@ final objectsByTypeProvider = Provider.family<List<ContentObject>, String>((
   final grouped = ref.watch(groupedObjectsProvider);
   return grouped[type] ?? [];
 });
+
+// ── Typed read-only list providers (derived from groupedObjectsProvider) ──
+// Widgets that only need to READ objects should use these instead of allObjectsProvider.
+// This prevents unnecessary rebuilds when unrelated object types change.
+
+final tasksListProvider = Provider<List<Task>>((ref) =>
+    ref.watch(objectsByTypeProvider('task')).cast<Task>());
+
+final habitsListProvider = Provider<List<Habit>>((ref) =>
+    ref.watch(objectsByTypeProvider('habit')).cast<Habit>());
+
+final goalsListProvider = Provider<List<Goal>>((ref) =>
+    ref.watch(objectsByTypeProvider('goal')).cast<Goal>());
+
+final notesListProvider = Provider<List<Note>>((ref) =>
+    ref.watch(objectsByTypeProvider('note')).cast<Note>());
+
+final organizersListProvider = Provider<List<Organizer>>((ref) =>
+    ref.watch(objectsByTypeProvider('organizer')).cast<Organizer>());
+
+final resourcesListProvider = Provider<List<Resource>>((ref) =>
+    ref.watch(objectsByTypeProvider('resource')).cast<Resource>());
+
+final ideasListProvider = Provider<List<IdeaDefinition>>((ref) =>
+    ref.watch(objectsByTypeProvider('idea')).cast<IdeaDefinition>());
+
+final journalEntriesListProvider = Provider<List<JournalEntry>>((ref) =>
+    ref.watch(allObjectsProvider.select((a) =>
+        a.valueOrNull?.whereType<JournalEntry>().toList() ?? [])));
+
+final trackersListProvider = Provider<List<TrackerDefinition>>((ref) =>
+    ref.watch(objectsByTypeProvider('tracker_definition')).cast<TrackerDefinition>());
+
+final moodDefsListProvider = Provider<List<MoodDefinition>>((ref) =>
+    ref.watch(objectsByTypeProvider('mood_definition')).cast<MoodDefinition>());
+
 
 final conflictingObjectsProvider = Provider<Map<String, List<ContentObject>>>((
   ref,
@@ -1002,11 +1039,24 @@ class ProjectsNotifier extends Notifier<List<Project>> {
   }
 
   Future<void> updateProject(Project project) async {
+    // Update KPI values before persisting
+    final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+    final updatedKpis = List<KPI>.from(project.kpis);
+    KPIEngine.updateKPIValues(
+      kpis: updatedKpis,
+      habits: allObjects.whereType<Habit>().toList(),
+      trackerRecords: allObjects.whereType<TrackingRecord>().toList(),
+      entries: allObjects.whereType<JournalEntry>().toList(),
+      moods: allObjects.whereType<MoodDefinition>().toList(),
+      allObjects: allObjects,
+    );
+    final updatedProject = project.copyWith(kpis: updatedKpis);
+
     state = [
       for (final p in state)
-        if (p.id == project.id) project else p,
+        if (p.id == project.id) updatedProject else p,
     ];
-    await ref.read(vaultProvider.notifier).updateObject(project);
+    await ref.read(vaultProvider.notifier).updateObject(updatedProject);
   }
 
   Future<void> deleteProject(Project project) async {
@@ -1736,7 +1786,15 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
       }
     });
 
-    // 2. Offload listing, reading, parsing and post-processing to the background isolate.
+    // 2. Check which one-time migrations still need to run.
+    // This must happen on the main thread because SharedPreferences uses
+    // platform channels that are unavailable inside an isolate.
+    final prefs = ref.read(sharedPreferencesProvider);
+    const entryTypeMigrationKey = 'entry_type_migration_done';
+    final needsEntryTypeMigration = prefs.getBool(entryTypeMigrationKey) != true;
+
+    // 3. Offload listing, reading, parsing and post-processing to the background isolate.
+    final supportDir = await getApplicationSupportDirectory();
     final parsedVault = await parseVaultInIsolate(
       VaultIsolateParams(
         vaultName: settings.vaultName,
@@ -1746,8 +1804,15 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
         dailyNoteFolder: settings.dailyNoteFolder,
         dailyNoteIdentifier: settings.dailyNoteIdentifier,
         dailyNoteDateFormat: settings.dailyNoteDateFormat,
+        runEntryTypeMigration: needsEntryTypeMigration,
+        cacheDirectoryPath: supportDir.path,
       ),
     );
+
+    // Mark entry-type migration as done so it never runs again.
+    if (needsEntryTypeMigration) {
+      await prefs.setBool(entryTypeMigrationKey, true);
+    }
 
     // 3. Display user-friendly error messages for YAML parsing errors
     if (parsedVault.yamlErrors.isNotEmpty) {
@@ -1791,7 +1856,7 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
     final service = ref.read(obsidianServiceProvider);
     object.updatedAt = DateTime.now();
     await service.writeFile(object.obsidianPath, object.toMarkdown());
-    ref.invalidateSelf();
+    replaceObjectInMemory(object);
   }
 
   void replaceObjectInMemory(ContentObject object) {
@@ -1819,6 +1884,18 @@ final allObjectsProvider =
       return AllObjectsNotifier();
     });
 
+/// Extract searchable content from an object without full serialization
+String _extractSearchableContent(ContentObject obj) {
+  if (obj is JournalEntry) return obj.body;
+  if (obj is Note) return obj.body;
+  if (obj is Goal) return obj.description ?? '';
+  if (obj is Task) return obj.notes.join('\n');
+  if (obj is IdeaDefinition) return obj.body;
+  if (obj is Resource) return obj.synopsis ?? '';
+  // Fallback to full markdown for other types
+  return obj.toMarkdown();
+}
+
 final backlinksProvider = FutureProvider.family<List<ContentObject>, String>((
   ref,
   targetId,
@@ -1842,7 +1919,24 @@ final backlinksProvider = FutureProvider.family<List<ContentObject>, String>((
           .where((value) => value.isNotEmpty)
           .toSet();
 
-  return allObjects.where((obj) {
+  final obsidianService = ref.read(obsidianServiceProvider);
+  final rawFiles = await obsidianService.searchRawMarkdownFiles(targetKeys);
+  
+  final mappedPaths = allObjects.map((o) => o.obsidianPath.replaceAll('\\', '/')).toSet();
+  
+  final rawObjects = rawFiles.where((file) {
+    final relPath = file.path.replaceAll('\\', '/').split('/${obsidianService.vaultDir?.path.split(Platform.pathSeparator).last ?? ''}/').last;
+    return !mappedPaths.contains(relPath);
+  }).map((file) {
+    final relPath = file.path.replaceAll('\\', '/').split('/${obsidianService.vaultDir?.path.split(Platform.pathSeparator).last ?? ''}/').last;
+    return RawMarkdownFile(
+      title: file.path.split(Platform.pathSeparator).last,
+      body: '',
+      obsidianPath: relPath,
+    );
+  }).toList();
+
+  final mappedResults = allObjects.where((obj) {
     if (obj.id == targetId) return false;
     if (target is MoodDefinition && obj is JournalEntry) {
       final moodSlug = obj.moodSlug?.trim().toLowerCase();
@@ -1853,7 +1947,7 @@ final backlinksProvider = FutureProvider.family<List<ContentObject>, String>((
     )) {
       return true;
     }
-    final content = obj.toMarkdown().toLowerCase();
+    final content = _extractSearchableContent(obj).toLowerCase();
     return targetKeys.any(
       (key) =>
           content.contains('[[$key]]') ||
@@ -1862,6 +1956,8 @@ final backlinksProvider = FutureProvider.family<List<ContentObject>, String>((
           content.contains('[[moods/$key|'),
     );
   }).toList();
+
+  return [...mappedResults, ...rawObjects];
 });
 
 class JournalNotifier extends Notifier<List<JournalEntry>> {
@@ -2382,6 +2478,7 @@ class VaultNotifier extends Notifier<void> {
       'value' => 'organizers/values',
       'routine' => 'organizers/routines',
       'pillar' => 'pillars',
+      'pomodoro_session' => 'pomodoros',
       _ => 'app',
     };
   }
@@ -2726,7 +2823,7 @@ class VaultNotifier extends Notifier<void> {
         objectType: signatureKey,
         objectId: object.id,
         operation: operation,
-        payload: object.toBaseMap(),
+        payload: object.toSyncPayload(),
       ),
     );
     await _scheduleObjectReminders(object);
@@ -3191,7 +3288,7 @@ class VaultNotifier extends Notifier<void> {
             objectType: _signatureKeyFor(object),
             objectId: object.id,
             operation: SyncOperation.delete,
-            payload: object.toBaseMap(),
+            payload: object.toSyncPayload(),
           ),
         );
         debugPrint(
@@ -3506,7 +3603,7 @@ class VaultNotifier extends Notifier<void> {
           objectType: _signatureKeyFor(object),
           objectId: object.id,
           operation: SyncOperation.delete,
-          payload: object.toBaseMap(),
+          payload: object.toSyncPayload(),
         ),
       );
 
@@ -3533,7 +3630,7 @@ class VaultNotifier extends Notifier<void> {
           objectType: _signatureKeyFor(object),
           objectId: object.id,
           operation: SyncOperation.create,
-          payload: object.toBaseMap(),
+          payload: object.toSyncPayload(),
         ),
       );
 
@@ -3584,7 +3681,11 @@ class VaultNotifier extends Notifier<void> {
         objectType: type ?? 'file',
         objectId: frontmatter['id']?.toString() ?? fileName,
         operation: SyncOperation.create,
-        payload: Map<String, dynamic>.from(frontmatter),
+        payload: {
+          ...Map<String, dynamic>.from(frontmatter),
+          'obsidian_path': originalPath,
+          'slug': frontmatter['slug']?.toString() ?? fileName.replaceAll(RegExp(r'\.md$'), ''),
+        },
       ),
     );
 

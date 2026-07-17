@@ -2,9 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/goal_model.dart';
 import '../models/idea_model.dart';
 import '../models/project_model.dart';
-import '../models/task_model.dart';
 import '../models/resource_model.dart';
-import '../models/reminder_model.dart';
 import '../models/routine_model.dart';
 import '../models/content_object.dart';
 import 'vault_provider.dart';
@@ -39,8 +37,8 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
 
   final items = <OverdueItem>[];
 
-  final allObjects = ref.watch(allObjectsProvider).value ?? [];
-  for (final task in allObjects.whereType<Task>()) {
+  final tasks = ref.watch(tasksListProvider);
+  for (final task in tasks) {
     if (task.isCompleted || task.archived) continue;
     final dl = task.endDate ?? task.startDate;
     if (!isOverdue(dl)) continue;
@@ -51,7 +49,9 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
       itemType: 'task',
     ));
   }
-  for (final goal in allObjects.whereType<Goal>()) {
+  
+  final goals = ref.watch(goalsListProvider);
+  for (final goal in goals) {
     if (goal.state == GoalStatus.completed ||
         goal.state == GoalStatus.cancelled ||
         goal.archived) {
@@ -65,6 +65,7 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
       itemType: 'goal',
     ));
   }
+  
   for (final project in ref.watch(objectsByTypeProvider('project')).cast<Project>()) {
     if (project.state == ProjectState.completed ||
         project.state == ProjectState.archived ||
@@ -79,6 +80,7 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
       itemType: 'project',
     ));
   }
+  
   for (final idea in ref.watch(ideasProvider)) {
     if (idea.status == IdeaStatus.converted ||
         idea.status == IdeaStatus.dropped ||
@@ -95,7 +97,8 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
   }
   
   // Resources - overdue if readDate is set and passed, or if status is not completed/dropped
-  for (final resource in allObjects.whereType<Resource>()) {
+  final resources = ref.watch(resourcesListProvider);
+  for (final resource in resources) {
     if (resource.status == ResourceStatus.completed ||
         resource.status == ResourceStatus.dropped ||
         resource.archived) {
@@ -113,7 +116,8 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
   }
   
   // Reminders - overdue if time is passed and not completed
-  for (final reminder in allObjects.whereType<Reminder>()) {
+  final reminders = ref.watch(remindersProvider);
+  for (final reminder in reminders) {
     if (reminder.isCompleted || reminder.archived) continue;
     if (!isOverdue(reminder.time)) continue;
     items.add(OverdueItem(
@@ -125,7 +129,8 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
   }
   
   // Routines - overdue if endDate is set and passed, and not archived
-  for (final routine in allObjects.whereType<Routine>()) {
+  final routines = ref.watch(organizersListProvider).whereType<Routine>();
+  for (final routine in routines) {
     if (routine.archived) continue;
     if (routine.endDate != null && isOverdue(routine.endDate!)) {
       items.add(OverdueItem(

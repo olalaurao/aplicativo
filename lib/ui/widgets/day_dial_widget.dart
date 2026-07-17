@@ -13,6 +13,12 @@ class DayDialWidget extends StatefulWidget {
   final void Function(int hour)? onHourTap;
   final void Function(DialSegment segment, DateTime newStart)? onSegmentMove;
   final void Function(DialSegment segment, DateTime newEnd)? onSegmentResize;
+  /// Background color of the dial circle. Should match the card/scaffold background
+  /// so icons sit on a surface that contrasts with segment arcs.
+  final Color? backgroundColor;
+  /// Color used to tint icons drawn inside the dial (habits, reminders).
+  /// Defaults to the theme's onSurface color when null.
+  final Color? iconColor;
 
   const DayDialWidget({
     super.key,
@@ -22,6 +28,8 @@ class DayDialWidget extends StatefulWidget {
     this.onHourTap,
     this.onSegmentMove,
     this.onSegmentResize,
+    this.backgroundColor,
+    this.iconColor,
   });
 
   @override
@@ -38,6 +46,8 @@ class _DayDialWidgetState extends State<DayDialWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final dialBg = widget.backgroundColor ?? Theme.of(context).colorScheme.surface;
+    final dialIconColor = widget.iconColor ?? Theme.of(context).colorScheme.onSurface;
     return AspectRatio(
       aspectRatio: 1.0,
       child: ClipRect(
@@ -53,6 +63,8 @@ class _DayDialWidgetState extends State<DayDialWidget> {
             draggedSegment: _draggedSegment,
             dragPreviewStart: _dragPreviewStart,
             dragPreviewEnd: _dragPreviewEnd,
+            backgroundColor: dialBg,
+            iconColor: dialIconColor,
           ),
           child: Stack(
             children: [
@@ -319,6 +331,8 @@ class _DayDialPainter extends CustomPainter {
   final DialSegment? draggedSegment;
   final DateTime? dragPreviewStart;
   final DateTime? dragPreviewEnd;
+  final Color backgroundColor;
+  final Color iconColor;
 
   _DayDialPainter({
     required this.snapshot,
@@ -326,6 +340,8 @@ class _DayDialPainter extends CustomPainter {
     this.draggedSegment,
     this.dragPreviewStart,
     this.dragPreviewEnd,
+    this.backgroundColor = const Color(0xFFF1F3F5),
+    this.iconColor = const Color(0xFF1F2937),
   });
 
   @override
@@ -338,7 +354,7 @@ class _DayDialPainter extends CustomPainter {
     
     // Background
     final backgroundPaint = Paint()
-      ..color = const Color(0xFFF1F3F5)
+      ..color = backgroundColor
       ..style = PaintingStyle.fill;
     canvas.drawCircle(center, radius, backgroundPaint);
 
@@ -455,7 +471,7 @@ class _DayDialPainter extends CustomPainter {
 
   void _drawIcon(Canvas canvas, IconData iconData, double x, double y, double size) {
     final textPainter = TextPainter(
-      text: TextSpan(text: String.fromCharCode(iconData.codePoint), style: TextStyle(fontSize: size, fontFamily: 'MaterialIcons')),
+      text: TextSpan(text: String.fromCharCode(iconData.codePoint), style: TextStyle(fontSize: size, fontFamily: 'MaterialIcons', color: iconColor)),
       textDirection: ui.TextDirection.ltr,
     );
     textPainter.layout();
@@ -488,7 +504,9 @@ class _DayDialPainter extends CustomPainter {
         oldDelegate.selectedDate != selectedDate ||
         oldDelegate.draggedSegment != draggedSegment ||
         oldDelegate.dragPreviewStart != dragPreviewStart ||
-        oldDelegate.dragPreviewEnd != dragPreviewEnd;
+        oldDelegate.dragPreviewEnd != dragPreviewEnd ||
+        oldDelegate.backgroundColor != backgroundColor ||
+        oldDelegate.iconColor != iconColor;
   }
 }
 

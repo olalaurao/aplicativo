@@ -94,6 +94,9 @@ class TypeSignature {
   final String markerValue;
   final String emoji;
   final String? iconName;
+  /// Optional hex color (e.g. '#F97316') chosen by the user for this object type.
+  /// Used by timeline, month grid, dial legend and completables components.
+  final String? colorHex;
 
   TypeSignature({
     required this.objectType,
@@ -101,6 +104,7 @@ class TypeSignature {
     required this.markerValue,
     this.emoji = '',
     this.iconName,
+    this.colorHex,
   });
 
   Map<String, dynamic> toMap() => {
@@ -109,6 +113,7 @@ class TypeSignature {
     'markerValue': markerValue,
     'emoji': emoji,
     'iconName': iconName,
+    if (colorHex != null) 'colorHex': colorHex,
   };
 
   factory TypeSignature.fromMap(Map<String, dynamic> map) => TypeSignature(
@@ -120,6 +125,7 @@ class TypeSignature {
     markerValue: map['markerValue'] ?? '',
     emoji: map['emoji'] ?? '',
     iconName: map['iconName'],
+    colorHex: map['colorHex'] as String?,
   );
 }
 

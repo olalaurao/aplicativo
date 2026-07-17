@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/widget_service.dart';
+import '../../models/note_model.dart';
 import '../theme.dart';
 
 class ChecklistWidgetConfigScreen extends ConsumerStatefulWidget {
@@ -18,7 +19,7 @@ class _ChecklistWidgetConfigScreenState extends ConsumerState<ChecklistWidgetCon
   Widget build(BuildContext context) {
     final allObjects = ref.watch(allObjectsProvider).value ?? [];
     final allNotes = allObjects.whereType<Note>().toList();
-    final checklists = allNotes.where((n) => n.isChecklist).toList();
+    final checklists = allNotes.where((n) => n.subtype == NoteSubtype.collection).toList();
 
     return Scaffold(
       appBar: AppBar(

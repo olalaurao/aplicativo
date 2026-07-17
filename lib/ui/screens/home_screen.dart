@@ -28,6 +28,8 @@ import '../widgets/dashboard/week_overview_component.dart';
 import '../widgets/dashboard/month_overview_component.dart';
 import '../widgets/dashboard/goals_projects_overview_component.dart';
 import '../widgets/dashboard/dashboard_component_config_sheet.dart';
+import '../widgets/dashboard/pinned_object_component.dart';
+import '../widgets/dashboard/tracker_analysis_component.dart';
 import '../forms/create_habit_form.dart';
 import '../forms/create_task_form.dart';
 import '../theme.dart';
@@ -282,55 +284,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
               final visibleBlocks = _editMode ? blocks : blocks.where((b) => b.visible).toList();
 
-              return ReorderableListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
-                itemCount: visibleBlocks.length + (_editMode ? 1 : 0),
-                onReorder: (oldIndex, newIndex) {
-                  if (oldIndex < visibleBlocks.length && newIndex <= visibleBlocks.length) {
-                    ref.read(dashboardProvider.notifier).reorderBlocks(oldIndex, newIndex);
-                  }
-                },
-                itemBuilder: (context, index) {
-                  if (_editMode && index == visibleBlocks.length) {
-                    return Padding(
-                      key: const ValueKey('add_component_button'),
-                      padding: const EdgeInsets.only(top: 16),
-                      child: InkWell(
-                        onTap: () => AddComponentSheet.show(context),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.textMuted.withValues(alpha: 0.3)),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_rounded, color: AppTheme.accentColor(context)),
-                              const SizedBox(width: 8),
-                              Text('Add component', style: TextStyle(color: AppTheme.accentColor(context), fontWeight: FontWeight.w600)),
-                            ],
+              if (_editMode) {
+                // Edit mode: use ReorderableListView for drag-to-reorder
+                return ReorderableListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+                  itemCount: visibleBlocks.length + 1,
+                  onReorder: (oldIndex, newIndex) {
+                    if (oldIndex < visibleBlocks.length && newIndex <= visibleBlocks.length) {
+                      ref.read(dashboardProvider.notifier).reorderBlocks(oldIndex, newIndex);
+                    }
+                  },
+                  itemBuilder: (context, index) {
+                    if (index == visibleBlocks.length) {
+                      return Padding(
+                        key: const ValueKey('add_component_button'),
+                        padding: const EdgeInsets.only(top: 16),
+                        child: InkWell(
+                          onTap: () => AddComponentSheet.show(context),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: AppColors.textMuted.withValues(alpha: 0.3)),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_rounded, color: AppTheme.accentColor(context)),
+                                const SizedBox(width: 8),
+                                Text('Add component', style: TextStyle(color: AppTheme.accentColor(context), fontWeight: FontWeight.w600)),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  }
+                      );
+                    }
 
-                  final block = visibleBlocks[index];
-                  Widget child = _buildComponent(block);
-
-                  if (_editMode) {
-                    child = Container(
+                    final block = visibleBlocks[index];
+                    return Container(
                       key: ValueKey(block.id),
                       margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(
                         border: Border.all(color: AppColors.accent, width: 2),
-                        borderRadius: BorderRadius.circular(16), // to match card padding somewhat
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: Stack(
                         children: [
-                          Opacity(opacity: block.visible ? 1.0 : 0.5, child: child),
+                          Opacity(opacity: block.visible ? 1.0 : 0.5, child: _buildComponent(block)),
                           Positioned(
                             top: 8,
                             right: 8,
@@ -360,17 +361,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         ],
                       ),
                     );
-                  } else {
-                    child = Padding(
-                      key: ValueKey(block.id),
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: child,
-                    );
-                  }
-
-                  return child;
-                },
-              );
+                  },
+                );
+              } else {
+                // Normal mode: use simple CustomScrollView — NO ReorderableListView semantics overhead
+                return CustomScrollView(
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final block = visibleBlocks[index];
+                            return Padding(
+                              key: ValueKey(block.id),
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _buildComponent(block),
+                            );
+                          },
+                          childCount: visibleBlocks.length,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
             },
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (err, stack) => Center(child: Text('Error: $err')),
@@ -417,6 +432,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       case BlockType.goalsProjectsOverview: return GoalsProjectsOverviewComponent(block: block);
       case BlockType.todayCompletables: return TodayCompletablesComponent(block: block);
       case BlockType.todayHabits: return TodayCompletablesComponent(block: block);
+      case BlockType.pinnedObject: return PinnedObjectComponent(block: block);
+      case BlockType.trackerAnalysis: return TrackerAnalysisComponent(block: block);
       default: return Container(
         height: 100,
         decoration: AppTheme.cardDecoration(context),

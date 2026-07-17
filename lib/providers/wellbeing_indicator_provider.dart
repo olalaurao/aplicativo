@@ -39,12 +39,7 @@ class WellbeingSignalStatus {
 // wellbeingIndicatorsProvider - loads all Wellbeing Indicator objects
 // ---------------------------------------------------------------------------
 final wellbeingIndicatorsProvider = Provider<List<WellbeingIndicator>>((ref) {
-  final allObjectsAsync = ref.watch(allObjectsProvider);
-  final allObjects = allObjectsAsync.valueOrNull ?? [];
-  return allObjects
-      .where((obj) => obj.type == 'wellbeing_indicator')
-      .map((obj) => obj as WellbeingIndicator)
-      .toList();
+  return ref.watch(objectsByTypeProvider('wellbeing_indicator')).cast<WellbeingIndicator>();
 });
 
 // ---------------------------------------------------------------------------
@@ -55,9 +50,8 @@ final wellbeingSignalStatusesProvider = Provider<List<WellbeingSignalStatus>>((r
   final indicators = ref.watch(wellbeingIndicatorsProvider);
   // Use select to only rebuild when specific data changes, not on every vault update
   final trackers = ref.watch(trackersProvider);
-  final allObjects = ref.watch(allObjectsProvider).value ?? [];
-  final habits = allObjects.whereType<Habit>().toList();
-  final tasks = allObjects.whereType<Task>().toList();
+  final habits = ref.watch(habitsListProvider);
+  final tasks = ref.watch(tasksListProvider);
   final journalEntries = ref.watch(allEntriesProvider);
   final trackingRecords = ref.watch(trackingRecordsProvider);
   final now = DateTime.now();
