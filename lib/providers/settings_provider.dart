@@ -66,6 +66,7 @@ class AppSettings {
   final String? fontFamily;
   final bool nlpTaskParsingEnabled;
   final bool showOverdueSection;
+  final bool syncStateResetV1Applied;
   final String dailyNoteIdentifier;
   final String dailyNoteDateFormat;
   final String dailyNoteFolder;
@@ -136,6 +137,7 @@ class AppSettings {
     this.fontFamily,
     this.nlpTaskParsingEnabled = true,
     this.showOverdueSection = true,
+    this.syncStateResetV1Applied = false,
     this.dailyNoteIdentifier = 'filename_format',
     this.dailyNoteDateFormat = 'yyyy-MM-dd',
     this.dailyNoteFolder = 'daily',
@@ -231,6 +233,7 @@ class AppSettings {
     String? fontFamily,
     bool? nlpTaskParsingEnabled,
     bool? showOverdueSection,
+    bool? syncStateResetV1Applied,
     String? dailyNoteIdentifier,
     String? dailyNoteDateFormat,
     String? dailyNoteFolder,
@@ -300,6 +303,7 @@ class AppSettings {
       nlpTaskParsingEnabled:
           nlpTaskParsingEnabled ?? this.nlpTaskParsingEnabled,
       showOverdueSection: showOverdueSection ?? this.showOverdueSection,
+      syncStateResetV1Applied: syncStateResetV1Applied ?? this.syncStateResetV1Applied,
       dailyNoteIdentifier: dailyNoteIdentifier ?? this.dailyNoteIdentifier,
       dailyNoteDateFormat: dailyNoteDateFormat ?? this.dailyNoteDateFormat,
       dailyNoteFolder: dailyNoteFolder ?? this.dailyNoteFolder,
@@ -423,6 +427,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       fontFamily: prefs.getString('fontFamily'),
       nlpTaskParsingEnabled: prefs.getBool('nlpTaskParsingEnabled') ?? true,
       showOverdueSection: prefs.getBool('showOverdueSection') ?? true,
+      syncStateResetV1Applied: prefs.getBool('syncStateResetV1Applied') ?? false,
       dailyNoteIdentifier:
           prefs.getString('dailyNoteIdentifier') ?? 'filename_format',
       dailyNoteDateFormat:
@@ -819,6 +824,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> updateConflictResolution(bool value) async {
     await _prefs.setBool('conflictKeepNewest', value);
     state = state.copyWith(conflictKeepNewest: value);
+  }
+
+  Future<void> markSyncStateResetV1Applied() async {
+    await _prefs.setBool('syncStateResetV1Applied', true);
+    state = state.copyWith(syncStateResetV1Applied: true);
   }
 
   Future<void> updateHabitReminders(bool value) async {

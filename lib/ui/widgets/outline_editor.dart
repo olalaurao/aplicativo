@@ -66,6 +66,7 @@ class _OutlineEditorState extends State<OutlineEditor> {
     }
 
     final lines = widget.initialContent.split('\n');
+    int index = 0;
     _items = lines.where((l) => l.trim().isNotEmpty).map((line) {
       final indentMatch = RegExp(r'^(\s*)').firstMatch(line);
       final indent = indentMatch?.group(1)?.length ?? 0;
@@ -88,7 +89,7 @@ class _OutlineEditorState extends State<OutlineEditor> {
         text: text,
         level: level,
         isCompleted: completed,
-        id: '${DateTime.now().millisecondsSinceEpoch}_${line.hashCode}',
+        id: '${DateTime.now().millisecondsSinceEpoch}_${index++}',
       );
     }).toList();
 
@@ -208,45 +209,42 @@ class _OutlineEditorState extends State<OutlineEditor> {
                       child: _buildWikiText(item.text, item),
                     ),
                   )
-                : KeyboardListener(
-                    focusNode: FocusNode(),
-                    onKeyEvent: (event) => _handleKeyEvent(event, index, item),
-                    child: Focus(
-                      onFocusChange: (hasFocus) {
-                        if (hasFocus) {
-                          setState(() => _editingIndex = index);
-                        } else if (_editingIndex == index) {
-                          setState(() => _editingIndex = null);
-                        }
+                : Focus(
+                    onFocusChange: (hasFocus) {
+                      if (hasFocus) {
+                        setState(() => _editingIndex = index);
+                      } else if (_editingIndex == index) {
+                        setState(() => _editingIndex = null);
+                      }
+                    },
+                    onKeyEvent: (node, event) => _handleKeyEvent(event, index, item),
+                    child: TextField(
+                      onChanged: (v) {
+                        item.text = v;
+                        _updateContent();
                       },
-                      child: TextField(
-                        onChanged: (v) {
-                          item.text = v;
-                          _updateContent();
-                        },
-                        controller: TextEditingController(text: item.text)
-                          ..selection = TextSelection.fromPosition(
-                            TextPosition(offset: item.text.length),
-                          ),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(vertical: 12),
+                      controller: TextEditingController(text: item.text)
+                        ..selection = TextSelection.fromPosition(
+                          TextPosition(offset: item.text.length),
                         ),
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: item.level == 0
-                              ? FontWeight.w600
-                              : FontWeight.w400,
-                          color: item.isCompleted
-                              ? AppTheme.textMutedColor(context)
-                              : AppTheme.textPrimaryColor(context),
-                          decoration: item.isCompleted
-                              ? TextDecoration.lineThrough
-                              : null,
-                        ),
-                        onSubmitted: (_) => _addItemAfter(index),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(vertical: 12),
                       ),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: item.level == 0
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        color: item.isCompleted
+                            ? AppTheme.textMutedColor(context)
+                            : AppTheme.textPrimaryColor(context),
+                        decoration: item.isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
+                      onSubmitted: (_) => _addItemAfter(index),
                     ),
                   ),
           ),
@@ -286,8 +284,8 @@ class _OutlineEditorState extends State<OutlineEditor> {
     );
   }
 
-  void _handleKeyEvent(KeyEvent event, int index, OutlineItem item) {
-    if (event is! KeyDownEvent) return;
+  KeyEventResult _handleKeyEvent(KeyEvent event, int index, OutlineItem item) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
     if (event.logicalKey == LogicalKeyboardKey.tab) {
       if (HardwareKeyboard.instance.isShiftPressed) {
@@ -296,13 +294,17 @@ class _OutlineEditorState extends State<OutlineEditor> {
         if (item.level < 8) setState(() => item.level++);
       }
       _updateContent();
+      return KeyEventResult.handled;
     }
 
     if (event.logicalKey == LogicalKeyboardKey.backspace &&
         item.text.isEmpty &&
         _items.length > 1) {
       _removeItem(index);
+      return KeyEventResult.handled;
     }
+
+    return KeyEventResult.ignored;
   }
 
   void _addItemAfter(int index) {

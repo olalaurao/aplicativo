@@ -277,6 +277,11 @@ class SyncQueueService {
     );
   }
 
+  Future<void> resetFileSyncState() async {
+    if (_db == null) throw Exception('Database not initialized');
+    await _db!.delete('file_sync_state');
+  }
+
   Future<List<Map<String, dynamic>>> getConflicts() async {
     if (_db == null) throw Exception('Database not initialized');
     return _db!.query('sync_conflicts', orderBy: 'detectedAt DESC');

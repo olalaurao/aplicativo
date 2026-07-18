@@ -14,6 +14,12 @@ class GoogleDriveSyncService {
   String? get vaultFolderId => _vaultFolderId;
   final Map<String, String> _folderIdCache = {};
 
+  Future<void> Function({
+    required String relativePath,
+    required String localContent,
+    required String remoteContent,
+  })? onConflictDetected;
+
   void init(AuthClient client) {
     _driveApi = drive.DriveApi(client);
   }
@@ -147,7 +153,17 @@ class GoogleDriveSyncService {
       // Conflict Resolution:
       // If remoteHash exists and is different from our baseHash, someone else modified it.
       if (baseHash != null && remoteHash != null && remoteHash != baseHash) {
-        await _handleConflict(relativePath, content, remoteId, fileName);
+        final remoteContent = await downloadFile(remoteId) ?? '';
+        if (onConflictDetected != null) {
+          await onConflictDetected!(
+            relativePath: relativePath,
+            localContent: content,
+            remoteContent: remoteContent,
+          );
+        } else {
+          // Fallback only reachable if SyncManager never wired the callback.
+          await _saveConflictFiles(relativePath, content, remoteContent, fileName);
+        }
         return false; // Stop sync for this file, let user resolve
       }
 
@@ -176,77 +192,6 @@ class GoogleDriveSyncService {
       );
       return true;
     }
-  }
-
-  Future<void> _handleConflict(
-    String relativePath,
-    String localContent,
-    String remoteId,
-    String fileName,
-  ) async {
-    // 1. Download remote content
-    final response =
-        await _driveApi!.files.get(
-              remoteId,
-              downloadOptions: drive.DownloadOptions.fullMedia,
-              supportsAllDrives: true,
-            )
-            as drive.Media;
-    final remoteBytes = await response.stream.fold<List<int>>(
-      [],
-      (p, e) => p..addAll(e),
-    );
-    final remoteContent = utf8.decode(remoteBytes);
-
-    // 2. Attempt Simple Merge for Frontmatter
-    final localFM = MarkdownParser.parseFrontmatter(localContent);
-    final remoteFM = MarkdownParser.parseFrontmatter(remoteContent);
-    final localBody = MarkdownParser.extractBody(localContent);
-    final remoteBody = MarkdownParser.extractBody(remoteContent);
-
-    final mergedFM = MarkdownParser.mergeFrontmatter(localFM, remoteFM);
-
-    // For body, if it's a daily note, we can try to merge sections
-    String mergedBody = localBody;
-    final isDailyPath =
-        relativePath == 'daily' ||
-        relativePath.startsWith('daily/') ||
-        relativePath.contains('/daily/');
-    if (localFM['type'] == 'daily_note' || isDailyPath) {
-      // Very naive body merge: if remote has things local doesn't, append them?
-      // Better: just keep both in different files if body differs significantly.
-      if (localBody != remoteBody) {
-        mergedBody = "$localBody\n\n--- REMOTE CONTENT ---\n\n$remoteBody";
-      }
-    } else {
-      if (localBody != remoteBody) {
-        // Not a daily note, and bodies differ. Fallback to conflict files.
-        await _saveConflictFiles(
-          relativePath,
-          localContent,
-          remoteContent,
-          fileName,
-        );
-        return;
-      }
-    }
-
-    // 3. Upload merged version
-    final mergedContent =
-        "---\n${mergedFM.entries.map((e) => "${e.key}: ${e.value}").join('\n')}\n---\n\n$mergedBody";
-    final mergedBytes = utf8.encode(mergedContent);
-    final media = drive.Media(Stream.value(mergedBytes), mergedBytes.length);
-    final updateFile = drive.File()
-      ..name = fileName
-      ..appProperties = {'Quartzo_hash': calculateHash(mergedContent)};
-
-    await _driveApi!.files.update(
-      updateFile,
-      remoteId,
-      uploadMedia: media,
-      supportsAllDrives: true,
-    );
-    debugPrint('Conflict resolved via merge for $relativePath');
   }
 
   Future<void> _saveConflictFiles(

@@ -18,7 +18,7 @@ class QuartzoDayDialWidgetProvider : AppWidgetProvider() {
         appWidgetIds: IntArray,
     ) {
         val data = QuartzoWidgetUtils.json(
-            HomeWidgetPlugin.getData(context).getString("quartzo_day_dial", null),
+            HomeWidgetPlugin.getData(context).getString("Quartzo_day_dial", null),
         )
 
         val now = Date()

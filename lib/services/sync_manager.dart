@@ -58,6 +58,14 @@ class SyncManager {
     // 1. Process notification actions
     await _ref.read(vaultProvider.notifier).processPendingNotificationActions();
 
+    // One-time cleanup: clear stale file_sync_state rows left over
+    // from the pre-fix baseHash bug. Runs exactly once per install.
+    if (!settings.syncStateResetV1Applied) {
+      await _ref.read(syncQueueServiceProvider).resetFileSyncState();
+      await _ref.read(settingsProvider.notifier).markSyncStateResetV1Applied();
+      debugPrint('[SyncManager] Cleared stale file_sync_state (one-time v1 reset).');
+    }
+
     // 2. Perform sync if signed in
     if (settings.autoSync && await authService.ensureClient() != null) {
       await performSync();
@@ -180,6 +188,19 @@ class SyncManager {
 
     final settings = _ref.read(settingsProvider);
     driveSync.init(authClient);
+    driveSync.onConflictDetected = ({
+      required String relativePath,
+      required String localContent,
+      required String remoteContent,
+    }) async {
+      await _storeConflict(
+        driveSync: driveSync,
+        obsidian: obsidian,
+        relativePath: relativePath,
+        localContent: localContent,
+        remoteContent: remoteContent,
+      );
+    };
     debugPrint('[SyncManager] Preparing Drive folder.');
     if (settings.driveSyncFolderId.isNotEmpty) {
       await driveSync.useExistingVaultFolder(settings.driveSyncFolderId);
@@ -251,7 +272,7 @@ class SyncManager {
           relativePath: relativePath,
           localHash: localHash,
           remoteHash: localHash,
-          baseHash: baseHash ?? localHash,
+          baseHash: localHash,
           remoteFileId: remoteFile?.id,
         );
       }
@@ -389,7 +410,7 @@ class SyncManager {
             relativePath: relPath,
             localHash: localHash,
             remoteHash: localHash,
-            baseHash: baseHash,
+            baseHash: localHash,
             remoteFileId: remoteFile.id,
             localModifiedAt: await localFile.lastModified(),
           );
@@ -453,7 +474,7 @@ class SyncManager {
             relativePath: relPath,
             localHash: localHash,
             remoteHash: localHash,
-            baseHash: baseHash ?? localHash,
+            baseHash: localHash,
             remoteFileId: remoteFile.id,
             localModifiedAt: await localFile.lastModified(),
           );

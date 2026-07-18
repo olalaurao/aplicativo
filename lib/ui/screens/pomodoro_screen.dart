@@ -111,7 +111,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                           child: Column(
                             children: [
                               Text(
-                                state.currentItemTitle ?? 'Selecionar Task',
+                                state.currentItemTitle ?? 'Selecionar objeto',
                                 style: const TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.w800,

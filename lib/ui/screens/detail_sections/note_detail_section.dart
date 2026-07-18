@@ -14,7 +14,12 @@ List<Widget> buildNotePropertyCards(
   final allObjects = ref.watch(allObjectsProvider).value ?? [];
   final allNotes = allObjects.whereType<Note>().where((n) => n.parentNoteId == note.id).toList();
   return [
-    _buildNotePropertiesGrid(context, note, allNotes),
+    SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: _buildNotePropertiesGrid(context, note, allNotes),
+      ),
+    ),
   ];
 }
 

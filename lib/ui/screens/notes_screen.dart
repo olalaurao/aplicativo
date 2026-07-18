@@ -7,6 +7,7 @@ import '../../providers/vault_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../models/saved_filter.dart';
 import '../../models/note_model.dart';
+import '../../services/markdown_parser.dart';
 import '../widgets/rich_text_editor.dart';
 import '../widgets/outline_editor.dart';
 import '../widgets/collection_editor.dart';
@@ -30,6 +31,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   List<SavedFilter> _savedFilters = [];
   NoteViewMode _viewMode = NoteViewMode.grid;
   String? _expandedNoteId;
+  
+  // Bulk selection
+  final Set<String> _selectedIds = {};
+  bool _isSelectionMode = false;
 
   @override
   void initState() {
@@ -40,9 +45,15 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   }
 
   List<T> _applyFilterAndSort<T>(List<T> all) {
-    var result = (_activeFilter?.apply(all) ?? all).where((item) =>
-      _searchQuery.isEmpty ||
-      (item as dynamic).title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    var result = (_activeFilter?.apply(all) ?? all).where((item) {
+      // Filter out crash reports and conflicts
+      final path = (item as dynamic).obsidianPath as String? ?? '';
+      if (path.contains('_conflicts') || path.contains('_crash') || path.contains('crash_report')) {
+        return false;
+      }
+      return _searchQuery.isEmpty ||
+          (item as dynamic).title.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
     final sort = _activeFilter?.sortBy ?? SortField.modified;
     final asc  = _activeFilter?.sortAscending ?? false;
     result.sort((a, b) {
@@ -94,16 +105,63 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   @override
   Widget build(BuildContext context) {
     final allObjects = ref.watch(allObjectsProvider).value ?? [];
-    final allNotes = allObjects.whereType<Note>().toList();
+    final settings = ref.watch(settingsProvider);
+    final noteSignature = settings.typeSignatures['note'];
+    
+    final allNotes = allObjects.whereType<Note>().where((note) {
+      // Filter by Object Identification signature for notes
+      if (noteSignature != null) {
+        final frontmatter = note.toBaseMap();
+        final body = note.body ?? '';
+        final path = note.obsidianPath ?? '';
+        if (!MarkdownParser.matchesSignature(frontmatter, body, path, noteSignature)) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
     final filteredNotes = _applyFilterAndSort(allNotes);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notes'),
+        title: _isSelectionMode
+            ? Text('${_selectedIds.length} selecionados')
+            : const Text('Notes'),
         centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: Colors.transparent,
+        actions: [
+          if (_isSelectionMode) ...[
+            IconButton(
+              icon: const Icon(Icons.select_all_rounded),
+              onPressed: () {
+                final allObjects = ref.read(allObjectsProvider).value ?? [];
+                final allNotes = allObjects.whereType<Note>().toList();
+                final filteredNotes = _applyFilterAndSort(allNotes);
+                setState(() {
+                  _selectedIds.clear();
+                  _selectedIds.addAll(filteredNotes.map((n) => n.id));
+                });
+              },
+              tooltip: 'Selecionar todos',
+            ),
+            IconButton(
+              icon: const Icon(Icons.close_rounded),
+              onPressed: () => setState(() {
+                _isSelectionMode = false;
+                _selectedIds.clear();
+              }),
+              tooltip: 'Cancelar seleção',
+            ),
+          ] else ...[
+            IconButton(
+              icon: const Icon(Icons.check_circle_outline_rounded),
+              onPressed: () => setState(() => _isSelectionMode = true),
+              tooltip: 'Seleção múltipla',
+            ),
+          ],
+        ],
       ),
       body: CustomScrollView(
         slivers: [
@@ -171,34 +229,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
             ),
 
           // ─── Notes List ───
-          if (filteredNotes.isNotEmpty)
-            if (_viewMode == NoteViewMode.grid)
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2, crossAxisSpacing: 10,
-                    mainAxisSpacing: 10, childAspectRatio: 1.05),
-                  delegate: SliverChildBuilderDelegate(
-                    (ctx, i) => _buildGridCard(ctx, filteredNotes[i]),
-                    childCount: filteredNotes.length)))
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                sliver: SliverReorderableList(
-                  itemBuilder: (context, index) => Padding(
-                    key: ValueKey((filteredNotes[index] as dynamic).id),
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _buildNoteItem(context, filteredNotes[index]),
-                  ),
-                  itemCount: filteredNotes.length,
-                  onReorder: (oldIndex, newIndex) {
-                    if (_activeFilter?.sortBy != SortField.manual) return;
-                    _onReorder(filteredNotes, oldIndex, newIndex);
-                  },
-                ),
-              )
-          else
+          if (filteredNotes.isEmpty)
             // ─── Empty State ───
             SliverFillRemaining(
               hasScrollBody: false,
@@ -233,7 +264,31 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                   ],
                 ),
               ),
-            ),
+            )
+          else
+            _viewMode == NoteViewMode.grid
+                ? SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    sliver: SliverGrid(
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2, crossAxisSpacing: 10,
+                        mainAxisSpacing: 10, childAspectRatio: 1.05),
+                      delegate: SliverChildBuilderDelegate(
+                        (ctx, i) => _buildGridCard(ctx, filteredNotes[i], key: ValueKey(filteredNotes[i].id)),
+                        childCount: filteredNotes.length,
+                      )))
+                : SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _buildNoteItem(context, filteredNotes[index], key: ValueKey(filteredNotes[index].id)),
+                        ),
+                        childCount: filteredNotes.length,
+                      ),
+                    ),
+                  ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
@@ -288,53 +343,111 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
         color: selected ? Colors.black : AppTheme.textSecondaryColor(context)))));
 
-  Widget _buildGridCard(BuildContext context, dynamic note) {
+  Widget _buildGridCard(BuildContext context, Note note, {Key? key}) {
     final (_, color, label) = _noteTypeAssets(note);
-    return ObjectActionWrapper(object: note,
-      child: InkWell(
-        onTap: () => Navigator.push(context,
-          MaterialPageRoute(builder: (_) => UniversalDetailView(object: note))),
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: AppTheme.cardDecoration(context),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Builder(
-              builder: (context) {
-                final iconData = _noteIconData(note);
-                if (iconData != null)
-                  return Icon(iconData, size: 20, color: AppTheme.accentColor(context));
-                return Text(_noteEmoji(note), style: const TextStyle(fontSize: 20));
-              },
+    final isSelected = _selectedIds.contains(note.id);
+    
+    return GestureDetector(
+      key: key,
+      onTap: _isSelectionMode
+          ? () {
+              setState(() {
+                if (isSelected) {
+                  _selectedIds.remove(note.id);
+                } else {
+                  _selectedIds.add(note.id);
+                }
+              });
+            }
+          : () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => UniversalDetailView(object: note))),
+      onLongPress: () {
+        setState(() {
+          _isSelectionMode = true;
+          _selectedIds.add(note.id);
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.accentColor(context).withValues(alpha: 0.1) : null,
+          borderRadius: BorderRadius.circular(14),
+          border: isSelected
+              ? Border.all(color: AppTheme.accentColor(context), width: 2)
+              : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                Builder(
+                  builder: (context) {
+                    final iconData = _noteIconData(note);
+                    if (iconData != null) {
+                      return Icon(iconData, size: 20, color: AppTheme.accentColor(context));
+                    }
+                    return Text(_noteEmoji(note), style: const TextStyle(fontSize: 20));
+                  },
+                ),
+                if (_isSelectionMode)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isSelected ? Icons.check_circle : Icons.circle_outlined,
+                        color: isSelected ? AppTheme.accentColor(context) : Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
-            Text(note.title, maxLines: 2, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            Text(
+              note.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
             const Spacer(),
-            Row(children: [
-              _typeBadge(label, color),
-              const Spacer(),
-              Text(_formatDate(note.updatedAt ?? note.createdAt),
-                style: TextStyle(fontSize: 9, color: AppTheme.textMutedColor(context))),
-            ]),
-          ]))));
+            Row(
+              children: [
+                _typeBadge(label, color),
+                const Spacer(),
+                Text(
+                  _formatDate(note.updatedAt ?? note.createdAt),
+                  style: TextStyle(fontSize: 9, color: AppTheme.textMutedColor(context)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  IconData? _noteIconData(dynamic note) {
+  IconData? _noteIconData(Note note) {
     final iconData = ObjectIcons.iconDataForType('note', ref);
     if (note.noteType == 'outline') return ObjectIcons.defaultIconDataForNoteSubtype('outline');
     if (note.noteType == 'collection') return ObjectIcons.defaultIconDataForNoteSubtype('collection');
     return iconData;
   }
 
-  String _noteEmoji(dynamic note) {
+  String _noteEmoji(Note note) {
     final emoji = ObjectIcons.emojiForType('note', ref);
     if (note.noteType == 'outline') return ObjectIcons.defaultIconForNoteSubtype('outline');
     if (note.noteType == 'collection') return ObjectIcons.defaultIconForNoteSubtype('collection');
     return emoji;
   }
 
-  (IconData, Color, String) _noteTypeAssets(dynamic note) => switch (note.noteType) {
+  (IconData, Color, String) _noteTypeAssets(Note note) => switch (note.noteType) {
     'outline'    => (Icons.account_tree_outlined, AppColors.habitGreen, 'Outline'),
     'collection' => (Icons.grid_view_rounded, AppColors.habitPurple, 'Collection'),
     _            => (Icons.description_outlined, AppColors.info, 'Text'),
@@ -347,36 +460,79 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     child: Text(label, style: TextStyle(
       fontSize: 9, fontWeight: FontWeight.w700, color: color)));
 
-  Widget _buildNoteItem(BuildContext context, dynamic note) {
+  Widget _buildNoteItem(BuildContext context, Note note, {Key? key}) {
     final isExpanded = _expandedNoteId == note.id;
     final (icon, color, typeLabel) = _noteTypeAssets(note);
+    final isSelected = _selectedIds.contains(note.id);
 
-    return ObjectActionWrapper(
-      object: note,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        decoration: AppTheme.cardDecoration(context),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Column(
-            children: [
-              InkWell(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => UniversalDetailView(object: note)),
-                ),
+    return AnimatedContainer(
+      key: key,
+      duration: const Duration(milliseconds: 300),
+      decoration: BoxDecoration(
+        color: isSelected ? AppTheme.accentColor(context).withValues(alpha: 0.1) : null,
+        borderRadius: BorderRadius.circular(16),
+        border: isSelected
+            ? Border.all(color: AppTheme.accentColor(context), width: 2)
+            : null,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          children: [
+            InkWell(
+                onTap: _isSelectionMode
+                    ? () {
+                        setState(() {
+                          if (isSelected) {
+                            _selectedIds.remove(note.id);
+                          } else {
+                            _selectedIds.add(note.id);
+                          }
+                        });
+                      }
+                    : () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => UniversalDetailView(object: note)),
+                      ),
+                onLongPress: () {
+                  setState(() {
+                    _isSelectionMode = true;
+                    _selectedIds.add(note.id);
+                  });
+                },
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(icon, size: 20, color: color),
+                      Stack(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(icon, size: 20, color: color),
+                          ),
+                          if (_isSelectionMode)
+                            Positioned(
+                              top: -4,
+                              right: -4,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  isSelected ? Icons.check_circle : Icons.circle_outlined,
+                                  color: isSelected ? AppTheme.accentColor(context) : Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -461,14 +617,13 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     child: _buildExpandedEditor(note),
                   ),
                 ),
-            ],
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildExpandedEditor(dynamic note) {
+  Widget _buildExpandedEditor(Note note) {
     if (note.noteType == 'outline') {
       return OutlineEditor(
         initialContent: note.body,
