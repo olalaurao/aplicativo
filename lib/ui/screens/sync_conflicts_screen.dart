@@ -12,12 +12,16 @@ class PersistedSyncConflict {
   final String localPath;
   final String remotePath;
   final DateTime detectedAt;
+  final DateTime? localModifiedAt;
+  final DateTime? remoteModifiedAt;
 
   const PersistedSyncConflict({
     required this.relativePath,
     required this.localPath,
     required this.remotePath,
     required this.detectedAt,
+    this.localModifiedAt,
+    this.remoteModifiedAt,
   });
 
   factory PersistedSyncConflict.fromMap(Map<String, dynamic> map) {
@@ -28,6 +32,12 @@ class PersistedSyncConflict {
       detectedAt: DateTime.fromMillisecondsSinceEpoch(
         map['detectedAt'] as int? ?? 0,
       ),
+      localModifiedAt: map['localModifiedAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['localModifiedAt'] as int)
+          : null,
+      remoteModifiedAt: map['remoteModifiedAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['remoteModifiedAt'] as int)
+          : null,
     );
   }
 }
@@ -104,35 +114,53 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
                         ),
                       ),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _resolveAll(
-                              context,
-                              conflicts,
-                              keepLocal: true,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () => _resolveAll(
+                                  context,
+                                  conflicts,
+                                  keepLocal: true,
+                                ),
+                                icon: const Icon(Icons.phone_android, size: 18),
+                                label: const Text(
+                                  'Manter todos local',
+                                  style: TextStyle(fontSize: 13),
+                                ),
+                              ),
                             ),
-                            icon: const Icon(Icons.phone_android, size: 18),
-                            label: const Text(
-                              'Manter todos local',
-                              style: TextStyle(fontSize: 13),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => _resolveAll(
+                                  context,
+                                  conflicts,
+                                  keepLocal: false,
+                                ),
+                                icon: const Icon(Icons.cloud, size: 18),
+                                label: const Text(
+                                  'Manter todos Drive',
+                                  style: TextStyle(fontSize: 13),
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _resolveAll(
-                              context,
-                              conflicts,
-                              keepLocal: false,
-                            ),
-                            icon: const Icon(Icons.cloud, size: 18),
-                            label: const Text(
-                              'Manter todos Drive',
-                              style: TextStyle(fontSize: 13),
-                            ),
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          onPressed: () => _resolveAllByDate(context, conflicts),
+                          icon: const Icon(Icons.schedule, size: 18),
+                          label: const Text(
+                            'Manter versão mais recente',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.info,
+                            foregroundColor: Colors.white,
                           ),
                         ),
                       ],
@@ -290,6 +318,147 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
       );
     } catch (e) {
       debugPrint('Failed to resolve all conflicts: $e');
+      messenger.showSnackBar(
+        SnackBar(content: Text('Erro ao resolver conflitos: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResolvingAll = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _resolveAllByDate(
+    BuildContext context,
+    List<PersistedSyncConflict> conflicts,
+  ) async {
+    setState(() {
+      _isResolvingAll = true;
+    });
+
+    final messenger = ScaffoldMessenger.of(context);
+    int resolved = 0;
+    int failed = 0;
+    int localCount = 0;
+    int remoteCount = 0;
+
+    try {
+      final obsidian = ref.read(obsidianServiceProvider);
+      final queue = ref.read(syncQueueServiceProvider);
+      final driveSync = ref.read(googleDriveSyncServiceProvider);
+      final authService = ref.read(auth.googleAuthServiceProvider);
+      final settings = ref.read(settingsProvider);
+      final backupService = ref.read(backupServiceProvider);
+
+      final client = await authService.ensureClient();
+      if (client == null) {
+        throw Exception('Google Drive não está conectado');
+      }
+
+      driveSync.init(client);
+      if (settings.driveSyncFolderId.isNotEmpty) {
+        await driveSync.useExistingVaultFolder(settings.driveSyncFolderId);
+      } else {
+        await driveSync.setupVaultFolder(settings.driveSyncFolder);
+      }
+
+      final zipFile = await backupService.createBackup();
+      if (zipFile != null) {
+        await driveSync.createBackupFromFile(zipFile);
+      }
+
+      for (final conflict in conflicts) {
+        try {
+          // Determine which version is newer based on modification times
+          DateTime? localTime = conflict.localModifiedAt;
+          DateTime? remoteTime = conflict.remoteModifiedAt;
+
+          // If modification times are not available, fall back to current file times
+          if (localTime == null) {
+            localTime = await obsidian.getFileModificationTime(conflict.localPath);
+          }
+
+          // Compare times - if remote is null or local is newer, use local
+          bool keepLocal = true;
+          if (remoteTime != null && localTime != null) {
+            keepLocal = localTime.isAfter(remoteTime);
+          } else if (remoteTime != null && localTime == null) {
+            // Only remote time available, use remote
+            keepLocal = false;
+          }
+          // If both null, default to local
+
+          final sourcePath = keepLocal
+              ? conflict.localPath
+              : conflict.remotePath;
+          final chosenContent = await obsidian.readFile(sourcePath);
+          if (chosenContent == null) {
+            failed++;
+            debugPrint(
+              'Failed to resolve ${conflict.relativePath}: version not found',
+            );
+            continue;
+          }
+
+          await obsidian.writeFile(conflict.relativePath, chosenContent);
+          final hash = driveSync.calculateHash(chosenContent);
+          final uploaded = await driveSync.syncFile(
+            conflict.relativePath,
+            chosenContent,
+            hash,
+          );
+          if (!uploaded) {
+            failed++;
+            debugPrint(
+              'Failed to resolve ${conflict.relativePath}: upload failed',
+            );
+            continue;
+          }
+
+          await queue.upsertFileSyncState(
+            relativePath: conflict.relativePath,
+            localHash: hash,
+            remoteHash: hash,
+            baseHash: hash,
+          );
+          await queue.removeConflict(conflict.relativePath);
+
+          ref
+              .read(syncConflictsProvider.notifier)
+              .removeConflict(conflict.relativePath);
+          resolved++;
+          if (keepLocal) {
+            localCount++;
+          } else {
+            remoteCount++;
+          }
+        } catch (e) {
+          failed++;
+          debugPrint('Failed to resolve ${conflict.relativePath}: $e');
+        }
+      }
+
+      ref.invalidate(persistedSyncConflictsProvider);
+      ref.invalidate(allObjectsProvider);
+
+      final remaining = await queue.getConflicts();
+      ref
+          .read(syncStatusProvider.notifier)
+          .setStatus(
+            remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
+          );
+
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Resolvidos: $resolved (Local: $localCount, Drive: $remoteCount), Falharam: $failed',
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Failed to resolve all conflicts by date: $e');
       messenger.showSnackBar(
         SnackBar(content: Text('Erro ao resolver conflitos: $e')),
       );

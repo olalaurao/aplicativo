@@ -255,6 +255,7 @@ class SyncManager {
             relativePath: relativePath,
             localContent: content,
             remoteContent: remoteContent,
+            remoteModifiedAt: remoteFile?.modifiedTime,
           );
         }
         return;
@@ -373,6 +374,7 @@ class SyncManager {
             relativePath: relPath,
             localContent: content,
             remoteContent: remoteContent,
+            remoteModifiedAt: remoteFile.modifiedTime,
           );
         }
         continue;
@@ -433,6 +435,7 @@ class SyncManager {
               relativePath: relPath,
               localContent: content,
               remoteContent: remoteContent,
+              remoteModifiedAt: remoteFile.modifiedTime,
             );
             continue;
           }
@@ -463,6 +466,7 @@ class SyncManager {
               relativePath: relPath,
               localContent: content,
               remoteContent: remoteContent,
+              remoteModifiedAt: remoteFile.modifiedTime,
             );
           }
           continue;
@@ -540,6 +544,8 @@ class SyncManager {
     required String relativePath,
     required String localContent,
     required String remoteContent,
+    DateTime? localModifiedAt,
+    DateTime? remoteModifiedAt,
   }) async {
     await _ensurePreSyncBackup(driveSync);
     await driveSync.saveConflictPair(
@@ -555,6 +561,10 @@ class SyncManager {
     final remoteConflictPath = '_conflicts/${_generateSafeFileName(safePath, 'remote', timestamp)}.md';
     await obsidian.writeFile(localConflictPath, localContent);
     await obsidian.writeFile(remoteConflictPath, remoteContent);
+    
+    // Get modification times if not provided
+    localModifiedAt ??= await obsidian.getFileModificationTime(relativePath);
+    
     await _ref
         .read(syncQueueServiceProvider)
         .upsertConflict(
@@ -562,6 +572,8 @@ class SyncManager {
           localPath: localConflictPath,
           remotePath: remoteConflictPath,
           detectedAt: detectedAt,
+          localModifiedAt: localModifiedAt,
+          remoteModifiedAt: remoteModifiedAt,
         );
 
     _syncHadConflict = true;

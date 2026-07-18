@@ -524,6 +524,15 @@ class ObsidianService {
     invalidateFileCacheForPath(relativePath);
   }
 
+  Future<DateTime?> getFileModificationTime(String relativePath) async {
+    if (vaultDir == null) return null;
+    final file = File('${vaultDir!.path}/$relativePath');
+    if (await file.exists()) {
+      return await file.lastModified();
+    }
+    return null;
+  }
+
   Future<void> moveFile(String fromRelativePath, String toRelativePath) async {
     if (vaultDir == null) return;
     final source = File('${vaultDir!.path}/$fromRelativePath');

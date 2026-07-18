@@ -14,12 +14,20 @@ class SyncQueueService {
 
     _db = await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         await _createTables(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         await _createTables(db);
+        if (oldVersion < 3) {
+          await db.execute('''
+            ALTER TABLE sync_conflicts ADD COLUMN localModifiedAt INTEGER
+          ''');
+          await db.execute('''
+            ALTER TABLE sync_conflicts ADD COLUMN remoteModifiedAt INTEGER
+          ''');
+        }
       },
     );
   }
@@ -52,7 +60,9 @@ class SyncQueueService {
         relativePath TEXT PRIMARY KEY,
         localPath TEXT,
         remotePath TEXT,
-        detectedAt INTEGER
+        detectedAt INTEGER,
+        localModifiedAt INTEGER,
+        remoteModifiedAt INTEGER
       )
     ''');
   }
@@ -292,6 +302,8 @@ class SyncQueueService {
     required String localPath,
     required String remotePath,
     required DateTime detectedAt,
+    DateTime? localModifiedAt,
+    DateTime? remoteModifiedAt,
   }) async {
     if (_db == null) throw Exception('Database not initialized');
     await _db!.insert('sync_conflicts', {
@@ -299,6 +311,8 @@ class SyncQueueService {
       'localPath': localPath,
       'remotePath': remotePath,
       'detectedAt': detectedAt.millisecondsSinceEpoch,
+      'localModifiedAt': localModifiedAt?.millisecondsSinceEpoch,
+      'remoteModifiedAt': remoteModifiedAt?.millisecondsSinceEpoch,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 

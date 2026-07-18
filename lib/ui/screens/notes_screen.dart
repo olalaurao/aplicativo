@@ -326,7 +326,8 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
             color: AppColors.info.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(20)),
+            borderRadius: BorderRadius.circular(20),
+          ),
           child: const Text('+ filtro', style: TextStyle(
             fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.info)))),
     ]));
@@ -339,7 +340,8 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       decoration: BoxDecoration(
         color: selected ? AppTheme.accentColor(context) : AppTheme.surfaceVariantColor(context),
-        borderRadius: BorderRadius.circular(20)),
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
         color: selected ? Colors.black : AppTheme.textSecondaryColor(context)))));
 
@@ -661,3 +663,4 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     }
   }
 }
+
