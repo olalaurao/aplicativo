@@ -201,6 +201,13 @@ class SyncManager {
         remoteContent: remoteContent,
       );
     };
+
+    // Files that already have an unresolved conflict must not be re-compared
+    // or re-flagged — that's what caused _conflicts/ to grow on every sync.
+    final pendingConflictPaths = (await queue.getConflicts())
+        .map((row) => row['relativePath'] as String)
+        .toSet();
+
     debugPrint('[SyncManager] Preparing Drive folder.');
     if (settings.driveSyncFolderId.isNotEmpty) {
       await driveSync.useExistingVaultFolder(settings.driveSyncFolderId);
@@ -214,6 +221,11 @@ class SyncManager {
     await queue.processQueue((action) async {
       final relativePath = await _relativePathForAction(action);
       if (relativePath == null && action.operation != SyncOperation.delete) {
+        return;
+      }
+
+      if (relativePath != null && pendingConflictPaths.contains(relativePath)) {
+        debugPrint('[SyncManager] Skipping $relativePath — unresolved conflict pending.');
         return;
       }
 
@@ -255,7 +267,7 @@ class SyncManager {
             relativePath: relativePath,
             localContent: content,
             remoteContent: remoteContent,
-            remoteModifiedAt: remoteFile?.modifiedTime,
+            remoteModifiedAt: remoteFile.modifiedTime,
           );
         }
         return;
@@ -281,7 +293,7 @@ class SyncManager {
 
     // 2. Pull remote changes after local queued edits are safely uploaded.
     debugPrint('[SyncManager] Running full Drive sync.');
-    await _runFullSync(driveSync, obsidian);
+    await _runFullSync(driveSync, obsidian, pendingConflictPaths);
     debugPrint('[SyncManager] Refreshing local notifications.');
     await _refreshNotificationsFromLocalVault();
 
@@ -310,6 +322,7 @@ class SyncManager {
   Future<void> _runFullSync(
     GoogleDriveSyncService driveSync,
     ObsidianService obsidian,
+    Set<String> pendingConflictPaths,
   ) async {
     final queue = _ref.read(syncQueueServiceProvider);
     final remoteFiles = await driveSync.fetchRemoteFiles();
@@ -324,6 +337,8 @@ class SyncManager {
 
     // 1. Upload local files that don't exist or are newer remotely
     for (final relPath in localMap.keys) {
+      if (pendingConflictPaths.contains(relPath)) continue;
+
       final localFile = localMap[relPath]!;
       final remoteFile = remoteMap[relPath] as drive.File?;
 
@@ -488,6 +503,8 @@ class SyncManager {
 
     // 2. Download remote files that don't exist locally or are newer
     for (final relPath in remoteMap.keys) {
+      if (pendingConflictPaths.contains(relPath)) continue;
+
       final remoteFile = remoteMap[relPath] as drive.File;
       if (remoteFile.mimeType == 'application/vnd.google-apps.folder') continue;
       if (!relPath.endsWith('.md')) continue;

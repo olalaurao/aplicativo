@@ -524,6 +524,24 @@ class ObsidianService {
     invalidateFileCacheForPath(relativePath);
   }
 
+  /// Deletes every file inside the local `_conflicts/` folder, regardless
+  /// of whether it's referenced by any current sync_conflicts row. Used by
+  /// the one-time bulk cleanup action.
+  Future<int> clearConflictsFolder() async {
+    if (vaultDir == null) return 0;
+    final dir = Directory('${vaultDir!.path}/_conflicts');
+    if (!await dir.exists()) return 0;
+    var count = 0;
+    await for (final entity in dir.list()) {
+      if (entity is File) {
+        await entity.delete();
+        count++;
+      }
+    }
+    invalidateFileCacheForPath('_conflicts');
+    return count;
+  }
+
   Future<DateTime?> getFileModificationTime(String relativePath) async {
     if (vaultDir == null) return null;
     final file = File('${vaultDir!.path}/$relativePath');

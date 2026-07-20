@@ -152,7 +152,8 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
                         ),
                         const SizedBox(height: 12),
                         ElevatedButton.icon(
-                          onPressed: () => _resolveAllByDate(context, conflicts),
+                          onPressed: () =>
+                              _resolveAllByDate(context, conflicts),
                           icon: const Icon(Icons.schedule, size: 18),
                           label: const Text(
                             'Manter versão mais recente',
@@ -160,6 +161,20 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.info,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ElevatedButton.icon(
+                          onPressed: () =>
+                              _resolveAndCleanAll(context, conflicts),
+                          icon: const Icon(Icons.cleaning_services, size: 18),
+                          label: const Text(
+                            'Resolver e Limpar Tudo',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.deepPurple,
                             foregroundColor: Colors.white,
                           ),
                         ),
@@ -287,6 +302,16 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
           );
           await queue.removeConflict(conflict.relativePath);
 
+          // Ticket 2: Delete the physical conflict-pair files after resolution.
+          try {
+            await obsidian.deleteFile(conflict.localPath);
+            await obsidian.deleteFile(conflict.remotePath);
+            await driveSync.permanentlyDeleteFileByPath(conflict.localPath);
+            await driveSync.permanentlyDeleteFileByPath(conflict.remotePath);
+          } catch (e) {
+            debugPrint('[Conflicts] Cleanup of conflict artifacts failed: $e');
+          }
+
           ref
               .read(syncConflictsProvider.notifier)
               .removeConflict(conflict.relativePath);
@@ -327,6 +352,132 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
           _isResolvingAll = false;
         });
       }
+    }
+  }
+
+  /// Resolves all pending conflicts (keeping local version), then sweeps
+  /// the entire _conflicts/ folder on both local and Drive to remove any
+  /// orphan files left over from before this fix.
+  Future<void> _resolveAndCleanAll(
+    BuildContext context,
+    List<PersistedSyncConflict> conflicts,
+  ) async {
+    setState(() => _isResolvingAll = true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    int resolved = 0;
+    int failed = 0;
+    int localRemoved = 0;
+    int driveRemoved = 0;
+
+    try {
+      final obsidian = ref.read(obsidianServiceProvider);
+      final queue = ref.read(syncQueueServiceProvider);
+      final driveSync = ref.read(googleDriveSyncServiceProvider);
+      final authService = ref.read(auth.googleAuthServiceProvider);
+      final settings = ref.read(settingsProvider);
+      final backupService = ref.read(backupServiceProvider);
+
+      final client = await authService.ensureClient();
+      if (client == null) {
+        throw Exception('Google Drive não está conectado');
+      }
+
+      driveSync.init(client);
+      if (settings.driveSyncFolderId.isNotEmpty) {
+        await driveSync.useExistingVaultFolder(settings.driveSyncFolderId);
+      } else {
+        await driveSync.setupVaultFolder(settings.driveSyncFolder);
+      }
+
+      final zipFile = await backupService.createBackup();
+      if (zipFile != null) {
+        await driveSync.createBackupFromFile(zipFile);
+      }
+
+      // Step 1: Resolve all tracked conflicts, keeping local version.
+      for (final conflict in conflicts) {
+        try {
+          final chosenContent = await obsidian.readFile(conflict.localPath);
+          if (chosenContent == null) {
+            failed++;
+            continue;
+          }
+          await obsidian.writeFile(conflict.relativePath, chosenContent);
+          final hash = driveSync.calculateHash(chosenContent);
+          final uploaded = await driveSync.syncFile(
+            conflict.relativePath,
+            chosenContent,
+            hash,
+          );
+          if (!uploaded) {
+            failed++;
+            continue;
+          }
+          await queue.upsertFileSyncState(
+            relativePath: conflict.relativePath,
+            localHash: hash,
+            remoteHash: hash,
+            baseHash: hash,
+          );
+          await queue.removeConflict(conflict.relativePath);
+          try {
+            await obsidian.deleteFile(conflict.localPath);
+            await obsidian.deleteFile(conflict.remotePath);
+            await driveSync.permanentlyDeleteFileByPath(conflict.localPath);
+            await driveSync.permanentlyDeleteFileByPath(conflict.remotePath);
+          } catch (e) {
+            debugPrint('[Conflicts] Cleanup of conflict artifacts failed: $e');
+          }
+          ref
+              .read(syncConflictsProvider.notifier)
+              .removeConflict(conflict.relativePath);
+          resolved++;
+        } catch (e) {
+          failed++;
+          debugPrint('[Conflicts] Failed to resolve ${conflict.relativePath}: $e');
+        }
+      }
+
+      // Step 2: Sweep the entire _conflicts/ folder on both sides to remove
+      // any orphan files that predate this fix.
+      try {
+        localRemoved = await obsidian.clearConflictsFolder();
+      } catch (e) {
+        debugPrint('[Conflicts] clearConflictsFolder failed: $e');
+      }
+      try {
+        driveRemoved = await driveSync.clearRemoteConflictsFolder();
+      } catch (e) {
+        debugPrint('[Conflicts] clearRemoteConflictsFolder failed: $e');
+      }
+
+      ref.invalidate(persistedSyncConflictsProvider);
+      ref.invalidate(allObjectsProvider);
+
+      final remaining = await queue.getConflicts();
+      ref
+          .read(syncStatusProvider.notifier)
+          .setStatus(
+            remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
+          );
+
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Resolvidos: $resolved, Falharam: $failed, '
+            'Arquivos removidos: $localRemoved (local), $driveRemoved (Drive)',
+          ),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    } catch (e) {
+      debugPrint('[Conflicts] _resolveAndCleanAll failed: $e');
+      messenger.showSnackBar(
+        SnackBar(content: Text('Erro ao limpar conflitos: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isResolvingAll = false);
     }
   }
 
@@ -424,6 +575,16 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
             baseHash: hash,
           );
           await queue.removeConflict(conflict.relativePath);
+
+          // Ticket 2: Delete the physical conflict-pair files after resolution.
+          try {
+            await obsidian.deleteFile(conflict.localPath);
+            await obsidian.deleteFile(conflict.remotePath);
+            await driveSync.permanentlyDeleteFileByPath(conflict.localPath);
+            await driveSync.permanentlyDeleteFileByPath(conflict.remotePath);
+          } catch (e) {
+            debugPrint('[Conflicts] Cleanup of conflict artifacts failed: $e');
+          }
 
           ref
               .read(syncConflictsProvider.notifier)
@@ -790,6 +951,16 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
       );
       await queue.removeConflict(conflict.relativePath);
 
+      // Ticket 2: Delete the physical conflict-pair files after resolution.
+      try {
+        await obsidian.deleteFile(conflict.localPath);
+        await obsidian.deleteFile(conflict.remotePath);
+        await driveSync.permanentlyDeleteFileByPath(conflict.localPath);
+        await driveSync.permanentlyDeleteFileByPath(conflict.remotePath);
+      } catch (e) {
+        debugPrint('[Conflicts] Cleanup of conflict artifacts failed: $e');
+      }
+
       ref
           .read(syncConflictsProvider.notifier)
           .removeConflict(conflict.relativePath);
@@ -868,6 +1039,16 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
       await obsidian.deleteFile(conflict.relativePath);
       await queue.removeFileSyncState(conflict.relativePath);
       await queue.removeConflict(conflict.relativePath);
+
+      // Ticket 2: Delete the physical conflict-pair files after resolution.
+      try {
+        await obsidian.deleteFile(conflict.localPath);
+        await obsidian.deleteFile(conflict.remotePath);
+        await driveSync.permanentlyDeleteFileByPath(conflict.localPath);
+        await driveSync.permanentlyDeleteFileByPath(conflict.remotePath);
+      } catch (e) {
+        debugPrint('[Conflicts] Cleanup of conflict artifacts failed: $e');
+      }
 
       ref
           .read(syncConflictsProvider.notifier)
@@ -953,6 +1134,16 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
         baseHash: hash,
       );
       await queue.removeConflict(conflict.relativePath);
+
+      // Ticket 2: Delete the physical conflict-pair files after resolution.
+      try {
+        await obsidian.deleteFile(conflict.localPath);
+        await obsidian.deleteFile(conflict.remotePath);
+        await driveSync.permanentlyDeleteFileByPath(conflict.localPath);
+        await driveSync.permanentlyDeleteFileByPath(conflict.remotePath);
+      } catch (e) {
+        debugPrint('[Conflicts] Cleanup of conflict artifacts failed: $e');
+      }
 
       ref
           .read(syncConflictsProvider.notifier)

@@ -269,6 +269,36 @@ class GoogleDriveSyncService {
     );
   }
 
+  /// Permanently deletes a file living under `_conflicts/` (or any known
+  /// relative path) by looking it up and issuing a hard delete. Used only
+  /// for conflict-artifact cleanup — never for real vault content.
+  Future<void> permanentlyDeleteFileByPath(String relativePath) async {
+    if (_driveApi == null || _vaultFolderId == null) return;
+
+    final pathParts = relativePath.split('/');
+    final fileName = pathParts.last;
+    final folderPath = pathParts.sublist(0, pathParts.length - 1).join('/');
+
+    final parentId = folderPath.isEmpty
+        ? _vaultFolderId!
+        : await _getOrCreateFolder(folderPath);
+
+    final query =
+        "name='${_queryStringLiteral(fileName)}' and '${_queryStringLiteral(parentId)}' in parents and trashed=false";
+    final fileList = await _driveApi!.files.list(
+      q: query,
+      spaces: 'drive',
+      includeItemsFromAllDrives: true,
+      supportsAllDrives: true,
+      $fields: 'files(id)',
+    );
+
+    final match = fileList.files?.firstOrNull;
+    if (match?.id != null) {
+      await _driveApi!.files.delete(match!.id!, supportsAllDrives: true);
+    }
+  }
+
   Future<void> createBackup(List<File> files, {String? rootPath}) async {
     final archive = Archive();
 
@@ -346,6 +376,27 @@ class GoogleDriveSyncService {
       if (id == null) continue;
       await _driveApi!.files.delete(id, supportsAllDrives: true);
     }
+  }
+
+  /// Permanently deletes every file inside the Drive `_conflicts/` folder.
+  /// Used by the one-time bulk cleanup action.
+  Future<int> clearRemoteConflictsFolder() async {
+    if (_driveApi == null || _vaultFolderId == null) return 0;
+    final conflictsFolderId = await _getOrCreateFolder('_conflicts');
+    final fileList = await _driveApi!.files.list(
+      q: "'${_queryStringLiteral(conflictsFolderId)}' in parents and trashed=false",
+      spaces: 'drive',
+      includeItemsFromAllDrives: true,
+      supportsAllDrives: true,
+      $fields: 'files(id)',
+    );
+    var count = 0;
+    for (final f in fileList.files ?? <drive.File>[]) {
+      if (f.id == null) continue;
+      await _driveApi!.files.delete(f.id!, supportsAllDrives: true);
+      count++;
+    }
+    return count;
   }
 
   Future<List<drive.File>> fetchRemoteFiles() async {
