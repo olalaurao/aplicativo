@@ -161,6 +161,12 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
       route: '/routines',
       inBottomBar: false,
     ),
+    NavigationItem(
+      section: NavSection.replanning,
+      label: 'Replanning',
+      route: '/replanning',
+      inBottomBar: false,
+    ),
   ];
 
   Future<void> _save() async {

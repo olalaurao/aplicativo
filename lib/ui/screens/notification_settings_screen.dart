@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme.dart';
 import '../../providers/settings_provider.dart';
+import '../../providers/color_palette_provider.dart';
+import '../../models/color_palette_model.dart';
 
 /// Settings screen for customizing notification appearance (popup colors, alarm colors, buttons).
 class NotificationSettingsScreen extends ConsumerStatefulWidget {
@@ -282,20 +284,30 @@ class _NotificationSettingsScreenState
   }
 
   void _showColorPicker(String key, Color current) {
-    final presets = [
-      const Color(0xFFEF4444), // Red
-      const Color(0xFFF97316), // Orange
-      const Color(0xFFF59E0B), // Amber
-      const Color(0xFF22C55E), // Green
-      const Color(0xFF14B8A6), // Teal
-      const Color(0xFF3B82F6), // Blue
-      const Color(0xFF6366F1), // Indigo
-      const Color(0xFF8B5CF6), // Purple
-      const Color(0xFFEC4899), // Pink
-      const Color(0xFF9CA3AF), // Gray
-      const Color(0xFF1E293B), // Dark
-      const Color(0xFFFFB000), // Gold (brand)
-    ];
+    final palette = ref.read(colorPaletteProvider);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    // Use custom palette colors, or fall back to default
+    final colorHexes = isDarkMode && palette.useSeparateDarkPalette
+        ? palette.darkHexes
+        : palette.lightHexes;
+    
+    final presets = colorHexes.isNotEmpty
+        ? colorHexes.map((hex) => PaletteColor.parseHex(hex)).toList()
+        : [
+            const Color(0xFFEF4444), // Red
+            const Color(0xFFF97316), // Orange
+            const Color(0xFFF59E0B), // Amber
+            const Color(0xFF22C55E), // Green
+            const Color(0xFF14B8A6), // Teal
+            const Color(0xFF3B82F6), // Blue
+            const Color(0xFF6366F1), // Indigo
+            const Color(0xFF8B5CF6), // Purple
+            const Color(0xFFEC4899), // Pink
+            const Color(0xFF9CA3AF), // Gray
+            const Color(0xFF1E293B), // Dark
+            const Color(0xFFFFB000), // Gold (brand)
+          ];
 
     showModalBottomSheet(
       context: context,

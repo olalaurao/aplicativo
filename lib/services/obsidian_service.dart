@@ -576,6 +576,8 @@ class ObsidianService {
 
   Future<List<File>> getAllMarkdownFiles({bool forceRefresh = false}) async {
     final now = DateTime.now();
+    
+    // Use cache if still valid and not forced refresh
     if (!forceRefresh &&
         _allMarkdownFilesCache != null &&
         _allMarkdownFilesCacheTimestamp != null &&
@@ -583,9 +585,24 @@ class ObsidianService {
             _cacheValidDuration) {
       return _allMarkdownFilesCache!;
     }
+    
     if (vaultDir == null) return [];
     
-    // Otimização: usar listSync para scan mais rápido em vez de await for
+    // Otimização incremental: se temos cache e não é forceRefresh,
+    // verificar apenas arquivos modificados desde o último scan
+    if (!forceRefresh && 
+        _allMarkdownFilesCache != null && 
+        _lastFullScanTime != null) {
+      return await _getModifiedMarkdownFiles();
+    }
+    
+    // Full scan (first time or forced)
+    return await _performFullMarkdownFileScan();
+  }
+  
+  Future<List<File>> _performFullMarkdownFileScan() async {
+    if (vaultDir == null) return [];
+    
     final files = <File>[];
     try {
       final entities = vaultDir!.listSync(
@@ -604,6 +621,13 @@ class ObsidianService {
             continue;
           }
           files.add(entity);
+          // Update modification cache
+          try {
+            final modTime = await entity.lastModified();
+            _fileModificationCache[path] = modTime;
+          } catch (_) {
+            // Ignore if we can't get modification time
+          }
         }
       }
     } catch (e) {
@@ -623,13 +647,87 @@ class ObsidianService {
             continue;
           }
           files.add(entity);
+          // Update modification cache
+          try {
+            final modTime = await entity.lastModified();
+            _fileModificationCache[path] = modTime;
+          } catch (_) {
+            // Ignore if we can't get modification time
+          }
         }
       }
     }
     
     _allMarkdownFilesCache = files;
-    _allMarkdownFilesCacheTimestamp = now;
-    _lastFullScanTime = now;
+    _allMarkdownFilesCacheTimestamp = DateTime.now();
+    _lastFullScanTime = DateTime.now();
+    return files;
+  }
+  
+  Future<List<File>> _getModifiedMarkdownFiles() async {
+    if (vaultDir == null || _allMarkdownFilesCache == null) {
+      return await _performFullMarkdownFileScan();
+    }
+    
+    final files = <File>[];
+    final cachedFiles = _allMarkdownFilesCache!;
+    final cachedPaths = cachedFiles.map((f) => f.path.replaceAll('\\', '/')).toSet();
+    
+    try {
+      final entities = vaultDir!.listSync(
+        recursive: true,
+        followLinks: false,
+      );
+      
+      for (final entity in entities) {
+        if (entity is File && entity.path.endsWith('.md')) {
+          final path = entity.path.replaceAll('\\', '/');
+          if (path.contains('/_attachments/') ||
+              path.contains('/_deleted/') ||
+              path.contains('/_conflicts/') ||
+              path.contains('/_backups/') ||
+              path.contains('/_cache/')) {
+            continue;
+          }
+          
+          try {
+            final modTime = await entity.lastModified();
+            final cachedModTime = _fileModificationCache[path];
+            
+            // File is new or modified
+            if (cachedModTime == null || modTime.isAfter(cachedModTime)) {
+              files.add(entity);
+              _fileModificationCache[path] = modTime;
+            } else {
+              // File unchanged, use from cache
+              final cachedFile = cachedFiles.firstWhere(
+                (f) => f.path.replaceAll('\\', '/') == path,
+                orElse: () => entity,
+              );
+              files.add(cachedFile);
+            }
+          } catch (_) {
+            // If we can't check modification time, include the file
+            files.add(entity);
+          }
+        }
+      }
+      
+      // Check for deleted files (in cache but not on disk)
+      final currentPaths = files.map((f) => f.path.replaceAll('\\', '/')).toSet();
+      for (final cachedFile in cachedFiles) {
+        final cachedPath = cachedFile.path.replaceAll('\\', '/');
+        if (!currentPaths.contains(cachedPath)) {
+          _fileModificationCache.remove(cachedPath);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in incremental scan, falling back to full: $e');
+      return await _performFullMarkdownFileScan();
+    }
+    
+    _allMarkdownFilesCache = files;
+    _allMarkdownFilesCacheTimestamp = DateTime.now();
     return files;
   }
 

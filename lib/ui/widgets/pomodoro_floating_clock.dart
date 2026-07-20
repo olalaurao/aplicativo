@@ -48,7 +48,7 @@ class _PomodoroFloatingClockState extends ConsumerState<PomodoroFloatingClock> {
 
         final isOverDismissZone = _isDragging &&
             _offset != null &&
-            _offset!.dy > screenHeight - 140;
+            _offset!.dy > screenHeight - 120;
 
         return Stack(
           children: [
@@ -141,7 +141,9 @@ class _PomodoroFloatingClockState extends ConsumerState<PomodoroFloatingClock> {
                     opacity: _isDragging ? 0.6 : 0.85,
                     duration: const Duration(milliseconds: 100),
                     child: _ClockWidget(
-                      remainingSeconds: pomodoro.remainingSeconds,
+                      remainingSeconds: pomodoro.currentType == PomodoroType.stopwatch 
+                          ? pomodoro.elapsedSeconds 
+                          : pomodoro.remainingSeconds,
                       totalSeconds: pomodoro.totalSeconds,
                       type: pomodoro.currentType,
                       onTap: () {

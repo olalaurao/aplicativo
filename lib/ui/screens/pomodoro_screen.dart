@@ -227,33 +227,52 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                           spacing: 16,
                           runSpacing: 12,
                           children: [
-                            _actionButton(
-                              onPressed: state.isRunning
-                                  ? notifier.stop
-                                  : notifier.start,
-                              icon: state.isRunning
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              label: state.isRunning ? 'Pausar' : 'Focar',
-                              color: AppColors.error,
-                              isPrimary: true,
-                            ),
-                            if (state.isRunning)
+                            if (state.currentType == PomodoroType.stopwatch) ...[
+                              // Stopwatch mode: Play, Pause, Finish
+                              _actionButton(
+                                onPressed: state.isRunning ? notifier.pause : notifier.start,
+                                icon: state.isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                label: state.isRunning ? 'Pausar' : 'Iniciar',
+                                color: AppColors.info,
+                                isPrimary: true,
+                              ),
                               _actionButton(
                                 onPressed: () => _showStopDialog(context, ref),
-                                icon: Icons.stop_rounded,
-                                label: 'Parar',
-                                color: AppColors.textMuted,
-                                isPrimary: false,
-                              )
-                            else
-                              _actionButton(
-                                onPressed: () => _handleSkip(context, ref),
-                                icon: Icons.skip_next_rounded,
-                                label: 'Pular',
+                                icon: Icons.check_rounded,
+                                label: 'Finalizar',
                                 color: AppColors.textMuted,
                                 isPrimary: false,
                               ),
+                            ] else ...[
+                              // Regular pomodoro mode
+                              _actionButton(
+                                onPressed: state.isRunning
+                                    ? notifier.stop
+                                    : notifier.start,
+                                icon: state.isRunning
+                                    ? Icons.pause_rounded
+                                    : Icons.play_arrow_rounded,
+                                label: state.isRunning ? 'Pausar' : 'Focar',
+                                color: AppColors.error,
+                                isPrimary: true,
+                              ),
+                              if (state.isRunning)
+                                _actionButton(
+                                  onPressed: () => _showStopDialog(context, ref),
+                                  icon: Icons.stop_rounded,
+                                  label: 'Parar',
+                                  color: AppColors.textMuted,
+                                  isPrimary: false,
+                                )
+                              else
+                                _actionButton(
+                                  onPressed: () => _handleSkip(context, ref),
+                                  icon: Icons.skip_next_rounded,
+                                  label: 'Pular',
+                                  color: AppColors.textMuted,
+                                  isPrimary: false,
+                                ),
+                            ],
                           ],
                         ),
                       ],

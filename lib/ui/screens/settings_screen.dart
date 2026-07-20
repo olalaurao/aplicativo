@@ -16,6 +16,10 @@ import 'notification_settings_screen.dart';
 import 'day_theme_screen.dart';
 import 'import_vault_screen.dart';
 import 'social_bulk_import_screen.dart';
+import 'color_palette_screen.dart';
+import 'background_color_screen.dart';
+import '../../providers/color_palette_provider.dart';
+import '../../models/color_palette_model.dart';
 
 import 'package:file_picker/file_picker.dart';
 import '../../services/google_drive_sync_service.dart';
@@ -300,6 +304,54 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                     onTap: () =>
                         _showAccentColorPicker(context, settings, notifier),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: ListTile(
+                    title: const Text(
+                      'Color Palette',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Customize your color palette (up to 15 colors)',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ColorPaletteScreen(),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: ListTile(
+                    title: const Text(
+                      'Background Colors',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Save background colors for quick access',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const BackgroundColorScreen(),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -2182,14 +2234,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     AppSettings settings,
     SettingsNotifier notifier,
   ) {
-    final colors = [
-      '#F97316',
-      '#0EA5E9',
-      '#10B981',
-      '#8B5CF6',
-      '#F43F5E',
-      '#EAB308',
-    ];
+    final palette = ref.read(colorPaletteProvider);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    // Use custom palette colors, or fall back to default
+    final colorHexes = isDarkMode && palette.useSeparateDarkPalette
+        ? palette.darkHexes
+        : palette.lightHexes;
+    
+    final colors = colorHexes.isNotEmpty
+        ? colorHexes
+        : [
+            '#F97316',
+            '#0EA5E9',
+            '#10B981',
+            '#8B5CF6',
+            '#F43F5E',
+            '#EAB308',
+          ];
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(

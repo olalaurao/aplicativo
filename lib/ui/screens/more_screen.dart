@@ -6,7 +6,7 @@ import '../theme.dart';
 import '../../providers/navigation_provider.dart';
 import '../../models/navigation_item.dart';
 import 'settings_screen.dart';
-import 'appearance_screen.dart';
+import 'theme_screen.dart';
 import 'category_management_screen.dart';
 import 'shopping_list_screen.dart';
 import 'vault_files_screen.dart';
@@ -276,14 +276,14 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                 ),
                 _buildMenuRow(
                   context,
-                  'Appearance',
+                  'Theme',
                   Icons.palette_outlined,
                   AppColors.habitPurple,
                   () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const AppearanceScreen(),
+                        builder: (_) => const ThemeScreen(),
                       ),
                     );
                   },

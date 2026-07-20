@@ -399,7 +399,7 @@ class GoogleDriveSyncService {
     return count;
   }
 
-  Future<List<drive.File>> fetchRemoteFiles() async {
+  Future<List<drive.File>> fetchRemoteFiles({DateTime? modifiedSince}) async {
     if (_driveApi == null || _vaultFolderId == null) return [];
 
     final files = <drive.File>[];
@@ -407,6 +407,7 @@ class GoogleDriveSyncService {
       parentId: _vaultFolderId!,
       relativeFolder: '',
       results: files,
+      modifiedSince: modifiedSince,
     );
     return files;
   }
@@ -415,11 +416,18 @@ class GoogleDriveSyncService {
     required String parentId,
     required String relativeFolder,
     required List<drive.File> results,
+    DateTime? modifiedSince,
   }) async {
     String? pageToken;
+    String timeFilter = '';
+    if (modifiedSince != null) {
+      final isoTime = modifiedSince.toIso8601String();
+      timeFilter = " and modifiedTime > '$isoTime'";
+    }
+    
     do {
       final fileList = await _driveApi!.files.list(
-        q: "'${_queryStringLiteral(parentId)}' in parents and trashed=false",
+        q: "'${_queryStringLiteral(parentId)}' in parents and trashed=false$timeFilter",
         spaces: 'drive',
         pageToken: pageToken,
         includeItemsFromAllDrives: true,
@@ -445,6 +453,7 @@ class GoogleDriveSyncService {
             parentId: folderId,
             relativeFolder: relativePath,
             results: results,
+            modifiedSince: modifiedSince,
           );
         } else {
           item.name = relativePath;

@@ -61,3 +61,68 @@ final syncConflictsProvider =
     NotifierProvider<SyncConflictNotifier, List<SyncConflict>>(() {
       return SyncConflictNotifier();
     });
+
+class SyncProgress {
+  final int current;
+  final int total;
+  final String message;
+
+  const SyncProgress({
+    required this.current,
+    required this.total,
+    required this.message,
+  });
+
+  double get percentage => total > 0 ? current / total : 0.0;
+
+  SyncProgress copyWith({
+    int? current,
+    int? total,
+    String? message,
+  }) {
+    return SyncProgress(
+      current: current ?? this.current,
+      total: total ?? this.total,
+      message: message ?? this.message,
+    );
+  }
+}
+
+class SyncProgressNotifier extends Notifier<SyncProgress> {
+  @override
+  SyncProgress build() {
+    return const SyncProgress(
+      current: 0,
+      total: 0,
+      message: '',
+    );
+  }
+
+  void start(int total, String message) {
+    state = SyncProgress(
+      current: 0,
+      total: total,
+      message: message,
+    );
+  }
+
+  void update(int current, {String? message}) {
+    state = state.copyWith(
+      current: current,
+      message: message ?? state.message,
+    );
+  }
+
+  void reset() {
+    state = const SyncProgress(
+      current: 0,
+      total: 0,
+      message: '',
+    );
+  }
+}
+
+final syncProgressProvider =
+    NotifierProvider<SyncProgressNotifier, SyncProgress>(() {
+      return SyncProgressNotifier();
+    });

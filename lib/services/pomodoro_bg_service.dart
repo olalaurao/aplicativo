@@ -6,7 +6,9 @@ import '../models/reminder_config.dart';
 
 class PomodoroTaskHandler extends TaskHandler {
   int _remainingSeconds = 0;
+  int _elapsedSeconds = 0;
   bool _isRunning = false;
+  bool _isStopwatchMode = false;
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
@@ -16,14 +18,22 @@ class PomodoroTaskHandler extends TaskHandler {
 
   @override
   void onRepeatEvent(DateTime timestamp) {
-    if (_isRunning && _remainingSeconds > 0) {
-      _remainingSeconds--;
-      _updateNotification();
-      FlutterForegroundTask.sendDataToMain(_remainingSeconds);
-    } else if (_remainingSeconds <= 0) {
-      _isRunning = false;
-      _updateNotification(done: true);
-      FlutterForegroundTask.sendDataToMain(0);
+    if (_isStopwatchMode) {
+      if (_isRunning) {
+        _elapsedSeconds++;
+        _updateNotification();
+        FlutterForegroundTask.sendDataToMain(_elapsedSeconds);
+      }
+    } else {
+      if (_isRunning && _remainingSeconds > 0) {
+        _remainingSeconds--;
+        _updateNotification();
+        FlutterForegroundTask.sendDataToMain(_remainingSeconds);
+      } else if (_remainingSeconds <= 0) {
+        _isRunning = false;
+        _updateNotification(done: true);
+        FlutterForegroundTask.sendDataToMain(0);
+      }
     }
   }
 
@@ -51,7 +61,9 @@ class PomodoroTaskHandler extends TaskHandler {
   void onReceiveData(Object data) {
     if (data is Map<String, dynamic>) {
       if (data.containsKey('seconds')) _remainingSeconds = data['seconds'];
+      if (data.containsKey('elapsedSeconds')) _elapsedSeconds = data['elapsedSeconds'];
       if (data.containsKey('isRunning')) _isRunning = data['isRunning'];
+      if (data.containsKey('isStopwatchMode')) _isStopwatchMode = data['isStopwatchMode'];
       _updateNotification();
     }
   }
@@ -71,20 +83,21 @@ class PomodoroTaskHandler extends TaskHandler {
     }
 
     if (_isRunning) {
-      final minutes = _remainingSeconds ~/ 60;
-      final seconds = _remainingSeconds % 60;
+      final displaySeconds = _isStopwatchMode ? _elapsedSeconds : _remainingSeconds;
+      final minutes = displaySeconds ~/ 60;
+      final seconds = displaySeconds % 60;
       final timeStr =
           '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
       FlutterForegroundTask.updateService(
-        notificationTitle: 'Pomodoro em andamento',
-        notificationText: 'Tempo restante: $timeStr',
+        notificationTitle: _isStopwatchMode ? 'Cronômetro em andamento' : 'Pomodoro em andamento',
+        notificationText: _isStopwatchMode ? 'Tempo decorrido: $timeStr' : 'Tempo restante: $timeStr',
         notificationButtons: PomodoroBackgroundService._notificationButtons,
       );
       return;
     }
 
     FlutterForegroundTask.updateService(
-      notificationTitle: done ? 'Pomodoro concluído!' : 'Pomodoro pausado',
+      notificationTitle: done ? 'Pomodoro concluído!' : (_isStopwatchMode ? 'Cronômetro pausado' : 'Pomodoro pausado'),
       notificationText: done
           ? 'Hora de trocar de fase.'
           : 'Retome quando estiver pronto.',
@@ -134,7 +147,7 @@ class PomodoroBackgroundService {
     await startAutoSync(enabled: enabled);
   }
 
-  static Future<void> start(int seconds) async {
+  static Future<void> start(int seconds, {bool isStopwatchMode = false, int elapsedSeconds = 0}) async {
     if (!await FlutterForegroundTask.isRunningService) {
       await FlutterForegroundTask.startService(
         notificationTitle: 'Pomodoro Active',
@@ -144,7 +157,9 @@ class PomodoroBackgroundService {
     }
     FlutterForegroundTask.sendDataToTask({
       'seconds': seconds,
+      'elapsedSeconds': elapsedSeconds,
       'isRunning': true,
+      'isStopwatchMode': isStopwatchMode,
     });
   }
 

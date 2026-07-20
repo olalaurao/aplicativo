@@ -1494,9 +1494,9 @@ class MoodsNotifier extends Notifier<List<MoodDefinition>> {
         final exists = await obsidian.fileExists(path);
         if (!exists) {
           await obsidian.writeFile(path, mood.toMarkdown());
+          ref.read(allObjectsProvider.notifier).addObjectInMemory(mood);
         }
       }
-      ref.invalidate(allObjectsProvider);
     } catch (e) {
       debugPrint('Error seeding system moods: $e');
     } finally {
@@ -1877,6 +1877,27 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
     if (!replaced) updated.add(object);
     state = AsyncData(updated);
   }
+
+  void addObjectInMemory(ContentObject object) {
+    final objects = state.valueOrNull;
+    if (objects == null) return;
+
+    // Check if object already exists
+    if (objects.any((o) => o.id == object.id)) {
+      replaceObjectInMemory(object);
+      return;
+    }
+
+    state = AsyncData([...objects, object]);
+  }
+
+  void removeObjectInMemory(String objectId) {
+    final objects = state.valueOrNull;
+    if (objects == null) return;
+
+    final updated = objects.where((o) => o.id != objectId).toList();
+    state = AsyncData(updated);
+  }
 }
 
 final allObjectsProvider =
@@ -2185,7 +2206,7 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     );
 
     ref.invalidate(dailyNoteDataProvider(dateStr));
-    ref.invalidate(allObjectsProvider);
+    // Daily notes are not in allObjectsProvider, no need to invalidate
   }
 
   Future<void> _syncMoodEntriesFrontmatter(
@@ -2355,7 +2376,7 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     );
 
     ref.invalidate(dailyNoteDataProvider(dateStr));
-    ref.invalidate(allObjectsProvider);
+    // Daily notes are not in allObjectsProvider, no need to invalidate
   }
 
   Future<void> deleteEntry(JournalEntry entry) async {
@@ -2424,7 +2445,7 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     );
 
     ref.invalidate(dailyNoteDataProvider(dateStr));
-    ref.invalidate(allObjectsProvider);
+    // Daily notes are not in allObjectsProvider, no need to invalidate
   }
 }
 
@@ -2579,7 +2600,8 @@ class VaultNotifier extends Notifier<void> {
 
   void _invalidateObjectProviders(ContentObject object) {
     final key = _signatureKeyFor(object);
-    ref.invalidate(allObjectsProvider);
+    // Use granular update instead of full invalidation
+    ref.read(allObjectsProvider.notifier).replaceObjectInMemory(object);
     ref.invalidate(objectsByTypeProvider(object.type));
     ref.invalidate(objectsByTypeProvider(key));
 
@@ -3096,6 +3118,7 @@ class VaultNotifier extends Notifier<void> {
     }
 
     debugPrint('Imported $copied files from $sourcePath');
+    // Import adds new files, need full reload to parse them
     ref.invalidate(allObjectsProvider);
   }
 
@@ -3689,6 +3712,7 @@ class VaultNotifier extends Notifier<void> {
       ),
     );
 
+    // changeObjectType moves file to different folder/type, need full reload
     ref.invalidate(allObjectsProvider);
   }
 

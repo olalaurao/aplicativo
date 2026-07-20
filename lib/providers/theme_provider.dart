@@ -37,6 +37,9 @@ final activeThemeConfigProvider = Provider<AppThemeConfig>((ref) {
     },
   );
 
+  // Apply custom accent color from settings
+  final customAccentColor = AppThemeConfig.colorFromHex(settings.accentColor);
+
   // Apply custom light background color if set
   Color? customBgColor;
   if (settings.backgroundColor != null) {
@@ -52,7 +55,7 @@ final activeThemeConfigProvider = Provider<AppThemeConfig>((ref) {
   return AppThemeConfig(
     id: baseTheme.id,
     label: baseTheme.label,
-    accentColor: baseTheme.accentColor,
+    accentColor: customAccentColor,
     backgroundColor: customBgColor ?? baseTheme.backgroundColor,
     darkBackgroundColor: customDarkBgColor ?? baseTheme.darkBackgroundColor,
     icon: baseTheme.icon,

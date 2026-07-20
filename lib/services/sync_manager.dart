@@ -10,6 +10,7 @@ import 'google_auth_service.dart';
 import 'obsidian_service.dart';
 import 'dataview_generator.dart';
 import 'notification_service.dart';
+import 'sync_queue_service.dart';
 import '../models/content_object.dart';
 import '../models/sync_action.dart';
 import '../models/task_model.dart';
@@ -27,6 +28,7 @@ class SyncManager {
 
   final Ref _ref;
   Timer? _syncTimer;
+  Timer? _syncDebounceTimer; // Debounce for rapid sync triggers
   bool _isSyncing = false;
   bool _preSyncBackupCreated = false;
   bool _syncHadConflict = false;
@@ -37,7 +39,7 @@ class SyncManager {
     _syncTimer?.cancel();
     _syncTimer = Timer.periodic(const Duration(minutes: 15), (_) {
       if (_ref.read(settingsProvider).autoSync) {
-        performSync();
+        performSync(debounce: true);
       }
     });
 
@@ -123,9 +125,21 @@ class SyncManager {
 
   void stop() {
     _syncTimer?.cancel();
+    _syncDebounceTimer?.cancel();
   }
 
-  Future<void> performSync() async {
+  Future<void> performSync({bool debounce = false}) async {
+    // Cancel any pending debounced sync
+    _syncDebounceTimer?.cancel();
+    
+    // If debounce is requested, schedule sync after delay
+    if (debounce) {
+      _syncDebounceTimer = Timer(const Duration(seconds: 3), () {
+        performSync(debounce: false);
+      });
+      return;
+    }
+    
     if (_isSyncing) return;
 
     final authService = _ref.read(googleAuthServiceProvider);
@@ -146,6 +160,7 @@ class SyncManager {
     _preSyncBackupCreated = false;
     _syncHadConflict = false;
     _ref.read(syncStatusProvider.notifier).setStatus(SyncStatus.syncing);
+    _ref.read(syncProgressProvider.notifier).start(0, 'Iniciando sincronização...');
 
     try {
       await _performSyncWithClient(authClient).timeout(_syncTimeout);
@@ -178,6 +193,7 @@ class SyncManager {
       _ref.read(syncStatusProvider.notifier).setStatus(SyncStatus.error);
     } finally {
       _isSyncing = false;
+      _ref.read(syncProgressProvider.notifier).reset();
     }
   }
 
@@ -297,6 +313,9 @@ class SyncManager {
     debugPrint('[SyncManager] Refreshing local notifications.');
     await _refreshNotificationsFromLocalVault();
 
+    // 3. Update last successful sync timestamp for incremental sync
+    await _ref.read(settingsProvider.notifier).updateLastSuccessfulSyncTime(DateTime.now());
+
     // 3. Regenerate Dataview queries in index.md files in each vault folder
     try {
       debugPrint('[SyncManager] Regenerating Dataview indexes.');
@@ -325,8 +344,16 @@ class SyncManager {
     Set<String> pendingConflictPaths,
   ) async {
     final queue = _ref.read(syncQueueServiceProvider);
-    final remoteFiles = await driveSync.fetchRemoteFiles();
-    final localFiles = await obsidian.getAllMarkdownFiles();
+    final settings = _ref.read(settingsProvider);
+    
+    // Get last sync timestamp for incremental sync
+    final lastSyncTime = settings.lastSuccessfulSyncTime;
+    final remoteFiles = await driveSync.fetchRemoteFiles(
+      modifiedSince: lastSyncTime,
+    );
+    
+    // Otimização: buscar apenas arquivos locais modificados desde o último sync
+    final localFiles = await _getModifiedLocalFiles(obsidian, queue, lastSyncTime);
 
     final Map<String, File> localMap = {
       for (var f in localFiles) obsidian.getRelativePath(f.path): f,
@@ -334,6 +361,15 @@ class SyncManager {
     final Map<String, dynamic> remoteMap = {
       for (var f in remoteFiles) f.name!: f,
     };
+
+    // Calculate total files to process for progress tracking
+    final totalFiles = localMap.length + remoteMap.length;
+    _ref.read(syncProgressProvider.notifier).start(
+      totalFiles,
+      'Sincronizando arquivos...',
+    );
+
+    int processedCount = 0;
 
     // 1. Upload local files that don't exist or are newer remotely
     for (final relPath in localMap.keys) {
@@ -359,6 +395,8 @@ class SyncManager {
             localModifiedAt: await localFile.lastModified(),
           );
         }
+        processedCount++;
+        _ref.read(syncProgressProvider.notifier).update(processedCount);
         continue;
       }
 
@@ -373,6 +411,8 @@ class SyncManager {
           localModifiedAt: await localFile.lastModified(),
           remoteModifiedAt: remoteFile.modifiedTime,
         );
+        processedCount++;
+        _ref.read(syncProgressProvider.notifier).update(processedCount);
         continue;
       }
 
@@ -392,6 +432,8 @@ class SyncManager {
             remoteModifiedAt: remoteFile.modifiedTime,
           );
         }
+        processedCount++;
+        _ref.read(syncProgressProvider.notifier).update(processedCount);
         continue;
       }
 
@@ -411,6 +453,8 @@ class SyncManager {
           );
           debugPrint('Downloaded $relPath from Drive');
         }
+        processedCount++;
+        _ref.read(syncProgressProvider.notifier).update(processedCount);
         continue;
       }
 
@@ -432,6 +476,8 @@ class SyncManager {
             localModifiedAt: await localFile.lastModified(),
           );
         }
+        processedCount++;
+        _ref.read(syncProgressProvider.notifier).update(processedCount);
         continue;
       }
 
@@ -452,6 +498,8 @@ class SyncManager {
               remoteContent: remoteContent,
               remoteModifiedAt: remoteFile.modifiedTime,
             );
+            processedCount++;
+            _ref.read(syncProgressProvider.notifier).update(processedCount);
             continue;
           }
           await _ensurePreSyncBackup(driveSync);
@@ -467,6 +515,8 @@ class SyncManager {
           );
           debugPrint('Downloaded $relPath from Drive');
         }
+        processedCount++;
+        _ref.read(syncProgressProvider.notifier).update(processedCount);
       } else if (remoteHash == null &&
           await _isLocalFileNewer(localFile, remoteFile)) {
         // Optimistic concurrency check: re-read sync state before writing
@@ -484,6 +534,8 @@ class SyncManager {
               remoteModifiedAt: remoteFile.modifiedTime,
             );
           }
+          processedCount++;
+          _ref.read(syncProgressProvider.notifier).update(processedCount);
           continue;
         }
         await _ensurePreSyncBackup(driveSync);
@@ -498,6 +550,12 @@ class SyncManager {
             localModifiedAt: await localFile.lastModified(),
           );
         }
+        processedCount++;
+        _ref.read(syncProgressProvider.notifier).update(processedCount);
+      } else {
+        // File not changed, just count it as processed
+        processedCount++;
+        _ref.read(syncProgressProvider.notifier).update(processedCount);
       }
     }
 
@@ -526,8 +584,50 @@ class SyncManager {
           );
           debugPrint('Downloaded $relPath from Drive');
         }
+        processedCount++;
+        _ref.read(syncProgressProvider.notifier).update(processedCount);
+      } else {
+        // File exists locally, just count it as processed
+        processedCount++;
+        _ref.read(syncProgressProvider.notifier).update(processedCount);
       }
     }
+  }
+  
+  /// Get only local files modified since last sync
+  Future<List<File>> _getModifiedLocalFiles(
+    ObsidianService obsidian,
+    SyncQueueService queue,
+    DateTime? lastSyncTime,
+  ) async {
+    // If no previous sync, get all files
+    if (lastSyncTime == null) {
+      return await obsidian.getAllMarkdownFiles();
+    }
+    
+    final allFiles = await obsidian.getAllMarkdownFiles();
+    final modifiedFiles = <File>[];
+    
+    for (final file in allFiles) {
+      final relPath = obsidian.getRelativePath(file.path);
+      final state = await queue.getFileSyncState(relPath);
+      
+      // If no sync state, file is new/unsynced
+      if (state == null) {
+        modifiedFiles.add(file);
+        continue;
+      }
+      
+      // Check if file was modified locally since last sync
+      final localModifiedAt = state['localModifiedAt'] as DateTime?;
+      final currentModifiedAt = await file.lastModified();
+      
+      if (localModifiedAt == null || currentModifiedAt.isAfter(localModifiedAt)) {
+        modifiedFiles.add(file);
+      }
+    }
+    
+    return modifiedFiles;
   }
 
   Future<bool> _isLocalFileNewer(File localFile, drive.File remoteFile) async {

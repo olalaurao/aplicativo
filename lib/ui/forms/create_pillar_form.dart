@@ -8,6 +8,7 @@ import '../../models/shared_types.dart';
 import '../../models/action_menu_item_model.dart';
 import '../../models/content_object.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/color_palette_provider.dart';
 import '../theme.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/organizer_selector_field.dart';
@@ -16,6 +17,7 @@ import '../widgets/icon_picker.dart';
 import '../widgets/form_section_card.dart';
 import '../widgets/discard_guard.dart';
 import '../utils/material_icon_set.dart';
+import '../../models/color_palette_model.dart';
 
 class CreatePillarForm extends ConsumerStatefulWidget {
   final String? initialTitle;
@@ -295,36 +297,52 @@ class _CreatePillarFormState extends ConsumerState<CreatePillarForm> {
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: _colorSwatches.map((color) {
-            final isSelected = color == _selectedColor;
-            return GestureDetector(
-              onTap: () => setState(() => _selectedColor = color),
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Color(int.parse(color.replaceFirst('#', '0xFF'))),
-                  shape: BoxShape.circle,
-                  border: isSelected
-                      ? Border.all(color: Colors.white, width: 3)
-                      : null,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
+        Consumer(
+          builder: (context, ref, _) {
+            final palette = ref.watch(colorPaletteProvider);
+            final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+            
+            // Use custom palette colors, or fall back to default
+            final colorHexes = isDarkMode && palette.useSeparateDarkPalette
+                ? palette.darkHexes
+                : palette.lightHexes;
+            
+            final colorsToUse = colorHexes.isNotEmpty
+                ? colorHexes
+                : _colorSwatches;
+            
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: colorsToUse.map((color) {
+                final isSelected = color == _selectedColor;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedColor = color),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: PaletteColor.parseHex(color),
+                      shape: BoxShape.circle,
+                      border: isSelected
+                          ? Border.all(color: Colors.white, width: 3)
+                          : null,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: isSelected
-                    ? const Icon(Icons.check, color: Colors.white, size: 20)
-                    : null,
-              ),
+                    child: isSelected
+                        ? const Icon(Icons.check, color: Colors.white, size: 20)
+                        : null,
+                  ),
+                );
+              }).toList(),
             );
-          }).toList(),
+          },
         ),
       ],
     );

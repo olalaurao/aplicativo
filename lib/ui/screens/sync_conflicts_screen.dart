@@ -102,6 +102,45 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
 
             return Column(
               children: [
+                if (_isResolvingAll)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.cardFillColor(context),
+                      border: Border(
+                        bottom: BorderSide(
+                          color: AppTheme.dividerColor(context),
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    child: Consumer(
+                      builder: (context, ref, _) {
+                        final progress = ref.watch(syncProgressProvider);
+                        final percentage = progress.total > 0
+                            ? (progress.percentage * 100).toInt()
+                            : 0;
+                        return Column(
+                          children: [
+                            LinearProgressIndicator(
+                              value: progress.total > 0 ? progress.percentage : null,
+                              backgroundColor: AppTheme.dividerColor(context),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              progress.message.isNotEmpty
+                                  ? '${progress.message} $percentage% (${progress.current}/${progress.total})'
+                                  : 'Resolvendo conflitos...',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.accentColor(context),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
                 if (conflicts.isNotEmpty && !_isResolvingAll)
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -240,6 +279,12 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
     int resolved = 0;
     int failed = 0;
 
+    // Start progress tracking
+    ref.read(syncProgressProvider.notifier).start(
+      conflicts.length,
+      keepLocal ? 'Resolvendo conflitos (versão local)...' : 'Resolvendo conflitos (versão Drive)...',
+    );
+
     try {
       final obsidian = ref.read(obsidianServiceProvider);
       final queue = ref.read(syncQueueServiceProvider);
@@ -316,12 +361,15 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
               .read(syncConflictsProvider.notifier)
               .removeConflict(conflict.relativePath);
           resolved++;
+          ref.read(syncProgressProvider.notifier).update(resolved);
         } catch (e) {
           failed++;
           debugPrint('Failed to resolve ${conflict.relativePath}: $e');
+          ref.read(syncProgressProvider.notifier).update(resolved + failed);
         }
       }
 
+      ref.read(syncProgressProvider.notifier).reset();
       ref.invalidate(persistedSyncConflictsProvider);
       ref.invalidate(allObjectsProvider);
 
@@ -369,6 +417,12 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
     int failed = 0;
     int localRemoved = 0;
     int driveRemoved = 0;
+
+    // Start progress tracking
+    ref.read(syncProgressProvider.notifier).start(
+      conflicts.length,
+      'Resolvendo e limpando conflitos...',
+    );
 
     try {
       final obsidian = ref.read(obsidianServiceProvider);
@@ -433,14 +487,20 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
               .read(syncConflictsProvider.notifier)
               .removeConflict(conflict.relativePath);
           resolved++;
+          ref.read(syncProgressProvider.notifier).update(resolved);
         } catch (e) {
           failed++;
           debugPrint('[Conflicts] Failed to resolve ${conflict.relativePath}: $e');
+          ref.read(syncProgressProvider.notifier).update(resolved + failed);
         }
       }
 
       // Step 2: Sweep the entire _conflicts/ folder on both sides to remove
       // any orphan files that predate this fix.
+      ref.read(syncProgressProvider.notifier).update(
+        resolved + failed,
+        message: 'Limpando arquivos órfãos...',
+      );
       try {
         localRemoved = await obsidian.clearConflictsFolder();
       } catch (e) {
@@ -452,6 +512,7 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
         debugPrint('[Conflicts] clearRemoteConflictsFolder failed: $e');
       }
 
+      ref.read(syncProgressProvider.notifier).reset();
       ref.invalidate(persistedSyncConflictsProvider);
       ref.invalidate(allObjectsProvider);
 
@@ -494,6 +555,12 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
     int failed = 0;
     int localCount = 0;
     int remoteCount = 0;
+
+    // Start progress tracking
+    ref.read(syncProgressProvider.notifier).start(
+      conflicts.length,
+      'Resolvendo conflitos (versão mais recente)...',
+    );
 
     try {
       final obsidian = ref.read(obsidianServiceProvider);
@@ -590,6 +657,7 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
               .read(syncConflictsProvider.notifier)
               .removeConflict(conflict.relativePath);
           resolved++;
+          ref.read(syncProgressProvider.notifier).update(resolved);
           if (keepLocal) {
             localCount++;
           } else {
@@ -598,9 +666,11 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
         } catch (e) {
           failed++;
           debugPrint('Failed to resolve ${conflict.relativePath}: $e');
+          ref.read(syncProgressProvider.notifier).update(resolved + failed);
         }
       }
 
+      ref.read(syncProgressProvider.notifier).reset();
       ref.invalidate(persistedSyncConflictsProvider);
       ref.invalidate(allObjectsProvider);
 

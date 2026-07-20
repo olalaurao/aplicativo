@@ -35,6 +35,7 @@ import '../forms/create_task_form.dart';
 import '../theme.dart';
 import '../widgets/create_menu_sheet.dart';
 import '../widgets/steering_sheet.dart';
+import '../../features/overdue/widgets/overdue_section.dart';
 
 final _quickAddSubmittingProvider = StateProvider<bool>((ref) => false);
 final _quickTaskSubmittingProvider = StateProvider<bool>((ref) => false);
@@ -367,6 +368,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 // Normal mode: use simple CustomScrollView — NO ReorderableListView semantics overhead
                 return CustomScrollView(
                   slivers: [
+                    // Overdue section at the top
+                    const SliverToBoxAdapter(
+                      child: OverdueSection(),
+                    ),
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
                       sliver: SliverList(
@@ -399,6 +404,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return Consumer(
       builder: (context, ref, _) {
         final status = ref.watch(syncStatusProvider);
+        final progress = ref.watch(syncProgressProvider);
         final (icon, color, tooltip) = switch (status) {
           SyncStatus.synced   => (Icons.cloud_done_rounded,   AppColors.success, 'Synced'),
           SyncStatus.syncing  => (Icons.cloud_sync_rounded,   AppTheme.accentColor(context), 'Syncing…'),
@@ -406,14 +412,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           SyncStatus.error    => (Icons.cloud_off_rounded,    AppColors.error, 'Sync error — tap for details'),
           SyncStatus.conflict => (Icons.warning_amber_rounded, AppColors.warning, 'Sync conflict — tap to resolve'),
         };
+
+        String progressTooltip = tooltip;
+        if (status == SyncStatus.syncing && progress.total > 0) {
+          final percentage = (progress.percentage * 100).toInt();
+          progressTooltip = '${progress.message} $percentage% (${progress.current}/${progress.total})';
+        }
+
         return IconButton(
           icon: status == SyncStatus.syncing
-              ? const SizedBox(
-                  width: AppIconSize.md, height: AppIconSize.md,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+              ? Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: AppIconSize.md,
+                      height: AppIconSize.md,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        value: progress.total > 0 ? progress.percentage : null,
+                      ),
+                    ),
+                    if (progress.total > 0)
+                      Text(
+                        '${(progress.percentage * 100).toInt()}%',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: AppTheme.accentColor(context),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                  ],
                 )
               : Icon(icon, color: color),
-          tooltip: tooltip,
+          tooltip: progressTooltip,
           onPressed: status == SyncStatus.conflict || status == SyncStatus.error
               ? () => context.push('/sync-conflicts')
               : null,

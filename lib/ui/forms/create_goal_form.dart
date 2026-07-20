@@ -11,10 +11,12 @@ import '../../models/organizer_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/template_model.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/color_palette_provider.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../theme.dart';
 import '../widgets/date_picker_field.dart';
+import '../../models/color_palette_model.dart';
 
 class CreateGoalForm extends ConsumerStatefulWidget {
   final String? initialTitle;
@@ -187,46 +189,62 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                     const SizedBox(height: 16),
 
-                    // âÂ”Â€âÂ”Â€âÂ”Â€ Color Swatches âÂ”Â€âÂ”Â€âÂ”Â€
+                    // ─── Color Swatches ───
                     SizedBox(
                       height: 44,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _colorSwatches.length,
-                        separatorBuilder: (_, _) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final hex = _colorSwatches[index];
-                          final color = _parseColor(hex);
-                          final selected = _selectedColor == hex;
-                          return GestureDetector(
-                            onTap: () => setState(() => _selectedColor = hex),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: color,
-                                borderRadius: BorderRadius.circular(10),
-                                border: selected
-                                    ? Border.all(color: Colors.white, width: 3)
-                                    : null,
-                                boxShadow: selected
-                                    ? [
-                                        BoxShadow(
-                                          color: color.withValues(alpha: 0.5),
-                                          blurRadius: 8,
-                                        ),
-                                      ]
-                                    : [],
-                              ),
-                              child: selected
-                                  ? const Icon(
-                                      Icons.check_rounded,
-                                      color: Colors.white,
-                                      size: 18,
-                                    )
-                                  : null,
-                            ),
+                      child: Consumer(
+                        builder: (context, ref, _) {
+                          final palette = ref.watch(colorPaletteProvider);
+                          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                          
+                          // Use custom palette colors, or fall back to default
+                          final colorHexes = isDarkMode && palette.useSeparateDarkPalette
+                              ? palette.darkHexes
+                              : palette.lightHexes;
+                          
+                          final colorsToUse = colorHexes.isNotEmpty
+                              ? colorHexes
+                              : _colorSwatches;
+                          
+                          return ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: colorsToUse.length,
+                            separatorBuilder: (_, _) => const SizedBox(width: 8),
+                            itemBuilder: (context, index) {
+                              final hex = colorsToUse[index];
+                              final color = PaletteColor.parseHex(hex);
+                              final selected = _selectedColor == hex;
+                              return GestureDetector(
+                                onTap: () => setState(() => _selectedColor = hex),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: selected
+                                        ? Border.all(color: Colors.white, width: 3)
+                                        : null,
+                                    boxShadow: selected
+                                        ? [
+                                            BoxShadow(
+                                              color: color.withValues(alpha: 0.5),
+                                              blurRadius: 8,
+                                            ),
+                                          ]
+                                        : [],
+                                  ),
+                                  child: selected
+                                      ? const Icon(
+                                          Icons.check_rounded,
+                                          color: Colors.white,
+                                          size: 18,
+                                        )
+                                      : null,
+                                ),
+                              );
+                            },
                           );
                         },
                       ),

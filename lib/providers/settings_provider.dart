@@ -103,6 +103,9 @@ class AppSettings {
   // ── Day Dial settings ──
   final bool showDayDialLegend; // Show/hide legend in Day Dial component
 
+  // ── Sync optimization ──
+  final DateTime? lastSuccessfulSyncTime; // Timestamp of last successful sync for incremental sync
+
   AppSettings({
     required this.vaultName,
     this.vaultPath = '',
@@ -167,6 +170,7 @@ class AppSettings {
     this.recentSearches = const [],
     this.dayStartHour = 0,
     this.showDayDialLegend = true,
+    this.lastSuccessfulSyncTime,
   });
 
   /// All saved filters deserialized.
@@ -263,6 +267,7 @@ class AppSettings {
     List<String>? recentSearches,
     int? dayStartHour,
     bool? showDayDialLegend,
+    DateTime? lastSuccessfulSyncTime,
   }) {
     return AppSettings(
       vaultName: vaultName ?? this.vaultName,
@@ -342,6 +347,7 @@ class AppSettings {
       recentSearches: recentSearches ?? this.recentSearches,
       dayStartHour: dayStartHour ?? this.dayStartHour,
       showDayDialLegend: showDayDialLegend ?? this.showDayDialLegend,
+      lastSuccessfulSyncTime: lastSuccessfulSyncTime ?? this.lastSuccessfulSyncTime,
     );
   }
 }
@@ -485,6 +491,15 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       recentSearches: prefs.getStringList('recentSearches') ?? const [],
       dayStartHour: prefs.getInt('dayStartHour') ?? 0,
       showDayDialLegend: prefs.getBool('showDayDialLegend') ?? true,
+      lastSuccessfulSyncTime: () {
+        final raw = prefs.getString('lastSuccessfulSyncTime');
+        if (raw == null) return null;
+        try {
+          return DateTime.parse(raw);
+        } catch (_) {
+          return null;
+        }
+      }(),
     );
   }
 
@@ -1133,6 +1148,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     );
     await _prefs.setString('suppressedConflicts', encoded);
     state = state.copyWith(suppressedConflicts: next);
+  }
+
+  // ── Sync optimization ──
+  Future<void> updateLastSuccessfulSyncTime(DateTime time) async {
+    await _prefs.setString('lastSuccessfulSyncTime', time.toIso8601String());
+    state = state.copyWith(lastSuccessfulSyncTime: time);
   }
 
   Future<void> setIdeaStrategy({

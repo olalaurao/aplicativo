@@ -217,10 +217,12 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
   void _initBackgroundListener() {
     FlutterForegroundTask.addTaskDataCallback((data) {
       if (data is int) {
-        if (data == 0 && state.isRunning) {
+        if (data == 0 && state.isRunning && state.currentType != PomodoroType.stopwatch) {
           stop();
           _completeSession();
           _notifyPhaseEnd();
+        } else if (state.currentType == PomodoroType.stopwatch) {
+          state = state.copyWith(elapsedSeconds: data);
         } else {
           state = state.copyWith(remainingSeconds: data);
         }
@@ -368,7 +370,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
 
     // Start Background Service
     if (state.currentType == PomodoroType.stopwatch) {
-      PomodoroBackgroundService.start(0); // No countdown for stopwatch
+      PomodoroBackgroundService.start(0, isStopwatchMode: true, elapsedSeconds: state.elapsedSeconds);
     } else {
       PomodoroBackgroundService.start(state.remainingSeconds);
     }

@@ -75,6 +75,7 @@ import 'ui/screens/routines_screen.dart';
 import 'ui/forms/create_social_post_form.dart';
 import 'ui/widgets/pomodoro_floating_clock.dart';
 import 'ui/widgets/notification_popup_overlay.dart';
+import 'features/overdue/replanning/replanning_screen.dart';
 
 @pragma('vm:entry-point')
 Future<void> homeWidgetInteractiveCallback(Uri? uri) async {
@@ -326,7 +327,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
       onResume: () {
         debugPrint('[AppLifecycle] Resumed - refreshing widgets and syncing');
         unawaited(forceWidgetSync(widget.container));
-        widget.container.read(syncManagerProvider).performSync();
+        widget.container.read(syncManagerProvider).performSync(debounce: true);
         unawaited(_checkPendingSharedTextFromNative());
         unawaited(_checkPendingWidgetUriFromNative());
         // 1.4 — check person contacts on resume (moved out of PeopleNotifier.build)
@@ -612,7 +613,7 @@ Future<void> _initApp(ProviderContainer container) async {
     try {
       FlutterForegroundTask.addTaskDataCallback((data) {
         if (data is Map && data['action'] == 'sync_tick') {
-          container.read(syncManagerProvider).performSync();
+          container.read(syncManagerProvider).performSync(debounce: true);
         }
       });
     } catch (e) {
@@ -962,6 +963,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/routines',
             builder: (context, state) => const RoutinesScreen(),
+          ),
+          GoRoute(
+            path: '/replanning',
+            builder: (context, state) => const ReplanningScreen(),
           ),
           GoRoute(
             path: '/overdue',

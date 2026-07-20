@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/goal_model.dart';
 import '../models/idea_model.dart';
@@ -8,17 +9,42 @@ import '../models/content_object.dart';
 import 'vault_provider.dart';
 import 'settings_provider.dart';
 
+enum OverdueSeverity { none, light, moderate, severe }
+
+OverdueSeverity computeSeverity(DateTime dueDate, DateTime now) {
+  final daysLate = now.difference(dueDate).inDays;
+  if (daysLate <= 0) return OverdueSeverity.none;
+  if (daysLate <= 2) return OverdueSeverity.light;
+  if (daysLate <= 6) return OverdueSeverity.moderate;
+  return OverdueSeverity.severe;
+}
+
+Color severityColor(OverdueSeverity severity) {
+  switch (severity) {
+    case OverdueSeverity.none:
+      return Colors.transparent;
+    case OverdueSeverity.light:
+      return const Color(0xFFF59E0B); // Yellow/amber
+    case OverdueSeverity.moderate:
+      return const Color(0xFFF97316); // Orange
+    case OverdueSeverity.severe:
+      return const Color(0xFFEF4444); // Red
+  }
+}
+
 class OverdueItem {
   final ContentObject object;
   final DateTime deadline;
   final int daysLate;
   final String itemType; // 'task' | 'goal' | 'project' | 'idea' | 'resource' | 'reminder' | 'routine'
+  final OverdueSeverity severity;
 
   const OverdueItem({
     required this.object,
     required this.deadline,
     required this.daysLate,
     required this.itemType,
+    required this.severity,
   });
 }
 
@@ -47,6 +73,7 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
       deadline: dl!,
       daysLate: daysLate(dl),
       itemType: 'task',
+      severity: computeSeverity(dl!, now),
     ));
   }
   
@@ -63,6 +90,7 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
       deadline: goal.deadline!,
       daysLate: daysLate(goal.deadline!),
       itemType: 'goal',
+      severity: computeSeverity(goal.deadline!, now),
     ));
   }
   
@@ -78,6 +106,7 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
       deadline: project.endDate!,
       daysLate: daysLate(project.endDate!),
       itemType: 'project',
+      severity: computeSeverity(project.endDate!, now),
     ));
   }
   
@@ -93,6 +122,7 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
       deadline: idea.targetDate!,
       daysLate: daysLate(idea.targetDate!),
       itemType: 'idea',
+      severity: computeSeverity(idea.targetDate!, now),
     ));
   }
   
@@ -111,6 +141,7 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
         deadline: resource.readDate!,
         daysLate: daysLate(resource.readDate!),
         itemType: 'resource',
+        severity: computeSeverity(resource.readDate!, now),
       ));
     }
   }
@@ -125,6 +156,7 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
       deadline: reminder.time,
       daysLate: daysLate(reminder.time),
       itemType: 'reminder',
+      severity: computeSeverity(reminder.time, now),
     ));
   }
   
@@ -138,11 +170,17 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
         deadline: routine.endDate!,
         daysLate: daysLate(routine.endDate!),
         itemType: 'routine',
+        severity: computeSeverity(routine.endDate!, now),
       ));
     }
   }
 
-  items.sort((a, b) => b.daysLate.compareTo(a.daysLate));
+  // Sort by severity (severe first) then by days late (most overdue first)
+  items.sort((a, b) {
+    final severityCompare = b.severity.index.compareTo(a.severity.index);
+    if (severityCompare != 0) return severityCompare;
+    return b.daysLate.compareTo(a.daysLate);
+  });
   return items;
 });
 

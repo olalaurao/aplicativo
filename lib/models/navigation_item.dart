@@ -26,6 +26,7 @@ enum NavSection {
   tasks,
   pillarsValues,
   routines,
+  replanning,
 }
 
 class NavigationItem {
@@ -148,6 +149,8 @@ class NavigationItem {
         return active ? Icons.star_rounded : Icons.star_outline_rounded;
       case NavSection.routines:
         return active ? Icons.sync_rounded : Icons.sync_outlined;
+      case NavSection.replanning:
+        return active ? Icons.event_busy_rounded : Icons.event_busy_outlined;
     }
   }
 

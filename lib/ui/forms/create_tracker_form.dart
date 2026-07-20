@@ -6,9 +6,11 @@ import '../../models/tracker_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/template_model.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/color_palette_provider.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../theme.dart';
 import '../widgets/app_switch_tile.dart';
+import '../../models/color_palette_model.dart';
 
 class CreateTrackerForm extends ConsumerStatefulWidget {
   final TrackerDefinition? tracker;
@@ -151,37 +153,51 @@ class _CreateTrackerFormState extends ConsumerState<CreateTrackerForm> {
                     // Color Selector
                     SizedBox(
                       height: 40,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _colorSwatches.length,
-                        separatorBuilder: (_, _) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final hex = _colorSwatches[index];
-                          final color = Color(
-                            int.parse(hex.replaceAll('#', '0xFF')),
-                          );
-                          final selected = _selectedColor == hex;
-                          return GestureDetector(
-                            onTap: () => setState(() => _selectedColor = hex),
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color: color,
-                                shape: BoxShape.circle,
-                                border: selected
-                                    ? Border.all(color: Colors.white, width: 3)
-                                    : null,
-                                boxShadow: selected
-                                    ? [
-                                        BoxShadow(
+                      child: Consumer(
+                        builder: (context, ref, _) {
+                          final palette = ref.watch(colorPaletteProvider);
+                          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                          
+                          // Use custom palette colors, or fall back to default
+                          final colorHexes = isDarkMode && palette.useSeparateDarkPalette
+                              ? palette.darkHexes
+                              : palette.lightHexes;
+                          
+                          final colorsToUse = colorHexes.isNotEmpty
+                              ? colorHexes
+                              : _colorSwatches;
+                          
+                          return ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: colorsToUse.length,
+                            separatorBuilder: (_, _) => const SizedBox(width: 8),
+                            itemBuilder: (context, index) {
+                              final hex = colorsToUse[index];
+                              final color = PaletteColor.parseHex(hex);
+                              final selected = _selectedColor == hex;
+                              return GestureDetector(
+                                onTap: () => setState(() => _selectedColor = hex),
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                    border: selected
+                                        ? Border.all(color: Colors.white, width: 3)
+                                        : null,
+                                    boxShadow: selected
+                                        ? [
+                                            BoxShadow(
                                           color: color.withValues(alpha: 0.4),
                                           blurRadius: 6,
                                         ),
                                       ]
                                     : [],
-                              ),
-                            ),
+                                  ),
+                                ),
+                              );
+                            },
                           );
                         },
                       ),

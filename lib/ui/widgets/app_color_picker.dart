@@ -1,8 +1,11 @@
 // lib/ui/widgets/app_color_picker.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme.dart';
+import '../../providers/color_palette_provider.dart';
+import '../../models/color_palette_model.dart';
 
-class AppColorPicker extends StatelessWidget {
+class AppColorPicker extends ConsumerWidget {
   final String value;
   final ValueChanged<String> onChanged;
 
@@ -47,7 +50,19 @@ class AppColorPicker extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = ref.watch(colorPaletteProvider);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    // Use custom palette colors, or fall back to default
+    final colorHexes = isDarkMode && palette.useSeparateDarkPalette
+        ? palette.darkHexes
+        : palette.lightHexes;
+    
+    final colorsToUse = colorHexes.isNotEmpty
+        ? colorHexes
+        : defaultColors.map((c) => c['hex']!).toList();
+    
     final normalizedSelected = normalizeHex(value);
 
     return Column(
@@ -66,15 +81,14 @@ class AppColorPicker extends StatelessWidget {
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: defaultColors.length,
+          itemCount: colorsToUse.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 6,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
           ),
           itemBuilder: (context, index) {
-            final colorInfo = defaultColors[index];
-            final hex = colorInfo['hex']!;
+            final hex = colorsToUse[index];
             final color = parseHex(hex);
             final isSelected = normalizedSelected.toUpperCase() == hex.toUpperCase();
 
