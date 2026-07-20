@@ -17,7 +17,7 @@ class ObjectConflictsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Conflitos de Tipo'),
+        title: const Text('Type Conflicts'),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,

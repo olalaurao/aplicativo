@@ -625,7 +625,7 @@ class ThemeScreen extends ConsumerWidget {
     required String currentColor,
     required VoidCallback onTap,
   }) {
-    final color = Color(int.parse(colorHex, radix: 16));
+    final color = Color(int.parse(colorHex.replaceAll('#', ''), radix: 16));
     final isSelected = currentColor.toUpperCase() == colorHex.toUpperCase();
 
     return InkWell(
@@ -720,7 +720,7 @@ class ThemeScreen extends ConsumerWidget {
     required String? currentColor,
     required VoidCallback onTap,
   }) {
-    final color = Color(int.parse(colorHex, radix: 16));
+    final color = Color(int.parse(colorHex.replaceAll('#', ''), radix: 16));
     final isSelected = (currentColor?.toUpperCase() ?? '') == colorHex.toUpperCase();
 
     return InkWell(

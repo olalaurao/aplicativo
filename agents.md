@@ -1747,6 +1747,57 @@ Exemplo real encontrado neste projeto:
 - Antes de remover `timeline_screen.dart`, confirmar no `go_router`/`navigation_provider.dart` se alguma rota ainda aponta pra ele. Status atual: Usado — rota `/timeline` existe em navigation_provider.dart.
 
 ### Bug Fixes Aplicados
+
+---
+
+## CONFIGURAÇÃO DE SETTINGS — LOCALIZAÇÃO
+
+Esta tabela documenta onde cada configuração do usuário é armazenada e acessada no códigobase.
+
+| Configuração | Localização (SettingsProvider) | UI Principal | Notas |
+|---|---|---|---|
+| `userName` | `settings_provider.dart` | Settings → Profile | Nome do usuário |
+| `vaultPath` | `settings_provider.dart` | Settings → Vault & Import | Caminho local do vault |
+| `vaultName` | `settings_provider.dart` | Settings → Vault & Import | Nome do vault |
+| `tiktokResolverEndpoint` | `settings_provider.dart` | Settings → Vault & Import | Endpoint para TikTok |
+| `tiktokResolverApiKey` | `settings_provider.dart` | Settings → Vault & Import | API key para TikTok |
+| `dailyNoteIdentifier` | `settings_provider.dart` | Settings → Vault & Import | Identificador de daily note |
+| `dailyNoteDateFormat` | `settings_provider.dart` | Settings → Vault & Import | Formato de data |
+| `dailyNoteFolder` | `settings_provider.dart` | Settings → Vault & Import | Pasta de daily notes |
+| `accentColor` | `settings_provider.dart` | Settings → Appearance (via ThemeScreen) | Cor de destaque |
+| `colorPalette` | `color_palette_provider.dart` | Settings → Appearance (via ThemeScreen) | Paleta de cores |
+| `backgroundColors` | `settings_provider.dart` | Settings → Appearance (via ThemeScreen) | Cores de fundo |
+| `autoSync` | `settings_provider.dart` | Settings → Sync & Backup | Auto-sync em background |
+| `conflictKeepNewest` | `settings_provider.dart` | Settings → Sync & Backup | Resolução de conflitos |
+| `driveSyncFolder` | `settings_provider.dart` | Settings → Google Account | Pasta do Drive |
+| `driveSyncFolderId` | `settings_provider.dart` | Settings → Google Account | ID da pasta do Drive |
+| `habitReminders` | `settings_provider.dart` | Settings → Notifications | Lembretes de hábitos |
+| `pomodoroSounds` | `settings_provider.dart` | Settings → Notifications | Sons do Pomodoro |
+| `plannerColorMode` | `settings_provider.dart` | Settings → Planner & Tasks | Modo de cor do planner |
+| `startOfWeek` | `settings_provider.dart` | Settings → Planner & Tasks | Dia de início da semana |
+| `nlpTaskParsingEnabled` | `settings_provider.dart` | Settings → Planner & Tasks | NLP parsing |
+| `showOverdueSection` | `settings_provider.dart` | Settings → Planner & Tasks | Seção de atrasados |
+| `autoCategoryRules` | `settings_provider.dart` | Settings → Object Structure | Regras de categorização |
+| `categoryColors` | `settings_provider.dart` | Settings → Object Structure | Cores de categorias |
+| `ideaStrategy` | `settings_provider.dart` | Settings → Object Structure | Estratégia de ideias |
+| `ideaTag` | `settings_provider.dart` | Settings → Object Structure | Tag de ideias |
+| `ideaFolder` | `settings_provider.dart` | Settings → Object Structure | Pasta de ideias |
+| `typeSignatures` | `settings_provider.dart` | Settings → Object Identification | Assinaturas de tipo |
+| `dailyReviewTemplateId` | `settings_provider.dart` | Settings → Object Structure | Template de revisão |
+| `googleBooksApiKey` | `settings_provider.dart` | Settings → Third-Party & API Keys | API key Google Books |
+| `omdbApiKey` | `settings_provider.dart` | Settings → Third-Party & API Keys | API key OMDb |
+| `sleepInTomorrow` | `settings_provider.dart` | (Removido da UI) | Sleep in (UI removido) |
+| `sleepInUntil` | `settings_provider.dart` | (Removido da UI) | Sleep in até (UI removido) |
+| `themeMode` | `settings_provider.dart` | Settings → Appearance (via ThemeScreen) | Modo de tema |
+| `activeThemeId` | `settings_provider.dart` | Settings → Appearance (via ThemeScreen) | ID do tema ativo |
+
+### Providers Externos Relacionados a Settings
+
+- `google_auth_service.dart` / `google_calendar_provider.dart` — Autenticação Google e Calendar
+- `color_palette_provider.dart` — Paleta de cores customizada
+- `navigation_provider.dart` — Configuração de navegação e itens
+
+### Bug Fixes Aplicados
 - `organizer_selector_field.dart`: migrado de `Icons.*` hardcoded para `ObjectIcons.emojiForType()`. Corrigido bug no `_getTypeLabel()` que fazia switch em valores inexistentes de `OrganizerType`.
 - `timeline_screen.dart`: migrado para `ObjectIcons.emojiForType()`.
 

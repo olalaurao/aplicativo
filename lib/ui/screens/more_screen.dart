@@ -96,6 +96,8 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
             padding: const EdgeInsets.all(20),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                _buildSyncRow(context),
+                const SizedBox(height: 24),
                 _buildSectionHeader('Navigation & Content'),
                 if (_isEditingNav) ...[
                   Padding(
@@ -168,6 +170,8 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                     ),
                 ],
 
+                const SizedBox(height: 24),
+                _buildSectionHeader('Quick Access'),
                 const SizedBox(height: 12),
                 _buildMenuRow(
                   context,
@@ -255,59 +259,6 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                       },
                     );
                   },
-                ),
-
-                const SizedBox(height: 24),
-                _buildSectionHeader('Settings'),
-                _buildSyncRow(context),
-                _buildMenuRow(
-                  context,
-                  'Categories',
-                  Icons.category_outlined,
-                  AppColors.habitGreen,
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const CategoryManagementScreen(),
-                      ),
-                    );
-                  },
-                ),
-                _buildMenuRow(
-                  context,
-                  'Theme',
-                  Icons.palette_outlined,
-                  AppColors.habitPurple,
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ThemeScreen(),
-                      ),
-                    );
-                  },
-                ),
-                _buildMenuRow(
-                  context,
-                  'Widgets',
-                  Icons.widgets_outlined,
-                  AppColors.info,
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const widgets_management_screen.WidgetsManagementScreen(),
-                      ),
-                    );
-                  },
-                ),
-                _buildMenuRow(
-                  context,
-                  'About',
-                  Icons.info_outline_rounded,
-                  AppColors.textMuted,
-                  () => _showAboutDialog(context),
                 ),
               ]),
             ),

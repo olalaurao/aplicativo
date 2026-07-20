@@ -14,6 +14,7 @@ import 'mood_settings_screen.dart';
 import 'scheduler_management_screen.dart';
 import 'notification_settings_screen.dart';
 import 'day_theme_screen.dart';
+import 'theme_screen.dart';
 import 'import_vault_screen.dart';
 import 'social_bulk_import_screen.dart';
 import 'color_palette_screen.dart';
@@ -81,8 +82,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             padding: const EdgeInsets.all(20),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                // ─── PERFIL ───
-                _section('Perfil'),
+                _section('Profile'),
                 const SizedBox(height: 12),
                 Container(
                   decoration: AppTheme.cardDecoration(context),
@@ -102,7 +102,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ),
                     title: const Text(
-                      'Seu nome',
+                      'Your name',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -111,7 +111,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     subtitle: Text(
                       settings.userName?.isNotEmpty == true
                           ? settings.userName!
-                          : 'Como posso te chamar?',
+                          : 'What should I call you?',
                       style: const TextStyle(fontSize: 12),
                     ),
                     trailing: const Icon(
@@ -123,7 +123,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
 
-                _section('Obsidian Link'),
+                _section('Vault & Import'),
                 const SizedBox(height: 12),
                 Container(
                   decoration: AppTheme.cardDecoration(context),
@@ -191,14 +191,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       const Divider(height: 1, indent: 16),
                       ListTile(
                         title: const Text(
-                          'Importar Vault Existente',
+                          'Import Existing Vault',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                         subtitle: const Text(
-                          'Seleciona uma pasta existente e indexa os arquivos compatíveis.',
+                          'Point to an existing folder and index its compatible files.',
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: Icon(
@@ -216,14 +216,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       const Divider(height: 1, indent: 16),
                       ListTile(
                         title: const Text(
-                          'Importar lista de URLs',
+                          'Import URL List',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                         subtitle: const Text(
-                          'Importa posts sociais a partir de uma lista de links.',
+                          'Import social posts from a list of links.',
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: Icon(
@@ -241,7 +241,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       const Divider(height: 1, indent: 16),
                       ListTile(
                         title: const Text(
-                          'Player TikTok nativo',
+                          'Native TikTok Player',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -249,7 +249,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         subtitle: Text(
                           settings.tiktokResolverEndpoint.isEmpty
-                              ? 'Configure uma API para extrair URL direta de vídeo'
+                              ? 'Configure an API to extract the direct video URL'
                               : settings.tiktokResolverEndpoint,
                           style: const TextStyle(fontSize: 12),
                           maxLines: 1,
@@ -267,93 +267,102 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const Divider(height: 1, indent: 16),
+                      ListTile(
+                        leading: Icon(
+                          Icons.today_rounded,
+                          color: AppTheme.accentColor(context),
+                        ),
+                        title: const Text(
+                          'Daily Note Format',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${_dailyIdentifierLabel(settings.dailyNoteIdentifier)} · ${settings.dailyNoteFolder}/${_dailyPreview(settings.dailyNoteDateFormat)}',
+                          style: const TextStyle(fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () =>
+                            _showDailyNoteDialog(context, settings, notifier),
+                      ),
+                      const Divider(height: 1, indent: 16),
                       _switchTileSimple('Sync Hidden Files', false, (v) {}),
                     ],
                   ),
                 ),
                 const SizedBox(height: 24),
-                _section('Interface Customization'),
-                const SizedBox(height: 12),
-                _buildBottomBarEditor(),
+                _section('Appearance'),
                 const SizedBox(height: 12),
                 Container(
                   decoration: AppTheme.cardDecoration(context),
                   child: ListTile(
                     title: const Text(
-                      'Accent Color',
+                      'Appearance',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     subtitle: const Text(
-                      'Cor principal do app',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    trailing: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: _parseColor(settings.accentColor),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Theme.of(context).dividerColor,
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                    onTap: () =>
-                        _showAccentColorPicker(context, settings, notifier),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  decoration: AppTheme.cardDecoration(context),
-                  child: ListTile(
-                    title: const Text(
-                      'Color Palette',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    subtitle: const Text(
-                      'Customize your color palette (up to 15 colors)',
+                      'Theme, colors, and font',
                       style: TextStyle(fontSize: 12),
                     ),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const ColorPaletteScreen(),
+                        builder: (_) => const ThemeScreen(),
                       ),
                     ),
                   ),
                 ),
+                const SizedBox(height: 24),
+                _section('Google Account'),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    'One account powers both Calendar sync and Drive backup — signing out disables both.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textMuted,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+                _buildGoogleAccountSignInRow(),
+                const SizedBox(height: 12),
+                _buildGoogleCalendarTile(),
                 const SizedBox(height: 12),
                 Container(
                   decoration: AppTheme.cardDecoration(context),
                   child: ListTile(
                     title: const Text(
-                      'Background Colors',
+                      'Google Drive Folder',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    subtitle: const Text(
-                      'Save background colors for quick access',
-                      style: TextStyle(fontSize: 12),
+                    subtitle: Text(
+                      settings.driveSyncFolderPath.isNotEmpty
+                          ? settings.driveSyncFolderPath
+                          : settings.driveSyncFolder,
+                      style: const TextStyle(fontSize: 12),
                     ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const BackgroundColorScreen(),
-                      ),
+                    trailing: const Icon(
+                      Icons.cloud_sync_rounded,
+                      size: 20,
+                      color: AppColors.info,
                     ),
+                    onTap: () => _showDriveFolderPicker(context, notifier),
                   ),
                 ),
+                const SizedBox(height: 24),
+                _section('Mood & Schedules'),
                 const SizedBox(height: 12),
                 Container(
                   decoration: AppTheme.cardDecoration(context),
@@ -416,37 +425,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     },
                   ),
                 ),
+                const SizedBox(height: 24),
+                _section('Interface Customization'),
                 const SizedBox(height: 12),
-                Container(
-                  decoration: AppTheme.cardDecoration(context),
-                  child: ListTile(
-                    title: const Text(
-                      'Manage Categories',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const CategoryManagementScreen(),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _switchTile(
-                  'Natural Language Task Parsing',
-                  settings.nlpTaskParsingEnabled,
-                  (v) => notifier.updateNlpTaskParsingEnabled(v),
-                ),
+                _buildBottomBarEditor(),
 
                 const SizedBox(height: 24),
-                _section('External Connections'),
-                const SizedBox(height: 12),
-                _buildGoogleCalendarTile(),
+                _section('Third-Party & API Keys'),
                 const SizedBox(height: 12),
                 Container(
                   decoration: AppTheme.cardDecoration(context),
@@ -499,7 +484,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                _section('Synchronization'),
+                _section('Sync & Backup'),
                 const SizedBox(height: 12),
                 _switchTile('Auto-Sync in Background', settings.autoSync, (
                   value,
@@ -516,25 +501,104 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 Container(
                   decoration: AppTheme.cardDecoration(context),
                   child: ListTile(
+                    leading: Icon(
+                      Icons.backup_rounded,
+                      color: AppTheme.accentColor(context),
+                    ),
                     title: const Text(
-                      'Google Drive Folder',
+                      'Backup Now',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    subtitle: Text(
-                      settings.driveSyncFolderPath.isNotEmpty
-                          ? settings.driveSyncFolderPath
-                          : settings.driveSyncFolder,
-                      style: const TextStyle(fontSize: 12),
+                    subtitle: const Text(
+                      'Creates a copy on Google Drive',
+                      style: TextStyle(fontSize: 12),
                     ),
-                    trailing: const Icon(
-                      Icons.cloud_sync_rounded,
-                      size: 20,
-                      color: AppColors.info,
+                    onTap: () async {
+                      try {
+                        final backupService = ref.read(
+                          backupServiceProvider,
+                        );
+                        final driveSync = ref.read(
+                          googleDriveSyncServiceProvider,
+                        );
+                        final auth = ref.read(
+                          drive_auth.googleAuthServiceProvider,
+                        );
+                        if (auth.authClient == null) {
+                          throw Exception('Google Drive not connected');
+                        }
+
+                        driveSync.init(auth.authClient!);
+                        final settings = ref.read(settingsProvider);
+
+                        // 1. Garantir que a pasta do vault existe no Drive
+                        if (settings.driveSyncFolderId.isNotEmpty) {
+                          await driveSync.useExistingVaultFolder(
+                            settings.driveSyncFolderId,
+                          );
+                        } else {
+                          await driveSync.setupVaultFolder(
+                            settings.driveSyncFolder,
+                          );
+                        }
+
+                        // 2. Criar backup local (ZIP completo com anexos)
+                        final zipFile = await backupService.createBackup();
+                        if (zipFile == null) {
+                          throw Exception('Failed to generate backup file');
+                        }
+
+                        // 3. Upload para o Drive
+                        await driveSync.createBackupFromFile(zipFile);
+
+                        if (!context.mounted) return;
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Backup sent to Google Drive!'),
+                          ),
+                        );
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Backup error: $e')),
+                        );
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: ListTile(
+                    leading: const Icon(
+                      Icons.delete_sweep_rounded,
+                      color: AppColors.error,
                     ),
-                    onTap: () => _showDriveFolderPicker(context, notifier),
+                    title: const Text(
+                      'Clear Data Cache',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Reloads all Vault files',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    onTap: () {
+                      ref.invalidate(allObjectsProvider);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Cache cleared. Data will be reloaded.',
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -574,104 +638,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                 ),
-                Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: AppTheme.cardDecoration(context),
-                  child: Column(
-                    children: [
-                      ListTile(
-                        title: const Text(
-                          'Dormir Até Mais Tarde',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: Text(
-                          settings.sleepInTomorrow
-                              ? 'Ignorar alarmes de hábitos amanhã até ${settings.sleepInUntil}'
-                              : 'Ignorar alarmes de hábitos do dia seguinte',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        trailing: Switch.adaptive(
-                          value: settings.sleepInTomorrow,
-                          onChanged: (v) async {
-                            await notifier.updateSleepInTomorrow(v);
-                            await ref
-                                .read(vaultProvider.notifier)
-                                .rescheduleAllHabits();
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    v
-                                        ? 'Modo dormir ativado: alarmes de hábitos ignorados até ${settings.sleepInUntil} de amanhã.'
-                                        : 'Alarmes de hábitos restaurados.',
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                          activeThumbColor: AppTheme.accentColor(context),
-                        ),
-                      ),
-                      if (settings.sleepInTomorrow) ...[
-                        const Divider(height: 1, indent: 16),
-                        ListTile(
-                          title: const Text(
-                            'Silenciar alarmes até',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          subtitle: Text(
-                            settings.sleepInUntil,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.accentColor(context),
-                            ),
-                          ),
-                          trailing: Icon(
-                            Icons.access_time_rounded,
-                            color: AppTheme.accentColor(context),
-                          ),
-                          onTap: () async {
-                            final parts = settings.sleepInUntil.split(':');
-                            final hour = int.tryParse(parts.first) ?? 10;
-                            final minute = parts.length > 1
-                                ? int.tryParse(parts[1]) ?? 0
-                                : 0;
-                            final picked = await showTimePicker(
-                              context: context,
-                              initialTime: TimeOfDay(
-                                hour: hour,
-                                minute: minute,
-                              ),
-                            );
-                            if (picked != null) {
-                              final formattedTime =
-                                  '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
-                              await notifier.updateSleepInUntil(formattedTime);
-                              await ref
-                                  .read(vaultProvider.notifier)
-                                  .rescheduleAllHabits();
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Alarmes de hábitos serão silenciados até $formattedTime de amanhã.',
-                                    ),
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
                 if (Platform.isAndroid) ...[
                   const SizedBox(height: 12),
                   Container(
@@ -694,7 +660,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 size: 20,
                               ),
                               title: const Text(
-                                'Permissão de Alarme Exato',
+                                'Exact Alarm Permission',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
@@ -702,8 +668,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                               subtitle: Text(
                                 granted
-                                    ? 'Concedida — alarmes disparam no horário exato'
-                                    : 'Não concedida — alarmes podem atrasar',
+                                    ? 'Granted — alarms fire at exact time'
+                                    : 'Not granted — alarms may be delayed',
                                 style: const TextStyle(fontSize: 12),
                               ),
                               trailing: granted
@@ -739,7 +705,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 size: 20,
                               ),
                               title: const Text(
-                                'Notificação em Tela Cheia',
+                                'Full-Screen Notification',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
@@ -747,8 +713,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                               subtitle: Text(
                                 granted
-                                    ? 'Concedida — popups aparecem sobre a tela de bloqueio'
-                                    : 'Não concedida — popups podem não aparecer na tela de bloqueio',
+                                    ? 'Granted — popups appear over lock screen'
+                                    : 'Not granted — popups may not appear on lock screen',
                                 style: const TextStyle(fontSize: 12),
                               ),
                               trailing: granted
@@ -771,7 +737,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ],
                 const SizedBox(height: 24),
-                _section('Planner'),
+                _section('Planner & Tasks'),
                 const SizedBox(height: 12),
                 Container(
                   decoration: AppTheme.cardDecoration(context),
@@ -829,14 +795,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       const Divider(height: 1, indent: 16),
                       ListTile(
                         title: const Text(
-                          'Processamento de Linguagem Natural',
+                          'Natural Language Task Parsing',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                         subtitle: const Text(
-                          'Detectar datas, horários e prioridades ao digitar tarefas',
+                          'Detect dates, times, and priorities as you type tasks',
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: Switch.adaptive(
@@ -848,8 +814,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       const Divider(height: 1, indent: 16),
                       AppSwitchTile(
-                        title: 'Mostrar seção Atrasados',
-                        subtitle: 'Exibe tarefas, metas e projetos com prazo vencido',
+                        title: 'Show Overdue Section',
+                        subtitle: 'Show overdue tasks, goals, and projects',
                         value: settings.showOverdueSection,
                         onChanged: (val) =>
                             notifier.updateShowOverdueSection(val),
@@ -889,14 +855,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       const Divider(height: 1, indent: 16),
                       ListTile(
                         title: const Text(
-                          'Ideias',
+                          'Ideas',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                         subtitle: const Text(
-                          'Configurar estratégia de captura',
+                          'Configure capture strategy',
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: const Icon(Icons.chevron_right_rounded),
@@ -906,16 +872,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           notifier,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                _section('Automatic Categorization'),
-                const SizedBox(height: 12),
-                Container(
-                  decoration: AppTheme.cardDecoration(context),
-                  child: Column(
-                    children: [
+                      const Divider(height: 1, indent: 16),
+                      ListTile(
+                        title: const Text(
+                          'Manage Categories',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const CategoryManagementScreen(),
+                          ),
+                        ),
+                      ),
+                      const Divider(height: 1, indent: 16),
                       ListTile(
                         title: const Text(
                           'Categorization Rules',
@@ -967,7 +941,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                _section('Obsidian Integration'),
+                _section('Obsidian Tools'),
                 const SizedBox(height: 12),
                 Container(
                   decoration: AppTheme.cardDecoration(context),
@@ -979,200 +953,85 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           color: AppTheme.accentColor(context),
                         ),
                         title: const Text(
-                          'Regenerar queries Dataview',
+                          'Regenerate Dataview Queries',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                         subtitle: const Text(
-                          'Gera index.md com queries Dataview em cada pasta do vault',
+                          'Generates index.md with Dataview queries in each vault folder',
                           style: TextStyle(fontSize: 12),
                         ),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () => _regenerateDataview(context),
                       ),
-                      const Divider(height: 1, indent: 16),
-                      ListTile(
-                        leading: Icon(
-                          Icons.today_rounded,
-                          color: AppTheme.accentColor(context),
-                        ),
-                        title: const Text(
-                          'Formato da daily note',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: Text(
-                          '${_dailyIdentifierLabel(settings.dailyNoteIdentifier)} · ${settings.dailyNoteFolder}/${_dailyPreview(settings.dailyNoteDateFormat)}',
-                          style: const TextStyle(fontSize: 12),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () =>
-                            _showDailyNoteDialog(context, settings, notifier),
-                      ),
-                      const Divider(height: 1, indent: 16),
-                      ListTile(
-                        leading: const Icon(
-                          Icons.folder_zip_outlined,
-                          color: AppColors.info,
-                        ),
-                        title: const Text(
-                          'Importar vault Obsidian existente',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: const Text(
-                          'Aponta para uma pasta de vault e indexa os arquivos compatíveis',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ImportVaultScreen(),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 24),
-                _section('Maintenance'),
+                _section('Diagnostics & Maintenance'),
                 const SizedBox(height: 12),
                 Container(
                   decoration: AppTheme.cardDecoration(context),
-                  child: Column(
-                    children: [
-                      ListTile(
-                        leading: Icon(
-                          Icons.backup_rounded,
-                          color: AppTheme.accentColor(context),
-                        ),
-                        title: const Text(
-                          'Backup Now',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: const Text(
-                          'Creates a copy on Google Drive',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        onTap: () async {
-                          try {
-                            final backupService = ref.read(
-                              backupServiceProvider,
-                            );
-                            final driveSync = ref.read(
-                              googleDriveSyncServiceProvider,
-                            );
-                            final auth = ref.read(
-                              drive_auth.googleAuthServiceProvider,
-                            );
-                            if (auth.authClient == null) {
-                              throw Exception('Google Drive not connected');
-                            }
-
-                            driveSync.init(auth.authClient!);
-                            final settings = ref.read(settingsProvider);
-
-                            // 1. Garantir que a pasta do vault existe no Drive
-                            if (settings.driveSyncFolderId.isNotEmpty) {
-                              await driveSync.useExistingVaultFolder(
-                                settings.driveSyncFolderId,
-                              );
-                            } else {
-                              await driveSync.setupVaultFolder(
-                                settings.driveSyncFolder,
-                              );
-                            }
-
-                            // 2. Criar backup local (ZIP completo com anexos)
-                            final zipFile = await backupService.createBackup();
-                            if (zipFile == null) {
-                              throw Exception('Failed to generate backup file');
-                            }
-
-                            // 3. Upload para o Drive
-                            await driveSync.createBackupFromFile(zipFile);
-
-                            if (!context.mounted) return;
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Backup sent to Google Drive!'),
-                              ),
-                            );
-                          } catch (e) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Backup error: $e')),
-                            );
-                          }
-                        },
+                  child: ListTile(
+                    leading: Icon(
+                      Icons.assessment_rounded,
+                      color: AppTheme.accentColor(context),
+                    ),
+                    title: const Text(
+                      'Diagnostic Reports',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
-                      const Divider(height: 1, indent: 16),
-                      ListTile(
-                        leading: const Icon(
-                          Icons.delete_sweep_rounded,
-                          color: AppColors.error,
-                        ),
-                        title: const Text(
-                          'Clear Data Cache',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: const Text(
-                          'Reloads all Vault files',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        onTap: () {
-                          ref.invalidate(allObjectsProvider);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Cache cleared. Data will be reloaded.',
-                              ),
-                            ),
-                          );
-                        },
+                    ),
+                    subtitle: const Text(
+                      'View system health and performance metrics',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const DiagnosticReportsScreen(),
                       ),
-                      const Divider(height: 1, indent: 16),
-                      ListTile(
-                        leading: Icon(
-                          Icons.bug_report_outlined,
-                          color: AppTheme.accentColor(context),
-                        ),
-                        title: const Text(
-                          'Diagnostic Reports',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: const Text(
-                          'View local error and ANR reports',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const DiagnosticReportsScreen(),
-                          ),
-                        ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _section('About'),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: ListTile(
+                    leading: Icon(
+                      Icons.info_outline_rounded,
+                      color: AppTheme.accentColor(context),
+                    ),
+                    title: const Text(
+                      'About Citrine',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
-                    ],
+                    ),
+                    subtitle: const Text(
+                      'Version 1.0.0',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => showAboutDialog(
+                      context: context,
+                      applicationName: 'Citrine',
+                      applicationVersion: '1.0.0',
+                      applicationIcon: Icon(
+                        Icons.auto_awesome_rounded,
+                        color: AppTheme.accentColor(context),
+                        size: 48,
+                      ),
+                      children: [const Text('Your personal vault and productivity assistant.')],
+                    ),
                   ),
                 ),
               ]),
@@ -1193,21 +1052,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Seu nome'),
+        title: const Text('Your name'),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'Como posso te chamar?'),
+          decoration: const InputDecoration(hintText: 'What should I call you?'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
             style: FilledButton.styleFrom(backgroundColor: AppTheme.accentColor(context)),
-            child: const Text('Salvar'),
+            child: const Text('Save'),
           ),
         ],
       ),
@@ -1515,7 +1374,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 ),
                               ),
                               subtitle: const Text(
-                                'Prompt de revisão diária',
+                                'Daily review prompt',
                                 style: TextStyle(
                                   color: AppColors.textMuted,
                                   fontSize: 12,
@@ -1572,19 +1431,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Formato da daily note'),
+          title: const Text('Daily Note Format'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
                 initialValue: identifier,
-                decoration: const InputDecoration(labelText: 'Identificação'),
+                decoration: const InputDecoration(labelText: 'Identifier'),
                 items: const [
                   DropdownMenuItem(
                     value: 'filename_format',
-                    child: Text('Nome do arquivo'),
+                    child: Text('Filename'),
                   ),
-                  DropdownMenuItem(value: 'folder', child: Text('Pasta')),
+                  DropdownMenuItem(value: 'folder', child: Text('Folder')),
                   DropdownMenuItem(
                     value: 'frontmatter_type',
                     child: Text('Frontmatter type: daily_note'),
@@ -1636,7 +1495,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('CANCELAR'),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
@@ -1652,7 +1511,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   folder: folder,
                 );
               },
-              child: const Text('SALVAR'),
+              child: const Text('Save'),
             ),
           ],
         ),
@@ -1675,14 +1534,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Player TikTok nativo'),
+        title: const Text('Native TikTok Player'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Configure uma API que devolva uma URL direta de vídeo. '
-                'Use {url} no endpoint para inserir o link do TikTok; sem {url}, o app envia ?url=...',
+                'Configure an API that returns a direct video URL. '
+                'Use {url} in the endpoint to insert the TikTok link; without {url}, the app sends ?url=...',
               ),
               const SizedBox(height: 12),
               TextField(
@@ -1697,8 +1556,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               TextField(
                 controller: apiKeyController,
                 decoration: const InputDecoration(
-                  labelText: 'API key opcional',
-                  hintText: 'Enviada no header x-api-key',
+                  labelText: 'Optional API key',
+                  hintText: 'Sent in x-api-key header',
                 ),
                 obscureText: true,
               ),
@@ -1708,7 +1567,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('CANCELAR'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
@@ -1720,7 +1579,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 apiKey: apiKey,
               );
             },
-            child: const Text('SALVAR'),
+            child: const Text('Save'),
           ),
         ],
       ),
@@ -1740,13 +1599,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Configuração de Ideias'),
+          title: const Text('Idea Configuration'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Como o sistema deve reconhecer uma ideia?'),
+                const Text('How should the system recognize an idea?'),
                 const SizedBox(height: 12),
                 RadioGroup<String>(
                   groupValue: currentStrategy,
@@ -1807,7 +1666,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('CANCELAR'),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
@@ -1821,7 +1680,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   folder: folder,
                 );
               },
-              child: const Text('SALVAR'),
+              child: const Text('Save'),
             ),
           ],
         ),
@@ -2409,6 +2268,60 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Widget _buildGoogleAccountSignInRow() {
+    final authAccount = ref.watch(calendar_auth.googleAuthServiceProvider);
+    final authNotifier = ref.read(calendar_auth.googleAuthServiceProvider.notifier);
+    final isSignedIn = authAccount != null;
+
+    return Container(
+      decoration: AppTheme.cardDecoration(context),
+      child: ListTile(
+        leading: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: AppColors.info.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            isSignedIn
+                ? Icons.cloud_done_rounded
+                : Icons.cloud_off_rounded,
+            size: 18,
+            color: AppColors.info,
+          ),
+        ),
+        title: Text(
+          isSignedIn ? 'Signed in as ${authAccount!.email}' : 'Sign in to Google',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        subtitle: Text(
+          isSignedIn ? 'Connected to Calendar and Drive' : 'Tap to connect',
+          style: const TextStyle(fontSize: 12),
+        ),
+        trailing: isSignedIn
+            ? TextButton(
+                onPressed: () => authNotifier.signOut(),
+                child: const Text(
+                  'Sign out',
+                  style: TextStyle(fontSize: 11, color: AppColors.error),
+                ),
+              )
+            : const Icon(Icons.chevron_right_rounded),
+        onTap: () async {
+          if (isSignedIn) {
+            await authNotifier.signOut();
+          } else {
+            await authNotifier.signIn();
+          }
+        },
+      ),
+    );
+  }
+
   Widget _buildGoogleCalendarTile() {
     final googleUser = ref.watch(calendar_auth.googleAuthServiceProvider);
     final authNotifier = ref.read(
@@ -2434,22 +2347,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             subtitle: Text(
               googleUser != null
-                  ? 'Conectado como ${googleUser.email}'
-                  : 'Não conectado',
+                  ? 'Connected as ${googleUser.email}'
+                  : 'Not connected',
               style: const TextStyle(fontSize: 12),
             ),
             trailing: googleUser != null
                 ? TextButton(
                     onPressed: () => authNotifier.signOut(),
                     child: const Text(
-                      'DESCONECTAR',
+                      'DISCONNECT',
                       style: TextStyle(fontSize: 11, color: AppColors.error),
                     ),
                   )
                 : TextButton(
                     onPressed: () => authNotifier.signIn(),
                     child: Text(
-                      'CONECTAR',
+                      'CONNECT',
                       style: TextStyle(fontSize: 11, color: AppTheme.accentColor(context)),
                     ),
                   ),
@@ -2471,7 +2384,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Nenhum calendário encontrado.',
+                        'No calendars found.',
                         style: TextStyle(
                           color: AppColors.textMuted,
                           fontSize: 12,
@@ -2491,7 +2404,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       return AppSwitchTile(
                         title: title,
                         subtitle: calendar.primary == true
-                            ? 'Calendário principal'
+                            ? 'Primary calendar'
                             : id,
                         value: enabled.contains(id),
                         onChanged: (_) => ref
@@ -2526,7 +2439,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Não foi possível carregar calendários: $error',
+                    'Failed to load calendars: $error',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -2546,7 +2459,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final dir = Directory(path);
       if (!await dir.exists()) {
-        return 'A pasta selecionada não existe.';
+        return 'The selected folder does not exist.';
       }
       final probe = File(
         '${dir.path}${Platform.pathSeparator}.citrine_write_test',
@@ -2557,7 +2470,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
       return null;
     } catch (e) {
-      return 'Sem permissão de escrita nesta pasta: $e';
+      return 'No write permission for this folder: $e';
     }
   }
 }

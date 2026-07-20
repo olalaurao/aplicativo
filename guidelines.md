@@ -2516,6 +2516,45 @@ Unchanged from V4 in structure — apply the FAB tab additions (Part 4), the dp 
 
 ---
 
+## PART 24 — MORE & SETTINGS SCREEN ARCHITECTURE
+
+### 24.1 PRINCIPLES
+
+**More** is for navigation and quick content access. **Settings** is the exhaustive source of truth for all preferences and configuration. No setting should be reachable from More without also being present in Settings. Settings is the single canonical location for all configuration controls.
+
+### 24.2 MORE SCREEN STRUCTURE
+
+- **Top status card**: Google sign-in/sign-out status (unlabeled, functional card)
+- **Navigation & Content**: Reorderable/pinnable navigation items (drag to reorder, eye icon to pin to footer)
+- **Quick Access**: Shopping List, Day Themes & Time Blocks, Vault Files, Pillars, Type Conflicts
+
+No "Settings" section exists in More. The AppBar gear icon is the sole way to reach the full Settings screen from More.
+
+### 24.3 SETTINGS SCREEN SECTIONS
+
+Settings is organized into 13 sections:
+
+1. **Profile**: User name
+2. **Vault & Import**: Vault Folder (Local), Vault Name, Import Existing Vault, Import URL List, Native TikTok Player, Daily Note Format, Sync Hidden Files (dead control, gated on Decision C)
+3. **Appearance**: Single row pushing to ThemeScreen (consolidated from inline Accent Color/Color Palette/Background Colors)
+4. **Google Account**: Sign-in/sign-out row, Google Calendar controls, Google Drive Folder (consolidated from External Connections and Synchronization)
+5. **Mood & Schedules**: Mood Definitions, Schedules Management, Day Themes & Time Blocks (moved from Interface Customization)
+6. **Interface Customization**: Bottom Bar Editor only (Mood Definitions, Schedules Management, Day Themes & Time Blocks moved to Mood & Schedules; Manage Categories moved to Object Structure)
+7. **Third-Party & API Keys**: Google Books API Key, OMDb API Key (IMDb)
+8. **Sync & Backup**: Auto-Sync in Background, Conflicts: Keep Most Recent, Backup Now, Clear Data Cache (Backup Now and Clear Data Cache moved from Diagnostics & Maintenance)
+9. **Notifications**: Habit Reminders, Pomodoro Sounds, Notification Appearance, Exact Alarm Permission (Android), Full-Screen Notification (Android)
+10. **Planner & Tasks**: Color Scheme, Start of Week, Natural Language Task Parsing, Show Overdue Section
+11. **Object Structure**: Object Identification, Daily Review Template, Ideas, Manage Categories, Categorization Rules, Category Colors (Manage Categories, Categorization Rules, Category Colors moved from Automatic Categorization)
+12. **Obsidian Tools**: Regenerate Dataview Queries (Daily Note Format moved to Vault & Import)
+13. **Diagnostics & Maintenance**: Diagnostic Reports
+14. **About**: About Citrine
+
+### 24.4 LANGUAGE CONSISTENCY
+
+All UI text in More and Settings is in English. Cancel/Save button pairs use Title Case ("Cancel" / "Save") consistently.
+
+---
+
 ## END OF DOCUMENT
 
 Every item raised across the five audit rounds and the clarification pass has been addressed above, either as a direct fix, a formalized rule, or — for the 5 previously-undocumented object types plus Area/Activity/Label — a full specification pulled from the real implementation. Nothing was left as "TBD" except where explicitly noted as a deliberate open choice (there are none remaining as of this version).
