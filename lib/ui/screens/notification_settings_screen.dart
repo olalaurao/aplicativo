@@ -52,7 +52,7 @@ class _NotificationSettingsScreenState
   }
 
   Map<String, Color> _loadColors(AppSettings settings) {
-    final saved = settings.categoryColors;
+    final saved = settings.notificationAppearanceConfig;
     return Map.fromEntries(_defaultColors.entries.map((e) {
       final hex = saved['notif_${e.key}'];
       return MapEntry(
@@ -63,7 +63,7 @@ class _NotificationSettingsScreenState
   }
 
   Map<String, bool> _loadButtons(AppSettings settings) {
-    final saved = settings.categoryColors;
+    final saved = settings.notificationAppearanceConfig;
     return Map.fromEntries(_defaultButtons.entries.map((e) {
       final val = saved['btn_${e.key}'];
       return MapEntry(e.key, val == 'false' ? false : e.value);
@@ -82,14 +82,14 @@ class _NotificationSettingsScreenState
     _typeColors[key] = color;
     final notifier = ref.read(settingsProvider.notifier);
     final hex = '#${(color.toARGB32() & 0x00FFFFFF).toRadixString(16).padLeft(6, '0')}';
-    await notifier.updateCategoryColor('notif_$key', hex);
+    await notifier.updateNotificationAppearanceConfig('notif_$key', hex);
     if (mounted) setState(() {});
   }
 
   Future<void> _saveButton(String key, bool value) async {
     _buttonVisibility[key] = value;
     final notifier = ref.read(settingsProvider.notifier);
-    await notifier.updateCategoryColor('btn_$key', value.toString());
+    await notifier.updateNotificationAppearanceConfig('btn_$key', value.toString());
     if (mounted) setState(() {});
   }
 
@@ -407,10 +407,10 @@ class _NotificationSettingsScreenState
     final notifier = ref.read(settingsProvider.notifier);
     for (final entry in _defaultColors.entries) {
       final hex = '#${(entry.value.toARGB32() & 0x00FFFFFF).toRadixString(16).padLeft(6, '0')}';
-      await notifier.updateCategoryColor('notif_${entry.key}', hex);
+      await notifier.updateNotificationAppearanceConfig('notif_${entry.key}', hex);
     }
     for (final entry in _defaultButtons.entries) {
-      await notifier.updateCategoryColor('btn_${entry.key}', entry.value.toString());
+      await notifier.updateNotificationAppearanceConfig('btn_${entry.key}', entry.value.toString());
     }
     setState(() {
       _typeColors = Map.from(_defaultColors);

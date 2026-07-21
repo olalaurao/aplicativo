@@ -575,6 +575,11 @@ class NotificationService with WidgetsBindingObserver {
       // Force sound and vibration for all notifications to ensure they work reliably
       playSound: true,
       enableVibration: true,
+      vibrationPattern: isAlarm
+          ? Int64List.fromList(<int>[0, 500, 200, 500])
+          : (isPopup
+              ? Int64List.fromList(<int>[0, 300, 200, 300])
+              : Int64List.fromList(<int>[0, 250, 150, 250])),
       audioAttributesUsage: isAlarm || isPopup
           ? AudioAttributesUsage.alarm
           : AudioAttributesUsage.notification,
@@ -775,20 +780,21 @@ class NotificationService with WidgetsBindingObserver {
       );
       return;
     }
-    const androidDetails = AndroidNotificationDetails(
+    final androidDetails = AndroidNotificationDetails(
       'immediate_channel_v2',
       'Immediate Notifications',
       importance: Importance.high,
       priority: Priority.high,
       playSound: true,
       enableVibration: true,
+      vibrationPattern: Int64List.fromList(<int>[0, 200, 100, 200]),
     );
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
     );
-    const details = NotificationDetails(
+    final details = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );
@@ -899,7 +905,7 @@ class NotificationService with WidgetsBindingObserver {
       id: id,
     );
 
-    const androidDetails = AndroidNotificationDetails(
+    final androidDetails = AndroidNotificationDetails(
       'reminder_channel_v2',
       'Reminders',
       channelDescription: 'General task reminders',
@@ -908,6 +914,9 @@ class NotificationService with WidgetsBindingObserver {
       category: AndroidNotificationCategory.reminder,
       visibility: NotificationVisibility.public,
       channelShowBadge: true,
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList(<int>[0, 250, 150, 250]),
       actions: [
         AndroidNotificationAction('done', 'Concluído'),
         AndroidNotificationAction('snooze', 'Adiar'),
@@ -926,7 +935,7 @@ class NotificationService with WidgetsBindingObserver {
       title,
       body,
       tz.TZDateTime.from(fireTime, tz.local),
-      const NotificationDetails(android: androidDetails, iOS: iosDetails),
+      NotificationDetails(android: androidDetails, iOS: iosDetails),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,

@@ -92,36 +92,40 @@ class ReplanningActions {
   }
 
   static void _deferItem(ContentObject item, dynamic vaultNotifier, {required int days}) {
-    final now = DateTime.now();
-    final newDate = now.add(Duration(days: days));
+    final today = DateTime.now();
+    final newDate = DateTime(today.year, today.month, today.day).add(Duration(days: days));
 
     switch (item.type) {
       case 'task':
         final task = item as Task;
         vaultNotifier.updateObject(
           task.copyWith(
-            endDate: task.endDate != null
-                ? task.endDate!.add(Duration(days: days))
-                : task.startDate?.add(Duration(days: days)),
-            startDate: task.startDate?.add(Duration(days: days)),
+            endDate: newDate,
+            startDate: task.startDate != null ? newDate : null,
           ),
         );
         break;
       case 'goal':
         final goal = item as Goal;
-        if (goal.deadline != null) {
-          vaultNotifier.updateObject(
-            goal.copyWith(
-              deadline: goal.deadline!.add(Duration(days: days)),
-            ),
-          );
-        }
+        vaultNotifier.updateObject(
+          goal.copyWith(
+            deadline: newDate,
+          ),
+        );
         break;
       case 'reminder':
         final reminder = item as Reminder;
+        // Keep the original time, change the date to today + days
+        final newDateTime = DateTime(
+          newDate.year,
+          newDate.month,
+          newDate.day,
+          reminder.time.hour,
+          reminder.time.minute,
+        );
         vaultNotifier.updateObject(
           reminder.copyWith(
-            time: reminder.time.add(Duration(days: days)),
+            time: newDateTime,
           ),
         );
         break;

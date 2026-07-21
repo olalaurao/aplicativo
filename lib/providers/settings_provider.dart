@@ -106,6 +106,9 @@ class AppSettings {
   // ── Sync optimization ──
   final DateTime? lastSuccessfulSyncTime; // Timestamp of last successful sync for incremental sync
 
+  // ── Notification appearance config ──
+  final Map<String, String> notificationAppearanceConfig; // Stores notification colors and button visibility
+
   AppSettings({
     required this.vaultName,
     this.vaultPath = '',
@@ -171,6 +174,7 @@ class AppSettings {
     this.dayStartHour = 0,
     this.showDayDialLegend = true,
     this.lastSuccessfulSyncTime,
+    this.notificationAppearanceConfig = const {},
   });
 
   /// All saved filters deserialized.
@@ -268,6 +272,7 @@ class AppSettings {
     int? dayStartHour,
     bool? showDayDialLegend,
     DateTime? lastSuccessfulSyncTime,
+    Map<String, String>? notificationAppearanceConfig,
   }) {
     return AppSettings(
       vaultName: vaultName ?? this.vaultName,
@@ -348,6 +353,7 @@ class AppSettings {
       dayStartHour: dayStartHour ?? this.dayStartHour,
       showDayDialLegend: showDayDialLegend ?? this.showDayDialLegend,
       lastSuccessfulSyncTime: lastSuccessfulSyncTime ?? this.lastSuccessfulSyncTime,
+      notificationAppearanceConfig: notificationAppearanceConfig ?? this.notificationAppearanceConfig,
     );
   }
 }
@@ -498,6 +504,15 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
           return DateTime.parse(raw);
         } catch (_) {
           return null;
+        }
+      }(),
+      notificationAppearanceConfig: () {
+        final raw = prefs.getString('notificationAppearanceConfig');
+        if (raw == null) return const <String, String>{};
+        try {
+          return Map<String, String>.from(json.decode(raw));
+        } catch (_) {
+          return const <String, String>{};
         }
       }(),
     );
@@ -859,6 +874,13 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> updatePlannerColorMode(String mode) async {
     await _prefs.setString('plannerColorMode', mode);
     state = state.copyWith(plannerColorMode: mode);
+  }
+
+  Future<void> updateNotificationAppearanceConfig(String key, String value) async {
+    final config = Map<String, String>.from(state.notificationAppearanceConfig);
+    config[key] = value;
+    await _prefs.setString('notificationAppearanceConfig', json.encode(config));
+    state = state.copyWith(notificationAppearanceConfig: config);
   }
 
   Future<void> updateDriveSyncFolder(String folder) async {

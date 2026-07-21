@@ -57,9 +57,8 @@ class OverdueSection extends ConsumerWidget {
             item: overdueItem,
             onTap: () {
               // Navigate to the item's detail view
-              final type = overdueItem.object.type;
               final id = overdueItem.object.id;
-              context.go('/$type/$id');
+              context.go('/detail/$id');
             },
           )),
           if (remainingCount > 0)

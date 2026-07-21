@@ -98,11 +98,11 @@ class RotationZoneDetailScreen extends ConsumerWidget {
             ),
           if (status != null) _ZoneHero(status: status, group: group),
           const SizedBox(height: 24),
-          _section(context, ref, 'DIÁRIAS — resetam todo dia', daily, status,
+          _section(context, ref, project, 'DIÁRIAS — resetam todo dia', daily, status,
               RotationFrequencyType.daily),
-          _section(context, ref, 'UMA VEZ NO PERÍODO', once, status,
+          _section(context, ref, project, 'UMA VEZ NO PERÍODO', once, status,
               RotationFrequencyType.oncePerPeriod),
-          _section(context, ref, 'POR FREQUÊNCIA', everyN, status,
+          _section(context, ref, project, 'POR FREQUÊNCIA', everyN, status,
               RotationFrequencyType.everyNRotations),
         ],
       ),
@@ -128,6 +128,7 @@ class RotationZoneDetailScreen extends ConsumerWidget {
   Widget _section(
     BuildContext context,
     WidgetRef ref,
+    Project project,
     String title,
     List<Task> tasks,
     RotationStatus? status,
@@ -159,7 +160,7 @@ class RotationZoneDetailScreen extends ConsumerWidget {
                   child: GestureDetector(
                     onTap: isPreview || status == null
                         ? null
-                        : () => _toggle(context, ref, task, status, type),
+                        : () => _toggle(context, ref, project, task, status, type),
                     child: Padding(
                       padding: const EdgeInsets.all(10),
                       child: AnimatedContainer(
@@ -216,6 +217,7 @@ class RotationZoneDetailScreen extends ConsumerWidget {
   Future<void> _toggle(
     BuildContext context,
     WidgetRef ref,
+    Project project,
     Task task,
     RotationStatus status,
     RotationFrequencyType type,
@@ -231,6 +233,23 @@ class RotationZoneDetailScreen extends ConsumerWidget {
       RotationFrequencyType.none => task,
     };
     await ref.read(vaultProvider.notifier).updateObject(updated);
+
+    // Check for zone advancement
+    final allObjects = ref.read(allObjectsProvider).value ?? [];
+    final allTasks = allObjects.whereType<Task>().toList();
+    final result = RotationService.checkAndAdvanceZone(project, allTasks);
+    
+    if (result.advanced && result.nextGroup != null) {
+      await ref.read(vaultProvider.notifier).updateObject(result.updated);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Zone completed! Next: ${result.nextGroup!.name} 🎉'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 }
 

@@ -3,21 +3,52 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/project_model.dart';
+import '../../models/task_model.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/rotation_service.dart';
 import '../forms/create_task_form.dart';
 import '../theme.dart';
 import 'rotation_zone_detail_screen.dart';
 
-class RotationOverviewScreen extends ConsumerWidget {
+class RotationOverviewScreen extends ConsumerStatefulWidget {
   final String projectId;
 
   const RotationOverviewScreen({super.key, required this.projectId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RotationOverviewScreen> createState() => _RotationOverviewScreenState();
+}
+
+class _RotationOverviewScreenState extends ConsumerState<RotationOverviewScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Check for timeout advancement after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkTimeoutAdvancement();
+    });
+  }
+
+  Future<void> _checkTimeoutAdvancement() async {
+    final project = ref.read(projectsProvider).cast<Project?>().firstWhere(
+          (p) => p?.id == widget.projectId,
+          orElse: () => null,
+        );
+    if (project == null) return;
+
+    final allObjects = ref.read(allObjectsProvider).value ?? [];
+    final allTasks = allObjects.whereType<Task>().toList();
+    final advancementResult = RotationService.checkAndAdvanceZone(project, allTasks);
+    
+    if (advancementResult.advanced) {
+      await ref.read(vaultProvider.notifier).updateObject(advancementResult.updated);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final project = ref.watch(projectsProvider).cast<Project?>().firstWhere(
-          (p) => p?.id == projectId,
+          (p) => p?.id == widget.projectId,
           orElse: () => null,
         );
     if (project == null) {

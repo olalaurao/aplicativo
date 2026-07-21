@@ -30,31 +30,116 @@ class RotationService {
   static RotationStatus? computeActiveStatus(Project project, {DateTime? now}) {
     if (!project.hasRotation) return null;
     final today = _dateOnly(now ?? DateTime.now());
-    final start = _dateOnly(project.rotationStartDate!);
-    final daysSince = today.difference(start).inDays;
-    if (daysSince < 0) return null;
-    final cycleLen = project.rotationCycleLengthDays;
-    if (cycleLen == 0) return null;
-    final fullCycles = daysSince ~/ cycleLen;
-    final posInCycle = daysSince % cycleLen;
-    final groups = [...project.rotationGroups]..sort((a, b) => a.order.compareTo(b.order));
-    var cum = 0;
-    for (final g in groups) {
-      if (posInCycle < cum + g.periodDays) {
-        final dayOfPeriod = posInCycle - cum + 1;
-        final periodStart = start.add(Duration(days: fullCycles * cycleLen + cum));
-        final periodEnd = periodStart.add(Duration(days: g.periodDays - 1));
-        return RotationStatus(
-          group: g,
-          dayOfPeriod: dayOfPeriod,
-          periodStart: periodStart,
-          periodEnd: periodEnd,
-          occurrenceNumber: fullCycles + 1,
-        );
-      }
-      cum += g.periodDays;
+    
+    // Bootstrap: first evaluation, set initial state
+    if (project.rotationCurrentGroupId == null) {
+      final groups = [...project.rotationGroups]..sort((a, b) => a.order.compareTo(b.order));
+      if (groups.isEmpty) return null;
+      final firstGroup = groups.first;
+      final start = _dateOnly(project.rotationStartDate!);
+      return RotationStatus(
+        group: firstGroup,
+        dayOfPeriod: today.difference(start).inDays + 1,
+        periodStart: start,
+        periodEnd: start.add(Duration(days: firstGroup.periodDays - 1)),
+        occurrenceNumber: 1,
+      );
     }
-    return null;
+    
+    // Use persisted state
+    final currentGroupId = project.rotationCurrentGroupId!;
+    final periodStart = _dateOnly(project.rotationCurrentPeriodStart!);
+    final currentGroup = project.rotationGroups.firstWhere((g) => g.id == currentGroupId);
+    final dayOfPeriod = today.difference(periodStart).inDays + 1;
+    final periodEnd = periodStart.add(Duration(days: currentGroup.periodDays - 1));
+    
+    return RotationStatus(
+      group: currentGroup,
+      dayOfPeriod: dayOfPeriod,
+      periodStart: periodStart,
+      periodEnd: periodEnd,
+      occurrenceNumber: project.rotationCycleNumber,
+    );
+  }
+
+  static ({Project updated, bool advanced, RotationGroup? nextGroup}) checkAndAdvanceZone(
+    Project project,
+    List<Task> allTasks, {
+    DateTime? now,
+  }) {
+    if (!project.hasRotation) return (updated: project, advanced: false, nextGroup: null);
+    
+    final today = _dateOnly(now ?? DateTime.now());
+    final groups = [...project.rotationGroups]..sort((a, b) => a.order.compareTo(b.order));
+    if (groups.isEmpty) return (updated: project, advanced: false, nextGroup: null);
+    
+    // Bootstrap if needed
+    var currentGroupId = project.rotationCurrentGroupId;
+    var periodStart = project.rotationCurrentPeriodStart;
+    var cycleNumber = project.rotationCycleNumber;
+    
+    if (currentGroupId == null) {
+      currentGroupId = groups.first.id;
+      periodStart = _dateOnly(project.rotationStartDate!);
+      cycleNumber = 1;
+    }
+    
+    final currentGroup = groups.firstWhere((g) => g.id == currentGroupId);
+    final periodEnd = _dateOnly(periodStart!).add(Duration(days: currentGroup.periodDays - 1));
+    
+    // Check for early completion
+    bool isZoneComplete = false;
+    final zoneTasks = allTasks.where((t) => t.rotationGroupId == currentGroupId && t.isRotationTask).toList();
+    
+    final oncePerPeriodTasks = zoneTasks
+        .where((t) => t.rotationFrequencyType == RotationFrequencyType.oncePerPeriod)
+        .toList();
+    final everyNTasks = zoneTasks
+        .where((t) => t.rotationFrequencyType == RotationFrequencyType.everyNRotations)
+        .toList();
+    
+    // Only check completion if there are relevant tasks
+    if (oncePerPeriodTasks.isNotEmpty || everyNTasks.isNotEmpty) {
+      final currentStatus = RotationStatus(
+        group: currentGroup,
+        dayOfPeriod: today.difference(periodStart).inDays + 1,
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        occurrenceNumber: cycleNumber,
+      );
+      
+      final allOnceDone = oncePerPeriodTasks.every((t) => isDoneThisOccurrence(t, currentStatus));
+      final allEveryNDone = everyNTasks.every((t) => !isDueNow(t, currentStatus) || isDoneThisOccurrence(t, currentStatus));
+      
+      isZoneComplete = allOnceDone && allEveryNDone;
+    }
+    
+    // Check for timeout
+    final isTimeout = today.isAfter(periodEnd);
+    
+    if (isZoneComplete || isTimeout) {
+      // Advance to next zone
+      final currentIdx = groups.indexWhere((g) => g.id == currentGroupId);
+      final nextIdx = (currentIdx + 1) % groups.length;
+      final nextGroup = groups[nextIdx];
+      
+      // Increment cycle number if we wrapped around
+      if (nextIdx == 0) {
+        cycleNumber++;
+      }
+      
+      return (
+        updated: project.copyProjectWith(
+          rotationCurrentGroupId: nextGroup.id,
+          rotationCurrentPeriodStart: periodEnd.add(const Duration(days: 1)),
+          rotationCycleNumber: cycleNumber,
+        ),
+        advanced: true,
+        nextGroup: nextGroup,
+      );
+    }
+    
+    return (updated: project, advanced: false, nextGroup: null);
   }
 
   static List<({RotationGroup group, DateTime startsAt, DateTime endsAt})>

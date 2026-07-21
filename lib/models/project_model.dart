@@ -107,6 +107,9 @@ class Project extends Organizer {
   @override Scheduler? scheduler;
   List<RotationGroup> rotationGroups = [];
   DateTime? rotationStartDate;
+  String? rotationCurrentGroupId;
+  DateTime? rotationCurrentPeriodStart;
+  int rotationCycleNumber = 1;
   /// V5: absorbed from Goal's plan_mode
   String? objective;       // the why
   String? strategy;        // the how
@@ -152,6 +155,9 @@ class Project extends Organizer {
     super.reminders,
     List<RotationGroup>? rotationGroups,
     this.rotationStartDate,
+    this.rotationCurrentGroupId,
+    this.rotationCurrentPeriodStart,
+    this.rotationCycleNumber = 1,
     this.methodLabel,
     this.objective,
     this.strategy,
@@ -220,6 +226,16 @@ class Project extends Organizer {
     if (rotationStartDate != null) {
       frontmatter['rotation_start_date'] =
           rotationStartDate!.toIso8601String().split('T').first;
+    }
+    if (rotationCurrentGroupId != null) {
+      frontmatter['rotation_current_group'] = rotationCurrentGroupId;
+    }
+    if (rotationCurrentPeriodStart != null) {
+      frontmatter['rotation_current_period_start'] =
+          rotationCurrentPeriodStart!.toIso8601String().split('T').first;
+    }
+    if (rotationCycleNumber != 1) {
+      frontmatter['rotation_cycle_number'] = rotationCycleNumber;
     }
     if (methodLabel != null) frontmatter['method_label'] = methodLabel;
 
@@ -318,6 +334,12 @@ class Project extends Organizer {
       project.rotationStartDate =
           DateTime.tryParse(frontmatter['rotation_start_date'].toString());
     }
+    project.rotationCurrentGroupId = frontmatter['rotation_current_group']?.toString();
+    if (frontmatter['rotation_current_period_start'] != null) {
+      project.rotationCurrentPeriodStart =
+          DateTime.tryParse(frontmatter['rotation_current_period_start'].toString());
+    }
+    project.rotationCycleNumber = frontmatter['rotation_cycle_number'] as int? ?? 1;
     project.methodLabel = frontmatter['method_label']?.toString();
 
     // V5: Plan-mode fields
@@ -387,6 +409,9 @@ class Project extends Organizer {
       scheduler: scheduler,
       rotationGroups: rotationGroups,
       rotationStartDate: rotationStartDate,
+      rotationCurrentGroupId: rotationCurrentGroupId,
+      rotationCurrentPeriodStart: rotationCurrentPeriodStart,
+      rotationCycleNumber: rotationCycleNumber,
       methodLabel: methodLabel,
       objective: objective,
       strategy: strategy,
@@ -422,6 +447,9 @@ class Project extends Organizer {
     Scheduler? scheduler,
     List<RotationGroup>? rotationGroups,
     DateTime? rotationStartDate,
+    String? rotationCurrentGroupId,
+    DateTime? rotationCurrentPeriodStart,
+    int? rotationCycleNumber,
     String? methodLabel,
     String? objective,
     String? strategy,
@@ -460,6 +488,9 @@ class Project extends Organizer {
       scheduler: scheduler ?? this.scheduler,
       rotationGroups: rotationGroups ?? this.rotationGroups,
       rotationStartDate: rotationStartDate ?? this.rotationStartDate,
+      rotationCurrentGroupId: rotationCurrentGroupId ?? this.rotationCurrentGroupId,
+      rotationCurrentPeriodStart: rotationCurrentPeriodStart ?? this.rotationCurrentPeriodStart,
+      rotationCycleNumber: rotationCycleNumber ?? this.rotationCycleNumber,
       methodLabel: methodLabel ?? this.methodLabel,
       objective: objective ?? this.objective,
       strategy: strategy ?? this.strategy,
