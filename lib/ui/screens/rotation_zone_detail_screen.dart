@@ -244,7 +244,7 @@ class RotationZoneDetailScreen extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Zone completed! Next: ${result.nextGroup!.name} 🎉'),
+            content: Text('Zona concluída! Próxima: ${result.nextGroup!.name} 🎉'),
             duration: const Duration(seconds: 2),
           ),
         );

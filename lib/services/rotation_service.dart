@@ -131,7 +131,7 @@ class RotationService {
       return (
         updated: project.copyProjectWith(
           rotationCurrentGroupId: nextGroup.id,
-          rotationCurrentPeriodStart: periodEnd.add(const Duration(days: 1)),
+          rotationCurrentPeriodStart: today,
           rotationCycleNumber: cycleNumber,
         ),
         advanced: true,
