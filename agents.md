@@ -1746,8 +1746,6 @@ Exemplo real encontrado neste projeto:
 - Glyph de origem: 🕐 criado, ✏️ editado, 📅 programado, ⚡ aconteceu.
 - Antes de remover `timeline_screen.dart`, confirmar no `go_router`/`navigation_provider.dart` se alguma rota ainda aponta pra ele. Status atual: Usado — rota `/timeline` existe em navigation_provider.dart.
 
-### Bug Fixes Aplicados
-
 ---
 
 ## CONFIGURAÇÃO DE SETTINGS — LOCALIZAÇÃO

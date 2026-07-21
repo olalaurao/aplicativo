@@ -6,7 +6,7 @@
     android:orientation="vertical"
     android:gravity="center"
     android:padding="16dp"
-    android:background="@drawable/widget_background">
+    android:background="@color/quartzo_surface">
 
     <!-- Time Display -->
     <TextView
@@ -16,6 +16,8 @@
         android:text="12:00"
         android:textSize="32sp"
         android:textStyle="bold"
+        android:textColor="@color/quartzo_text_primary"
+        android:fontFamily="sans-serif"
         android:layout_marginBottom="4dp" />
 
     <!-- Date Display -->
@@ -25,6 +27,8 @@
         android:layout_height="wrap_content"
         android:text="Today"
         android:textSize="14sp"
+        android:textColor="@color/quartzo_text_secondary"
+        android:fontFamily="sans-serif"
         android:layout_marginBottom="16dp" />
 
     <!-- Simple visual representation of day progress -->
@@ -32,14 +36,14 @@
         android:layout_width="match_parent"
         android:layout_height="4dp"
         android:orientation="horizontal"
-        android:background="#E0E0E0">
+        android:background="@color/quartzo_surface_variant">
 
         <View
             android:id="@+id/day_progress_bar"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="0.5"
-            android:background="#FF6B5B" />
+            android:background="@color/quartzo_accent" />
 
     </LinearLayout>
 
@@ -50,6 +54,8 @@
         android:layout_height="wrap_content"
         android:text="2 tasks • 1 event"
         android:textSize="12sp"
+        android:textColor="@color/quartzo_text_secondary"
+        android:fontFamily="sans-serif"
         android:layout_marginTop="12dp" />
 
 </LinearLayout>

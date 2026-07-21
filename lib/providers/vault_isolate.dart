@@ -117,6 +117,12 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
         batch.map((file) async {
           try {
             final relativePath = service.getRelativePath(file.path);
+            
+            // Skip _diagnostics files - they are temporary and can cause sync conflicts
+            if (relativePath.startsWith('_diagnostics/') || relativePath.contains('/_diagnostics/')) {
+              return;
+            }
+            
             final stat = await file.stat();
             final mtime = stat.modified.millisecondsSinceEpoch;
             
@@ -476,6 +482,12 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
               );
             }
           } catch (e, st) {
+            // Skip files that don't exist (e.g., deleted crash reports)
+            if (e.toString().contains('PathNotFoundException') || 
+                e.toString().contains('No such file or directory')) {
+              debugPrint('Skipping missing file: ${file.path}');
+              return;
+            }
             debugPrint('Error processing file ${file.path}: $e\n$st');
           }
         }),

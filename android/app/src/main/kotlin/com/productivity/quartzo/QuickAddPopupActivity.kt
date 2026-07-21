@@ -62,7 +62,7 @@ class QuickAddPopupActivity : Activity() {
         val addBtn = Button(this).apply {
             text = "Adicionar"
             setTextColor(android.graphics.Color.WHITE)
-            setBackgroundColor(QuartzoWidgetUtils.accent)
+            setBackgroundColor(QuartzoWidgetUtils.accent(this@QuickAddPopupActivity))
             setPadding(32, 12, 32, 12)
             setOnClickListener { 
                 addTask()

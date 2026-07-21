@@ -92,7 +92,7 @@ class DayDialAggregator {
           _isSameDay(s.occurredAt ?? s.date, date));
       if (hasSession) continue;
 
-      final duration = task.duration;
+      final duration = task.duration > 0 ? task.duration : 15; // Default to 15min if duration is 0 or invalid
       segments.add(DialSegment(
         id: 'taskPlanned:${task.id}',
         kind: DialSegmentKind.taskPlanned,

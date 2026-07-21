@@ -89,7 +89,7 @@ class DayPopupActivity : Activity() {
             text = "Fechar"
             textSize = 16f
             gravity = Gravity.CENTER
-            setTextColor(QuartzoWidgetUtils.accent)
+            setTextColor(QuartzoWidgetUtils.accent(this@DayPopupActivity))
             setPadding(0, 22, 0, 6)
             setOnClickListener { finish() }
         })
@@ -112,7 +112,7 @@ class DayPopupActivity : Activity() {
             text = item.optString("time")
             textSize = 16f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setTextColor(QuartzoWidgetUtils.accent)
+            setTextColor(QuartzoWidgetUtils.accent(this@DayPopupActivity))
         }, LinearLayout.LayoutParams(104, ViewGroup.LayoutParams.WRAP_CONTENT))
         row.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL

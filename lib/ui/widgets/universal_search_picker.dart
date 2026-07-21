@@ -12,9 +12,11 @@ import '../../models/resource_model.dart';
 import '../../models/project_model.dart';
 import '../../models/social_post.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../services/search_service.dart';
 import '../theme.dart';
 import 'app_chip.dart';
+import '../utils/object_icons.dart';
 
 class UniversalSearchPickerSheet extends ConsumerStatefulWidget {
   final String title;
@@ -397,70 +399,85 @@ class _UniversalSearchPickerSheetState
   }
 
   Widget _getIconForType(ContentObject obj) {
+    final settings = ref.read(settingsProvider);
+    
     IconData icon;
     Color color;
+    
     if (obj is Organizer) {
-      switch (obj.organizerType) {
-        case OrganizerType.area:
-          icon = Icons.layers_outlined;
-          color = AppTheme.accentColor(context);
-          break;
-        case OrganizerType.project:
-          icon = Icons.folder_outlined;
-          color = AppTheme.accentColor(context);
-          break;
-        case OrganizerType.label:
-          icon = Icons.label_outline_rounded;
-          color = AppColors.habitPurple;
-          break;
-        default:
-          icon = Icons.radio_button_unchecked_rounded;
-          color = AppColors.textMuted;
-      }
+      final typeStr = obj.organizerType.name;
+      final signatureColor = ObjectIcons.colorForTypeWithSignatures(typeStr, settings.typeSignatures);
+      final defaultColor = ObjectIcons.defaultColorForType(typeStr);
+      
+      // Use signature color if configured and different from default
+      color = (signatureColor != defaultColor) 
+          ? signatureColor 
+          : _getOrganizerHardcodedColor(obj.organizerType);
+      
+      icon = ObjectIcons.iconDataForTypeWithSignatures(typeStr, settings.typeSignatures) 
+          ?? _getOrganizerDefaultIcon(obj.organizerType);
     } else {
-      switch (obj.type) {
-        case 'task':
-          icon = Icons.check_circle_outline_rounded;
-          color = AppColors.info;
-          break;
-        case 'goal':
-          icon = Icons.track_changes_rounded;
-          color = AppColors.habitOrange;
-          break;
-        case 'habit':
-          icon = Icons.loop_rounded;
-          color = AppColors.habitGreen;
-          break;
-        case 'project':
-          icon = Icons.folder_outlined;
-          color = AppColors.habitPurple;
-          break;
-        case 'note':
-          icon = Icons.article_outlined;
-          color = AppTheme.accentColor(context);
-          break;
-        case 'idea':
-          icon = Icons.lightbulb_outline_rounded;
-          color = AppColors.warning;
-          break;
-        case 'resource':
-          icon = Icons.menu_book_outlined;
-          color = AppTheme.accentColor(context);
-          break;
-        case 'social_post':
-          icon = Icons.bookmarks_outlined;
-          color = AppTheme.accentColor(context);
-          break;
-        case 'person':
-          icon = Icons.person_outline_rounded;
-          color = AppTheme.accentColor(context);
-          break;
-        default:
-          icon = Icons.radio_button_unchecked_rounded;
-          color = AppColors.textMuted;
-      }
+      final signatureColor = ObjectIcons.colorForTypeWithSignatures(obj.type, settings.typeSignatures);
+      final defaultColor = ObjectIcons.defaultColorForType(obj.type);
+      
+      // Use signature color if configured and different from default
+      color = (signatureColor != defaultColor) 
+          ? signatureColor 
+          : _getObjectTypeHardcodedColor(obj.type);
+      
+      icon = ObjectIcons.iconDataForTypeWithSignatures(obj.type, settings.typeSignatures) 
+          ?? _getObjectTypeDefaultIcon(obj.type);
     }
+    
     return Icon(icon, color: color);
+  }
+
+  Color _getOrganizerHardcodedColor(OrganizerType type) {
+    return switch (type) {
+      OrganizerType.area => AppTheme.accentColor(context),
+      OrganizerType.project => AppTheme.accentColor(context),
+      OrganizerType.label => AppColors.habitPurple,
+      _ => AppColors.textMuted,
+    };
+  }
+
+  IconData _getOrganizerDefaultIcon(OrganizerType type) {
+    return switch (type) {
+      OrganizerType.area => Icons.layers_outlined,
+      OrganizerType.project => Icons.folder_outlined,
+      OrganizerType.label => Icons.label_outline_rounded,
+      _ => Icons.radio_button_unchecked_rounded,
+    };
+  }
+
+  Color _getObjectTypeHardcodedColor(String type) {
+    return switch (type) {
+      'task' => AppColors.info,
+      'goal' => AppColors.habitOrange,
+      'habit' => AppColors.habitGreen,
+      'project' => AppColors.habitPurple,
+      'note' => AppTheme.accentColor(context),
+      'idea' => AppColors.warning,
+      'resource' => AppTheme.accentColor(context),
+      'social_post' => AppTheme.accentColor(context),
+      'person' => AppTheme.accentColor(context),
+      _ => AppColors.textMuted,
+    };
+  }
+
+  IconData _getObjectTypeDefaultIcon(String type) {
+    return switch (type) {
+      'task' => Icons.check_circle_outline_rounded,
+      'goal' => Icons.track_changes_rounded,
+      'habit' => Icons.loop_rounded,
+      'project' => Icons.folder_outlined,
+      'note' => Icons.article_outlined,
+      'idea' => Icons.lightbulb_outline_rounded,
+      'resource' => Icons.menu_book_outlined,
+      'social_post' => Icons.bookmarks_outlined,
+      'person' => Icons.person_outline_rounded,
+      _ => Icons.radio_button_unchecked_rounded,
+    };
   }
 
   String _getTypeLabel(ContentObject obj) {

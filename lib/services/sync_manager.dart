@@ -619,7 +619,15 @@ class SyncManager {
       }
       
       // Check if file was modified locally since last sync
-      final localModifiedAt = state['localModifiedAt'] as DateTime?;
+      final localModifiedAtRaw = state['localModifiedAt'];
+      DateTime? localModifiedAt;
+      if (localModifiedAtRaw != null) {
+        if (localModifiedAtRaw is DateTime) {
+          localModifiedAt = localModifiedAtRaw;
+        } else if (localModifiedAtRaw is int) {
+          localModifiedAt = DateTime.fromMillisecondsSinceEpoch(localModifiedAtRaw);
+        }
+      }
       final currentModifiedAt = await file.lastModified();
       
       if (localModifiedAt == null || currentModifiedAt.isAfter(localModifiedAt)) {
@@ -664,6 +672,18 @@ class SyncManager {
     DateTime? localModifiedAt,
     DateTime? remoteModifiedAt,
   }) async {
+    // If the conflict is in _diagnostics folder, just delete the file instead of creating conflict
+    if (relativePath.startsWith('_diagnostics/') || relativePath.contains('/_diagnostics/')) {
+      try {
+        await obsidian.deleteFile(relativePath);
+        debugPrint('Deleted _diagnostics file instead of creating conflict: $relativePath');
+        return;
+      } catch (e) {
+        debugPrint('Failed to delete _diagnostics file: $relativePath, error: $e');
+        // Continue with normal conflict handling if deletion fails
+      }
+    }
+
     await _ensurePreSyncBackup(driveSync);
     await driveSync.saveConflictPair(
       relativePath: relativePath,

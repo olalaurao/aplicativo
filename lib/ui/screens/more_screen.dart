@@ -6,14 +6,11 @@ import '../theme.dart';
 import '../../providers/navigation_provider.dart';
 import '../../models/navigation_item.dart';
 import 'settings_screen.dart';
-import 'theme_screen.dart';
-import 'category_management_screen.dart';
 import 'shopping_list_screen.dart';
 import 'vault_files_screen.dart';
 import 'object_conflicts_screen.dart';
 import 'day_theme_screen.dart';
 import 'pillars_screen.dart';
-import 'widgets_management_screen.dart' as widgets_management_screen;
 import '../../providers/google_calendar_provider.dart';
 import '../widgets/navigation_shortcut_picker.dart';
 import '../../providers/vault_provider.dart';
@@ -283,19 +280,6 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     );
   }
 
-  void _showAboutDialog(BuildContext context) {
-    showAboutDialog(
-      context: context,
-      applicationName: 'Citrine',
-      applicationVersion: '1.0.0',
-      applicationIcon: Icon(
-        Icons.auto_awesome_rounded,
-        color: AppTheme.accentColor(context),
-        size: 48,
-      ),
-      children: [const Text('Your personal vault and productivity assistant.')],
-    );
-  }
 
   void _showAddShortcut(BuildContext context) async {
     final result = await showModalBottomSheet<NavigationItem>(

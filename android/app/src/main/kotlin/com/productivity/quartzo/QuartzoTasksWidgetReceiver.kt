@@ -62,7 +62,7 @@ class QuartzoTasksWidgetReceiver : AppWidgetProvider() {
 
             val completed = item.optBoolean("completed", false)
             views.setTextViewText(checkboxId, if (completed) "✓" else "○")
-            views.setTextColor(checkboxId, if (completed) QuartzoWidgetUtils.accent else QuartzoWidgetUtils.textColor(context))
+            views.setTextColor(checkboxId, if (completed) QuartzoWidgetUtils.accent(context) else QuartzoWidgetUtils.textColor(context))
 
             val toggleUri = item.optString("toggleUri", "")
             if (toggleUri.isNotEmpty()) {

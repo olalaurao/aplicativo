@@ -4,7 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:padding="12dp"
+    android:background="@color/quartzo_surface">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -19,13 +20,17 @@
             android:layout_weight="1"
             android:text="Tarefas"
             android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:textColor="@color/quartzo_text_primary"
+            android:fontFamily="sans-serif" />
 
         <TextView
             android:id="@+id/tasks_subtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="12sp" />
+            android:textSize="12sp"
+            android:textColor="@color/quartzo_text_secondary"
+            android:fontFamily="sans-serif" />
 
         <TextView
             android:id="@+id/tasks_add_button"
@@ -35,7 +40,9 @@
             android:textSize="20sp"
             android:textStyle="bold"
             android:padding="8dp"
-            android:layout_marginStart="8dp" />
+            android:layout_marginStart="8dp"
+            android:textColor="@color/quartzo_accent"
+            android:fontFamily="sans-serif" />
     </LinearLayout>
 
     <LinearLayout

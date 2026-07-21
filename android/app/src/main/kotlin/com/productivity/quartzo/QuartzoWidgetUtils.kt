@@ -15,19 +15,59 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object QuartzoWidgetUtils {
-    const val accent = 0xFFFFB300.toInt()
-
     fun isDark(context: Context): Boolean {
         return (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
             Configuration.UI_MODE_NIGHT_YES
     }
 
-    fun bgColor(context: Context): Int = if (isDark(context)) 0xFF1F2024.toInt() else Color.WHITE
-    fun textColor(context: Context): Int = if (isDark(context)) 0xFFF4F4F5.toInt() else 0xFF1F2430.toInt()
-    fun mutedColor(context: Context): Int = if (isDark(context)) 0xFF9CA3AF.toInt() else 0xFF9AA0AA.toInt()
-    fun chipColor(context: Context): Int = if (isDark(context)) 0xFF30323A.toInt() else 0xFFF0F1F3.toInt()
-    fun softAccent(context: Context): Int = if (isDark(context)) 0xFF3A3020.toInt() else 0xFFFFF5E2.toInt()
-    fun dividerColor(context: Context): Int = if (isDark(context)) 0xFF2C2E33.toInt() else 0xFFEEEEEE.toInt()
+    fun accent(context: Context): Int = if (Build.VERSION.SDK_INT >= 23) {
+        context.getColor(R.color.quartzo_accent)
+    } else {
+        @Suppress("DEPRECATION")
+        context.resources.getColor(R.color.quartzo_accent)
+    }
+
+    fun bgColor(context: Context): Int = if (Build.VERSION.SDK_INT >= 23) {
+        if (isDark(context)) context.getColor(R.color.quartzo_dark_background) else context.getColor(R.color.quartzo_background)
+    } else {
+        @Suppress("DEPRECATION")
+        if (isDark(context)) context.resources.getColor(R.color.quartzo_dark_background) else context.resources.getColor(R.color.quartzo_background)
+    }
+
+    fun textColor(context: Context): Int = if (Build.VERSION.SDK_INT >= 23) {
+        if (isDark(context)) context.getColor(R.color.quartzo_dark_text_primary) else context.getColor(R.color.quartzo_text_primary)
+    } else {
+        @Suppress("DEPRECATION")
+        if (isDark(context)) context.resources.getColor(R.color.quartzo_dark_text_primary) else context.resources.getColor(R.color.quartzo_text_primary)
+    }
+
+    fun mutedColor(context: Context): Int = if (Build.VERSION.SDK_INT >= 23) {
+        if (isDark(context)) context.getColor(R.color.quartzo_dark_text_secondary) else context.getColor(R.color.quartzo_text_secondary)
+    } else {
+        @Suppress("DEPRECATION")
+        if (isDark(context)) context.resources.getColor(R.color.quartzo_dark_text_secondary) else context.resources.getColor(R.color.quartzo_text_secondary)
+    }
+
+    fun chipColor(context: Context): Int = if (Build.VERSION.SDK_INT >= 23) {
+        if (isDark(context)) context.getColor(R.color.quartzo_dark_card_fill) else context.getColor(R.color.quartzo_surface_variant)
+    } else {
+        @Suppress("DEPRECATION")
+        if (isDark(context)) context.resources.getColor(R.color.quartzo_dark_card_fill) else context.resources.getColor(R.color.quartzo_surface_variant)
+    }
+
+    fun softAccent(context: Context): Int = if (Build.VERSION.SDK_INT >= 23) {
+        if (isDark(context)) context.getColor(R.color.quartzo_dark_card_fill) else context.getColor(R.color.quartzo_surface_variant)
+    } else {
+        @Suppress("DEPRECATION")
+        if (isDark(context)) context.resources.getColor(R.color.quartzo_dark_card_fill) else context.resources.getColor(R.color.quartzo_surface_variant)
+    }
+
+    fun dividerColor(context: Context): Int = if (Build.VERSION.SDK_INT >= 23) {
+        if (isDark(context)) context.getColor(R.color.quartzo_dark_divider) else context.getColor(R.color.quartzo_divider)
+    } else {
+        @Suppress("DEPRECATION")
+        if (isDark(context)) context.resources.getColor(R.color.quartzo_dark_divider) else context.resources.getColor(R.color.quartzo_divider)
+    }
 
     fun json(raw: String?): JSONObject = try {
         if (raw.isNullOrBlank()) JSONObject() else JSONObject(raw)
@@ -231,7 +271,7 @@ object QuartzoWidgetUtils {
             views.setInt(checkId, "setBackgroundResource", 0)
         }
         views.setTextViewText(timeId, item.optString("time", ""))
-        views.setTextColor(timeId, accent)
+        views.setTextColor(timeId, accent(context))
         views.setTextViewText(titleId, displayText(item, "title", "label"))
         views.setTextViewText(subtitleId, displayText(item, "subtitle", fallback = ""))
         views.setTextColor(titleId, textColor(context))

@@ -11,7 +11,7 @@
         android:id="@+id/calendar_item_time"
         android:layout_width="48dp"
         android:layout_height="wrap_content"
-        android:textColor="#FFB300"
+        android:textColor="@color/quartzo_accent"
         android:textSize="14sp" />
 
     <TextView
@@ -20,7 +20,7 @@
         android:layout_height="20dp"
         android:layout_marginEnd="8dp"
         android:gravity="center"
-        android:textColor="#9AA0AA"
+        android:textColor="@color/quartzo_text_secondary"
         android:textSize="14sp" />
 
     <LinearLayout
@@ -35,8 +35,9 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="#1F2430"
-            android:textSize="15sp" />
+            android:textColor="@color/quartzo_text_primary"
+            android:textSize="15sp"
+            android:fontFamily="sans-serif" />
 
         <TextView
             android:id="@+id/calendar_item_subtitle"
@@ -44,7 +45,8 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="#9AA0AA"
-            android:textSize="13sp" />
+            android:textColor="@color/quartzo_text_secondary"
+            android:textSize="13sp"
+            android:fontFamily="sans-serif" />
     </LinearLayout>
 </LinearLayout>

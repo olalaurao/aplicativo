@@ -7,6 +7,7 @@ import '../widgets/app_switch_tile.dart';
 import '../../providers/navigation_provider.dart';
 import '../../models/navigation_item.dart';
 import '../../models/task_model.dart';
+import 'widgets_management_screen.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/google_calendar_provider.dart' as calendar_auth;
@@ -999,6 +1000,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: ListTile(
+                    leading: Icon(
+                      Icons.widgets_rounded,
+                      color: AppTheme.accentColor(context),
+                    ),
+                    title: const Text(
+                      'Widgets',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Manage home screen widgets',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const WidgetsManagementScreen(),
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 24),
                 _section('About'),
                 const SizedBox(height: 12),
@@ -1085,14 +1114,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Queries Dataview regeneradas com sucesso!'),
+          content: Text('Dataview queries regenerated successfully!'),
         ),
       );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Erro ao regenerar: $e')));
+      ).showSnackBar(SnackBar(content: Text('Error regenerating: $e')));
     }
   }
 
@@ -1319,7 +1348,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
                   child: Text(
-                    'Selecione o Template de Daily Review',
+                    'Select Daily Review Template',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -1406,9 +1435,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   String _dailyIdentifierLabel(String value) {
     return switch (value) {
-      'folder' => 'Pasta',
+      'folder' => 'Folder',
       'frontmatter_type' => 'Frontmatter type',
-      _ => 'Nome do arquivo',
+      _ => 'Filename',
     };
   }
 
@@ -1618,7 +1647,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const RadioListTile<String>(
-                        title: Text('Por Tag'),
+                        title: Text('By Tag'),
                         value: 'tag',
                       ),
                       if (currentStrategy == 'tag')
@@ -1631,12 +1660,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           child: TextField(
                             controller: tagController,
                             decoration: const InputDecoration(
-                              labelText: 'Tag (sem #)',
+                              labelText: 'Tag (without #)',
                             ),
                           ),
                         ),
                       const RadioListTile<String>(
-                        title: Text('Por Pasta'),
+                        title: Text('By Folder'),
                         value: 'folder',
                       ),
                       if (currentStrategy == 'folder')
@@ -1649,12 +1678,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           child: TextField(
                             controller: folderController,
                             decoration: const InputDecoration(
-                              labelText: 'Caminho da Pasta',
+                              labelText: 'Folder Path',
                             ),
                           ),
                         ),
                       const RadioListTile<String>(
-                        title: Text('Toda Nota'),
+                        title: Text('Any Note'),
                         value: 'any_note',
                       ),
                     ],
@@ -2073,86 +2102,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Color _parseColor(String hexString) {
-    try {
-      final buffer = StringBuffer();
-      if (hexString.length == 6 || hexString.length == 7) buffer.write('ff');
-      buffer.write(hexString.replaceFirst('#', ''));
-      return Color(int.parse(buffer.toString(), radix: 16));
-    } catch (_) {
-      return AppTheme.accentColor(context);
-    }
-  }
-
-  void _showAccentColorPicker(
-    BuildContext context,
-    AppSettings settings,
-    SettingsNotifier notifier,
-  ) {
-    final palette = ref.read(colorPaletteProvider);
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
-    // Use custom palette colors, or fall back to default
-    final colorHexes = isDarkMode && palette.useSeparateDarkPalette
-        ? palette.darkHexes
-        : palette.lightHexes;
-    
-    final colors = colorHexes.isNotEmpty
-        ? colorHexes
-        : [
-            '#F97316',
-            '#0EA5E9',
-            '#10B981',
-            '#8B5CF6',
-            '#F43F5E',
-            '#EAB308',
-          ];
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Selecione a Cor Principal'),
-        content: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: colors.map((hex) {
-            final color = _parseColor(hex);
-            final isSelected =
-                settings.accentColor.toUpperCase() == hex.toUpperCase();
-            return GestureDetector(
-              onTap: () {
-                notifier.updateAccentColor(
-                  hex,
-                ); // Assume this method exists or we need to add it
-                Navigator.pop(context);
-              },
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: isSelected
-                      ? Border.all(color: AppColors.textPrimary, width: 3)
-                      : null,
-                ),
-                child: isSelected
-                    ? const Icon(Icons.check, color: Colors.white)
-                    : null,
-              ),
-            );
-          }).toList(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fechar'),
-          ),
-        ],
       ),
     );
   }

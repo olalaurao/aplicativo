@@ -54,7 +54,12 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
       date: today,
       tasks: allObjects.whereType<Task>().toList(),
       habits: allObjects.whereType<Habit>().toList(),
-      pomodoroSessions: allObjects.whereType<PomodoroSession>().toList(),
+      pomodoroSessions: allObjects.whereType<PomodoroSession>().where((s) {
+        final effectiveDate = s.occurredAt ?? s.date;
+        return effectiveDate.year == today.year && 
+               effectiveDate.month == today.month && 
+               effectiveDate.day == today.day;
+      }).toList(),
       googleEvents: const [],
       localEvents: allObjects.whereType<Event>().toList(),
       reminders: allObjects.whereType<Reminder>().toList(),

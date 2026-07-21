@@ -617,7 +617,8 @@ class ObsidianService {
               path.contains('/_deleted/') ||
               path.contains('/_conflicts/') ||
               path.contains('/_backups/') ||
-              path.contains('/_cache/')) {
+              path.contains('/_cache/') ||
+              path.contains('/_diagnostics/')) {
             continue;
           }
           files.add(entity);

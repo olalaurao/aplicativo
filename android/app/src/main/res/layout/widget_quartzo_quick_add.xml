@@ -4,7 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="horizontal"
-    android:padding="12dp">
+    android:padding="12dp"
+    android:background="@color/quartzo_surface">
 
     <TextView
         android:id="@+id/quick_add_btn_1"
@@ -17,7 +18,9 @@
         android:maxLines="1"
         android:ellipsize="end"
         android:text="Entrada"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        android:textColor="@color/quartzo_text_primary"
+        android:fontFamily="sans-serif" />
 
     <TextView
         android:id="@+id/quick_add_btn_2"
@@ -30,5 +33,7 @@
         android:maxLines="1"
         android:ellipsize="end"
         android:text="Tarefa"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        android:textColor="@color/quartzo_text_primary"
+        android:fontFamily="sans-serif" />
 </LinearLayout>

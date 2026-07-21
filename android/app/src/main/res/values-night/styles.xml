@@ -19,4 +19,102 @@
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+
+    <!-- Widget Theme - Dark -->
+    <style name="QuartzoWidgetTheme" parent="@android:style/Theme.DeviceDefault">
+        <item name="android:background">@color/quartzo_dark_background</item>
+        <item name="android:textColor">@color/quartzo_dark_text_primary</item>
+    </style>
+
+    <style name="QuartzoWidgetDialogTheme" parent="@android:style/Theme.Material.Dialog.Alert">
+        <item name="android:windowMinWidthMajor">88%</item>
+        <item name="android:windowMinWidthMinor">88%</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:background">@color/quartzo_dark_surface</item>
+        <item name="android:textColor">@color/quartzo_dark_text_primary</item>
+    </style>
+
+    <!-- Widget Text Styles - Dark -->
+    <style name="QuartzoWidgetDay">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/quartzo_dark_text_primary</item>
+        <item name="android:fontFamily">sans-serif</item>
+    </style>
+
+    <style name="QuartzoWidgetDot">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/quartzo_dark_text_secondary</item>
+        <item name="android:fontFamily">sans-serif</item>
+    </style>
+
+    <style name="QuartzoWidgetRowTitle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/quartzo_dark_text_primary</item>
+        <item name="android:fontFamily">sans-serif</item>
+    </style>
+
+    <style name="QuartzoWidgetRowSubtitle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">@color/quartzo_dark_text_secondary</item>
+        <item name="android:fontFamily">sans-serif</item>
+    </style>
+
+    <style name="QuartzoPomoColumn">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">bottom|center_horizontal</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="QuartzoPomoBar">
+        <item name="android:layout_width">14dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">4dp</item>
+        <item name="android:text"></item>
+        <item name="android:background">@color/quartzo_accent</item>
+    </style>
+
+    <style name="QuartzoPomoLabel">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">6dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">@color/quartzo_dark_text_secondary</item>
+        <item name="android:fontFamily">sans-serif</item>
+    </style>
+
+    <!-- Widget Background Style - Dark -->
+    <style name="QuartzoWidgetBackground">
+        <item name="android:background">@color/quartzo_dark_surface</item>
+    </style>
+
+    <!-- Widget Card Style - Dark -->
+    <style name="QuartzoWidgetCard">
+        <item name="android:background">@color/quartzo_dark_card_fill</item>
+        <item name="android:textColor">@color/quartzo_dark_text_primary</item>
+    </style>
 </resources>

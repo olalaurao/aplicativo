@@ -20,7 +20,8 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:textSize="14sp"
-        android:textColor="#000000"
+        android:textColor="@color/quartzo_text_primary"
         android:maxLines="1"
-        android:ellipsize="end" />
+        android:ellipsize="end"
+        android:fontFamily="sans-serif" />
 </LinearLayout>

@@ -4,8 +4,11 @@ export 'habit_check_handler.dart' show handleHabitCheckTap;
 import '../../models/habit_model.dart';
 import '../theme.dart';
 import 'habit_detail_sheet.dart';
+import '../utils/object_icons.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/settings_provider.dart';
 
-class HabitRow extends StatelessWidget {
+class HabitRow extends ConsumerWidget {
   final Habit habit;
   final VoidCallback? onTap;
   final VoidCallback? onComplete;
@@ -13,8 +16,8 @@ class HabitRow extends StatelessWidget {
   const HabitRow({super.key, required this.habit, this.onTap, this.onComplete});
 
   @override
-  Widget build(BuildContext context) {
-    final color = _parseColor(habit.color);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final color = _getHabitColor(habit, ref);
     final todayRecord = habit.completionHistory.where((r) {
       final now = DateTime.now();
       return r.date.year == now.year &&
@@ -94,7 +97,7 @@ class HabitRow extends StatelessWidget {
 
             // Streak badge or Pact Day Count
             if (!isPact && habit.streak > 0)
-              _buildBadge('🔥 ${habit.streak}', AppColors.habitOrange),
+              _buildBadge('🔥 ${habit.streak}', color),
 
             if (isPact && dayCount > 0) _buildBadge('Dia $dayCount', color),
 
@@ -125,7 +128,7 @@ class HabitRow extends StatelessWidget {
             if (daysSince >= 0)
               Padding(
                 padding: const EdgeInsets.only(left: 6),
-                child: _buildDaysSinceBadge(context, daysSince),
+                child: _buildDaysSinceBadge(context, daysSince, color),
               ),
           ],
         ),
@@ -133,22 +136,22 @@ class HabitRow extends StatelessWidget {
     );
   }
 
-  Widget _buildDaysSinceBadge(BuildContext context, int days) {
+  Widget _buildDaysSinceBadge(BuildContext context, int days, Color habitColor) {
     if (days == 0) {
       // F3.10: Add checkmark icon for "Done today" state
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-          color: AppColors.habitGreen.withValues(alpha: 0.1),
+          color: habitColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.check_rounded,
               size: 10,
-              color: AppColors.habitGreen,
+              color: habitColor,
             ),
             SizedBox(width: 4),
             Text(
@@ -156,7 +159,7 @@ class HabitRow extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
-                color: AppColors.habitGreen,
+                color: habitColor,
               ),
             ),
           ],
@@ -199,6 +202,20 @@ class HabitRow extends StatelessWidget {
     );
   }
 
+  Color _getHabitColor(Habit habit, WidgetRef ref) {
+    final customColor = _parseColor(habit.color);
+    if (customColor != AppColors.primary) return customColor;
+    
+    // Use typeSignatures color if configured
+    final settings = ref.read(settingsProvider);
+    final signatureColor = ObjectIcons.colorForTypeWithSignatures('habit', settings.typeSignatures);
+    if (signatureColor != ObjectIcons.defaultColorForType('habit')) {
+      return signatureColor;
+    }
+    
+    return AppColors.primary;
+  }
+
   Color _parseColor(String hex) {
     try {
       return Color(int.parse(hex.replaceAll('#', '0xFF')));
@@ -209,15 +226,15 @@ class HabitRow extends StatelessWidget {
 }
 
 /// Compact version for the habits section card on Timeline
-class HabitProgressRow extends StatelessWidget {
+class HabitProgressRow extends ConsumerWidget {
   final Habit habit;
   final VoidCallback? onTap;
 
   const HabitProgressRow({super.key, required this.habit, this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    final color = _parseColor(habit.color);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final color = _getHabitColor(habit, ref);
     final todayRecord = habit.completionHistory.where((r) {
       final now = DateTime.now();
       return r.date.year == now.year &&
@@ -362,6 +379,20 @@ class HabitProgressRow extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Color _getHabitColor(Habit habit, WidgetRef ref) {
+    final customColor = _parseColor(habit.color);
+    if (customColor != AppColors.primary) return customColor;
+    
+    // Use typeSignatures color if configured
+    final settings = ref.read(settingsProvider);
+    final signatureColor = ObjectIcons.colorForTypeWithSignatures('habit', settings.typeSignatures);
+    if (signatureColor != ObjectIcons.defaultColorForType('habit')) {
+      return signatureColor;
+    }
+    
+    return AppColors.primary;
   }
 
   Color _parseColor(String hex) {

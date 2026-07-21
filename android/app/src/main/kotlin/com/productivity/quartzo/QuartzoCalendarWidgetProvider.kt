@@ -117,7 +117,7 @@ open class QuartzoCalendarWidgetProvider : AppWidgetProvider() {
                     views.setTextViewText(headerId, dayObj.optString("dayHeader", ""))
                     views.setTextViewText(numId, dayObj.optString("dayNum", ""))
                     val isSelected = dayObj.optBoolean("isSelected", false)
-                    views.setTextColor(numId, if (isSelected) QuartzoWidgetUtils.accent else textColor)
+                    views.setTextColor(numId, if (isSelected) QuartzoWidgetUtils.accent(context) else textColor)
                     
                     val dotCount = dayObj.optInt(
                         "dotCount",

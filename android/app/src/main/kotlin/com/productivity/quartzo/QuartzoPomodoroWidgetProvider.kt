@@ -32,11 +32,11 @@ open class QuartzoPomodoroWidgetProvider : AppWidgetProvider() {
         views.setTextViewText(R.id.pomodoro_total, data.optString("total", "0h"))
         views.setTextViewText(R.id.pomodoro_details, data.optString("details", "esta semana"))
         views.setTextViewText(R.id.pomodoro_average, data.optString("average", "~0h por dia"))
-        views.setTextColor(R.id.pomodoro_total, QuartzoWidgetUtils.accent)
+        views.setTextColor(R.id.pomodoro_total, QuartzoWidgetUtils.accent(context))
         views.setTextColor(R.id.pomodoro_details, QuartzoWidgetUtils.mutedColor(context))
         views.setTextColor(R.id.pomodoro_average, QuartzoWidgetUtils.mutedColor(context))
         views.setTextColor(R.id.pomodoro_start, 0xFFFFFFFF.toInt())
-        views.setInt(R.id.pomodoro_start, "setBackgroundColor", QuartzoWidgetUtils.accent)
+        views.setInt(R.id.pomodoro_start, "setBackgroundColor", QuartzoWidgetUtils.accent(context))
         views.setOnClickPendingIntent(R.id.pomodoro_start, QuartzoWidgetUtils.openUriIntent(context, "Quartzo:///pomodoro?action=start_with_picker"))
 
         val barIds = intArrayOf(
@@ -53,7 +53,7 @@ open class QuartzoPomodoroWidgetProvider : AppWidgetProvider() {
             val heightDp = if (maxHours <= 0.0) 4 else (8 + (hours / maxHours * 54)).toInt()
             val heightPx = (heightDp * context.resources.displayMetrics.density).toInt()
             views.setInt(barIds[i], "setMinimumHeight", heightPx)
-            views.setInt(barIds[i], "setBackgroundColor", if (hours > 0.0) QuartzoWidgetUtils.accent else QuartzoWidgetUtils.chipColor(context))
+            views.setInt(barIds[i], "setBackgroundColor", if (hours > 0.0) QuartzoWidgetUtils.accent(context) else QuartzoWidgetUtils.chipColor(context))
             views.setTextViewText(labelIds[i], item?.optString("label") ?: "")
             views.setTextColor(labelIds[i], QuartzoWidgetUtils.mutedColor(context))
         }

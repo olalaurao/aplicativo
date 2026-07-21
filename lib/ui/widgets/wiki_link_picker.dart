@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/content_object.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../services/search_service.dart';
 import '../theme.dart';
 import 'app_chip.dart';
+import '../utils/object_icons.dart';
 
 class WikiLinkPicker extends ConsumerStatefulWidget {
   final Function(ContentObject) onSelected;
@@ -306,33 +308,40 @@ class _WikiLinkPickerState extends ConsumerState<WikiLinkPicker> {
   }
 
   Widget _buildTypeIcon(String type) {
-    IconData icon;
-    Color color;
-    switch (type) {
-      case 'task':
-        icon = Icons.check_circle_outline_rounded;
-        color = AppColors.info;
-        break;
-      case 'habit':
-        icon = Icons.repeat_rounded;
-        color = AppColors.habitOrange;
-        break;
-      case 'project':
-        icon = Icons.folder_open_rounded;
-        color = AppColors.habitPurple;
-        break;
-      case 'person':
-        icon = Icons.person_outline_rounded;
-        color = AppColors.habitGreen;
-        break;
-      case 'resource':
-        icon = Icons.bookmark_outline_rounded;
-        color = AppColors.error;
-        break;
-      default:
-        icon = Icons.description_outlined;
-        color = AppColors.textMuted;
-    }
+    final settings = ref.read(settingsProvider);
+    final signatureColor = ObjectIcons.colorForTypeWithSignatures(type, settings.typeSignatures);
+    final defaultColor = ObjectIcons.defaultColorForType(type);
+    
+    // Use signature color if configured and different from default
+    final color = (signatureColor != defaultColor) 
+        ? signatureColor 
+        : _getDefaultHardcodedColor(type);
+    
+    final icon = ObjectIcons.iconDataForTypeWithSignatures(type, settings.typeSignatures) 
+        ?? _getDefaultIcon(type);
+    
     return Icon(icon, color: color, size: 20);
+  }
+
+  Color _getDefaultHardcodedColor(String type) {
+    return switch (type) {
+      'task' => AppColors.info,
+      'habit' => AppColors.habitOrange,
+      'project' => AppColors.habitPurple,
+      'person' => AppColors.habitGreen,
+      'resource' => AppColors.error,
+      _ => AppColors.textMuted,
+    };
+  }
+
+  IconData _getDefaultIcon(String type) {
+    return switch (type) {
+      'task' => Icons.check_circle_outline_rounded,
+      'habit' => Icons.repeat_rounded,
+      'project' => Icons.folder_open_rounded,
+      'person' => Icons.person_outline_rounded,
+      'resource' => Icons.bookmark_outline_rounded,
+      _ => Icons.description_outlined,
+    };
   }
 }

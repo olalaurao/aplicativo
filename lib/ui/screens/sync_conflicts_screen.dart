@@ -280,12 +280,15 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
     int failed = 0;
 
     // Start progress tracking
-    ref.read(syncProgressProvider.notifier).start(
-      conflicts.length,
-      keepLocal ? 'Resolvendo conflitos (versão local)...' : 'Resolvendo conflitos (versão Drive)...',
-    );
+    if (mounted) {
+      ref.read(syncProgressProvider.notifier).start(
+        conflicts.length,
+        keepLocal ? 'Resolvendo conflitos (versão local)...' : 'Resolvendo conflitos (versão Drive)...',
+      );
+    }
 
     try {
+      if (!mounted) return;
       final obsidian = ref.read(obsidianServiceProvider);
       final queue = ref.read(syncQueueServiceProvider);
       final driveSync = ref.read(googleDriveSyncServiceProvider);
@@ -357,28 +360,38 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
             debugPrint('[Conflicts] Cleanup of conflict artifacts failed: $e');
           }
 
-          ref
-              .read(syncConflictsProvider.notifier)
-              .removeConflict(conflict.relativePath);
+          if (mounted) {
+            ref
+                .read(syncConflictsProvider.notifier)
+                .removeConflict(conflict.relativePath);
+          }
           resolved++;
-          ref.read(syncProgressProvider.notifier).update(resolved);
+          if (mounted) {
+            ref.read(syncProgressProvider.notifier).update(resolved);
+          }
         } catch (e) {
           failed++;
           debugPrint('Failed to resolve ${conflict.relativePath}: $e');
-          ref.read(syncProgressProvider.notifier).update(resolved + failed);
+          if (mounted) {
+            ref.read(syncProgressProvider.notifier).update(resolved + failed);
+          }
         }
       }
 
-      ref.read(syncProgressProvider.notifier).reset();
-      ref.invalidate(persistedSyncConflictsProvider);
-      ref.invalidate(allObjectsProvider);
+      if (mounted) {
+        ref.read(syncProgressProvider.notifier).reset();
+        ref.invalidate(persistedSyncConflictsProvider);
+        ref.invalidate(allObjectsProvider);
+      }
 
       final remaining = await queue.getConflicts();
-      ref
-          .read(syncStatusProvider.notifier)
-          .setStatus(
-            remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
-          );
+      if (mounted) {
+        ref
+            .read(syncStatusProvider.notifier)
+            .setStatus(
+              remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
+            );
+      }
 
       messenger.showSnackBar(
         SnackBar(
@@ -419,12 +432,15 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
     int driveRemoved = 0;
 
     // Start progress tracking
-    ref.read(syncProgressProvider.notifier).start(
-      conflicts.length,
-      'Resolvendo e limpando conflitos...',
-    );
+    if (mounted) {
+      ref.read(syncProgressProvider.notifier).start(
+        conflicts.length,
+        'Resolvendo e limpando conflitos...',
+      );
+    }
 
     try {
+      if (!mounted) return;
       final obsidian = ref.read(obsidianServiceProvider);
       final queue = ref.read(syncQueueServiceProvider);
       final driveSync = ref.read(googleDriveSyncServiceProvider);
@@ -483,24 +499,32 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
           } catch (e) {
             debugPrint('[Conflicts] Cleanup of conflict artifacts failed: $e');
           }
-          ref
-              .read(syncConflictsProvider.notifier)
-              .removeConflict(conflict.relativePath);
+          if (mounted) {
+            ref
+                .read(syncConflictsProvider.notifier)
+                .removeConflict(conflict.relativePath);
+          }
           resolved++;
-          ref.read(syncProgressProvider.notifier).update(resolved);
+          if (mounted) {
+            ref.read(syncProgressProvider.notifier).update(resolved);
+          }
         } catch (e) {
           failed++;
           debugPrint('[Conflicts] Failed to resolve ${conflict.relativePath}: $e');
-          ref.read(syncProgressProvider.notifier).update(resolved + failed);
+          if (mounted) {
+            ref.read(syncProgressProvider.notifier).update(resolved + failed);
+          }
         }
       }
 
       // Step 2: Sweep the entire _conflicts/ folder on both sides to remove
       // any orphan files that predate this fix.
-      ref.read(syncProgressProvider.notifier).update(
-        resolved + failed,
-        message: 'Limpando arquivos órfãos...',
-      );
+      if (mounted) {
+        ref.read(syncProgressProvider.notifier).update(
+          resolved + failed,
+          message: 'Limpando arquivos órfãos...',
+        );
+      }
       try {
         localRemoved = await obsidian.clearConflictsFolder();
       } catch (e) {
@@ -512,16 +536,20 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
         debugPrint('[Conflicts] clearRemoteConflictsFolder failed: $e');
       }
 
-      ref.read(syncProgressProvider.notifier).reset();
-      ref.invalidate(persistedSyncConflictsProvider);
-      ref.invalidate(allObjectsProvider);
+      if (mounted) {
+        ref.read(syncProgressProvider.notifier).reset();
+        ref.invalidate(persistedSyncConflictsProvider);
+        ref.invalidate(allObjectsProvider);
+      }
 
       final remaining = await queue.getConflicts();
-      ref
-          .read(syncStatusProvider.notifier)
-          .setStatus(
-            remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
-          );
+      if (mounted) {
+        ref
+            .read(syncStatusProvider.notifier)
+            .setStatus(
+              remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
+            );
+      }
 
       messenger.showSnackBar(
         SnackBar(
@@ -557,12 +585,15 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
     int remoteCount = 0;
 
     // Start progress tracking
-    ref.read(syncProgressProvider.notifier).start(
-      conflicts.length,
-      'Resolvendo conflitos (versão mais recente)...',
-    );
+    if (mounted) {
+      ref.read(syncProgressProvider.notifier).start(
+        conflicts.length,
+        'Resolvendo conflitos (versão mais recente)...',
+      );
+    }
 
     try {
+      if (!mounted) return;
       final obsidian = ref.read(obsidianServiceProvider);
       final queue = ref.read(syncQueueServiceProvider);
       final driveSync = ref.read(googleDriveSyncServiceProvider);
@@ -653,11 +684,15 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
             debugPrint('[Conflicts] Cleanup of conflict artifacts failed: $e');
           }
 
-          ref
-              .read(syncConflictsProvider.notifier)
-              .removeConflict(conflict.relativePath);
+          if (mounted) {
+            ref
+                .read(syncConflictsProvider.notifier)
+                .removeConflict(conflict.relativePath);
+          }
           resolved++;
-          ref.read(syncProgressProvider.notifier).update(resolved);
+          if (mounted) {
+            ref.read(syncProgressProvider.notifier).update(resolved);
+          }
           if (keepLocal) {
             localCount++;
           } else {
@@ -666,20 +701,26 @@ class _SyncConflictsScreenState extends ConsumerState<SyncConflictsScreen> {
         } catch (e) {
           failed++;
           debugPrint('Failed to resolve ${conflict.relativePath}: $e');
-          ref.read(syncProgressProvider.notifier).update(resolved + failed);
+          if (mounted) {
+            ref.read(syncProgressProvider.notifier).update(resolved + failed);
+          }
         }
       }
 
-      ref.read(syncProgressProvider.notifier).reset();
-      ref.invalidate(persistedSyncConflictsProvider);
-      ref.invalidate(allObjectsProvider);
+      if (mounted) {
+        ref.read(syncProgressProvider.notifier).reset();
+        ref.invalidate(persistedSyncConflictsProvider);
+        ref.invalidate(allObjectsProvider);
+      }
 
       final remaining = await queue.getConflicts();
-      ref
-          .read(syncStatusProvider.notifier)
-          .setStatus(
-            remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
-          );
+      if (mounted) {
+        ref
+            .read(syncStatusProvider.notifier)
+            .setStatus(
+              remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
+            );
+      }
 
       messenger.showSnackBar(
         SnackBar(
@@ -912,6 +953,7 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
     BuildContext context,
     PersistedSyncConflict conflict,
   ) async {
+    if (!mounted) return;
     final obsidian = ref.read(obsidianServiceProvider);
     final localContent = await obsidian.readFile(conflict.localPath) ?? '';
     final remoteContent = await obsidian.readFile(conflict.remotePath) ?? '';
@@ -988,6 +1030,7 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
     final messenger = ScaffoldMessenger.of(context);
 
     try {
+      if (!mounted) return;
       final obsidian = ref.read(obsidianServiceProvider);
       final queue = ref.read(syncQueueServiceProvider);
       final driveSync = ref.read(googleDriveSyncServiceProvider);
@@ -1031,18 +1074,22 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
         debugPrint('[Conflicts] Cleanup of conflict artifacts failed: $e');
       }
 
-      ref
-          .read(syncConflictsProvider.notifier)
-          .removeConflict(conflict.relativePath);
-      ref.invalidate(persistedSyncConflictsProvider);
-      ref.invalidate(allObjectsProvider);
+      if (mounted) {
+        ref
+            .read(syncConflictsProvider.notifier)
+            .removeConflict(conflict.relativePath);
+        ref.invalidate(persistedSyncConflictsProvider);
+        ref.invalidate(allObjectsProvider);
+      }
 
       final remaining = await queue.getConflicts();
-      ref
-          .read(syncStatusProvider.notifier)
-          .setStatus(
-            remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
-          );
+      if (mounted) {
+        ref
+            .read(syncStatusProvider.notifier)
+            .setStatus(
+              remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
+            );
+      }
 
       messenger.showSnackBar(
         const SnackBar(content: Text('Conflito resolvido com edição manual')),
@@ -1089,24 +1136,33 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
     final messenger = ScaffoldMessenger.of(context);
 
     try {
+      if (!mounted) return;
       final queue = ref.read(syncQueueServiceProvider);
       final obsidian = ref.read(obsidianServiceProvider);
       final driveSync = ref.read(googleDriveSyncServiceProvider);
       final authService = ref.read(auth.googleAuthServiceProvider);
 
-      final client = await authService.ensureClient();
-      if (client != null) {
-        driveSync.init(client);
-        final remoteFiles = await driveSync.fetchRemoteFiles();
-        final remoteFile = remoteFiles
-            .where((f) => f.name == conflict.relativePath)
-            .firstOrNull;
-        if (remoteFile != null && remoteFile.id != null) {
-          await driveSync.deleteFile(conflict.relativePath, remoteFile.id!);
+      // Check if this is a _diagnostics conflict - handle more gracefully
+      final isDiagnosticsConflict = conflict.relativePath.contains('_diagnostics/') ||
+                                     conflict.localPath.contains('_diagnostics/') ||
+                                     conflict.remotePath.contains('_diagnostics/');
+
+      if (!isDiagnosticsConflict) {
+        final client = await authService.ensureClient();
+        if (client != null) {
+          driveSync.init(client);
+          final remoteFiles = await driveSync.fetchRemoteFiles();
+          final remoteFile = remoteFiles
+              .where((f) => f.name == conflict.relativePath)
+              .firstOrNull;
+          if (remoteFile != null && remoteFile.id != null) {
+            await driveSync.deleteFile(conflict.relativePath, remoteFile.id!);
+          }
         }
+
+        await obsidian.deleteFile(conflict.relativePath);
       }
 
-      await obsidian.deleteFile(conflict.relativePath);
       await queue.removeFileSyncState(conflict.relativePath);
       await queue.removeConflict(conflict.relativePath);
 
@@ -1114,24 +1170,34 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
       try {
         await obsidian.deleteFile(conflict.localPath);
         await obsidian.deleteFile(conflict.remotePath);
-        await driveSync.permanentlyDeleteFileByPath(conflict.localPath);
-        await driveSync.permanentlyDeleteFileByPath(conflict.remotePath);
+        if (!isDiagnosticsConflict) {
+          await driveSync.permanentlyDeleteFileByPath(conflict.localPath);
+          await driveSync.permanentlyDeleteFileByPath(conflict.remotePath);
+        }
       } catch (e) {
         debugPrint('[Conflicts] Cleanup of conflict artifacts failed: $e');
+        // For _diagnostics files, this is expected - they may have been deleted already
+        if (!isDiagnosticsConflict) {
+          rethrow;
+        }
       }
 
-      ref
-          .read(syncConflictsProvider.notifier)
-          .removeConflict(conflict.relativePath);
-      ref.invalidate(persistedSyncConflictsProvider);
-      ref.invalidate(allObjectsProvider);
+      if (mounted) {
+        ref
+            .read(syncConflictsProvider.notifier)
+            .removeConflict(conflict.relativePath);
+        ref.invalidate(persistedSyncConflictsProvider);
+        ref.invalidate(allObjectsProvider);
+      }
 
       final remaining = await queue.getConflicts();
-      ref
-          .read(syncStatusProvider.notifier)
-          .setStatus(
-            remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
-          );
+      if (mounted) {
+        ref
+            .read(syncStatusProvider.notifier)
+            .setStatus(
+              remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
+            );
+      }
 
       messenger.showSnackBar(
         const SnackBar(content: Text('Arquivo excluído com sucesso')),
@@ -1156,6 +1222,7 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
     HapticFeedback.mediumImpact();
     final messenger = ScaffoldMessenger.of(context);
     try {
+      if (!mounted) return;
       final obsidian = ref.read(obsidianServiceProvider);
       final queue = ref.read(syncQueueServiceProvider);
       final driveSync = ref.read(googleDriveSyncServiceProvider);
@@ -1215,18 +1282,22 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
         debugPrint('[Conflicts] Cleanup of conflict artifacts failed: $e');
       }
 
-      ref
-          .read(syncConflictsProvider.notifier)
-          .removeConflict(conflict.relativePath);
-      ref.invalidate(persistedSyncConflictsProvider);
-      ref.invalidate(allObjectsProvider);
+      if (mounted) {
+        ref
+            .read(syncConflictsProvider.notifier)
+            .removeConflict(conflict.relativePath);
+        ref.invalidate(persistedSyncConflictsProvider);
+        ref.invalidate(allObjectsProvider);
+      }
 
       final remaining = await queue.getConflicts();
-      ref
-          .read(syncStatusProvider.notifier)
-          .setStatus(
-            remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
-          );
+      if (mounted) {
+        ref
+            .read(syncStatusProvider.notifier)
+            .setStatus(
+              remaining.isEmpty ? SyncStatus.synced : SyncStatus.conflict,
+            );
+      }
 
       messenger.showSnackBar(
         SnackBar(

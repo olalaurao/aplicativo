@@ -9,6 +9,7 @@ import '../../providers/vault_provider.dart';
 import '../../providers/pomodoro_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../theme.dart';
+import '../utils/object_icons.dart';
 import 'package:googleapis/calendar/v3.dart' as google_calendar;
 import '../../models/habit_model.dart';
 import 'object_action_wrapper.dart';
@@ -847,15 +848,20 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
     if (widget.colorMode == 'priority') {
       baseColor = _getPriorityColor(task.priority);
     } else {
-      // Category mode - derive color from linked Organizer/Area
-      if (task.organizers.isNotEmpty) {
+      // Category mode - derive color from linked Organizer/Area or typeSignatures
+      final settings = ref.watch(settingsProvider);
+      
+      // First try typeSignatures for 'task' type
+      final signatureColor = ObjectIcons.colorForTypeWithSignatures('task', settings.typeSignatures);
+      if (signatureColor != ObjectIcons.defaultColorForType('task')) {
+        baseColor = signatureColor;
+      } else if (task.organizers.isNotEmpty) {
         final organizer = task.organizers.first;
         // Try to use the organizer's own color field first
         if (organizer.color != null && organizer.color!.isNotEmpty) {
           baseColor = _parseColor(organizer.color!);
         } else {
           // Fall back to category colors from settings
-          final settings = ref.watch(settingsProvider);
           final category = organizer.title;
           final colorHex = settings.categoryColors[category];
           baseColor = colorHex != null 
@@ -1242,7 +1248,17 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
   }
 
   Color _getHabitColor(Habit habit) {
-    return _parseOptionalColor(habit.color) ?? AppColors.habitGreen;
+    final customColor = _parseOptionalColor(habit.color);
+    if (customColor != null) return customColor;
+    
+    // Use typeSignatures color if configured
+    final settings = ref.read(settingsProvider);
+    final signatureColor = ObjectIcons.colorForTypeWithSignatures('habit', settings.typeSignatures);
+    if (signatureColor != ObjectIcons.defaultColorForType('habit')) {
+      return signatureColor;
+    }
+    
+    return AppColors.habitGreen;
   }
 
   Color? _parseOptionalColor(String? color) {

@@ -2532,7 +2532,7 @@ No "Settings" section exists in More. The AppBar gear icon is the sole way to re
 
 ### 24.3 SETTINGS SCREEN SECTIONS
 
-Settings is organized into 13 sections:
+Settings is organized into 14 sections:
 
 1. **Profile**: User name
 2. **Vault & Import**: Vault Folder (Local), Vault Name, Import Existing Vault, Import URL List, Native TikTok Player, Daily Note Format, Sync Hidden Files (dead control, gated on Decision C)
@@ -2546,7 +2546,7 @@ Settings is organized into 13 sections:
 10. **Planner & Tasks**: Color Scheme, Start of Week, Natural Language Task Parsing, Show Overdue Section
 11. **Object Structure**: Object Identification, Daily Review Template, Ideas, Manage Categories, Categorization Rules, Category Colors (Manage Categories, Categorization Rules, Category Colors moved from Automatic Categorization)
 12. **Obsidian Tools**: Regenerate Dataview Queries (Daily Note Format moved to Vault & Import)
-13. **Diagnostics & Maintenance**: Diagnostic Reports
+13. **Diagnostics & Maintenance**: Diagnostic Reports, Widgets
 14. **About**: About Citrine
 
 ### 24.4 LANGUAGE CONSISTENCY

@@ -67,7 +67,7 @@ class OverduePopupActivity : Activity() {
             text = "Fechar"
             textSize = 16f
             gravity = Gravity.CENTER
-            setTextColor(QuartzoWidgetUtils.accent)
+            setTextColor(QuartzoWidgetUtils.accent(this@OverduePopupActivity))
             setPadding(0, 22, 0, 6)
             setOnClickListener { finish() }
         })

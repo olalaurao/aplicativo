@@ -62,7 +62,7 @@ class ShoppingAddPopupActivity : Activity() {
         val addBtn = Button(this).apply {
             text = "Adicionar"
             setTextColor(android.graphics.Color.WHITE)
-            setBackgroundColor(QuartzoWidgetUtils.accent)
+            setBackgroundColor(QuartzoWidgetUtils.accent(this@ShoppingAddPopupActivity))
             setPadding(32, 12, 32, 12)
             setOnClickListener { 
                 addShoppingItem()

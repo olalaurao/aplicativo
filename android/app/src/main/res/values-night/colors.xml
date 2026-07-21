@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand Colors (same in dark mode) -->
+    <color name="quartzo_primary">#F97316</color>
+    <color name="quartzo_primary_light">#FFD54F</color>
+    <color name="quartzo_primary_dark">#E65100</color>
+    <color name="quartzo_accent">#F97316</color>
+    <color name="quartzo_secondary">#0EA5E9</color>
+    <color name="quartzo_secondary_light">#7DD3FC</color>
+
+    <!-- Surface Colors - Dark -->
+    <color name="quartzo_background">#0F1117</color>
+    <color name="quartzo_surface">#1A1C25</color>
+    <color name="quartzo_card_fill">#22252F</color>
+    <color name="quartzo_surface_variant">#22252F</color>
+
+    <!-- Surface Colors - Dark (overrides) -->
+    <color name="quartzo_dark_background">#0F1117</color>
+    <color name="quartzo_dark_surface">#1A1C25</color>
+    <color name="quartzo_dark_card_fill">#22252F</color>
+
+    <!-- Text Colors - Dark -->
+    <color name="quartzo_text_primary">#F3F4F6</color>
+    <color name="quartzo_text_secondary">#9CA3AF</color>
+    <color name="quartzo_text_muted">#9CA3AF</color>
+    <color name="quartzo_text_on_primary">#FFFFFF</color>
+
+    <!-- Text Colors - Dark (overrides) -->
+    <color name="quartzo_dark_text_primary">#F3F4F6</color>
+    <color name="quartzo_dark_text_secondary">#9CA3AF</color>
+
+    <!-- Status Colors (same in dark mode) -->
+    <color name="quartzo_success">#22C55E</color>
+    <color name="quartzo_warning">#F59E0B</color>
+    <color name="quartzo_error">#EF4444</color>
+    <color name="quartzo_info">#3B82F6</color>
+
+    <!-- Priority Colors (same in dark mode) -->
+    <color name="quartzo_priority_high">#EF4444</color>
+    <color name="quartzo_priority_medium">#F59E0B</color>
+    <color name="quartzo_priority_low">#3B82F6</color>
+
+    <!-- Habit Colors (same in dark mode) -->
+    <color name="quartzo_habit_green">#22C55E</color>
+    <color name="quartzo_habit_blue">#3B82F6</color>
+    <color name="quartzo_habit_purple">#8B5CF6</color>
+    <color name="quartzo_habit_orange">#F97316</color>
+    <color name="quartzo_habit_pink">#EC4899</color>
+
+    <!-- Divider Colors - Dark -->
+    <color name="quartzo_divider">#2D3040</color>
+    <color name="quartzo_dark_divider">#2D3040</color>
+
+    <!-- Navigation Colors (same in dark mode) -->
+    <color name="quartzo_nav_inactive">#9CA3AF</color>
+</resources>
