@@ -8,45 +8,11 @@ import 'alignment_log_entry.dart';
 
 enum JournalEntryType { standard, fieldNote, pmn }
 
-/// F2.14: Mood entry for multiple moods per day
-class MoodEntry {
-  final String moodSlug; // Reference to MoodDefinition.id
-  final DateTime timestamp; // When this mood was recorded
-  final int? pleasantness; // Optional pleasantness value (0-10)
-  final int? energy; // Optional energy value (0-10)
-
-  MoodEntry({
-    required this.moodSlug,
-    required this.timestamp,
-    this.pleasantness,
-    this.energy,
-  });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'mood_slug': moodSlug,
-      'timestamp': timestamp.toIso8601String(),
-      if (pleasantness != null) 'pleasantness': pleasantness,
-      if (energy != null) 'energy': energy,
-    };
-  }
-
-  factory MoodEntry.fromMap(Map<String, dynamic> map) {
-    return MoodEntry(
-      moodSlug: map['mood_slug'] as String,
-      timestamp: DateTime.parse(map['timestamp'] as String),
-      pleasantness: map['pleasantness'] as int?,
-      energy: map['energy'] as int?,
-    );
-  }
-}
-
 class JournalEntry extends ContentObject {
   String body;
   DateTime date;
   String? timeOfDay;
-  String? moodSlug; // Reference to MoodDefinition.id (legacy, kept for compatibility)
-  List<MoodEntry> moodEntries; // F2.14: Array of mood entries for multiple moods per day
+  String? moodSlug; // Reference to MoodDefinition.id
   List<AlignmentLogEntry> alignmentLogEntries; // RA-P1-2: Alignment tracking logs
   List<String> photos;
   String? location;
@@ -79,7 +45,6 @@ class JournalEntry extends ContentObject {
     required this.date,
     this.timeOfDay,
     this.moodSlug,
-    this.moodEntries = const [],
     this.alignmentLogEntries = const [],
     this.photos = const [],
     this.location,
@@ -235,11 +200,6 @@ class JournalEntry extends ContentObject {
       finalBody = '${finalBody.trimRight()}\n\nmood:: [[$moodSlug]]';
     }
 
-    // F2.14: Serialize mood_entries array
-    if (moodEntries.isNotEmpty) {
-      frontmatter['mood_entries'] = moodEntries.map((e) => e.toMap()).toList();
-    }
-
     // RA-P1-2: Serialize alignment_log_entries array
     if (alignmentLogEntries.isNotEmpty) {
       frontmatter['alignment_log_entries'] = alignmentLogEntries.map((e) => e.toMap()).toList();
@@ -330,14 +290,6 @@ class JournalEntry extends ContentObject {
       entry.moodSlug = frontmatter['mood']?.toString();
     }
 
-    // F2.14: Parse mood_entries array
-    final moodEntriesData = frontmatter['mood_entries'];
-    if (moodEntriesData is List) {
-      entry.moodEntries = moodEntriesData
-          .map((e) => MoodEntry.fromMap(e as Map<String, dynamic>))
-          .toList();
-    }
-
     // RA-P1-2: Parse alignment_log_entries array
     final alignmentLogData = frontmatter['alignment_log_entries'];
     if (alignmentLogData is List) {
@@ -418,7 +370,6 @@ class JournalEntry extends ContentObject {
     DateTime? date,
     String? timeOfDay,
     String? moodSlug,
-    List<MoodEntry>? moodEntries,
     List<AlignmentLogEntry>? alignmentLogEntries,
     List<String>? photos,
     String? location,
@@ -453,7 +404,6 @@ class JournalEntry extends ContentObject {
       date: date ?? this.date,
       timeOfDay: timeOfDay ?? this.timeOfDay,
       moodSlug: moodSlug ?? this.moodSlug,
-      moodEntries: moodEntries ?? this.moodEntries,
       alignmentLogEntries: alignmentLogEntries ?? this.alignmentLogEntries,
       photos: photos ?? this.photos,
       location: location ?? this.location,

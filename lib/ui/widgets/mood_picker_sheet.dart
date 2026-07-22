@@ -34,7 +34,6 @@ class _MoodPickerSheetState extends ConsumerState<MoodPickerSheet> {
       ),
       child: SafeArea(
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
             // Handle pill
             Center(
@@ -76,7 +75,7 @@ class _MoodPickerSheetState extends ConsumerState<MoodPickerSheet> {
             const SizedBox(height: 16),
             
             // Content
-            Flexible(
+            Expanded(
               child: _selectedQuadrant == null
                   ? _QuadrantSelectionGrid(
                       onQuadrantSelected: (quadrant) {
@@ -107,8 +106,6 @@ class _QuadrantSelectionGrid extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: GridView.count(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
         crossAxisCount: 2,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
@@ -223,13 +220,11 @@ class _MoodWordGrid extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
-          childAspectRatio: 1.3,
+          childAspectRatio: 1.0,
         ),
         itemCount: allMoods.length + 1, // +1 for Custom tile
         itemBuilder: (context, index) {
@@ -253,7 +248,6 @@ class _MoodWordGrid extends ConsumerWidget {
               // Lazy file creation
               await _lazyCreateMood(ref, mood);
               onMoodSelected(mood.id);
-              if (context.mounted) Navigator.pop(context);
             },
           );
         },
@@ -289,7 +283,7 @@ class _MoodWordTile extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(12),
@@ -300,32 +294,32 @@ class _MoodWordTile extends StatelessWidget {
           children: [
             Text(
               mood.emoji,
-              style: const TextStyle(fontSize: 32),
+              style: const TextStyle(fontSize: 36),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Flexible(
               child: Text(
                 mood.label,
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
                 textAlign: TextAlign.center,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
             if (mood.description != null && mood.description!.isNotEmpty) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Flexible(
                 child: Text(
                   mood.description!,
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: AppColors.textMuted,
                   ),
                   textAlign: TextAlign.center,
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

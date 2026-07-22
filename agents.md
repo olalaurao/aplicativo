@@ -553,6 +553,45 @@ O `VaultNotifier` (~54KB) é o **coração do aplicativo**. Ele:
 
 **NOTA**: Emojis são configuráveis via Object Identification (Settings → Object Identification). O usuário pode personalizar o emoji de cada tipo de objeto conforme preferência.
 
+### 6.1 Mood Handling — CRÍTICO
+
+**JournalEntry usa apenas `moodSlug` (string única), NÃO `moodEntries` (array removido).**
+
+```dart
+// ✅ CORRETO — Usar moodSlug (single string)
+final entry = JournalEntry(
+  moodSlug: 'happy', // ou 'happy,excited' para múltiplos
+  // ...
+);
+
+// ❌ ERRADO — moodEntries foi removido
+final entry = JournalEntry(
+  moodEntries: [MoodEntry(...)], // Campo não existe mais
+  // ...
+);
+```
+
+**Formato de armazenamento:**
+- `moodSlug` é armazenado como wiki-link no corpo do markdown: `mood:: [[slug]]`
+- Para múltiplos moods: `mood:: [[slug1]], [[slug2]]`
+- Parsing suporta separadores: `,`, `;`, `|`
+
+**Quando acessar moods de entries:**
+```dart
+// ✅ CORRETO — Filtrar por moodSlug
+final entriesWithMood = entries.where((e) => 
+  e.moodSlug != null && e.moodSlug!.isNotEmpty
+).toList();
+
+// ❌ ERRADO — Não acessar moodEntries
+final moods = entry.moodEntries; // Campo não existe
+```
+
+**Razão da remoção de moodEntries:**
+- Simplificação de arquitetura
+- Evitar conflitos ao citar moods ou criar trackers
+- moodSlug é suficiente para todos os casos de uso (single ou múltiplos)
+
 ### 5.1 Transformação de Day Themes e Time Blocks para Organizers
 
 **DEPRECATION NOTICE**: Os modelos `DayTheme` e `TimeBlock` (em `lib/models/day_theme_model.dart`) estão **DEPRECIADOS**. Use o modelo unificado `Organizer` com os tipos `dayTheme` e `timeBlock` em vez disso.

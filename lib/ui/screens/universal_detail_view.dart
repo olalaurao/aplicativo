@@ -2039,20 +2039,26 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
         children: [
           const Text('⚠️', style: TextStyle(fontSize: 16)),
           const SizedBox(width: 8),
-          Text(
-            'Atrasado há $days ${days == 1 ? 'dia' : 'dias'}',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.error,
+          Expanded(
+            child: Text(
+              'Atrasado há $days ${days == 1 ? 'dia' : 'dias'}',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.error,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          const Spacer(),
-          Text(
-            'Prazo: ${_deadlineLabel(obj)}',
-            style: TextStyle(
-              fontSize: 11,
-              color: AppColors.error.withValues(alpha: 0.7),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              'Prazo: ${_deadlineLabel(obj)}',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.error.withValues(alpha: 0.7),
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -4055,11 +4061,13 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       children: [
         Row(
           children: [
-            const Text(
-              'Snapshots / Reflections',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            Expanded(
+              child: Text(
+                'Snapshots / Reflections',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            const Spacer(),
             TextButton.icon(
               onPressed: () => _createSnapshot(context, ref, parentId),
               icon: const Icon(Icons.add_a_photo_outlined, size: 16),

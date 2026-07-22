@@ -183,11 +183,10 @@ class _WeekOverviewComponentState extends ConsumerState<WeekOverviewComponent> {
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Row(
-                                        mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Icon(item.iconData, size: 10, color: item.color),
                                           const SizedBox(width: 2),
-                                          Expanded(
+                                          Flexible(
                                             child: Text(
                                               item.title,
                                               style: Theme.of(context).textTheme.bodySmall!.copyWith(
@@ -248,7 +247,7 @@ class _WeekOverviewComponentState extends ConsumerState<WeekOverviewComponent> {
                     color: AppTheme.accentColor(context),
                   ),
                   const SizedBox(width: 16),
-                  Expanded(
+                  Flexible(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

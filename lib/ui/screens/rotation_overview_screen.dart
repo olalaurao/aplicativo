@@ -21,31 +21,6 @@ class RotationOverviewScreen extends ConsumerStatefulWidget {
 
 class _RotationOverviewScreenState extends ConsumerState<RotationOverviewScreen> {
   @override
-  void initState() {
-    super.initState();
-    // Check for timeout advancement after first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkTimeoutAdvancement();
-    });
-  }
-
-  Future<void> _checkTimeoutAdvancement() async {
-    final project = ref.read(projectsProvider).cast<Project?>().firstWhere(
-          (p) => p?.id == widget.projectId,
-          orElse: () => null,
-        );
-    if (project == null) return;
-
-    final allObjects = ref.read(allObjectsProvider).value ?? [];
-    final allTasks = allObjects.whereType<Task>().toList();
-    final advancementResult = RotationService.checkAndAdvanceZone(project, allTasks);
-    
-    if (advancementResult.advanced) {
-      await ref.read(vaultProvider.notifier).updateObject(advancementResult.updated);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     final project = ref.watch(projectsProvider).cast<Project?>().firstWhere(
           (p) => p?.id == widget.projectId,
@@ -53,8 +28,8 @@ class _RotationOverviewScreenState extends ConsumerState<RotationOverviewScreen>
         );
     if (project == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Rotação de Zonas')),
-        body: const Center(child: Text('Projeto não encontrado')),
+        appBar: AppBar(title: const Text('Zone Rotation')),
+        body: const Center(child: Text('Project not found')),
       );
     }
 
@@ -67,7 +42,7 @@ class _RotationOverviewScreenState extends ConsumerState<RotationOverviewScreen>
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Rotação de Zonas'),
+        title: const Text('Zone Rotation'),
         actions: [
           IconButton(
             icon: const Icon(Icons.more_horiz_rounded),
@@ -84,7 +59,7 @@ class _RotationOverviewScreenState extends ConsumerState<RotationOverviewScreen>
           ),
           const SizedBox(height: 4),
           Text(
-            '${project.methodLabel ?? 'Rotação'} · ${_rotationSubtitle(project)}',
+            '${project.methodLabel ?? 'Rotation'} · ${_rotationSubtitle(project)}',
             style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
           ),
           const SizedBox(height: 20),
@@ -109,13 +84,13 @@ class _RotationOverviewScreenState extends ConsumerState<RotationOverviewScreen>
               padding: const EdgeInsets.all(16),
               decoration: AppTheme.cardDecoration(context),
               child: const Text(
-                'Configure a data de início da rotação no projeto.',
+                'Set the rotation start date on the project.',
                 style: TextStyle(color: AppColors.textMuted),
               ),
             ),
           const SizedBox(height: 24),
           const Text(
-            'PRÓXIMAS ZONAS',
+            'UPCOMING ZONES',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w800,
@@ -172,12 +147,12 @@ class _RotationOverviewScreenState extends ConsumerState<RotationOverviewScreen>
 
   String _rotationSubtitle(Project project) {
     final groups = project.rotationGroups;
-    if (groups.isEmpty) return 'Sem zonas';
+    if (groups.isEmpty) return 'No zones';
     final same = groups.every((g) => g.periodDays == groups.first.periodDays);
     if (same) {
-      return 'Rotação de ${project.rotationCycleLengthDays} dias';
+      return '${project.rotationCycleLengthDays}-day rotation';
     }
-    return 'Rotação de ${groups.length} zonas';
+    return '${groups.length}-zone rotation';
   }
 }
 
@@ -215,7 +190,7 @@ class _ActiveZoneHero extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Text(
-                'ZONA ATIVA',
+                'ACTIVE ZONE',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 10,
@@ -242,7 +217,9 @@ class _ActiveZoneHero extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${DateFormat('d MMM').format(status.periodStart)} – ${DateFormat('d MMM').format(status.periodEnd)} · Dia ${status.dayOfPeriod} de ${status.group.periodDays}',
+                        '${DateFormat('d MMM').format(status.periodStart)} – ${DateFormat('d MMM').format(status.periodEnd)} · Day ${status.dayOfPeriod}/${status.group.periodDays}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.85),
                           fontSize: 12,
@@ -283,12 +260,12 @@ class _EmptyRotationState extends StatelessWidget {
               size: 48, color: AppColors.textMuted.withValues(alpha: 0.5)),
           const SizedBox(height: 12),
           const Text(
-            'Nenhuma zona configurada',
+            'No zones configured',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           Text(
-            'Adicione a primeira zona no formulário do projeto.',
+            'Add the first zone in the project form.',
             textAlign: TextAlign.center,
             style: TextStyle(color: AppTheme.textMutedColor(context)),
           ),

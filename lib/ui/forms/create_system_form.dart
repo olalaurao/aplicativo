@@ -86,9 +86,10 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
               borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             ),
             padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 Container(
                   width: 36,
                   height: 4,
@@ -147,6 +148,7 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                   ),
                 ),
               ],
+              ),
             ),
           );
         });
@@ -359,12 +361,16 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                               ),
                               const Spacer(),
-                              Text(
-                                _scheduler != null ? _getScheduleSummary(_scheduler!) : 'Nenhum',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: _scheduler != null ? AppTheme.accentColor(context) : AppColors.textMuted,
-                                  fontWeight: FontWeight.w500,
+                              Expanded(
+                                child: Text(
+                                  _scheduler != null ? _getScheduleSummary(_scheduler!) : 'Nenhum',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: _scheduler != null ? AppTheme.accentColor(context) : AppColors.textMuted,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.right,
                                 ),
                               ),
                               if (_scheduler != null)
@@ -392,12 +398,16 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                               ),
                               const Spacer(),
-                              Text(
-                                _estimatedMinutes > 0 ? '$_estimatedMinutes min' : 'Não estimado',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: _estimatedMinutes > 0 ? AppTheme.accentColor(context) : AppColors.textMuted,
-                                  fontWeight: FontWeight.w500,
+                              Expanded(
+                                child: Text(
+                                  _estimatedMinutes > 0 ? '$_estimatedMinutes min' : 'Não estimado',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: _estimatedMinutes > 0 ? AppTheme.accentColor(context) : AppColors.textMuted,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.right,
                                 ),
                               ),
                               const SizedBox(width: 4),

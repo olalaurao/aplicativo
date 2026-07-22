@@ -73,7 +73,7 @@ class PinnedObjectComponent extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 12),
-            Expanded(
+            Flexible(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

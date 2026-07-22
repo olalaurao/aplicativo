@@ -5,31 +5,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../theme.dart';
-import '../forms/create_entry_form.dart';
-import '../forms/create_event_form.dart';
-import '../forms/create_goal_form.dart';
-import '../forms/create_habit_form.dart';
 import '../forms/create_idea_form.dart';
 import '../forms/create_note_form.dart';
 import '../forms/create_organizer_form.dart';
 import '../forms/create_person_form.dart';
 import '../forms/create_pmn_form.dart';
-import '../forms/create_project_form.dart';
 import '../forms/create_record_form.dart';
-import '../forms/create_reminder_form.dart';
 import '../forms/create_resource_form.dart';
 import '../forms/create_scan_document_form.dart';
 import '../forms/create_snapshot_form.dart';
 import '../forms/create_social_post_form.dart';
 import '../forms/create_system_form.dart';
-import '../forms/create_task_form.dart';
 import '../forms/create_template_form.dart';
 import '../forms/create_tracker_form.dart';
 import '../../providers/vault_provider.dart';
 import '../../models/journal_entry.dart';
-import '../../models/task_model.dart';
 import '../../models/habit_model.dart';
+import '../../models/task_model.dart';
+import '../../models/shared_types.dart';
 import '../screens/shopping_list_screen.dart';
+import 'wiki_link_picker.dart';
+import 'mood_picker_sheet.dart';
 
 class CreateMenuSheet extends ConsumerStatefulWidget {
   final String? initialTitle;
@@ -43,9 +39,11 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
   int _selectedTab = 0; // 0 = Journal, 1 = Plan, 2 = Record, 3 = Create
 
   // Journal Tab state
-  bool _isEntryStandard = true; // true = Entrada completa, false = Observação rápida
+  bool _isEntryStandard = true; // true = Full entry, false = Quick observation
   String? _selectedCategory; // 'insight', 'energia', 'humor', 'encontro'
   final TextEditingController _quickTextController = TextEditingController();
+  String? _selectedMoodSlug; // For single mood selection
+  final List<String> _linkedObjectIds = []; // For vault object linking
 
   @override
   void dispose() {
@@ -55,11 +53,11 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
 
   String _getCategoryPlaceholder(String category) {
     return switch (category) {
-      'insight' => '💡 O que você percebeu?',
-      'energia' => '⚡ Como está sua energia agora (1-5)?',
-      'humor' => '😊 Como você está se sentindo?',
-      'encontro' => '👥 Quem você encontrou? Do que conversaram?',
-      _ => 'Digite sua observação...',
+      'insight' => '💡 What did you notice?',
+      'energia' => '⚡ How is your energy now (1-5)?',
+      'humor' => '😊 How are you feeling?',
+      'encontro' => '👥 Who did you meet? What did you talk about?',
+      _ => 'Type your observation...',
     };
   }
 
@@ -76,16 +74,39 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
   String _getCategoryLabel(String category) {
     return switch (category) {
       'insight' => '💡 Insight',
-      'energia' => '⚡ Energia',
-      'humor' => '😊 Humor',
-      'encontro' => '👥 Encontro',
+      'energia' => '⚡ Energy',
+      'humor' => '😊 Mood',
+      'encontro' => '👥 Meeting',
       _ => category,
     };
   }
 
+  bool _canSaveObservation() {
+    if (_selectedCategory == null) return false;
+    
+    // For mood category, require a mood to be selected
+    if (_selectedCategory == 'humor') {
+      return _selectedMoodSlug != null && _selectedMoodSlug!.isNotEmpty;
+    }
+    
+    // For other categories, require text input
+    return _quickTextController.text.trim().isNotEmpty;
+  }
+
   void _saveQuickObservation() async {
     final text = _quickTextController.text.trim();
-    if (text.isEmpty || _selectedCategory == null) return;
+    if (_selectedCategory == null) return;
+
+    // For mood category, require a mood to be selected
+    if (_selectedCategory == 'humor' && (_selectedMoodSlug == null || _selectedMoodSlug!.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a mood')),
+      );
+      return;
+    }
+
+    // For other categories, require text input
+    if (_selectedCategory != 'humor' && text.isEmpty) return;
 
     int? energyValue;
     if (_selectedCategory == 'energia') {
@@ -107,18 +128,39 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
       entry.energyValue = energyValue;
     }
 
+    // Set moodSlug for mood category (single mood, not multi-select)
+    if (_selectedMoodSlug != null && _selectedMoodSlug!.isNotEmpty) {
+      entry.moodSlug = _selectedMoodSlug;
+    }
+
+    // Add linked object references
+    if (_linkedObjectIds.isNotEmpty) {
+      final allObjects = ref.read(allObjectsProvider).value ?? [];
+      entry.organizers = _linkedObjectIds.map((id) {
+        final obj = allObjects.firstWhere(
+          (o) => o.id == id,
+          orElse: () => throw Exception('Object not found: $id'),
+        );
+        return OrganizerReference(
+          type: obj.type,
+          slug: obj.slug,
+          title: obj.title,
+        );
+      }).toList();
+    }
+
     try {
-      await ref.read(todayJournalProvider.notifier).addEntry(entry);
+      await ref.read(vaultProvider.notifier).createObject(entry);
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Observação rápida salva com sucesso.')),
+          const SnackBar(content: Text('Quick observation saved successfully.')),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao salvar observação: $e')),
+          SnackBar(content: Text('Error saving observation: $e')),
         );
       }
     }
@@ -214,7 +256,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      'Entrada completa',
+                      'Full entry',
                       style: TextStyle(
                         fontWeight: _isEntryStandard ? FontWeight.w700 : FontWeight.w500,
                         color: _isEntryStandard
@@ -240,7 +282,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      'Observação rápida',
+                      'Quick observation',
                       style: TextStyle(
                         fontWeight: !_isEntryStandard ? FontWeight.w700 : FontWeight.w500,
                         color: !_isEntryStandard
@@ -261,7 +303,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              context.push('/create-entry', extra: {'initialTitle': widget.initialTitle});
+              context.push('/create/entry', extra: {'initialTitle': widget.initialTitle});
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.accentColor(context),
@@ -273,7 +315,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
               elevation: 0,
             ),
             child: const Text(
-              '📓 Nova entrada',
+              '📓 New entry',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
@@ -296,7 +338,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
               elevation: 0,
             ),
             child: const Text(
-              '📋 PMN da semana',
+              '📋 Weekly PMN',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
@@ -326,6 +368,10 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
                     onSelected: (val) {
                       setState(() {
                         _selectedCategory = val ? cat : null;
+                        // Reset mood selection when switching categories
+                        if (cat != 'humor') {
+                          _selectedMoodSlug = null;
+                        }
                       });
                     },
                   ),
@@ -335,25 +381,198 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
           ),
           if (_selectedCategory != null) ...[
             const SizedBox(height: 16),
-            TextField(
-              controller: _quickTextController,
-              maxLines: 4,
-              onChanged: (_) { if (mounted) setState(() {}); },
-              decoration: InputDecoration(
-                hintText: _getCategoryPlaceholder(_selectedCategory!),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: AppColors.divider.withValues(alpha: 0.5)),
+            
+            // Mood picker for humor category
+            if (_selectedCategory == 'humor') ...[
+              Consumer(
+                builder: (context, ref, child) {
+                  final moods = ref.watch(moodsProvider);
+                  final selectedMood = _selectedMoodSlug != null
+                      ? moods.firstWhere(
+                          (m) => m.id == _selectedMoodSlug || m.slug == _selectedMoodSlug,
+                          orElse: () => moods.first,
+                        )
+                      : null;
+                  
+                  return GestureDetector(
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        isScrollControlled: true,
+                        builder: (context) => MoodPickerSheet(
+                          onMoodSelected: (moodSlug) {
+                            setState(() {
+                              _selectedMoodSlug = moodSlug;
+                            });
+                            Navigator.pop(context);
+                          },
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.divider.withValues(alpha: 0.5)),
+                      ),
+                      child: Row(
+                        children: [
+                          if (selectedMood != null) ...[
+                            Text(
+                              selectedMood.emoji,
+                              style: const TextStyle(fontSize: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    selectedMood.label,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  if (selectedMood.description != null && selectedMood.description!.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      selectedMood.description!,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textMuted,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.edit_rounded, size: 18),
+                              onPressed: () {
+                                showModalBottomSheet(
+                                  context: context,
+                                  backgroundColor: Colors.transparent,
+                                  isScrollControlled: true,
+                                  builder: (context) => MoodPickerSheet(
+                                    onMoodSelected: (moodSlug) {
+                                      setState(() {
+                                        _selectedMoodSlug = moodSlug;
+                                      });
+                                      Navigator.pop(context);
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                          ] else ...[
+                            const Icon(
+                              Icons.mood_outlined,
+                              size: 20,
+                              color: AppColors.textMuted,
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Tap to select mood',
+                                style: TextStyle(
+                                  color: AppColors.textMuted,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+            ] else ...[
+              // Text input for other categories
+              TextField(
+                controller: _quickTextController,
+                maxLines: 4,
+                onChanged: (_) { if (mounted) setState(() {}); },
+                decoration: InputDecoration(
+                  hintText: _getCategoryPlaceholder(_selectedCategory!),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  filled: true,
+                  fillColor: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkCardFill
+                      : AppColors.surfaceVariant.withValues(alpha: 0.5),
                 ),
-                filled: true,
-                fillColor: Theme.of(context).brightness == Brightness.dark
-                    ? AppColors.darkCardFill
-                    : AppColors.surfaceVariant.withValues(alpha: 0.5),
+              ),
+              const SizedBox(height: 16),
+            ],
+            
+            // Vault object linker (optional for all categories)
+            GestureDetector(
+              onTap: () {
+                showModalBottomSheet(
+                  context: context,
+                  backgroundColor: Colors.transparent,
+                  isScrollControlled: true,
+                  builder: (context) => WikiLinkPicker(
+                    onSelected: (obj) {
+                      setState(() {
+                        if (!_linkedObjectIds.contains(obj.id)) {
+                          _linkedObjectIds.add(obj.id);
+                        }
+                      });
+                      Navigator.pop(context);
+                    },
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.divider.withValues(alpha: 0.5)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.link_rounded, size: 20, color: AppColors.textMuted),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _linkedObjectIds.isEmpty
+                            ? 'Link vault objects (optional)'
+                            : '${_linkedObjectIds.length} object(s) linked',
+                        style: TextStyle(
+                          color: _linkedObjectIds.isEmpty
+                              ? AppColors.textMuted
+                              : AppTheme.textPrimaryColor(context),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    if (_linkedObjectIds.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 18),
+                        onPressed: () {
+                          setState(() {
+                            _linkedObjectIds.clear();
+                          });
+                        },
+                      ),
+                  ],
+                ),
               ),
             ),
+            
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _quickTextController.text.trim().isNotEmpty ? _saveQuickObservation : null,
+              onPressed: _canSaveObservation() ? _saveQuickObservation : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.accentColor(context),
                 foregroundColor: Colors.white,
@@ -364,7 +583,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
                 elevation: 0,
               ),
               child: const Text(
-                'Salvar observação',
+                'Save observation',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
@@ -380,57 +599,57 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.check_circle_outline_rounded,
           color: AppColors.info,
-          label: '✅ Nova task',
+          label: '✅ New task',
           onTap: () {
             Navigator.pop(context);
-            context.push('/create-task', extra: {'initialTitle': widget.initialTitle});
+            context.push('/create/task', extra: {'initialTitle': widget.initialTitle});
           },
         ),
         const Divider(),
         _buildOptionRow(
           icon: Icons.cached_rounded,
           color: AppColors.habitGreen,
-          label: '🔁 Novo hábito',
+          label: '🔁 New habit',
           onTap: () {
             Navigator.pop(context);
-            context.push('/create-habit', extra: {'initialTitle': widget.initialTitle});
+            context.push('/create/habit', extra: {'initialTitle': widget.initialTitle});
           },
         ),
         const Divider(),
         _buildOptionRow(
           icon: Icons.flag_outlined,
           color: AppColors.habitOrange,
-          label: '🎯 Nova meta',
+          label: '🎯 New goal',
           onTap: () {
             Navigator.pop(context);
-            context.push('/create-goal', extra: {'initialTitle': widget.initialTitle});
+            context.push('/create/goal', extra: {'initialTitle': widget.initialTitle});
           },
         ),
         const Divider(),
         _buildOptionRow(
           icon: Icons.event_note_rounded,
           color: AppTheme.accentColor(context),
-          label: '📅 Novo evento',
+          label: '📅 New event',
           onTap: () {
             Navigator.pop(context);
-            context.push('/create-event', extra: {'initialTitle': widget.initialTitle});
+            context.push('/create/event', extra: {'initialTitle': widget.initialTitle});
           },
         ),
         const Divider(),
         _buildOptionRow(
           icon: Icons.alarm,
           color: AppColors.warning,
-          label: '🔔 Novo lembrete',
+          label: '🔔 New reminder',
           onTap: () {
             Navigator.pop(context);
-            context.push('/create-reminder');
+            context.push('/create/reminder');
           },
         ),
         const Divider(),
         _buildOptionRow(
           icon: Icons.folder_outlined,
           color: AppColors.priorityHigh,
-          label: '📁 Novo projeto',
+          label: '📁 New project',
           onTap: () {
             Navigator.pop(context);
             context.push('/create-project', extra: {'initialTitle': widget.initialTitle});
@@ -440,10 +659,10 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.inbox_outlined,
           color: AppColors.info,
-          label: '📥 Adicionar ao backlog',
+          label: '📥 Add to backlog',
           onTap: () {
             Navigator.pop(context);
-            context.push('/create-task', extra: {
+            context.push('/create/task', extra: {
               'initialTitle': widget.initialTitle,
               'initialStage': TaskStage.backlog,
             });
@@ -467,7 +686,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
             Icon(Icons.show_chart_rounded, size: 48, color: AppColors.textMuted),
             SizedBox(height: 12),
             Text(
-              'Você ainda não tem trackers ou hábitos ativos.',
+              'You don\'t have any trackers or active habits yet.',
               style: TextStyle(fontSize: 14, color: AppColors.textMuted),
             ),
           ],
@@ -523,7 +742,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              'HÁBITOS ATIVOS (TAP PARA LOGAR)',
+              'ACTIVE HABITS (TAP TO LOG)',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
@@ -555,7 +774,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Hábito "${h.title}" atualizado com sucesso!'),
+                        content: Text('Habit "${h.title}" updated successfully!'),
                         duration: const Duration(seconds: 2),
                       ),
                     );
@@ -577,7 +796,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.description_outlined,
           color: AppTheme.accentColor(context),
-          label: '📝 Nota de texto',
+          label: '📝 Text note',
           onTap: () {
             Navigator.pop(context);
             Navigator.push(
@@ -595,7 +814,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.format_list_bulleted,
           color: AppColors.info,
-          label: '🗂 Nota de outline',
+          label: '🗂 Outline note',
           onTap: () {
             Navigator.pop(context);
             Navigator.push(
@@ -613,7 +832,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.table_chart_outlined,
           color: AppColors.habitPink,
-          label: '🗃 Coleção',
+          label: '🗃 Collection',
           onTap: () {
             Navigator.pop(context);
             Navigator.push(
@@ -673,7 +892,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.person_outline_rounded,
           color: AppColors.habitPink,
-          label: '👥 Nova pessoa',
+          label: '👥 New person',
           onTap: () {
             Navigator.pop(context);
             Navigator.push(
@@ -688,7 +907,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.auto_stories_rounded,
           color: AppColors.habitPurple,
-          label: '🍿 Novo recurso',
+          label: '🍿 New resource',
           onTap: () {
             Navigator.pop(context);
             Navigator.push(
@@ -703,7 +922,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.show_chart_rounded,
           color: AppColors.info,
-          label: '📊 Novo tracker',
+          label: '📊 New tracker',
           onTap: () {
             Navigator.pop(context);
             Navigator.push(
@@ -716,7 +935,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.copy_all_rounded,
           color: AppColors.textMuted,
-          label: '📋 Novo modelo (Template)',
+          label: '📋 New template',
           onTap: () {
             Navigator.pop(context);
             Navigator.push(
@@ -729,7 +948,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.camera_alt_outlined,
           color: AppColors.habitGreen,
-          label: '📸 Novo snapshot',
+          label: '📸 New snapshot',
           onTap: () {
             Navigator.pop(context);
             Navigator.push(
@@ -742,7 +961,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.document_scanner_outlined,
           color: AppColors.warning,
-          label: '📄 Escanear documento',
+          label: '📄 Scan document',
           onTap: () {
             Navigator.pop(context);
             Navigator.push(
@@ -755,7 +974,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.share_rounded,
           color: AppColors.info,
-          label: '📝 Novo post social',
+          label: '📝 New social post',
           onTap: () {
             Navigator.pop(context);
             Navigator.push(
@@ -768,7 +987,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.shopping_cart_outlined,
           color: AppColors.habitGreen,
-          label: '🛒 Item de compras',
+          label: '🛒 Shopping item',
           onTap: () {
             Navigator.pop(context);
             Navigator.push(

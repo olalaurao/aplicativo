@@ -298,20 +298,19 @@ class DayDialAggregator {
     final allDefs = [...MoodDefinition.systemMoods, ...catalog];
     for (final entry in entries) {
       if (!_isSameDay(entry.date, date)) continue;
-      for (final moodEntry in entry.moodEntries) {
-        if (!_isSameDay(moodEntry.timestamp, date)) continue;
-        final def = allDefs.firstWhere(
-          (d) => d.id == moodEntry.moodSlug,
-          orElse: () => allDefs.first,
-        );
-        markers.add(DialPointMarker(
-          id: '${entry.slug}:${moodEntry.timestamp.toIso8601String()}',
-          timestamp: moodEntry.timestamp,
-          iconData: Icons.sentiment_satisfied,
-          label: def.label,
-          sourceSlug: entry.slug,
-        ));
-      }
+      if (entry.moodSlug == null || entry.moodSlug!.isEmpty) continue;
+      
+      final def = allDefs.firstWhere(
+        (d) => d.id == entry.moodSlug || d.slug == entry.moodSlug,
+        orElse: () => allDefs.first,
+      );
+      markers.add(DialPointMarker(
+        id: entry.id,
+        timestamp: entry.date,
+        iconData: Icons.sentiment_satisfied,
+        label: def.label,
+        sourceSlug: entry.slug,
+      ));
     }
     return markers;
   }

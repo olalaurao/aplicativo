@@ -30,20 +30,20 @@ class MoodRoutineService {
   ) {
     if (journalEntries.isEmpty) return null;
 
-    // Sort by date descending and get the most recent entry with mood
+    // Sort by date descending and get the most recent entry with moodSlug
     final sortedEntries = journalEntries
-        .where((e) => e.moodEntries != null && e.moodEntries!.isNotEmpty)
+        .where((e) => e.moodSlug != null && e.moodSlug!.isNotEmpty)
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
 
     if (sortedEntries.isEmpty) return null;
 
     final latestEntry = sortedEntries.first;
-    final latestMoodId = latestEntry.moodEntries!.first;
+    final latestMoodId = latestEntry.moodSlug!;
 
     return allObjects
         .whereType<MoodDefinition>()
-        .firstWhere((m) => m.id == latestMoodId, orElse: () => null as MoodDefinition);
+        .firstWhere((m) => m.id == latestMoodId || m.slug == latestMoodId, orElse: () => null as MoodDefinition);
   }
 
   /// Parse mood trigger string to MoodQuadrant

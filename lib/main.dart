@@ -43,6 +43,10 @@ import 'ui/screens/planner_screen.dart';
 import 'ui/forms/create_entry_form.dart';
 import 'ui/forms/create_task_form.dart';
 import 'ui/forms/create_habit_form.dart';
+import 'ui/forms/create_goal_form.dart';
+import 'ui/forms/create_event_form.dart';
+import 'ui/forms/create_reminder_form.dart';
+import 'ui/forms/create_project_form.dart';
 import 'ui/screens/shopping_list_screen.dart';
 import 'ui/forms/create_note_form.dart';
 import 'ui/forms/create_resource_form.dart';
@@ -325,9 +329,11 @@ class _BootstrapAppState extends State<BootstrapApp> {
     super.initState();
     _lifecycleListener = AppLifecycleListener(
       onResume: () {
-        debugPrint('[AppLifecycle] Resumed - refreshing widgets and syncing');
-        unawaited(forceWidgetSync(widget.container));
-        widget.container.read(syncManagerProvider).performSync(debounce: true);
+        debugPrint('[AppLifecycle] Resumed - refreshing widgets');
+        // Debounce widget sync to avoid cascade with sync
+        Future.delayed(const Duration(seconds: 2), () {
+          unawaited(forceWidgetSync(widget.container));
+        });
         unawaited(_checkPendingSharedTextFromNative());
         unawaited(_checkPendingWidgetUriFromNative());
         // 1.4 — check person contacts on resume (moved out of PeopleNotifier.build)
@@ -352,7 +358,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
       if (currentDate != lastDate) {
         debugPrint(
           '[MidnightTimer] Day changed from $lastDate to $currentDate. '
-          'Invalidating date-dependent providers and syncing widgets.',
+          'Invalidating date-dependent providers.',
         );
         _lastCheckedDate = now;
         // Invalidate only date-dependent providers instead of entire vault
@@ -587,6 +593,15 @@ Future<void> _initApp(ProviderContainer container) async {
         .read(allObjectsProvider.future)
         .then((objects) async {
           debugPrint('[Startup] Vault loaded: ${objects.length} objects.');
+          
+          // Start sync AFTER vault loads to avoid conflicts and reduce startup load
+          try {
+            container.read(syncManagerProvider).start();
+            debugPrint('[Startup] Sync manager started after vault load');
+          } catch (e) {
+            debugPrint('Startup init failed: sync_manager_start: $e');
+          }
+          
           Future.delayed(const Duration(seconds: 3), () {
             container.read(peopleProvider.notifier).checkPersonContactsNow();
           });
@@ -612,22 +627,15 @@ Future<void> _initApp(ProviderContainer container) async {
   if (Platform.isAndroid || Platform.isIOS) {
     try {
       FlutterForegroundTask.addTaskDataCallback((data) {
-        if (data is Map && data['action'] == 'sync_tick') {
-          container.read(syncManagerProvider).performSync(debounce: true);
-        }
+        // DISABLED: Sync causing crashes
+        debugPrint('[Main] Foreground task sync disabled to prevent crashes');
+        // if (data is Map && data['action'] == 'sync_tick') {
+        //   container.read(syncManagerProvider).performSync(debounce: true);
+        // }
       });
     } catch (e) {
       debugPrint('Startup init failed: foreground_task_callback: $e');
     }
-  }
-
-  // Start Drive/vault sync before non-critical startup work. Otherwise a slow
-  // permission prompt or notification task can delay the initial pull and the
-  // filesystem watcher.
-  try {
-    container.read(syncManagerProvider).start();
-  } catch (e) {
-    debugPrint('Startup init failed: sync_manager_start: $e');
   }
 
   // Non-critical: run in background after UI is shown
@@ -636,12 +644,20 @@ Future<void> _initApp(ProviderContainer container) async {
     notificationService.setProviderContainer(container);
     notificationService.setNavigatorKey(_rootNavigatorKey);
 
+    // Request permissions after app is visible (avoids blocking splash)
+    await PermissionService.requestAllPermissions();
+    await notificationService.scheduleWeeklyReviewNotifications();
+
+    // Defer notification cache purge and reminder rescheduling until after vault loads
+    // to reduce startup overhead
     try {
       final prefs = await SharedPreferences.getInstance();
       const purgeKey = 'notification_cache_purged_late_duplicates_20260525';
       if (prefs.getBool(purgeKey) != true) {
         await notificationService.clearNotificationCache();
         await prefs.setBool(purgeKey, true);
+        // Wait for vault to load before rescheduling reminders
+        await container.read(allObjectsProvider.future);
         await container
             .read(vaultProvider.notifier)
             .rescheduleAllObjectReminders();
@@ -650,10 +666,6 @@ Future<void> _initApp(ProviderContainer container) async {
     } catch (e) {
       debugPrint('Startup init failed: notification_cache_purge: $e');
     }
-
-    // Request permissions after app is visible (avoids blocking splash)
-    await PermissionService.requestAllPermissions();
-    await notificationService.scheduleWeeklyReviewNotifications();
 
     // Check for expired pacts
     try {
@@ -857,6 +869,37 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/create/habit',
             builder: (context, state) => const CreateHabitForm(),
+          ),
+          GoRoute(
+            path: '/create/goal',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return CreateGoalForm(
+                initialTitle: extra?['initialTitle'] as String?,
+              );
+            },
+          ),
+          GoRoute(
+            path: '/create/event',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return CreateEventForm(
+                initialTitle: extra?['initialTitle'] as String?,
+              );
+            },
+          ),
+          GoRoute(
+            path: '/create/reminder',
+            builder: (context, state) => const CreateReminderForm(),
+          ),
+          GoRoute(
+            path: '/create-project',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return CreateProjectForm(
+                initialTitle: extra?['initialTitle'] as String?,
+              );
+            },
           ),
           GoRoute(
             path: '/create/note',

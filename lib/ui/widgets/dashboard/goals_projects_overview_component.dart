@@ -156,7 +156,7 @@ class GoalsProjectsOverviewComponent extends ConsumerWidget {
                               children: [
                                 Row(
                                   children: [
-                                    Expanded(
+                                    Flexible(
                                       child: Text(
                                         item.title,
                                         style: Theme.of(context).textTheme.bodyMedium!.copyWith(fontWeight: FontWeight.w500),

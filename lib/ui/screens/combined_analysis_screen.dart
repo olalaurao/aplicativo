@@ -719,30 +719,19 @@ class _CombinedAnalysisScreenState
     final entries = ref.read(allEntriesProvider);
     final moods = ref.read(moodsProvider);
 
-    // F2.14: Collect all mood entries for the day from moodEntries array
-    final allMoodEntries = <MoodEntry>[];
-    for (final entry in entries) {
-      if (entry.date.year == date.year &&
-          entry.date.month == date.month &&
-          entry.date.day == date.day) {
-        // Prefer moodEntries array over legacy moodSlug
-        if (entry.moodEntries.isNotEmpty) {
-          allMoodEntries.addAll(entry.moodEntries);
-        } else if (entry.moodSlug != null) {
-          // Legacy fallback: convert moodSlug to MoodEntry
-          allMoodEntries.add(MoodEntry(
-            moodSlug: entry.moodSlug!,
-            timestamp: entry.date,
-          ));
-        }
-      }
-    }
+    // Get entries for the day with moodSlug
+    final dayEntries = entries.where((entry) =>
+      entry.date.year == date.year &&
+      entry.date.month == date.month &&
+      entry.date.day == date.day &&
+      entry.moodSlug != null
+    ).toList();
 
-    if (allMoodEntries.isEmpty) return null;
+    if (dayEntries.isEmpty) return null;
 
-    // Get the most recent mood entry for the day
-    allMoodEntries.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    final recentEntry = allMoodEntries.first;
+    // Get the most recent entry for the day
+    dayEntries.sort((a, b) => b.date.compareTo(a.date));
+    final recentEntry = dayEntries.first;
     
     return moods
         .where((m) => m.id == recentEntry.moodSlug || m.slug == recentEntry.moodSlug)
@@ -791,32 +780,21 @@ class _CombinedAnalysisScreenState
     final entries = ref.read(allEntriesProvider);
     final moods = ref.read(moodsProvider);
 
-    // F2.14: Collect all mood entries for the day from moodEntries array
-    final allMoodEntries = <MoodEntry>[];
-    for (final entry in entries) {
-      if (entry.date.year == date.year &&
-          entry.date.month == date.month &&
-          entry.date.day == date.day) {
-        // Prefer moodEntries array over legacy moodSlug
-        if (entry.moodEntries.isNotEmpty) {
-          allMoodEntries.addAll(entry.moodEntries);
-        } else if (entry.moodSlug != null) {
-          // Legacy fallback: convert moodSlug to MoodEntry
-          allMoodEntries.add(MoodEntry(
-            moodSlug: entry.moodSlug!,
-            timestamp: entry.date,
-          ));
-        }
-      }
-    }
+    // Get entries for the day with moodSlug
+    final dayEntries = entries.where((entry) =>
+      entry.date.year == date.year &&
+      entry.date.month == date.month &&
+      entry.date.day == date.day &&
+      entry.moodSlug != null
+    ).toList();
 
-    if (allMoodEntries.isEmpty) return null;
+    if (dayEntries.isEmpty) return null;
 
     // Average all mood values for the day
-    final values = allMoodEntries
-        .map((moodEntry) {
+    final values = dayEntries
+        .map((entry) {
           final mood = moods
-              .where((m) => m.id == moodEntry.moodSlug || m.slug == moodEntry.moodSlug)
+              .where((m) => m.id == entry.moodSlug || m.slug == entry.moodSlug)
               .firstOrNull;
           return mood?.numericValue.toDouble();
         })

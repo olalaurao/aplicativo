@@ -1060,26 +1060,28 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
 
   Widget _buildEmptyState(String title, String subtitle) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.inbox_outlined,
-            size: 48,
-            color: AppColors.textMuted.withValues(alpha: 0.3),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
-          ),
-        ],
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.inbox_outlined,
+              size: 48,
+              color: AppColors.textMuted.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -248,6 +248,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
 
       final hasLinkedTask = tasks.any((t) {
         final isScheduled =
+            (t.startDate != null && _isSameDay(t.startDate!, date)) ||
             (t.deadline != null && _isSameDay(t.deadline!, date)) ||
             (t.scheduler != null &&
                 SchedulerService.shouldFire(
@@ -288,6 +289,11 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
     }
 
     final baseDayTasks = tasks.where((t) {
+      // Check if task starts today
+      if (t.startDate != null && _isSameDay(t.startDate!, _selectedDate)) {
+        return true;
+      }
+      // Check if task ends today (deadline)
       if (t.deadline != null && _isSameDay(t.deadline!, _selectedDate)) {
         return true;
       }
@@ -3041,7 +3047,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
 
             final date = DateTime(now.year, now.month, day);
             final hasTask = tasks.any(
-              (t) => t.deadline != null && _isSameDay(t.deadline!, date),
+              (t) =>
+                  (t.startDate != null && _isSameDay(t.startDate!, date)) ||
+                  (t.deadline != null && _isSameDay(t.deadline!, date)),
             );
             final isToday = _isSameDay(date, DateTime.now());
             
@@ -3133,7 +3141,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
   ) {
     final projects = ref.read(projectsProvider);
     final baseDayTasks = tasks
-        .where((t) => t.deadline != null && _isSameDay(t.deadline!, date))
+        .where((t) =>
+            (t.startDate != null && _isSameDay(t.startDate!, date)) ||
+            (t.deadline != null && _isSameDay(t.deadline!, date)))
         .toList();
     final dayTasks = mergeDayTasksWithRotation(
       baseDayTasks,
@@ -3172,6 +3182,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
 
       final hasLinkedTask = tasks.any((t) {
         final isScheduled =
+            (t.startDate != null && _isSameDay(t.startDate!, date)) ||
             (t.deadline != null && _isSameDay(t.deadline!, date)) ||
             (t.scheduler != null &&
                 SchedulerService.shouldFire(

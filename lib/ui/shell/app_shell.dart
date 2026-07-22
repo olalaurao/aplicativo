@@ -90,7 +90,7 @@ class _AppShellState extends ConsumerState<AppShell> {
             _lastBackPressTime = now;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Pressione novamente para sair'),
+                content: Text('Press again to exit'),
                 duration: Duration(seconds: 2),
               ),
             );
@@ -473,7 +473,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                           SizedBox(width: 8),
                           Flexible(
                             child: Text(
-                              'Nova Captura',
+                              'New Capture',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -614,7 +614,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                     onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                     icon: const Icon(Icons.history_rounded),
                     label: const Text(
-                      'Histórico',
+                      'History',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -722,7 +722,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text(
-                                  'Este item nao esta mais disponivel.',
+                                  'This item is no longer available.',
                                 ),
                               ),
                             );

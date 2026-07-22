@@ -1,4 +1,5 @@
 // lib/providers/google_calendar_provider.dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/calendar/v3.dart' as calendar;
@@ -35,9 +36,11 @@ class GoogleCalendarAuthNotifier extends StateNotifier<GoogleSignInAccount?> {
   Future<void> signIn() async {
     await _authService.signIn();
     state = _authService.currentUser;
-    if (state != null) {
-      await _ref.read(syncManagerProvider).performSync();
-    }
+    // DISABLED: Sync causing crashes
+    // if (state != null) {
+    //   await _ref.read(syncManagerProvider).performSync();
+    // }
+    debugPrint('[GoogleCalendar] Sync after sign-in disabled to prevent crashes');
   }
 
   Future<void> signOut() async {

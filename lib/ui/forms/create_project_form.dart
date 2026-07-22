@@ -50,6 +50,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
   List<RotationGroup> _rotationGroups = [];
   final _methodLabelController = TextEditingController();
   List<kpi_model.KPI> _kpis = [];
+  bool _rotationResetRequested = false;
   Scheduler? _scheduler;
 
   static const _colorSwatches = [
@@ -463,59 +464,138 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         AppSwitchTile(
-                          title: 'Este projeto usa rotação de zonas',
+                          title: 'This project uses zone rotation',
                           value: _useRotation,
                           onChanged: (v) => setState(() => _useRotation = v),
                           contentPadding: EdgeInsets.zero,
                         ),
                         if (_useRotation) ...[
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Início da rotação'),
-                            subtitle: Text(
-                              _rotationStartDate != null
-                                  ? DateFormat('d MMM yyyy')
-                                      .format(_rotationStartDate!)
-                                  : 'Selecionar data',
+                          if (widget.existingProject?.rotationCurrentGroupId == null) ...[
+                            // Show editable start date only if rotation hasn't started yet
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Rotation start date'),
+                              subtitle: Text(
+                                _rotationStartDate != null
+                                    ? DateFormat('d MMM yyyy')
+                                        .format(_rotationStartDate!)
+                                    : 'Select date',
+                              ),
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: _rotationStartDate ?? DateTime.now(),
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime(2100),
+                                );
+                                if (picked != null) {
+                                  setState(() => _rotationStartDate = picked);
+                                }
+                              },
                             ),
-                            onTap: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: _rotationStartDate ?? DateTime.now(),
-                                firstDate: DateTime(2000),
-                                lastDate: DateTime(2100),
-                              );
-                              if (picked != null) {
-                                setState(() => _rotationStartDate = picked);
-                              }
-                            },
-                          ),
+                          ] else ...[
+                            // Rotation has started - show read-only label and reset action
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Started on'),
+                              subtitle: Text(
+                                widget.existingProject?.rotationCurrentPeriodStart != null
+                                    ? DateFormat('d MMM yyyy').format(
+                                        widget.existingProject!.rotationCurrentPeriodStart!)
+                                    : 'Unknown',
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Restart rotation?'),
+                                    content: const Text(
+                                      'This resets which zone is active and all rotation history. Continue?',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        child: const Text('Restart'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed == true) {
+                                  setState(() {
+                                    _rotationStartDate = DateTime.now();
+                                    _rotationResetRequested = true;
+                                  });
+                                }
+                              },
+                              icon: const Icon(Icons.refresh, size: 18),
+                              label: const Text('Restart rotation from today'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.priorityHigh,
+                              ),
+                            ),
+                          ],
                           TextField(
                             controller: _methodLabelController,
                             decoration: const InputDecoration(
-                              labelText: 'Rótulo do método (opcional)',
-                              hintText: 'Método FlyLady',
+                              labelText: 'Method label (optional)',
+                              hintText: 'FlyLady method',
                             ),
                           ),
                           const SizedBox(height: 8),
-                          ..._rotationGroups.asMap().entries.map((e) {
-                            final g = e.value;
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text('${g.emoji ?? ''} ${g.name}'.trim()),
-                              subtitle: Text('${g.periodDays} dias'),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: () => setState(
-                                  () => _rotationGroups.removeAt(e.key),
+                          ReorderableListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _rotationGroups.length,
+                            onReorder: (oldIndex, newIndex) {
+                              setState(() {
+                                if (newIndex > oldIndex) newIndex--;
+                                final item = _rotationGroups.removeAt(oldIndex);
+                                _rotationGroups.insert(newIndex, item);
+                                // Update order fields to match new positions
+                                for (int i = 0; i < _rotationGroups.length; i++) {
+                                  _rotationGroups[i] = RotationGroup(
+                                    id: _rotationGroups[i].id,
+                                    name: _rotationGroups[i].name,
+                                    emoji: _rotationGroups[i].emoji,
+                                    colorHex: _rotationGroups[i].colorHex,
+                                    periodDays: _rotationGroups[i].periodDays,
+                                    order: i,
+                                  );
+                                }
+                              });
+                            },
+                            itemBuilder: (context, index) {
+                              final g = _rotationGroups[index];
+                              return Card(
+                                key: ValueKey('zone-${g.id}-$index'),
+                                margin: const EdgeInsets.only(bottom: 8),
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                                  leading: const Icon(Icons.drag_handle_rounded,
+                                      color: AppColors.textMuted, size: 20),
+                                  title: Text('${g.emoji ?? ''} ${g.name}'.trim()),
+                                  subtitle: Text('${g.periodDays} days'),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.delete_outline),
+                                    onPressed: () => setState(
+                                      () => _rotationGroups.removeAt(index),
+                                    ),
+                                  ),
+                                  onTap: () => _addRotationGroup(existingGroup: g),
                                 ),
-                              ),
-                            );
-                          }),
+                              );
+                            },
+                          ),
                           TextButton.icon(
-                            onPressed: _addRotationGroup,
+                            onPressed: () => _addRotationGroup(),
                             icon: const Icon(Icons.add_rounded),
-                            label: const Text('Adicionar zona'),
+                            label: const Text('Add zone'),
                           ),
                         ],
                       ],
@@ -656,49 +736,146 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
     });
   }
 
-  void _addRotationGroup() {
-    final nameController = TextEditingController();
-    final daysController = TextEditingController(text: '7');
+  void _addRotationGroup({RotationGroup? existingGroup}) {
+    final nameController = TextEditingController(text: existingGroup?.name ?? '');
+    final daysController = TextEditingController(text: existingGroup?.periodDays.toString() ?? '7');
+    String? selectedEmoji = existingGroup?.emoji;
+    String? selectedColor = existingGroup?.colorHex;
+    
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Nova zona'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Nome'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(existingGroup == null ? 'New zone' : 'Edit zone'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Name'),
+              ),
+              TextField(
+                controller: daysController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Duration (days)'),
+              ),
+              const SizedBox(height: 12),
+              // Emoji picker
+              Row(
+                children: [
+                  const Text('Emoji: ', style: TextStyle(fontSize: 14)),
+                  GestureDetector(
+                    onTap: () async {
+                      const emojis = ['🏠', '💼', '🏋️', '📚', '🎨', '🍳', '🧹', '🌿', '💰', '🚗', '✈️', '🎮'];
+                      final picked = await showModalBottomSheet<String>(
+                        context: context,
+                        builder: (ctx) => SafeArea(
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 4,
+                            ),
+                            itemCount: emojis.length,
+                            itemBuilder: (ctx, i) => Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: GestureDetector(
+                                onTap: () => Navigator.pop(ctx, emojis[i]),
+                                child: Text(
+                                  emojis[i],
+                                  style: const TextStyle(fontSize: 32),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => selectedEmoji = picked);
+                      }
+                    },
+                    child: Text(
+                      selectedEmoji ?? 'Select',
+                      style: const TextStyle(fontSize: 24),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Color picker
+              Row(
+                children: [
+                  const Text('Color: ', style: TextStyle(fontSize: 14)),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Wrap(
+                        spacing: 8,
+                        children: _colorSwatches.map((color) {
+                          final isSelected = selectedColor == color;
+                          return GestureDetector(
+                            onTap: () => setDialogState(() => selectedColor = color),
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: Color(int.parse(color.replaceAll('#', '0xFF'))),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected ? Colors.black : Colors.transparent,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
             ),
-            TextField(
-              controller: daysController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Duração (dias)'),
+            TextButton(
+              onPressed: () {
+                final name = nameController.text.trim();
+                if (name.isEmpty) return;
+                setState(() {
+                  if (existingGroup == null) {
+                    // Add new zone
+                    _rotationGroups.add(RotationGroup(
+                      id: slugify(name),
+                      name: name,
+                      emoji: selectedEmoji,
+                      colorHex: selectedColor,
+                      periodDays: int.tryParse(daysController.text) ?? 7,
+                      order: _rotationGroups.length,
+                    ));
+                  } else {
+                    // Edit existing zone - keep the same id
+                    final index = _rotationGroups.indexWhere((g) => g.id == existingGroup.id);
+                    if (index >= 0) {
+                      _rotationGroups[index] = RotationGroup(
+                        id: existingGroup.id,
+                        name: name,
+                        emoji: selectedEmoji,
+                        colorHex: selectedColor,
+                        periodDays: int.tryParse(daysController.text) ?? 7,
+                        order: existingGroup.order,
+                      );
+                    }
+                  }
+                });
+                Navigator.pop(ctx);
+              },
+              child: Text(existingGroup == null ? 'Add' : 'Save'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () {
-              final name = nameController.text.trim();
-              if (name.isEmpty) return;
-              setState(() {
-                _rotationGroups.add(RotationGroup(
-                  id: slugify(name),
-                  name: name,
-                  periodDays: int.tryParse(daysController.text) ?? 7,
-                  order: _rotationGroups.length,
-                ));
-              });
-              Navigator.pop(ctx);
-            },
-            child: const Text('Adicionar'),
-          ),
-        ],
       ),
     );
   }
@@ -814,6 +991,10 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
       methodLabel: _useRotation && _methodLabelController.text.trim().isNotEmpty
           ? _methodLabelController.text.trim()
           : null,
+      // Reset rotation state if user requested a restart
+      rotationCurrentGroupId: _rotationResetRequested ? null : widget.existingProject?.rotationCurrentGroupId,
+      rotationCurrentPeriodStart: _rotationResetRequested ? null : widget.existingProject?.rotationCurrentPeriodStart,
+      rotationCycleNumber: _rotationResetRequested ? 1 : widget.existingProject?.rotationCycleNumber,
     );
 
     if (widget.existingProject != null) {

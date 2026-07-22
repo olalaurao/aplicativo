@@ -100,12 +100,12 @@ class _ShoppingQuickAddComponentState extends ConsumerState<ShoppingQuickAddComp
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
+                Flexible(
                   child: Row(
                     children: [
                       Icon(Icons.add_shopping_cart_rounded, color: AppColors.textMuted, size: 20),
                       const SizedBox(width: 8),
-                      Expanded(
+                      Flexible(
                         child: Text(
                           widget.block.title.isNotEmpty ? widget.block.title : 'Quick Add — Shopping',
                           style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16),
@@ -203,7 +203,7 @@ class _ShoppingQuickAddComponentState extends ConsumerState<ShoppingQuickAddComp
                         children: [
                           const Icon(Icons.radio_button_unchecked_rounded, size: 18, color: AppColors.textMuted),
                           const SizedBox(width: 8),
-                          Expanded(
+                          Flexible(
                             child: Text(
                               '${item.name}${item.quantity != null ? ' (${item.quantity})' : ''}',
                               style: Theme.of(context).textTheme.bodyMedium!,

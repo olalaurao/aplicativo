@@ -31,10 +31,11 @@ class RotationService {
     if (!project.hasRotation) return null;
     final today = _dateOnly(now ?? DateTime.now());
     
+    final groups = [...project.rotationGroups]..sort((a, b) => a.order.compareTo(b.order));
+    if (groups.isEmpty) return null;
+    
     // Bootstrap: first evaluation, set initial state
     if (project.rotationCurrentGroupId == null) {
-      final groups = [...project.rotationGroups]..sort((a, b) => a.order.compareTo(b.order));
-      if (groups.isEmpty) return null;
       final firstGroup = groups.first;
       final start = _dateOnly(project.rotationStartDate!);
       return RotationStatus(
@@ -46,10 +47,20 @@ class RotationService {
       );
     }
     
-    // Use persisted state
+    // Use persisted state with fallback if current group was deleted
     final currentGroupId = project.rotationCurrentGroupId!;
-    final periodStart = _dateOnly(project.rotationCurrentPeriodStart!);
-    final currentGroup = project.rotationGroups.firstWhere((g) => g.id == currentGroupId);
+    final currentGroup = groups.firstWhere(
+      (g) => g.id == currentGroupId,
+      orElse: () => groups.first,
+    );
+    
+    // If we fell back to first group, reset state to today (bootstrap-like behavior)
+    final needsReset = currentGroup.id != currentGroupId;
+    final periodStart = needsReset 
+        ? today 
+        : _dateOnly(project.rotationCurrentPeriodStart!);
+    final cycleNumber = needsReset ? 1 : project.rotationCycleNumber;
+    
     final dayOfPeriod = today.difference(periodStart).inDays + 1;
     final periodEnd = periodStart.add(Duration(days: currentGroup.periodDays - 1));
     
@@ -58,20 +69,20 @@ class RotationService {
       dayOfPeriod: dayOfPeriod,
       periodStart: periodStart,
       periodEnd: periodEnd,
-      occurrenceNumber: project.rotationCycleNumber,
+      occurrenceNumber: cycleNumber,
     );
   }
 
-  static ({Project updated, bool advanced, RotationGroup? nextGroup}) checkAndAdvanceZone(
+  static ({Project updated, bool advanced, RotationGroup? nextGroup, bool viaTimeout}) checkAndAdvanceZone(
     Project project,
     List<Task> allTasks, {
     DateTime? now,
   }) {
-    if (!project.hasRotation) return (updated: project, advanced: false, nextGroup: null);
+    if (!project.hasRotation) return (updated: project, advanced: false, nextGroup: null, viaTimeout: false);
     
     final today = _dateOnly(now ?? DateTime.now());
     final groups = [...project.rotationGroups]..sort((a, b) => a.order.compareTo(b.order));
-    if (groups.isEmpty) return (updated: project, advanced: false, nextGroup: null);
+    if (groups.isEmpty) return (updated: project, advanced: false, nextGroup: null, viaTimeout: false);
     
     // Bootstrap if needed
     var currentGroupId = project.rotationCurrentGroupId;
@@ -84,7 +95,19 @@ class RotationService {
       cycleNumber = 1;
     }
     
-    final currentGroup = groups.firstWhere((g) => g.id == currentGroupId);
+    final currentGroup = groups.firstWhere(
+      (g) => g.id == currentGroupId,
+      orElse: () => groups.first,
+    );
+    
+    // If we fell back to first group, reset state and persist it
+    final needsReset = currentGroup.id != currentGroupId;
+    if (needsReset) {
+      currentGroupId = currentGroup.id;
+      periodStart = today;
+      cycleNumber = 1;
+    }
+    
     final periodEnd = _dateOnly(periodStart!).add(Duration(days: currentGroup.periodDays - 1));
     
     // Check for early completion
@@ -136,10 +159,25 @@ class RotationService {
         ),
         advanced: true,
         nextGroup: nextGroup,
+        viaTimeout: isTimeout,
       );
     }
     
-    return (updated: project, advanced: false, nextGroup: null);
+    // If we needed a reset but didn't advance, persist the reset state
+    if (needsReset) {
+      return (
+        updated: project.copyProjectWith(
+          rotationCurrentGroupId: currentGroupId,
+          rotationCurrentPeriodStart: periodStart,
+          rotationCycleNumber: cycleNumber,
+        ),
+        advanced: false,
+        nextGroup: null,
+        viaTimeout: false,
+      );
+    }
+    
+    return (updated: project, advanced: false, nextGroup: null, viaTimeout: false);
   }
 
   static List<({RotationGroup group, DateTime startsAt, DateTime endsAt})>

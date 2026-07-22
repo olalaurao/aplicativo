@@ -239,7 +239,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _refresh() async {
-    await ref.read(syncManagerProvider).performSync();
+    // DISABLED: Sync causing freeze/crash
+    debugPrint('[HomeScreen] Refresh sync disabled to prevent freeze/crash');
+    // await ref.read(syncManagerProvider).performSync();
   }
 
   @override

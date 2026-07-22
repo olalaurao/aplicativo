@@ -41,13 +41,18 @@ const _maxWidgetDayItems = 50;
 class _Debouncer {
   final Duration delay;
   Timer? _timer;
+  bool _isRunning = false;
 
   _Debouncer({required this.delay});
 
   void run(Future<void> Function() fn) {
     _timer?.cancel();
     _timer = Timer(delay, () {
-      fn();
+      if (_isRunning) return;
+      _isRunning = true;
+      fn().whenComplete(() {
+        _isRunning = false;
+      });
     });
   }
 
@@ -55,7 +60,7 @@ class _Debouncer {
 }
 
 final widgetSyncProvider = Provider<void>((ref) {
-  final debouncer = _Debouncer(delay: const Duration(milliseconds: 2000));
+  final debouncer = _Debouncer(delay: const Duration(milliseconds: 5000));
 
   // Use select to only watch specific data that affects widgets, not entire vault
   final allObjects = ref.watch(allObjectsProvider.select((data) => data.valueOrNull));
@@ -168,30 +173,51 @@ Future<void> _updateAllWidgets(
     final shopping = _buildShoppingSnapshot(allObjects);
     final pomodoro = _buildPomodoroSnapshot(pomodoroHistory);
     final tasks = _buildTasksSnapshot(allObjects, settings);
-    await WidgetService.updateDashboardWidgets(
-      calendar: calendar,
-      shopping: shopping,
-      pomodoro: pomodoro,
-      tasks: tasks,
-    );
     
-    await WidgetService.updateMonthWidget(
-      title: monthSnapshot['selectedTitle'] as String,
-      subtitle: monthSnapshot['selectedSubtitle'] as String,
-      days: (monthSnapshot['days'] as List).cast<Map<String, String>>(),
-      monthGrid: (monthSnapshot['monthGrid'] as List).cast<Map<String, dynamic>>(),
-    );
+    try {
+      await WidgetService.updateDashboardWidgets(
+        calendar: calendar,
+        shopping: shopping,
+        pomodoro: pomodoro,
+        tasks: tasks,
+      );
+    } catch (e) {
+      debugPrint('[WidgetSync] Failed to update dashboard widgets: $e');
+    }
+    
+    try {
+      await WidgetService.updateMonthWidget(
+        title: monthSnapshot['selectedTitle'] as String,
+        subtitle: monthSnapshot['selectedSubtitle'] as String,
+        days: (monthSnapshot['days'] as List).cast<Map<String, String>>(),
+        monthGrid: (monthSnapshot['monthGrid'] as List).cast<Map<String, dynamic>>(),
+      );
+    } catch (e) {
+      debugPrint('[WidgetSync] Failed to update month widget: $e');
+    }
     
     // Update note widget with pinned note
-    await _updateNoteWidget(allObjects);
+    try {
+      await _updateNoteWidget(allObjects);
+    } catch (e) {
+      debugPrint('[WidgetSync] Failed to update note widget: $e');
+    }
     
     // Update quick add widget
-    await WidgetService.updateQuickAddLabels();
+    try {
+      await WidgetService.updateQuickAddLabels();
+    } catch (e) {
+      debugPrint('[WidgetSync] Failed to update quick add labels: $e');
+    }
     
     // Update day dial widget
-    await _updateDayDialWidget(allObjects, pomodoroHistory, googleEvents, settings.typeSignatures);
+    try {
+      await _updateDayDialWidget(allObjects, pomodoroHistory, googleEvents, settings.typeSignatures);
+    } catch (e) {
+      debugPrint('[WidgetSync] Failed to update day dial widget: $e');
+    }
   } catch (e, st) {
-    debugPrint('[WidgetSync] failed: $e\n$st');
+    debugPrint('[WidgetSync] Failed to build widget snapshots: $e\n$st');
   }
 }
 

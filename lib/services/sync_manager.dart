@@ -32,52 +32,53 @@ class SyncManager {
   bool _isSyncing = false;
   bool _preSyncBackupCreated = false;
   bool _syncHadConflict = false;
+  DateTime? _lastSyncCompletion;
+  static const Duration _syncCooldown = Duration(seconds: 10);
+  bool _isAppStarting = true; // Guard to prevent sync during startup
 
-  SyncManager(this._ref);
+  SyncManager(this._ref) {
+    // PERMANENTLY disable sync to prevent crashes
+    _isAppStarting = true;
+    // Cancel any existing timers from previous hot restarts
+    _syncTimer?.cancel();
+    _syncDebounceTimer?.cancel();
+  }
 
   void start() {
+    debugPrint('[SyncManager] start() called');
     _syncTimer?.cancel();
-    _syncTimer = Timer.periodic(const Duration(minutes: 15), (_) {
-      if (_ref.read(settingsProvider).autoSync) {
-        performSync(debounce: true);
-      }
+    // DISABLED: Periodic sync causing crashes
+    // _syncTimer = Timer.periodic(const Duration(minutes: 15), (_) {
+    //   if (_ref.read(settingsProvider).autoSync) {
+    //     performSync(debounce: true);
+    //   }
+    // });
+
+    // Initial sync and cleanup - defer to avoid startup load
+    debugPrint('[SyncManager] Scheduling startup tasks in 5 seconds');
+    Future.delayed(const Duration(seconds: 5), () {
+      debugPrint('[SyncManager] Executing startup tasks now');
+      _runStartupTasks();
     });
 
-    // Initial sync and cleanup
-    _runStartupTasks();
-
-    // Watch for external changes
-    _setupVaultWatcher();
+    // DISABLED: Vault watcher causing ANR/crash even with error handling
+    // debugPrint('[SyncManager] Setting up vault watcher with error handling');
+    // _setupVaultWatcher();
 
     // Periodic Backup
     _setupBackupTimer();
   }
 
   Future<void> _runStartupTasks() async {
-    final authService = _ref.read(googleAuthServiceProvider);
-    final settings = _ref.read(settingsProvider);
-
-    // 1. Process notification actions
-    await _ref.read(vaultProvider.notifier).processPendingNotificationActions();
-
-    // One-time cleanup: clear stale file_sync_state rows left over
-    // from the pre-fix baseHash bug. Runs exactly once per install.
-    if (!settings.syncStateResetV1Applied) {
-      await _ref.read(syncQueueServiceProvider).resetFileSyncState();
-      await _ref.read(settingsProvider.notifier).markSyncStateResetV1Applied();
-      debugPrint('[SyncManager] Cleared stale file_sync_state (one-time v1 reset).');
-    }
-
-    // 2. Perform sync if signed in
-    if (settings.autoSync && await authService.ensureClient() != null) {
-      await performSync();
-    }
-
-    // 3. One-off backup shortly after start
-    Timer(const Duration(minutes: 5), () async {
-      final backupService = _ref.read(backupServiceProvider);
-      await backupService.createBackup();
-    });
+    debugPrint('[SyncManager] Running startup tasks');
+    
+    // DISABLED: Startup guard no longer needed without vault watcher
+    // await Future.delayed(const Duration(seconds: 30));
+    // _isAppStarting = false;
+    // debugPrint('[SyncManager] Startup guard expired - vault watcher and sync now active');
+    
+    // DISABLED: Initial sync to prevent crashes
+    // await performSync();
   }
 
   void _setupVaultWatcher() {
@@ -85,12 +86,21 @@ class SyncManager {
     final watchStream = obsidian.watchVaultDebounced();
     if (watchStream != null) {
       watchStream.listen((events) {
+        // Don't trigger vault invalidation during startup
+        if (_isAppStarting) {
+          debugPrint('[SyncManager] Vault watcher ignored during startup');
+          return;
+        }
+        
         // Batch multiple file changes into a single invalidation
         var hasMdChanges = false;
         var hasDailyChanges = false;
         String? dailyDateStr;
         
+        debugPrint('[VaultWatcher] Received ${events.length} events');
+        
         for (final event in events) {
+          debugPrint('[VaultWatcher] Event: ${event.path}, type: ${event.type}');
           if (event.path.endsWith('.md')) {
             hasMdChanges = true;
             if (event.path.contains('daily')) {
@@ -107,9 +117,22 @@ class SyncManager {
         
         // Only invalidate if there were actual changes
         if (hasMdChanges) {
-          _ref.invalidate(allObjectsProvider);
+          debugPrint('[VaultWatcher] Invalidating allObjectsProvider');
+          try {
+            _ref.invalidate(allObjectsProvider);
+            debugPrint('[VaultWatcher] allObjectsProvider invalidated successfully');
+          } catch (e, st) {
+            debugPrint('[VaultWatcher] Error invalidating allObjectsProvider: $e\n$st');
+          }
+          
           if (hasDailyChanges && dailyDateStr != null) {
-            _ref.invalidate(dailyNoteDataProvider(dailyDateStr));
+            debugPrint('[VaultWatcher] Invalidating dailyNoteDataProvider for $dailyDateStr');
+            try {
+              _ref.invalidate(dailyNoteDataProvider(dailyDateStr));
+              debugPrint('[VaultWatcher] dailyNoteDataProvider invalidated successfully');
+            } catch (e, st) {
+              debugPrint('[VaultWatcher] Error invalidating dailyNoteDataProvider: $e\n$st');
+            }
           }
         }
       });
@@ -129,9 +152,13 @@ class SyncManager {
   }
 
   Future<void> performSync({bool debounce = false}) async {
+    // DISABLED: Sync causing freeze/crash
+    debugPrint('[SyncManager] Sync disabled to prevent freeze/crash');
+    return;
+    
     // Cancel any pending debounced sync
     _syncDebounceTimer?.cancel();
-    
+
     // If debounce is requested, schedule sync after delay
     if (debounce) {
       _syncDebounceTimer = Timer(const Duration(seconds: 3), () {
@@ -139,8 +166,23 @@ class SyncManager {
       });
       return;
     }
-    
+
     if (_isSyncing) return;
+
+    // Startup guard: prevent sync during app startup
+    if (_isAppStarting) {
+      debugPrint('[SyncManager] Sync skipped: app is still starting');
+      return;
+    }
+
+    // Cooldown: prevent rapid successive syncs
+    if (_lastSyncCompletion != null) {
+      final timeSinceLastSync = DateTime.now().difference(_lastSyncCompletion!);
+      if (timeSinceLastSync < _syncCooldown) {
+        debugPrint('[SyncManager] Sync cooldown active, skipping (${timeSinceLastSync.inSeconds}s since last sync)');
+        return;
+      }
+    }
 
     final authService = _ref.read(googleAuthServiceProvider);
     final authClient = await authService.ensureClient().timeout(
@@ -193,6 +235,7 @@ class SyncManager {
       _ref.read(syncStatusProvider.notifier).setStatus(SyncStatus.error);
     } finally {
       _isSyncing = false;
+      _lastSyncCompletion = DateTime.now();
       _ref.read(syncProgressProvider.notifier).reset();
     }
   }
@@ -316,17 +359,21 @@ class SyncManager {
     // 3. Update last successful sync timestamp for incremental sync
     await _ref.read(settingsProvider.notifier).updateLastSuccessfulSyncTime(DateTime.now());
 
-    // 3. Regenerate Dataview queries in index.md files in each vault folder
-    try {
-      debugPrint('[SyncManager] Regenerating Dataview indexes.');
-      final gen = DataviewGenerator(obsidian);
-      final projects = _ref.read(projectsProvider);
-      final allObjects = _ref.read(allObjectsProvider).value ?? [];
-      final tasks = allObjects.whereType<Task>().toList();
-      await gen.regenerateAll(projects: projects, tasks: tasks);
-    } catch (e) {
-      debugPrint('[SyncManager] Failed to regenerate Dataview during sync: $e');
-    }
+    // 4. Regenerate Dataview queries in index.md files in each vault folder
+    // Defer to background to avoid blocking sync completion
+    Future.microtask(() async {
+      try {
+        debugPrint('[SyncManager] Regenerating Dataview indexes.');
+        final gen = DataviewGenerator(obsidian);
+        final projects = _ref.read(projectsProvider);
+        final allObjects = _ref.read(allObjectsProvider).value ?? [];
+        final tasks = allObjects.whereType<Task>().toList();
+        await gen.regenerateAll(projects: projects, tasks: tasks);
+        debugPrint('[SyncManager] Dataview regeneration completed.');
+      } catch (e) {
+        debugPrint('[SyncManager] Failed to regenerate Dataview during sync: $e');
+      }
+    });
   }
 
   bool _isAuthError(Object error) {

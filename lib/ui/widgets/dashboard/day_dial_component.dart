@@ -86,7 +86,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
                 children: [
                   Icon(Icons.donut_large_rounded, color: AppColors.textMuted, size: 20),
                   const SizedBox(width: 8),
-                  Expanded(
+                  Flexible(
                     child: Text(
                       widget.block.title.isNotEmpty ? widget.block.title : 'Day Dial',
                       style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
@@ -205,7 +205,6 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             Icons.access_time,
@@ -213,7 +212,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
             color: AppTheme.accentColor(context),
           ),
           const SizedBox(width: 6),
-          Expanded(
+          Flexible(
             child: Text(
               timeText,
               style: Theme.of(context).textTheme.bodySmall!.copyWith(

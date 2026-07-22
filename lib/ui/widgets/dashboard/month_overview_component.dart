@@ -80,7 +80,7 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
                     _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
                   }),
                 ),
-                Expanded(
+                Flexible(
                   child: Text(
                     DateFormat('MMMM yyyy', 'en_US').format(_currentMonth),
                     style: Theme.of(context).textTheme.bodyMedium!.copyWith(fontWeight: FontWeight.bold),
@@ -250,7 +250,7 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
                     style: const TextStyle(fontSize: 32),
                   ),
                   const SizedBox(width: 16),
-                  Expanded(
+                  Flexible(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

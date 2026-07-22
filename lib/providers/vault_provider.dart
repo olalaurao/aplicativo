@@ -254,7 +254,7 @@ final conflictingObjectsProvider = Provider<Map<String, List<ContentObject>>>((
   );
 });
 
-final typeConflictedObjectsProvider = Provider<List<ContentObject>>((ref) {
+final typeConflictedObjectsProvider = Provider.autoDispose<List<ContentObject>>((ref) {
   final all = ref.watch(allObjectsProvider).valueOrNull ?? [];
   return all.where((obj) => obj.hasTypeConflict).toList();
 });
@@ -1417,7 +1417,7 @@ final aggregatedRemindersProvider = Provider.autoDispose<List<Reminder>>((ref) {
   return results;
 });
 
-final organizerListProvider = Provider<List<OrganizerReference>>((ref) {
+final organizerListProvider = Provider.autoDispose<List<OrganizerReference>>((ref) {
   final asyncValue = ref.watch(allObjectsProvider);
   final data = asyncValue.valueOrNull;
   if (data != null) {
@@ -1732,7 +1732,7 @@ final templatesProvider =
       return TemplatesNotifier();
     });
 
-final allEntriesProvider = Provider<List<JournalEntry>>((ref) {
+final allEntriesProvider = Provider.autoDispose<List<JournalEntry>>((ref) {
   final asyncValue = ref.watch(allObjectsProvider);
   final data = asyncValue.valueOrNull;
 
@@ -2219,8 +2219,9 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
     frontmatter.remove('mood_label');
     frontmatter.remove('mood_emoji');
 
-    final moodEntries = <Map<String, dynamic>>[];
-    final resolvedMoods = <String, MoodDefinition>{};
+    // Get the latest mood entry
+    MoodDefinition? latestMood;
+    String? latestTime;
 
     for (final entry in entries) {
       final rawMood = entry['mood']?.toString().trim();
@@ -2235,27 +2236,20 @@ class JournalNotifier extends Notifier<List<JournalEntry>> {
           .where((mood) => mood.isNotEmpty)
           .toList();
 
-      for (final moodId in moodIds) {
-        final mood =
-            resolvedMoods[moodId] ?? await _resolveMoodDefinition(moodId);
-        resolvedMoods[moodId] = mood;
-        moodEntries.add({
-          'time': time,
-          'pleasantness': mood.pleasantness,
-          'energy': mood.energy,
-          'label': mood.label,
-          'emoji': mood.emoji,
-        });
+      if (moodIds.isNotEmpty) {
+        final moodId = moodIds.first;
+        final mood = await _resolveMoodDefinition(moodId);
+        latestMood = mood;
+        latestTime = time;
+        break; // Just use the first/latest mood
       }
     }
 
-    frontmatter['mood_entries'] = moodEntries;
-    if (moodEntries.isNotEmpty) {
-      final latest = moodEntries.last;
-      frontmatter['mood_pleasantness'] = latest['pleasantness'];
-      frontmatter['mood_energy'] = latest['energy'];
-      frontmatter['mood_label'] = latest['label'];
-      frontmatter['mood_emoji'] = latest['emoji'];
+    if (latestMood != null && latestTime != null) {
+      frontmatter['mood_pleasantness'] = latestMood.pleasantness;
+      frontmatter['mood_energy'] = latestMood.energy;
+      frontmatter['mood_label'] = latestMood.label;
+      frontmatter['mood_emoji'] = latestMood.emoji;
     }
   }
 
@@ -2461,7 +2455,8 @@ class VaultNotifier extends Notifier<void> {
 
   @override
   void build() {
-    _purgeOldDeletedFiles();
+    // Run purge asynchronously to avoid blocking main thread
+    Future.microtask(() => _purgeOldDeletedFiles());
   }
 
   String _signatureKeyFor(ContentObject object) {

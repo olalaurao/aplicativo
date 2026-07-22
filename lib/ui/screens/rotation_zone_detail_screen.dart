@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,13 @@ import '../../models/task_model.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/rotation_service.dart';
 import '../theme.dart';
+
+// Top-level function for compute() - must be static or top-level
+({Project updated, bool advanced, RotationGroup? nextGroup, bool viaTimeout}) _checkAndAdvanceZoneIsolate(
+  ({Project project, List<Task> allTasks}) params,
+) {
+  return RotationService.checkAndAdvanceZone(params.project, params.allTasks);
+}
 
 class RotationZoneDetailScreen extends ConsumerWidget {
   final String projectId;
@@ -30,7 +38,7 @@ class RotationZoneDetailScreen extends ConsumerWidget {
     if (project == null) {
       return Scaffold(
         appBar: AppBar(),
-        body: const Center(child: Text('Projeto não encontrado')),
+        body: const Center(child: Text('Project not found')),
       );
     }
 
@@ -41,7 +49,7 @@ class RotationZoneDetailScreen extends ConsumerWidget {
     if (group == null) {
       return Scaffold(
         appBar: AppBar(),
-        body: const Center(child: Text('Zona não encontrada')),
+        body: const Center(child: Text('Zone not found')),
       );
     }
 
@@ -73,7 +81,7 @@ class RotationZoneDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isPreview ? 'ZONA: ${group.name}' : 'ZONA ATIVA'),
+        title: Text(isPreview ? 'ZONE: ${group.name}' : 'ACTIVE ZONE'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
@@ -89,7 +97,7 @@ class RotationZoneDetailScreen extends ConsumerWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Esta zona ainda não está ativa — disponível a partir de ${DateFormat('d MMM yyyy').format(status.periodStart)}',
+                      'This zone isn\'t active yet — available from ${DateFormat('d MMM yyyy').format(status.periodStart)}',
                       style: const TextStyle(fontSize: 13),
                     ),
                   ),
@@ -98,11 +106,11 @@ class RotationZoneDetailScreen extends ConsumerWidget {
             ),
           if (status != null) _ZoneHero(status: status, group: group),
           const SizedBox(height: 24),
-          _section(context, ref, project, 'DIÁRIAS — resetam todo dia', daily, status,
+          _section(context, ref, project, 'DAILY — reset every day', daily, status,
               RotationFrequencyType.daily),
-          _section(context, ref, project, 'UMA VEZ NO PERÍODO', once, status,
+          _section(context, ref, project, 'ONCE PER PERIOD', once, status,
               RotationFrequencyType.oncePerPeriod),
-          _section(context, ref, project, 'POR FREQUÊNCIA', everyN, status,
+          _section(context, ref, project, 'BY FREQUENCY', everyN, status,
               RotationFrequencyType.everyNRotations),
         ],
       ),
@@ -155,7 +163,7 @@ class RotationZoneDetailScreen extends ConsumerWidget {
             child: Row(
               children: [
                 Semantics(
-                  label: "Marcar '${task.title}' como feito",
+                  label: "Mark '${task.title}' as done",
                   button: true,
                   child: GestureDetector(
                     onTap: isPreview || status == null
@@ -234,21 +242,35 @@ class RotationZoneDetailScreen extends ConsumerWidget {
     };
     await ref.read(vaultProvider.notifier).updateObject(updated);
 
-    // Check for zone advancement
-    final allObjects = ref.read(allObjectsProvider).value ?? [];
-    final allTasks = allObjects.whereType<Task>().toList();
-    final result = RotationService.checkAndAdvanceZone(project, allTasks);
-    
-    if (result.advanced && result.nextGroup != null) {
-      await ref.read(vaultProvider.notifier).updateObject(result.updated);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Zona concluída! Próxima: ${result.nextGroup!.name} 🎉'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+    // Check for zone advancement - run in isolate to avoid blocking main thread
+    try {
+      if (!context.mounted) return;
+      
+      final allObjects = ref.read(allObjectsProvider).value ?? [];
+      final allTasks = allObjects.whereType<Task>().toList();
+      
+      // Use compute to run in background isolate
+      final result = await compute(
+        _checkAndAdvanceZoneIsolate,
+        (project: project, allTasks: allTasks),
+      );
+      
+      if (result.advanced && result.nextGroup != null && context.mounted) {
+        await ref.read(vaultProvider.notifier).updateObject(result.updated);
+        if (context.mounted) {
+          final message = result.viaTimeout
+              ? "Time's up for this zone. Moving on to: ${result.nextGroup!.name}"
+              : 'Zone completed! Next: ${result.nextGroup!.name} 🎉';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
       }
+    } catch (e) {
+      debugPrint('Error checking zone advancement: $e');
     }
   }
 }
@@ -281,7 +303,7 @@ class _ZoneHero extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Dia ${status.dayOfPeriod} de ${group.periodDays}',
+            'Day ${status.dayOfPeriod} of ${group.periodDays}',
             style: TextStyle(color: Colors.white.withValues(alpha: 0.9)),
           ),
         ],
