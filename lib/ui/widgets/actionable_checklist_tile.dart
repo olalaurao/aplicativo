@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/habit_model.dart';
 import '../../models/task_model.dart';
 import '../../models/tracker_model.dart';
+import '../../models/note_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/pomodoro_session.dart';
 import '../../services/checklist_item_status.dart';
@@ -22,6 +25,7 @@ class ActionableChecklistTile extends ConsumerWidget {
   final String parentObjectId;
   final bool? plainValue;
   final ValueChanged<bool>? onPlainToggle;
+  final Function(String taskSlug)? onTaskCreated;
 
   const ActionableChecklistTile({
     super.key,
@@ -35,6 +39,7 @@ class ActionableChecklistTile extends ConsumerWidget {
     required this.parentObjectId,
     this.plainValue,
     this.onPlainToggle,
+    this.onTaskCreated,
   });
 
   IconData _getKindIcon() {
@@ -52,7 +57,13 @@ class ActionableChecklistTile extends ConsumerWidget {
     }
   }
 
-  bool _isDone(WidgetRef ref) {
+  bool _isDone(
+    WidgetRef ref, [
+    List<Habit>? habits,
+    List<Task>? tasks,
+    List<TrackingRecord>? trackingRecords,
+    PomodoroState? pomodoroState,
+  ]) {
     if (kind == 'plain') return plainValue ?? false;
     return computeChecklistItemDone(
       kind: kind,
@@ -62,6 +73,10 @@ class ActionableChecklistTile extends ConsumerWidget {
       ref: ref,
       parentObjectId: parentObjectId,
       itemId: itemId,
+      habits: habits,
+      tasks: tasks,
+      trackingRecords: trackingRecords,
+      pomodoroState: pomodoroState,
     );
   }
 
@@ -136,7 +151,8 @@ class ActionableChecklistTile extends ConsumerWidget {
         linkedSystem: parentObjectId,
       );
       await ref.read(tasksProvider.notifier).addTask(task);
-      // Caller must persist the new task's slug back onto the item
+      // Notify caller to persist the new task's slug
+      onTaskCreated?.call(task.slug);
       return;
     }
 
@@ -280,7 +296,13 @@ class ActionableChecklistTile extends ConsumerWidget {
   }
 
   Future<String?> _showSelectionPicker(WidgetRef ref, InputField field) async {
-    final options = field.options ?? [];
+    List<String> options = field.options ?? [];
+    
+    // Resolve options from collection if optionsSourceCollectionSlug is set
+    if (field.optionsSourceCollectionSlug != null) {
+      options = _getCollectionOptions(ref, field.optionsSourceCollectionSlug!);
+    }
+    
     if (options.isEmpty) return null;
 
     return showDialog<String>(
@@ -300,6 +322,48 @@ class ActionableChecklistTile extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  List<String> _getCollectionOptions(WidgetRef ref, String collectionSlug) {
+    final notes = ref.read(notesProvider);
+    final collection = notes.where((n) => n.slug == collectionSlug).firstOrNull;
+    if (collection == null || collection.subtype != NoteSubtype.collection) {
+      return [];
+    }
+
+    try {
+      final data = jsonDecode(collection.body);
+      final schemaData = data is Map ? data['schema'] : null;
+      final itemData = data is Map ? data['items'] : null;
+      
+      if (schemaData is! List || itemData is! List) return [];
+
+      final schema = schemaData
+          .whereType<Map>()
+          .map((e) => InputField.fromMap(Map<String, dynamic>.from(e)))
+          .toList();
+
+      final options = <String>[];
+      for (final item in itemData) {
+        if (item is Map) {
+          // Find first text-type property value by iterating schema
+          for (final prop in schema) {
+            if (prop.type != InputFieldType.text && prop.type != InputFieldType.selection) {
+              continue;
+            }
+            final value = item[prop.id];
+            if (value != null && value.toString().trim().isNotEmpty) {
+              options.add(value.toString().trim());
+              break;
+            }
+          }
+        }
+      }
+      return options;
+    } catch (e) {
+      debugPrint('Error parsing Collection options: $e');
+      return [];
+    }
   }
 
   Future<int?> _showDurationPicker(WidgetRef ref, InputField field) async {
@@ -346,14 +410,16 @@ class ActionableChecklistTile extends ConsumerWidget {
   Future<void> _handlePomodoroTap(WidgetRef ref) async {
     final pomodoroState = ref.read(pomodoroProvider);
     final expectedSlug = 'checklist:$parentObjectId:$itemId';
-    final existingSession = pomodoroState.history.firstWhere(
+    final existingSession = pomodoroState.history.where(
       (s) => s.linkedItemSlug == expectedSlug && s.state == PomodoroSessionState.completed,
-      orElse: () => pomodoroState.history.first,
-    );
+    ).firstOrNull;
 
-    if (existingSession.linkedItemSlug == expectedSlug && existingSession.state == PomodoroSessionState.completed) {
+    if (existingSession != null) {
       // Navigate to session detail instead of toggling
-      // TODO: Navigate to session detail
+      // For now, just show a message since session detail navigation isn't implemented
+      ScaffoldMessenger.of(ref.context).showSnackBar(
+        const SnackBar(content: Text('Session detail navigation not yet implemented')),
+      );
       return;
     }
 
@@ -382,7 +448,9 @@ class ActionableChecklistTile extends ConsumerWidget {
 
     if (choice == 'start') {
       // Navigate to Pomodoro screen with linkedItemSlug preset
-      // TODO: Navigate to Pomodoro screen
+      // Note: The Pomodoro screen needs to accept this as a query parameter or state
+      // For now, navigate to the screen
+      GoRouter.of(ref.context).push('/pomodoro');
     } else if (choice == 'log') {
       int duration = 25;
       await ref.read(pomodoroProvider.notifier).logRetroactiveSession(
@@ -396,17 +464,27 @@ class ActionableChecklistTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDone = _isDone(ref);
+    // Watch providers to ensure reactive updates
+    final habits = kind == 'habit' ? ref.watch(habitsProvider) : null;
+    final tasks = kind == 'task' ? ref.watch(tasksProvider) : null;
+    final trackingRecords = kind == 'tracker_entry' ? ref.watch(trackingRecordsProvider) : null;
+    final pomodoroState = kind == 'pomodoro' ? ref.watch(pomodoroProvider) : null;
+    
+    final isDone = _isDone(ref, habits, tasks, trackingRecords, pomodoroState);
     final icon = _getKindIcon();
 
-    return ListTile(
-      leading: Icon(icon, size: 20),
-      title: Text(title),
-      trailing: Checkbox(
-        value: isDone,
-        onChanged: (_) => _handleTap(ref),
+    return Semantics(
+      label: "Mark '$title' as done",
+      button: true,
+      child: ListTile(
+        leading: Icon(icon, size: 20),
+        title: Text(title),
+        trailing: Checkbox(
+          value: isDone,
+          onChanged: (_) => _handleTap(ref),
+        ),
+        onTap: () => _handleTap(ref),
       ),
-      onTap: () => _handleTap(ref),
     );
   }
 }

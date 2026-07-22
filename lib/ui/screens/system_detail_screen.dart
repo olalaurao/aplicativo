@@ -131,13 +131,13 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
   Future<void> _delete() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Excluir System?'),
         content: const Text('Esta ação pode ser desfeita por 30 dias.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: const Text('Excluir'),
           ),
@@ -350,7 +350,7 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
                       if (_isRunning)
                         TextButton.icon(
                           icon: const Icon(Icons.close_rounded, size: 16),
-                          label: const Text('Cancelar'),
+                          label: const Text('Cancel'),
                           style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
                           onPressed: _cancelRun,
                         ),
@@ -363,7 +363,7 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
                       padding: const EdgeInsets.all(16),
                       decoration: AppTheme.cardDecoration(context),
                       child: const Text(
-                        'Nenhum step configurado. Edite o System para adicionar.',
+                        'No steps configured. Edit the System to add some.',
                         style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                       ),
                     )
@@ -394,6 +394,19 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
                                         _plainStepsDone.remove(step.id);
                                       }
                                     });
+                                  },
+                                  onTaskCreated: (taskSlug) async {
+                                    // Persist the new task slug back to the system step
+                                    final updatedSteps = List<SystemStep>.from(system.steps);
+                                    final stepIndex = updatedSteps.indexWhere((s) => s.id == step.id);
+                                    if (stepIndex != -1) {
+                                      updatedSteps[stepIndex] = step.copyWith(linkedObjectSlug: taskSlug);
+                                      final updated = system.copyWith(steps: updatedSteps);
+                                      await ref.read(systemsProvider.notifier).updateSystem(updated);
+                                      setState(() {
+                                        _system = updated;
+                                      });
+                                    }
                                   },
                                 ),
                                 if (e.key < system.steps.length - 1)

@@ -2165,8 +2165,15 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                             onChanged: (v) {
                               final items =
                                   List<ChecklistItem>.from(section.items);
-                              items[itemIndex] = item.copyWith(
-                                estimatedMinutes: int.tryParse(v),
+                              final parsed = v.trim().isEmpty ? null : int.tryParse(v);
+                              items[itemIndex] = ChecklistItem(
+                                id: item.id,
+                                title: item.title,
+                                estimatedMinutes: parsed,
+                                kind: item.kind,
+                                linkedObjectSlug: item.linkedObjectSlug,
+                                trackerFieldId: item.trackerFieldId,
+                                attachedCollectionSlug: item.attachedCollectionSlug,
                               );
                               _checklistSections[sectionIndex] =
                                   ChecklistSection(

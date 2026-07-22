@@ -16,6 +16,10 @@ bool computeChecklistItemDone({
   required WidgetRef ref,
   required String parentObjectId,
   required String itemId,
+  List<Habit>? habits,
+  List<Task>? tasks,
+  List<TrackingRecord>? trackingRecords,
+  PomodoroState? pomodoroState,
 }) {
   final dateStr = date.toIso8601String().split('T').first;
 
@@ -26,8 +30,8 @@ bool computeChecklistItemDone({
 
     case 'habit':
       if (linkedObjectSlug == null) return false;
-      final habits = ref.read(habitsProvider);
-      final habit = habits.where((h) => h.slug == linkedObjectSlug).firstOrNull;
+      final habitList = habits ?? ref.read(habitsProvider);
+      final habit = habitList.where((h) => h.slug == linkedObjectSlug).firstOrNull;
       if (habit == null) return false;
       return habit.completionHistory.any((r) =>
         r.date.toIso8601String().split('T').first == dateStr &&
@@ -36,15 +40,15 @@ bool computeChecklistItemDone({
 
     case 'task':
       if (linkedObjectSlug == null) return false;
-      final tasks = ref.read(tasksProvider);
-      final task = tasks.where((t) => t.slug == linkedObjectSlug).firstOrNull;
+      final taskList = tasks ?? ref.read(tasksProvider);
+      final task = taskList.where((t) => t.slug == linkedObjectSlug).firstOrNull;
       if (task == null) return false;
       return task.stage == TaskStage.finalized;
 
     case 'tracker_entry':
       if (linkedObjectSlug == null || trackerFieldId == null) return false;
-      final records = ref.read(trackingRecordsProvider);
-      return records.any((r) =>
+      final recordList = trackingRecords ?? ref.read(trackingRecordsProvider);
+      return recordList.any((r) =>
         r.trackerId == linkedObjectSlug &&
         r.date.toIso8601String().split('T').first == dateStr &&
         r.fieldValues[trackerFieldId] != null &&
@@ -52,9 +56,9 @@ bool computeChecklistItemDone({
       );
 
     case 'pomodoro':
-      final pomodoroState = ref.read(pomodoroProvider);
+      final state = pomodoroState ?? ref.read(pomodoroProvider);
       final expectedSlug = 'checklist:$parentObjectId:$itemId';
-      return pomodoroState.history.any((s) =>
+      return state.history.any((s) =>
         s.linkedItemSlug == expectedSlug &&
         s.state == PomodoroSessionState.completed &&
         (s.occurredAt ?? s.date).toIso8601String().split('T').first == dateStr,

@@ -54,17 +54,27 @@ class _CreateRecordFormState extends ConsumerState<CreateRecordForm> {
 
     try {
       final data = jsonDecode(collection.body);
-      final items = data is Map ? data['items'] : null;
-      if (items is! List) return [];
+      final schemaData = data is Map ? data['schema'] : null;
+      final itemData = data is Map ? data['items'] : null;
+      
+      if (schemaData is! List || itemData is! List) return [];
+
+      final schema = schemaData
+          .whereType<Map>()
+          .map((e) => InputField.fromMap(Map<String, dynamic>.from(e)))
+          .toList();
 
       final options = <String>[];
-      for (final item in items) {
+      for (final item in itemData) {
         if (item is Map) {
-          // Find first text/richText property value
-          for (final entry in item.entries) {
-            final value = entry.value;
-            if (value is String && value.trim().isNotEmpty) {
-              options.add(value.trim());
+          // Find first text-type property value by iterating schema
+          for (final prop in schema) {
+            if (prop.type != InputFieldType.text && prop.type != InputFieldType.selection) {
+              continue;
+            }
+            final value = item[prop.id];
+            if (value != null && value.toString().trim().isNotEmpty) {
+              options.add(value.toString().trim());
               break;
             }
           }
