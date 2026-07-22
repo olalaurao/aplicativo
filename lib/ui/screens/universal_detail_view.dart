@@ -4553,6 +4553,26 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                               .read(habitsProvider.notifier)
                               .toggleChecklistItem(habit, today, item.id);
                         },
+                        onTaskCreated: (taskSlug) async {
+                          // Persist the new task slug back to the habit checklist item
+                          final updatedSections = List<ChecklistSection>.from(habit.checklistSections);
+                          for (final section in updatedSections) {
+                            final itemIndex = section.items.indexWhere((i) => i.id == item.id);
+                            if (itemIndex != -1) {
+                              final updatedItems = List<ChecklistItem>.from(section.items);
+                              updatedItems[itemIndex] = item.copyWith(linkedObjectSlug: taskSlug);
+                              updatedSections[updatedSections.indexOf(section)] = ChecklistSection(
+                                id: section.id,
+                                label: section.label,
+                                emoji: section.emoji,
+                                items: updatedItems,
+                              );
+                              break;
+                            }
+                          }
+                          final updated = habit.copyWith(checklistSections: updatedSections);
+                          await ref.read(habitsProvider.notifier).updateHabit(updated);
+                        },
                       );
                     }),
                     const SizedBox(height: 8),

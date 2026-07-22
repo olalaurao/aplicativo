@@ -403,9 +403,7 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
                                       updatedSteps[stepIndex] = step.copyWith(linkedObjectSlug: taskSlug);
                                       final updated = system.copyWith(steps: updatedSteps);
                                       await ref.read(systemsProvider.notifier).updateSystem(updated);
-                                      setState(() {
-                                        _system = updated;
-                                      });
+                                      // No need to setState - the provider will trigger rebuild
                                     }
                                   },
                                 ),

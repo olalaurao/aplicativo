@@ -415,11 +415,8 @@ class ActionableChecklistTile extends ConsumerWidget {
     ).firstOrNull;
 
     if (existingSession != null) {
-      // Navigate to session detail instead of toggling
-      // For now, just show a message since session detail navigation isn't implemented
-      ScaffoldMessenger.of(ref.context).showSnackBar(
-        const SnackBar(content: Text('Session detail navigation not yet implemented')),
-      );
+      // Navigate to Pomodoro screen to show session details
+      GoRouter.of(ref.context).push('/pomodoro?sessionId=${existingSession.id}');
       return;
     }
 
@@ -448,9 +445,7 @@ class ActionableChecklistTile extends ConsumerWidget {
 
     if (choice == 'start') {
       // Navigate to Pomodoro screen with linkedItemSlug preset
-      // Note: The Pomodoro screen needs to accept this as a query parameter or state
-      // For now, navigate to the screen
-      GoRouter.of(ref.context).push('/pomodoro');
+      GoRouter.of(ref.context).push('/pomodoro?linkedItemSlug=$expectedSlug');
     } else if (choice == 'log') {
       int duration = 25;
       await ref.read(pomodoroProvider.notifier).logRetroactiveSession(

@@ -31,6 +31,7 @@ bool computeChecklistItemDone({
     case 'habit':
       if (linkedObjectSlug == null) return false;
       final habitList = habits ?? ref.read(habitsProvider);
+      if (habitList == null) return false;
       final habit = habitList.where((h) => h.slug == linkedObjectSlug).firstOrNull;
       if (habit == null) return false;
       return habit.completionHistory.any((r) =>
@@ -41,6 +42,7 @@ bool computeChecklistItemDone({
     case 'task':
       if (linkedObjectSlug == null) return false;
       final taskList = tasks ?? ref.read(tasksProvider);
+      if (taskList == null) return false;
       final task = taskList.where((t) => t.slug == linkedObjectSlug).firstOrNull;
       if (task == null) return false;
       return task.stage == TaskStage.finalized;
@@ -48,6 +50,7 @@ bool computeChecklistItemDone({
     case 'tracker_entry':
       if (linkedObjectSlug == null || trackerFieldId == null) return false;
       final recordList = trackingRecords ?? ref.read(trackingRecordsProvider);
+      if (recordList == null) return false;
       return recordList.any((r) =>
         r.trackerId == linkedObjectSlug &&
         r.date.toIso8601String().split('T').first == dateStr &&
@@ -57,6 +60,7 @@ bool computeChecklistItemDone({
 
     case 'pomodoro':
       final state = pomodoroState ?? ref.read(pomodoroProvider);
+      if (state == null) return false;
       final expectedSlug = 'checklist:$parentObjectId:$itemId';
       return state.history.any((s) =>
         s.linkedItemSlug == expectedSlug &&

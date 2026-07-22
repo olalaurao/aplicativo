@@ -56,7 +56,28 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     if (_handledWidgetStartAction) return;
 
     final action = GoRouterState.of(context).uri.queryParameters['action'];
-    if (action == 'start_with_picker') {
+    final linkedItemSlug = GoRouterState.of(context).uri.queryParameters['linkedItemSlug'];
+    final sessionId = GoRouterState.of(context).uri.queryParameters['sessionId'];
+    
+    if (sessionId != null) {
+      // Show session details for the given session ID
+      _handledWidgetStartAction = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _showSessionDetails(context, ref, sessionId);
+        }
+      });
+    } else if (linkedItemSlug != null) {
+      _linkedObjectId = linkedItemSlug;
+      _handledWidgetStartAction = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          // Set the linked item and start the timer
+          ref.read(pomodoroProvider.notifier).setCurrentItem(linkedItemSlug, 'Checklist Item');
+          ref.read(pomodoroProvider.notifier).start();
+        }
+      });
+    } else if (action == 'start_with_picker') {
       _handledWidgetStartAction = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -1416,24 +1437,17 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                     height: 52,
                     child: FilledButton(
                       onPressed: () {
-                        final minutes = (state.totalSeconds ~/ 60).clamp(
-                          1,
-                          999,
-                        );
                         Navigator.pop(ctx);
-                        final notifier = ref.read(pomodoroProvider.notifier);
-                        notifier.setDuration(minutes, state.currentType);
-                        notifier.start();
+                        ref.read(pomodoroProvider.notifier).start();
                       },
                       style: FilledButton.styleFrom(
-                        backgroundColor: AppTheme.accentColor(context),
-                        foregroundColor: Colors.white,
+                        backgroundColor: AppColors.success,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       child: const Text(
-                        'One more round',
+                        'Start next',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
@@ -1446,6 +1460,60 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _showSessionDetails(BuildContext context, WidgetRef ref, String sessionId) {
+    final state = ref.read(pomodoroProvider);
+    final session = state.history.where((s) => s.id == sessionId).firstOrNull;
+    
+    if (session == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Session not found')),
+      );
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Session Details'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _detailRow('Date', DateFormat('MMM d, yyyy').format(session.occurredAt ?? session.date)),
+            _detailRow('Duration', '${session.minutesWorked} minutes'),
+            if (session.linkedItemSlug != null)
+              _detailRow('Linked Item', session.linkedItemSlug!),
+            _detailRow('Status', session.state.name),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Expanded(child: Text(value)),
+        ],
       ),
     );
   }
