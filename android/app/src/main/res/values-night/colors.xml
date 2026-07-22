@@ -21,13 +21,13 @@
 
     <!-- Text Colors - Dark -->
     <color name="quartzo_text_primary">#F3F4F6</color>
-    <color name="quartzo_text_secondary">#9CA3AF</color>
-    <color name="quartzo_text_muted">#9CA3AF</color>
+    <color name="quartzo_text_secondary">#D1D5DB</color>
+    <color name="quartzo_text_muted">#D1D5DB</color>
     <color name="quartzo_text_on_primary">#FFFFFF</color>
 
     <!-- Text Colors - Dark (overrides) -->
     <color name="quartzo_dark_text_primary">#F3F4F6</color>
-    <color name="quartzo_dark_text_secondary">#9CA3AF</color>
+    <color name="quartzo_dark_text_secondary">#D1D5DB</color>
 
     <!-- Status Colors (same in dark mode) -->
     <color name="quartzo_success">#22C55E</color>
@@ -52,5 +52,5 @@
     <color name="quartzo_dark_divider">#2D3040</color>
 
     <!-- Navigation Colors (same in dark mode) -->
-    <color name="quartzo_nav_inactive">#9CA3AF</color>
+    <color name="quartzo_nav_inactive">#D1D5DB</color>
 </resources>

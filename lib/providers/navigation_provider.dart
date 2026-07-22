@@ -162,6 +162,12 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
       inBottomBar: false,
     ),
     NavigationItem(
+      section: NavSection.systems,
+      label: 'Systems',
+      route: '/systems',
+      inBottomBar: false,
+    ),
+    NavigationItem(
       section: NavSection.replanning,
       label: 'Replanning',
       route: '/replanning',

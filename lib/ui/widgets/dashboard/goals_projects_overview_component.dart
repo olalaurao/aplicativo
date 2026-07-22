@@ -49,6 +49,7 @@ class GoalsProjectsOverviewComponent extends ConsumerWidget {
     if (typeFilter == 'all' || typeFilter == 'goals_only') {
       final goals = allObjects.whereType<Goal>().where((g) {
         if (!includeCompleted && (g.state == GoalStatus.completed || g.state == GoalStatus.cancelled)) return false;
+        if (g.archived || g.obsidianPath.contains('_deleted')) return false;
         return true;
       });
       for (final g in goals) {
@@ -65,6 +66,7 @@ class GoalsProjectsOverviewComponent extends ConsumerWidget {
     if (typeFilter == 'all' || typeFilter == 'projects_only') {
       final projects = allObjects.whereType<Project>().where((p) {
         if (!includeCompleted && p.archived) return false;
+        if (p.obsidianPath.contains('_deleted')) return false;
         return true;
       });
       for (final p in projects) {

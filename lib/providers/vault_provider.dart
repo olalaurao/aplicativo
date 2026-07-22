@@ -165,6 +165,9 @@ final groupedObjectsProvider = Provider<Map<String, List<ContentObject>>>((
   final all = asyncAll ?? [];
   final map = <String, List<ContentObject>>{};
   for (final obj in all) {
+    // Filter out archived and deleted items
+    if (obj.archived) continue;
+    if (obj.obsidianPath.contains('_deleted')) continue;
     final type = obj is TrackerDefinition
         ? 'tracker_definition'
         : obj is TrackingRecord
@@ -721,6 +724,82 @@ class HabitsNotifier extends Notifier<List<Habit>> {
       );
       rethrow;
     }
+  }
+
+  Future<void> setHabitCompletionRef(
+    Habit habit,
+    DateTime date,
+    VaultLinkRef? linkRef,
+  ) async {
+    final dateStr = date.toIso8601String().split('T').first;
+    final obsidianService = ref.read(obsidianServiceProvider);
+    final syncQueue = ref.read(syncQueueServiceProvider);
+
+    final path = 'daily/$dateStr.md';
+    final content = await obsidianService.readFile(path);
+    if (content == null) return; // toggleHabit must have run first to create the note
+
+    final frontmatter = MarkdownParser.parseFrontmatter(content);
+    final body = MarkdownParser.extractBody(content);
+    final refs = Map<String, dynamic>.from(frontmatter['habit_refs'] ?? {});
+
+    if (linkRef != null) {
+      refs[habit.slug] = linkRef.toMap();
+    } else {
+      refs.remove(habit.slug);
+    }
+    if (refs.isEmpty) {
+      frontmatter.remove('habit_refs');
+    } else {
+      frontmatter['habit_refs'] = refs;
+    }
+
+    // Rebuild the body exactly like toggleHabit does
+    final habitsMap = MarkdownParser.parseHabitCompletions(frontmatter);
+    final newBody = MarkdownParser.generateDailyNoteBody(
+      entries: MarkdownParser.parseJournalEntries(body, dateStr),
+      tasks: MarkdownParser.parseTasksFromDailyNote(body),
+      habits: habitsMap,
+      habitLabels: _habitLabelsFromRef(ref),
+      pactHabitSlugs: _pactHabitSlugsFromRef(ref),
+      trackers: MarkdownParser.parseTrackerRecords(frontmatter),
+      pomodoros: MarkdownParser.parsePomodoros(body),
+    );
+    await obsidianService.writeFile(path, generateMarkdown(frontmatter, newBody));
+
+    // Refresh in-memory completionHistory so the UI updates without a full reload.
+    final habit_ = state.where((h) => h.id == habit.id).firstOrNull ?? habit;
+    final history = [...habit_.completionHistory];
+    final idx = history.indexWhere(
+      (r) => r.date.toIso8601String().split('T').first == dateStr,
+    );
+    if (idx != -1) {
+      history[idx] = CompletionRecord(
+        date: history[idx].date,
+        completions: history[idx].completions,
+        slotCompletions: history[idx].slotCompletions,
+        successful: history[idx].successful,
+        value: history[idx].value,
+        comments: history[idx].comments,
+        journalEntries: history[idx].journalEntries,
+        completedAt: history[idx].completedAt,
+        linkedRef: linkRef,
+      );
+    }
+    final updated = habit_.copyWith(completionHistory: history);
+    state = [for (final h in state) if (h.id == updated.id) updated else h];
+    ref.read(allObjectsProvider.notifier).replaceObjectInMemory(updated);
+
+    ref.invalidate(dailyNoteDataProvider(dateStr));
+
+    await syncQueue.enqueueAction(
+      SyncAction(
+        objectType: 'daily_note',
+        objectId: dateStr,
+        operation: SyncOperation.update,
+        payload: frontmatter,
+      ),
+    );
   }
 
   bool _isTruthyCompletion(dynamic value) {
@@ -1453,6 +1532,34 @@ class TrackingRecordsNotifier extends Notifier<List<TrackingRecord>> {
   Future<void> addRecord(TrackingRecord record) async {
     state = [...state, record];
     await ref.read(vaultProvider.notifier).createObject(record);
+  }
+
+  Future<void> upsertRecordForDate(
+    String trackerId,
+    DateTime date,
+    Map<String, dynamic> fieldPatch,
+  ) async {
+    final dateStr = date.toIso8601String().split('T').first;
+    final existing = state.where((r) =>
+      r.trackerId == trackerId &&
+      r.date.toIso8601String().split('T').first == dateStr,
+    ).firstOrNull;
+
+    if (existing != null) {
+      final updated = existing.copyWith(
+        fieldValues: {...existing.fieldValues, ...fieldPatch},
+      );
+      state = [for (final r in state) if (r.id == updated.id) updated else r];
+      await ref.read(vaultProvider.notifier).updateObject(updated);
+    } else {
+      final record = TrackingRecord(
+        title: dateStr,
+        trackerId: trackerId,
+        date: date,
+        fieldValues: fieldPatch,
+      );
+      await addRecord(record);
+    }
   }
 }
 

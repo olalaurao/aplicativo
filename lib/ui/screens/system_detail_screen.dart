@@ -11,6 +11,7 @@ import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import '../forms/create_system_form.dart';
 import '../forms/create_task_form.dart';
+import '../widgets/actionable_checklist_tile.dart';
 
 class SystemDetailScreen extends ConsumerStatefulWidget {
   final SystemDefinition system;
@@ -36,13 +37,12 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
 
   // ──────────────────── Via C: Quick-run state ────────────────────
   bool _isRunning = false;
-  late List<bool> _stepsDone;
+  final Set<String> _plainStepsDone = {}; // For plain items only
   DateTime? _runStart;
 
   @override
   void initState() {
     super.initState();
-    _stepsDone = List.filled(widget.system.steps.length, false);
     if (widget.autoStart) {
       _isRunning = true;
       _runStart = DateTime.now();
@@ -53,7 +53,7 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
     setState(() {
       _isRunning = true;
       _runStart = DateTime.now();
-      _stepsDone = List.filled(_system.steps.length, false);
+      _plainStepsDone.clear();
     });
   }
 
@@ -62,22 +62,23 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
         ? DateTime.now().difference(_runStart!).inMinutes
         : 0;
     final system = _system;
-    final totalRuns = system.runCount + 1;
-    final newAvg = ((system.averageMinutes * system.runCount) + elapsed) ~/ totalRuns;
 
-    final updated = system.copyWith(
-      runCount: totalRuns,
-      lastRun: DateTime.now(),
-      averageMinutes: newAvg,
-    );
-    await ref.read(systemsProvider.notifier).updateSystem(updated);
+    // Create a lightweight summary Task to feed the existing derivation path
+    await ref.read(tasksProvider.notifier).addTask(Task(
+      id: '',
+      title: system.title,
+      stage: TaskStage.finalized,
+      createdAt: _runStart ?? DateTime.now(),
+      estimatedMinutes: elapsed,
+      linkedSystem: system.id,
+    ));
 
     HapticFeedback.mediumImpact();
 
     setState(() {
       _isRunning = false;
       _runStart = null;
-      _stepsDone = List.filled(_system.steps.length, false);
+      _plainStepsDone.clear();
     });
 
     if (mounted) {
@@ -99,7 +100,7 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
     setState(() {
       _isRunning = false;
       _runStart = null;
-      _stepsDone = List.filled(_system.steps.length, false);
+      _plainStepsDone.clear();
     });
   }
 
@@ -372,66 +373,30 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
                       child: Column(
                         children: [
                           ...system.steps.asMap().entries.map((e) {
-                            final i = e.key;
                             final step = e.value;
-                            final done = _isRunning && _stepsDone[i];
                             return Column(
                               children: [
-                                ListTile(
-                                  dense: true,
-                                  leading: _isRunning
-                                      ? GestureDetector(
-                                          onTap: () => setState(() => _stepsDone[i] = !_stepsDone[i]),
-                                          child: AnimatedContainer(
-                                            duration: const Duration(milliseconds: 200),
-                                            width: 24,
-                                            height: 24,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: done ? AppColors.success : Colors.transparent,
-                                              border: Border.all(
-                                                color: done ? AppColors.success : AppColors.textMuted,
-                                                width: 2,
-                                              ),
-                                            ),
-                                            child: done
-                                                ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
-                                                : null,
-                                          ),
-                                        )
-                                      : Container(
-                                          width: 24,
-                                          height: 24,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            border: Border.all(color: AppColors.textMuted.withValues(alpha: 0.4), width: 1.5),
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: Text(
-                                            '${i + 1}',
-                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted),
-                                          ),
-                                        ),
-                                  title: Text(
-                                    step.title,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      decoration: done ? TextDecoration.lineThrough : null,
-                                      color: done
-                                          ? AppTheme.textMutedColor(context)
-                                          : AppTheme.textPrimaryColor(context),
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  subtitle: step.substeps.isNotEmpty
-                                      ? Text(
-                                          '${step.substeps.length} sub-steps',
-                                          style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-                                        )
-                                      : null,
+                                ActionableChecklistTile(
+                                  itemId: step.id,
+                                  title: step.title,
+                                  kind: step.kind,
+                                  linkedObjectSlug: step.linkedObjectSlug,
+                                  trackerFieldId: step.trackerFieldId,
+                                  attachedCollectionSlug: step.attachedCollectionSlug,
+                                  date: _runStart ?? DateTime.now(),
+                                  parentObjectId: system.id,
+                                  plainValue: _plainStepsDone.contains(step.id),
+                                  onPlainToggle: (done) {
+                                    setState(() {
+                                      if (done) {
+                                        _plainStepsDone.add(step.id);
+                                      } else {
+                                        _plainStepsDone.remove(step.id);
+                                      }
+                                    });
+                                  },
                                 ),
-                                if (i < system.steps.length - 1)
+                                if (e.key < system.steps.length - 1)
                                   const Divider(height: 1, indent: 48, color: AppColors.divider),
                               ],
                             );

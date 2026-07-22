@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../models/habit_model.dart';
 import '../../models/scheduler.dart';
 import '../../models/template_model.dart';
+import '../../models/note_model.dart';
+import '../../models/tracker_model.dart';
+import '../../models/content_object.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/color_palette_provider.dart';
 import '../../services/collection_row_service.dart';
@@ -21,6 +24,7 @@ import '../widgets/form_section_card.dart';
 import '../widgets/discard_guard.dart';
 import '../widgets/app_color_picker.dart';
 import '../../models/color_palette_model.dart';
+import '../widgets/universal_search_picker.dart';
 
 class CreateHabitForm extends ConsumerStatefulWidget {
   final String? initialTitle;
@@ -1838,7 +1842,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
       return TextButton.icon(
         onPressed: _addChecklistSection,
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Adicionar seção'),
+        label: const Text('Add section'),
       );
     }
 
@@ -1933,35 +1937,225 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                           key: ValueKey('item-${item.id}-$itemIndex'),
                           leading:
                               const Icon(Icons.drag_handle_rounded, size: 18),
-                          title: TextField(
-                            decoration: const InputDecoration(
-                              hintText: 'Título do item',
-                              isDense: true,
-                            ),
-                            controller: TextEditingController(text: item.title)
-                              ..selection = TextSelection.collapsed(
-                                offset: item.title.length,
+                          title: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TextField(
+                                decoration: const InputDecoration(
+                                  hintText: 'Item title',
+                                  isDense: true,
+                                ),
+                                controller: TextEditingController(text: item.title)
+                                  ..selection = TextSelection.collapsed(
+                                    offset: item.title.length,
+                                  ),
+                                onChanged: (v) {
+                                  final items =
+                                      List<ChecklistItem>.from(section.items);
+                                  items[itemIndex] = item.copyWith(title: v);
+                                  _checklistSections[sectionIndex] =
+                                      ChecklistSection(
+                                    id: section.id,
+                                    label: section.label,
+                                    emoji: section.emoji,
+                                    items: items,
+                                  );
+                                },
                               ),
-                            onChanged: (v) {
-                              final items =
-                                  List<ChecklistItem>.from(section.items);
-                              items[itemIndex] = ChecklistItem(
-                                id: slugify(v.isEmpty ? 'item' : v),
-                                title: v,
-                                estimatedMinutes: item.estimatedMinutes,
-                              );
-                              _checklistSections[sectionIndex] =
-                                  ChecklistSection(
-                                id: section.id,
-                                label: section.label,
-                                emoji: section.emoji,
-                                items: items,
-                              );
-                            },
+                              const SizedBox(height: 8),
+                              // Kind selection
+                              SegmentedButton<String>(
+                                segments: const [
+                                  ButtonSegment(
+                                    value: 'plain',
+                                    label: Text('Reminder'),
+                                  ),
+                                  ButtonSegment(
+                                    value: 'habit',
+                                    label: Text('Habit'),
+                                  ),
+                                  ButtonSegment(
+                                    value: 'task',
+                                    label: Text('Task'),
+                                  ),
+                                  ButtonSegment(
+                                    value: 'tracker_entry',
+                                    label: Text('Tracker'),
+                                  ),
+                                  ButtonSegment(
+                                    value: 'pomodoro',
+                                    label: Text('Pomodoro'),
+                                  ),
+                                ],
+                                selected: {item.kind},
+                                onSelectionChanged: (Set<String> selected) {
+                                  final newKind = selected.first;
+                                  final items =
+                                      List<ChecklistItem>.from(section.items);
+                                  items[itemIndex] = item.copyWith(kind: newKind);
+                                  _checklistSections[sectionIndex] =
+                                      ChecklistSection(
+                                    id: section.id,
+                                    label: section.label,
+                                    emoji: section.emoji,
+                                    items: items,
+                                  );
+                                },
+                              ),
+                              if (item.kind == 'task')
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    'One-off items only — once checked, this stays checked. For something you\'ll do again tomorrow, use Habit instead.',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textMuted,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ),
+                              // Object picker for non-plain kinds
+                              if (item.kind != 'plain')
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: TextButton(
+                                    onPressed: () async {
+                                      final selected = await showModalBottomSheet<ContentObject>(
+                                        context: context,
+                                        isScrollControlled: true,
+                                        backgroundColor: Colors.transparent,
+                                        builder: (_) => UniversalSearchPickerSheet(
+                                          title: 'Select ${item.kind}',
+                                          initialFilter: item.kind == 'tracker_entry' ? 'tracker' : item.kind,
+                                          showClear: item.kind == 'task',
+                                          onSelected: (obj) => Navigator.pop(context, obj),
+                                        ),
+                                      );
+                                      if (selected != null) {
+                                        final items = List<ChecklistItem>.from(section.items);
+                                        items[itemIndex] = item.copyWith(linkedObjectSlug: selected.slug);
+                                        _checklistSections[sectionIndex] = ChecklistSection(
+                                          id: section.id,
+                                          label: section.label,
+                                          emoji: section.emoji,
+                                          items: items,
+                                        );
+                                      }
+                                    },
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.link, size: 16),
+                                        const SizedBox(width: 4),
+                                        Text(item.linkedObjectSlug ?? 'Link to ${item.kind}'),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              // Field picker for tracker_entry
+                              if (item.kind == 'tracker_entry' && item.linkedObjectSlug != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: TextButton(
+                                    onPressed: () async {
+                                      final trackers = ref.read(trackersProvider);
+                                      final tracker = trackers.where((t) => t.slug == item.linkedObjectSlug).firstOrNull;
+                                      if (tracker == null) return;
+
+                                      final allFields = <InputField>[];
+                                      for (final section in tracker.sections) {
+                                        allFields.addAll(section.inputFields);
+                                      }
+
+                                      final selectedField = await showDialog<InputField>(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: const Text('Select field'),
+                                          content: SizedBox(
+                                            width: double.maxFinite,
+                                            child: ListView.builder(
+                                              shrinkWrap: true,
+                                              itemCount: allFields.length,
+                                              itemBuilder: (context, index) => ListTile(
+                                                title: Text(allFields[index].title),
+                                                onTap: () => Navigator.pop(context, allFields[index]),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+
+                                      if (selectedField != null) {
+                                        final items = List<ChecklistItem>.from(section.items);
+                                        items[itemIndex] = item.copyWith(trackerFieldId: selectedField.id);
+                                        _checklistSections[sectionIndex] = ChecklistSection(
+                                          id: section.id,
+                                          label: section.label,
+                                          emoji: section.emoji,
+                                          items: items,
+                                        );
+                                      }
+                                    },
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.tune, size: 16),
+                                        const SizedBox(width: 4),
+                                        Text(item.trackerFieldId ?? 'Select field'),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              // Collection attachment toggle for habit/tracker_entry
+                              if (item.kind == 'habit' || item.kind == 'tracker_entry')
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: TextButton(
+                                    onPressed: () async {
+                                      final notes = ref.read(notesProvider);
+                                      final collections = notes.where((n) => n.subtype == NoteSubtype.collection).toList();
+
+                                      final selected = await showDialog<Note>(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: const Text('Attach Collection'),
+                                          content: SizedBox(
+                                            width: double.maxFinite,
+                                            child: ListView.builder(
+                                              shrinkWrap: true,
+                                              itemCount: collections.length,
+                                              itemBuilder: (context, index) => ListTile(
+                                                title: Text(collections[index].title),
+                                                onTap: () => Navigator.pop(context, collections[index]),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+
+                                      if (selected != null) {
+                                        final items = List<ChecklistItem>.from(section.items);
+                                        items[itemIndex] = item.copyWith(attachedCollectionSlug: selected.slug);
+                                        _checklistSections[sectionIndex] = ChecklistSection(
+                                          id: section.id,
+                                          label: section.label,
+                                          emoji: section.emoji,
+                                          items: items,
+                                        );
+                                      }
+                                    },
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.folder_open, size: 16),
+                                        const SizedBox(width: 4),
+                                        Text(item.attachedCollectionSlug ?? 'Attach Collection (optional)'),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                           subtitle: TextField(
                             decoration: const InputDecoration(
-                              hintText: 'Min (opcional)',
+                              hintText: 'Min (optional)',
                               isDense: true,
                             ),
                             keyboardType: TextInputType.number,
@@ -1971,9 +2165,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                             onChanged: (v) {
                               final items =
                                   List<ChecklistItem>.from(section.items);
-                              items[itemIndex] = ChecklistItem(
-                                id: item.id,
-                                title: item.title,
+                              items[itemIndex] = item.copyWith(
                                 estimatedMinutes: int.tryParse(v),
                               );
                               _checklistSections[sectionIndex] =
@@ -2007,7 +2199,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                     ),
                     TextButton(
                       onPressed: () => _addChecklistItem(sectionIndex),
-                      child: const Text('+ Adicionar item'),
+                      child: const Text('+ Add item'),
                     ),
                   ],
                 ),
@@ -2018,7 +2210,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
         TextButton.icon(
           onPressed: _addChecklistSection,
           icon: const Icon(Icons.add_rounded),
-          label: const Text('+ Adicionar seção'),
+          label: const Text('+ Add section'),
         ),
       ],
     );

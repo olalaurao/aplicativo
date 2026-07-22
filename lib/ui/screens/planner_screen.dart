@@ -182,9 +182,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     final tasks = ref.watch(tasksListProvider);
     final organizers = ref.watch(organizersListProvider);
-    final projects = ref.watch(projectsProvider.select((projects) => projects.toList()));
+    final projects = ref.watch(projectsProvider);
     final habits = ref.watch(habitsProvider.select((habits) => habits.where((h) => !h.isQuitting && !h.isNegative).toList()));
-    final people = ref.watch(peopleProvider.select((people) => people.toList()));
+    final people = ref.watch(peopleProvider);
     final dayThemes = organizers.where((o) => o.organizerType == OrganizerType.dayTheme).toList();
     final timeBlocks = organizers.where((o) => o.organizerType == OrganizerType.timeBlock).toList();
     final googleEvents = ref.watch(googleCalendarEventsProvider(_selectedDate));

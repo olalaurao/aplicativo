@@ -730,6 +730,7 @@ class MarkdownParser {
       'title',
       'trackers',
       'habit_completions',
+      'habit_refs',
       'target',
       'status',
       'priority',
@@ -767,6 +768,30 @@ class MarkdownParser {
     });
 
     return habits;
+  }
+
+  static Map<String, VaultLinkRef> parseHabitRefs(
+    Map<String, dynamic> frontmatter,
+  ) {
+    if (frontmatter['habit_refs'] == null) return {};
+    if (frontmatter['habit_refs'] is! Map) return {};
+    
+    final refsMap = <String, VaultLinkRef>{};
+    final refs = frontmatter['habit_refs'] as Map;
+    
+    refs.forEach((key, value) {
+      if (value is Map) {
+        try {
+          refsMap[key.toString()] = VaultLinkRef.fromMap(
+            Map<String, dynamic>.from(value),
+          );
+        } catch (e) {
+          // Skip malformed entries
+        }
+      }
+    });
+    
+    return refsMap;
   }
 
   static Map<String, dynamic> parseTrackerRecords(

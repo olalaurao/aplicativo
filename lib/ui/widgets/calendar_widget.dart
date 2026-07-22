@@ -30,8 +30,8 @@ class _CalendarWidgetState extends ConsumerState<CalendarWidget> {
   @override
   Widget build(BuildContext context) {
     final allObjects = ref.watch(allObjectsProvider).value ?? [];
-    final allTasks = allObjects.whereType<Task>().toList();
-    final habits = allObjects.whereType<Habit>().where((h) => !h.isQuitting).toList();
+    final allTasks = allObjects.whereType<Task>().where((t) => !t.archived && !t.obsidianPath.contains('_deleted')).toList();
+    final habits = allObjects.whereType<Habit>().where((h) => !h.isQuitting && !h.archived && !h.obsidianPath.contains('_deleted')).toList();
     final reminders = ref.watch(remindersProvider);
     final organizerObjects =
         ref

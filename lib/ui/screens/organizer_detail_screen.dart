@@ -522,14 +522,15 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
   ) {
     return itemsAsync.when(
       data: (items) {
-        final filteredItems = _filterItemsByPeriod(items);
-        if (filteredItems.isEmpty) {
+        final filteredItems = items.where((item) => !item.archived && !item.obsidianPath.contains('_deleted')).toList();
+        final periodFilteredItems = _filterItemsByPeriod(filteredItems);
+        if (periodFilteredItems.isEmpty) {
           return _buildEmptyState(
             'No activity yet',
             'Content tagged to this organizer will appear here',
           );
         }
-        final sortedItems = filteredItems.toList()
+        final sortedItems = periodFilteredItems.toList()
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
         return ListView.builder(
@@ -663,6 +664,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         final socialPosts = _postsForOrganizer();
         final visibleItems = items
             .where((item) => item is! SocialPost && item.type != 'social_post')
+            .where((item) => !item.archived && !item.obsidianPath.contains('_deleted'))
             .toList();
         if (visibleItems.isEmpty && socialPosts.isEmpty) {
           return _buildEmptyState(
@@ -760,7 +762,8 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
   }
 
   Widget _buildOutgoingList(BuildContext context, List<ContentObject> items) {
-    if (items.isEmpty) {
+    final filteredItems = items.where((item) => !item.archived && !item.obsidianPath.contains('_deleted')).toList();
+    if (filteredItems.isEmpty) {
       return _buildEmptyState(
         'No outgoing links',
         'Wiki-links in this organizer body will appear here',
@@ -769,9 +772,9 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
 
     return ListView.builder(
       padding: const EdgeInsets.all(20),
-      itemCount: items.length,
+      itemCount: filteredItems.length,
       itemBuilder: (context, index) {
-        final item = items[index];
+        final item = filteredItems[index];
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: ObjectActionWrapper(

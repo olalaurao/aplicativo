@@ -1,4 +1,5 @@
 // lib/ui/forms/create_record_form.dart
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../models/tracker_model.dart';
+import '../../models/note_model.dart';
+import '../../models/shared_types.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import '../widgets/date_picker_field.dart';
@@ -39,6 +42,38 @@ class _CreateRecordFormState extends ConsumerState<CreateRecordForm> {
       for (var field in section.inputFields) {
         _values[field.id] = field.defaultValue;
       }
+    }
+  }
+
+  List<String> _getCollectionOptions(String collectionSlug) {
+    final notes = ref.read(notesProvider);
+    final collection = notes.where((n) => n.slug == collectionSlug).firstOrNull;
+    if (collection == null || collection.subtype != NoteSubtype.collection) {
+      return [];
+    }
+
+    try {
+      final data = jsonDecode(collection.body);
+      final items = data is Map ? data['items'] : null;
+      if (items is! List) return [];
+
+      final options = <String>[];
+      for (final item in items) {
+        if (item is Map) {
+          // Find first text/richText property value
+          for (final entry in item.entries) {
+            final value = entry.value;
+            if (value is String && value.trim().isNotEmpty) {
+              options.add(value.trim());
+              break;
+            }
+          }
+        }
+      }
+      return options;
+    } catch (e) {
+      debugPrint('Error parsing Collection options: $e');
+      return [];
     }
   }
 
@@ -374,7 +409,9 @@ class _CreateRecordFormState extends ConsumerState<CreateRecordForm> {
           ),
         );
       case InputFieldType.selection:
-        final options = field.options ?? const <String>[];
+        final options = field.optionsSourceCollectionSlug != null
+            ? _getCollectionOptions(field.optionsSourceCollectionSlug!)
+            : (field.options ?? const <String>[]);
         final rawValue = _values[field.id];
         final selectedValue = rawValue is String && options.contains(rawValue)
             ? rawValue
@@ -389,10 +426,13 @@ class _CreateRecordFormState extends ConsumerState<CreateRecordForm> {
           underline: const SizedBox(),
         );
       case InputFieldType.checklist:
+        final checklistOptions = field.optionsSourceCollectionSlug != null
+            ? _getCollectionOptions(field.optionsSourceCollectionSlug!)
+            : (field.options ?? []);
         return Expanded(
           child: Wrap(
             spacing: 8,
-            children: (field.options ?? []).map((opt) {
+            children: checklistOptions.map((opt) {
               final selected = ((_values[field.id] as List?) ?? []).contains(
                 opt,
               );

@@ -84,10 +84,12 @@ class _OrganizerTasksWidgetState extends ConsumerState<OrganizerTasksWidget> {
     final tasks = allObjects
         .whereType<Task>()
         .where((task) => belongsToSelected(task.organizers))
+        .where((task) => !task.archived && !task.obsidianPath.contains('_deleted'))
         .toList();
     final habits = allObjects
         .whereType<Habit>()
         .where((habit) => belongsToSelected(habit.organizers))
+        .where((habit) => !habit.archived && !habit.obsidianPath.contains('_deleted'))
         .toList();
     final pomodoroTasks = tasks
         .where((task) => (task.pomodoroCount ?? 0) > 0)

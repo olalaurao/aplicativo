@@ -32,6 +32,7 @@ class InputField {
   double? min; // for range
   double? max; // for range
   List<String>? options; // for selection/checklist
+  String? optionsSourceCollectionSlug; // NEW — if set, options are read live from that Collection note
 
   // A6.2 — Health alert fields
   FieldAlertLevel alertLevel;
@@ -54,6 +55,7 @@ class InputField {
     this.min,
     this.max,
     this.options,
+    this.optionsSourceCollectionSlug,
     this.alertLevel = FieldAlertLevel.none,
     this.alertThreshold,
     this.alertNote,
@@ -73,6 +75,7 @@ class InputField {
       'min': min,
       'max': max,
       'options': options,
+      'options_source_collection_slug': optionsSourceCollectionSlug,
       'organizers': organizers.map((e) => e.toWikiLink()).toList(),
       // A6.2 alert fields
       'alert_level': alertLevel.name,
@@ -102,6 +105,7 @@ class InputField {
       options: rawOptions is List
           ? rawOptions.map((option) => option.toString()).toList()
           : const [],
+      optionsSourceCollectionSlug: map['options_source_collection_slug']?.toString(),
       organizers: (map['organizers'] as List? ?? [])
           .map((e) => OrganizerReference.fromWikiLink(e.toString()))
           .toList(),
@@ -344,5 +348,25 @@ class TrackingRecord extends ContentObject {
       frontmatter['field_values'] as Map? ?? {},
     );
     return record;
+  }
+
+  TrackingRecord copyWith({
+    String? trackerId,
+    DateTime? date,
+    Map<String, dynamic>? fieldValues,
+  }) {
+    return TrackingRecord(
+      id: id,
+      title: title,
+      trackerId: trackerId ?? this.trackerId,
+      date: date ?? this.date,
+      fieldValues: fieldValues ?? this.fieldValues,
+      organizers: organizers,
+      categories: categories,
+      tags: tags,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      obsidianPath: obsidianPath,
+    );
   }
 }

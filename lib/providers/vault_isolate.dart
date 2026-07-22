@@ -91,6 +91,7 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
 
     List<ContentObject> results = [];
     Map<String, List<Map<String, dynamic>>> dailyHabitCompletions = {};
+    Map<String, Map<String, VaultLinkRef>> dailyHabitRefs = {};
     Map<String, List<Map<String, dynamic>>> dailyTrackerRecords = {};
     final needsRewritePaths = <String>[];
     final yamlErrors = <Map<String, String>>[];
@@ -287,6 +288,11 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                   dailyHabitCompletions[dateStr] = habits.entries
                       .map((e) => {'slug': e.key, 'value': e.value})
                       .toList();
+                }
+
+                final habitRefs = MarkdownParser.parseHabitRefs(frontmatter);
+                if (habitRefs.isNotEmpty) {
+                  dailyHabitRefs[dateStr] = habitRefs;
                 }
 
                 final trackers = MarkdownParser.parseTrackerRecords(
@@ -564,6 +570,7 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
               slotCompletions: slotCompletions,
               successful: successful,
               completedAt: null, // Parsed from data, not live completion
+              linkedRef: dailyHabitRefs[dateStr]?[habit.slug],
             ),
           );
         }

@@ -48,6 +48,9 @@ class TodayAggregatorService {
     final List<TodayItem> items = [];
 
     for (final obj in allObjects) {
+      // Filter out archived and deleted items
+      if (obj.archived) continue;
+      if (obj.obsidianPath.contains('_deleted')) continue;
       if (obj is JournalEntry) {
         if (obj.date != null && obj.date!.year == date.year && obj.date!.month == date.month && obj.date!.day == date.day) {
           DateTime ts = obj.date!;

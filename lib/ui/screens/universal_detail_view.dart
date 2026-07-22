@@ -28,6 +28,7 @@ import '../../models/pillar_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/kpi_model.dart';
 import '../../providers/pomodoro_provider.dart';
+import '../widgets/actionable_checklist_tile.dart';
 import '../../services/kpi_engine.dart';
 import '../../services/markdown_parser.dart';
 import '../../services/scheduler_service.dart';
@@ -3616,7 +3617,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final entries = kpi.dataSource.sourceType == DataSourceType.entry
         ? ref.watch(allEntriesProvider.select((entries) => entries.toList()))
         : <JournalEntry>[];
-    final moods = <MoodDefinition>[]; // Mood-based KPIs not currently supported
+    final moods = (kpi.dataSource.sourceType == DataSourceType.journalMood ||
+        (kpi.sourceType == KPISourceType.others &&
+            (kpi.calculationMode == 'mood_average' ||
+                kpi.calculationMode == 'mood_trend')))
+        ? ref.watch(moodsProvider)
+        : <MoodDefinition>[];
     final allObjects =
         ref.watch(allObjectsProvider.select((async) => async.valueOrNull)) ??
         [];
@@ -4529,84 +4535,24 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                       ),
                     ),
                     ...section.items.map((item) {
-                      final done = checklistState[item.id] == true;
                       final title = item.estimatedMinutes != null
                           ? '${item.title} (${item.estimatedMinutes} min)'
                           : item.title;
-                      return Semantics(
-                        label: "Marcar '$title' como feito",
-                        button: true,
-                        child: GestureDetector(
-                          onTap: () async {
-                            await ref
-                                .read(habitsProvider.notifier)
-                                .toggleChecklistItem(habit, today, item.id);
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            child: Row(
-                              children: [
-                                AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 150),
-                                  transitionBuilder: (child, anim) =>
-                                      ScaleTransition(
-                                        scale: anim,
-                                        child: child,
-                                      ),
-                                  child: Container(
-                                    key: ValueKey(done),
-                                    width: 44,
-                                    height: 44,
-                                    alignment: Alignment.center,
-                                    child: Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: done
-                                            ? habitColor
-                                            : Colors.transparent,
-                                        border: Border.all(
-                                          color: done
-                                              ? habitColor
-                                              : AppColors.textMuted,
-                                          width: 2,
-                                        ),
-                                      ),
-                                      child: done
-                                          ? const Icon(
-                                              Icons.check,
-                                              size: 14,
-                                              color: Colors.white,
-                                            )
-                                          : null,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: AnimatedDefaultTextStyle(
-                                    duration: const Duration(milliseconds: 150),
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      decoration: done
-                                          ? TextDecoration.lineThrough
-                                          : TextDecoration.none,
-                                      color: done
-                                          ? AppColors.textMuted
-                                          : AppTheme.textPrimaryColor(context),
-                                    ),
-                                    child: Text(
-                                      title,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                      return ActionableChecklistTile(
+                        itemId: item.id,
+                        title: title,
+                        kind: item.kind,
+                        linkedObjectSlug: item.linkedObjectSlug,
+                        trackerFieldId: item.trackerFieldId,
+                        attachedCollectionSlug: item.attachedCollectionSlug,
+                        date: today,
+                        parentObjectId: habit.id,
+                        plainValue: checklistState[item.id],
+                        onPlainToggle: (done) async {
+                          await ref
+                              .read(habitsProvider.notifier)
+                              .toggleChecklistItem(habit, today, item.id);
+                        },
                       );
                     }),
                     const SizedBox(height: 8),

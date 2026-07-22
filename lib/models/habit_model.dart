@@ -21,23 +21,60 @@ class ChecklistItem {
   final String title;
   final int? estimatedMinutes;
 
+  // NEW — item linking
+  final String kind;                 // 'plain' | 'habit' | 'task' | 'tracker_entry' | 'pomodoro'
+  final String? linkedObjectSlug;    // Habit / Task / TrackerDefinition slug
+  final String? trackerFieldId;      // only for kind == 'tracker_entry'
+  final String? attachedCollectionSlug; // Note slug (subtype == collection), optional
+
   const ChecklistItem({
     required this.id,
     required this.title,
     this.estimatedMinutes,
+    this.kind = 'plain',
+    this.linkedObjectSlug,
+    this.trackerFieldId,
+    this.attachedCollectionSlug,
   });
 
   Map<String, dynamic> toMap() => {
     'id': id,
     'title': title,
     if (estimatedMinutes != null) 'estimated_minutes': estimatedMinutes,
+    'kind': kind,
+    if (linkedObjectSlug != null) 'linked_object_slug': linkedObjectSlug,
+    if (trackerFieldId != null) 'tracker_field_id': trackerFieldId,
+    if (attachedCollectionSlug != null) 'attached_collection_slug': attachedCollectionSlug,
   };
 
   factory ChecklistItem.fromMap(Map<String, dynamic> map) => ChecklistItem(
     id: map['id']?.toString() ?? '',
     title: map['title']?.toString() ?? '',
     estimatedMinutes: map['estimated_minutes'] as int?,
+    kind: map['kind']?.toString() ?? 'plain',
+    linkedObjectSlug: map['linked_object_slug']?.toString(),
+    trackerFieldId: map['tracker_field_id']?.toString(),
+    attachedCollectionSlug: map['attached_collection_slug']?.toString(),
   );
+
+  ChecklistItem copyWith({
+    String? title,
+    int? estimatedMinutes,
+    String? kind,
+    String? linkedObjectSlug,
+    String? trackerFieldId,
+    String? attachedCollectionSlug,
+  }) {
+    return ChecklistItem(
+      id: id,
+      title: title ?? this.title,
+      estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
+      kind: kind ?? this.kind,
+      linkedObjectSlug: linkedObjectSlug ?? this.linkedObjectSlug,
+      trackerFieldId: trackerFieldId ?? this.trackerFieldId,
+      attachedCollectionSlug: attachedCollectionSlug ?? this.attachedCollectionSlug,
+    );
+  }
 }
 
 class ChecklistSection {
@@ -240,6 +277,7 @@ class CompletionRecord {
   List<Comment> comments;
   List<JournalEntry> journalEntries; // Or references
   DateTime? completedAt; // When the completion was recorded (time component)
+  VaultLinkRef? linkedRef;   // NEW — e.g. which Collection row was used today
 
   CompletionRecord({
     required this.date,
@@ -250,6 +288,7 @@ class CompletionRecord {
     List<Comment>? comments,
     List<JournalEntry>? journalEntries,
     this.completedAt,
+    this.linkedRef,
   }) : comments = comments ?? [],
        journalEntries = journalEntries ?? [];
 }

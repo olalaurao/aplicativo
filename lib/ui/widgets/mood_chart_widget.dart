@@ -16,7 +16,7 @@ class MoodChartWidget extends ConsumerWidget {
 
     return allObjectsAsync.when(
       data: (objects) {
-        final entries = objects.whereType<JournalEntry>().toList()
+        final entries = objects.whereType<JournalEntry>().where((e) => !e.archived && !e.obsidianPath.contains('_deleted')).toList()
           ..sort((a, b) => a.date.compareTo(b.date));
         final moods = objects.whereType<MoodDefinition>().toList();
 

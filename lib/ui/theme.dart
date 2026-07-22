@@ -73,12 +73,12 @@ class AppColors {
   // Text — Light
   static const Color textPrimary = Color(0xFF1A1D26);
   static const Color textSecondary = Color(0xFF6B7280);
-  static const Color textMuted = Color(0xFF9CA3AF);
+  static const Color textMuted = Color(0xFF6B7280);
   static const Color textOnPrimary = Colors.white;
 
   // Text — Dark
   static const Color darkTextPrimary = Color(0xFFF3F4F6);
-  static const Color darkTextSecondary = Color(0xFF9CA3AF);
+  static const Color darkTextSecondary = Color(0xFFD1D5DB);
 
   // Status
   static const Color success = Color(0xFF22C55E);
@@ -103,7 +103,7 @@ class AppColors {
   static const Color darkDivider = Color(0xFF2D3040);
 
   // Bottom Nav
-  static const Color navInactive = Color(0xFF9CA3AF);
+  static const Color navInactive = Color(0xFF6B7280);
 }
 
 class AppTheme {

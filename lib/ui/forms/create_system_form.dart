@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/system_model.dart';
 import '../../models/shared_types.dart';
+import '../../models/content_object.dart';
+import '../../models/note_model.dart';
+import '../../models/tracker_model.dart';
+import '../../models/reminder_config.dart';
 import '../../providers/systems_provider.dart';
+import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import '../widgets/organizer_selector_field.dart';
+import '../widgets/universal_search_picker.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/scheduler.dart';
 import 'scheduler_picker.dart';
@@ -472,6 +478,11 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                                 index: index,
                                 step: step,
                                 onChanged: (title) => _updateStepTitle(index, title),
+                                onStepChanged: (newStep) {
+                                  setState(() {
+                                    _steps[index] = newStep;
+                                  });
+                                },
                                 onRemove: () => _removeStep(index),
                               );
                             },
@@ -574,6 +585,7 @@ class _StepRow extends StatefulWidget {
   final int index;
   final SystemStep step;
   final ValueChanged<String> onChanged;
+  final ValueChanged<SystemStep> onStepChanged;
   final VoidCallback onRemove;
 
   const _StepRow({
@@ -581,6 +593,7 @@ class _StepRow extends StatefulWidget {
     required this.index,
     required this.step,
     required this.onChanged,
+    required this.onStepChanged,
     required this.onRemove,
   });
 
@@ -607,53 +620,363 @@ class _StepRowState extends State<_StepRow> {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ReorderableDragStartListener(
-            index: widget.index,
-            child: const Icon(Icons.drag_handle_rounded, color: AppColors.textMuted, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.textMuted, width: 1.5),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '${widget.index + 1}',
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: TextField(
-              controller: _ctrl,
-              onChanged: widget.onChanged,
-              style: TextStyle(
-                fontSize: 14,
-                color: AppTheme.textPrimaryColor(context),
+          Row(
+            children: [
+              ReorderableDragStartListener(
+                index: widget.index,
+                child: const Icon(Icons.drag_handle_rounded, color: AppColors.textMuted, size: 20),
               ),
-              decoration: InputDecoration(
-                hintText: 'Descreva o step...',
-                hintStyle: TextStyle(color: AppTheme.textMutedColor(context), fontSize: 14),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
+              const SizedBox(width: 12),
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.textMuted, width: 1.5),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '${widget.index + 1}',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _ctrl,
+                  onChanged: widget.onChanged,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppTheme.textPrimaryColor(context),
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Describe step...',
+                    hintStyle: TextStyle(color: AppTheme.textMutedColor(context), fontSize: 14),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.textMuted),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: widget.onRemove,
+              ),
+            ],
+          ),
+          // Kind selector
+          Padding(
+            padding: const EdgeInsets.only(left: 48, top: 8),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(
+                    value: 'plain',
+                    label: Text('Reminder'),
+                  ),
+                  ButtonSegment(
+                    value: 'habit',
+                    label: Text('Habit'),
+                  ),
+                  ButtonSegment(
+                    value: 'task',
+                    label: Text('Task'),
+                  ),
+                  ButtonSegment(
+                    value: 'tracker_entry',
+                    label: Text('Tracker'),
+                  ),
+                  ButtonSegment(
+                    value: 'pomodoro',
+                    label: Text('Pomodoro'),
+                  ),
+                ],
+                selected: {widget.step.kind},
+                onSelectionChanged: (Set<String> selected) {
+                  widget.onStepChanged(widget.step.copyWith(kind: selected.first));
+                },
               ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.textMuted),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            onPressed: widget.onRemove,
+          // Reminder config for plain kind
+          if (widget.step.kind == 'plain')
+            Padding(
+              padding: const EdgeInsets.only(left: 48, top: 8),
+              child: TextButton(
+                onPressed: () async {
+                  final config = await showDialog<ReminderConfig>(
+                    context: context,
+                    builder: (context) => _ReminderConfigDialog(
+                      initialConfig: widget.step.reminderConfig,
+                    ),
+                  );
+                  if (config != null) {
+                    widget.onStepChanged(widget.step.copyWith(reminderConfig: config));
+                  }
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      widget.step.reminderConfig != null 
+                          ? Icons.notifications_active 
+                          : Icons.notifications_none,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        widget.step.reminderConfig != null
+                            ? 'Reminder: ${widget.step.reminderConfig!.type.name}'
+                            : 'Add reminder notification',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          // Object picker for non-plain kinds
+          if (widget.step.kind != 'plain')
+            Padding(
+              padding: const EdgeInsets.only(left: 48, top: 8),
+              child: Consumer(
+                builder: (context, ref, child) {
+                  return TextButton(
+                    onPressed: () async {
+                      final selected = await showModalBottomSheet<ContentObject>(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => UniversalSearchPickerSheet(
+                          title: 'Select ${widget.step.kind}',
+                          initialFilter: widget.step.kind == 'tracker_entry' ? 'tracker' : widget.step.kind,
+                          showClear: widget.step.kind == 'task',
+                          onSelected: (obj) => Navigator.pop(context, obj),
+                        ),
+                      );
+                      if (selected != null) {
+                        widget.onStepChanged(widget.step.copyWith(linkedObjectSlug: selected.slug));
+                      }
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.link, size: 16),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            widget.step.linkedObjectSlug ?? 'Link to ${widget.step.kind}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          // Field picker for tracker_entry
+          if (widget.step.kind == 'tracker_entry' && widget.step.linkedObjectSlug != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 48, top: 8),
+              child: Consumer(
+                builder: (context, ref, child) {
+                  return TextButton(
+                    onPressed: () async {
+                      final trackers = ref.read(trackersProvider);
+                      final tracker = trackers.where((t) => t.slug == widget.step.linkedObjectSlug).firstOrNull;
+                      if (tracker == null) return;
+
+                      final allFields = <InputField>[];
+                      for (final section in tracker.sections) {
+                        allFields.addAll(section.inputFields);
+                      }
+
+                      final selectedField = await showDialog<InputField>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Select field'),
+                          content: SizedBox(
+                            width: double.maxFinite,
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: allFields.length,
+                              itemBuilder: (context, index) => ListTile(
+                                title: Text(allFields[index].title),
+                                onTap: () => Navigator.pop(context, allFields[index]),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+
+                      if (selectedField != null) {
+                        widget.onStepChanged(widget.step.copyWith(trackerFieldId: selectedField.id));
+                      }
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.tune, size: 16),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            widget.step.trackerFieldId ?? 'Select field',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          // Collection attachment toggle for habit/tracker_entry
+          if (widget.step.kind == 'habit' || widget.step.kind == 'tracker_entry')
+            Padding(
+              padding: const EdgeInsets.only(left: 48, top: 8),
+              child: Consumer(
+                builder: (context, ref, child) {
+                  return TextButton(
+                    onPressed: () async {
+                      final notes = ref.read(notesProvider);
+                      final collections = notes.where((n) => n.subtype == NoteSubtype.collection).toList();
+
+                      final selected = await showDialog<Note>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Attach Collection'),
+                          content: SizedBox(
+                            width: double.maxFinite,
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: collections.length,
+                              itemBuilder: (context, index) => ListTile(
+                                title: Text(collections[index].title),
+                                onTap: () => Navigator.pop(context, collections[index]),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+
+                      if (selected != null) {
+                        widget.onStepChanged(widget.step.copyWith(attachedCollectionSlug: selected.slug));
+                      }
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.folder_open, size: 16),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            widget.step.attachedCollectionSlug ?? 'Attach Collection (optional)',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReminderConfigDialog extends StatefulWidget {
+  final ReminderConfig? initialConfig;
+  const _ReminderConfigDialog({this.initialConfig});
+
+  @override
+  State<_ReminderConfigDialog> createState() => _ReminderConfigDialogState();
+}
+
+class _ReminderConfigDialogState extends State<_ReminderConfigDialog> {
+  late NotificationType _selectedType;
+  late bool _playSound;
+  late bool _vibrate;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedType = widget.initialConfig?.type ?? NotificationType.push;
+    _playSound = widget.initialConfig?.playSound ?? true;
+    _vibrate = widget.initialConfig?.vibrate ?? true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Reminder Notification'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Notification Type', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          SegmentedButton<NotificationType>(
+            segments: const [
+              ButtonSegment(
+                value: NotificationType.push,
+                label: Text('Push'),
+              ),
+              ButtonSegment(
+                value: NotificationType.popup,
+                label: Text('Popup'),
+              ),
+              ButtonSegment(
+                value: NotificationType.alarm,
+                label: Text('Alarm'),
+              ),
+            ],
+            selected: {_selectedType},
+            onSelectionChanged: (Set<NotificationType> selected) {
+              setState(() => _selectedType = selected.first);
+            },
+          ),
+          const SizedBox(height: 16),
+          SwitchListTile(
+            title: const Text('Play Sound'),
+            value: _playSound,
+            onChanged: (value) => setState(() => _playSound = value),
+          ),
+          SwitchListTile(
+            title: const Text('Vibrate'),
+            value: _vibrate,
+            onChanged: (value) => setState(() => _vibrate = value),
           ),
         ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () {
+            final config = ReminderConfig(
+              id: widget.initialConfig?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+              type: _selectedType,
+              playSound: _playSound,
+              vibrate: _vibrate,
+            );
+            Navigator.pop(context, config);
+          },
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }
