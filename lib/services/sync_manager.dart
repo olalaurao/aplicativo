@@ -871,4 +871,80 @@ class SyncManager {
     
     return '${truncatedPath}_$hash$suffixWithTimestamp';
   }
+
+  /// Simplified manual sync with short timeout
+  /// Downloads files from Google Drive and replaces local files
+  Future<String?> performManualSync() async {
+    debugPrint('[SyncManager] Manual sync started');
+    
+    try {
+      final authService = _ref.read(googleAuthServiceProvider);
+      final authClient = await authService.ensureClient().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          debugPrint('[SyncManager] Google auth restore timed out.');
+          return null;
+        },
+      );
+
+      if (authClient == null) {
+        return 'Google auth failed - check connection';
+      }
+
+      final obsidian = _ref.read(obsidianServiceProvider);
+      final driveSync = GoogleDriveSyncService();
+      driveSync.init(authClient);
+      
+      await driveSync.setupVaultFolder('vault');
+      
+      debugPrint('[SyncManager] Fetching remote files...');
+      final remoteFiles = await driveSync.fetchRemoteFiles().timeout(
+        const Duration(seconds: 20),
+        onTimeout: () {
+          debugPrint('[SyncManager] Fetch remote files timed out');
+          throw TimeoutException('Fetch remote files timed out');
+        },
+      );
+      
+      debugPrint('[SyncManager] Found ${remoteFiles.length} remote files');
+      
+      int downloaded = 0;
+      int errors = 0;
+      
+      for (final file in remoteFiles) {
+        if (file.name == null || !file.name!.endsWith('.md')) continue;
+        
+        try {
+          final content = await driveSync.downloadFile(file.id!).timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              debugPrint('[SyncManager] Download ${file.name} timed out');
+              return null;
+            },
+          );
+          
+          if (content != null) {
+            await obsidian.writeFile(file.name!, content);
+            downloaded++;
+            debugPrint('[SyncManager] Downloaded: ${file.name}');
+          }
+        } catch (e) {
+          errors++;
+          debugPrint('[SyncManager] Error downloading ${file.name}: $e');
+        }
+      }
+      
+      // Invalidate cache to reload vault
+      obsidian.invalidateFileCache();
+      _ref.invalidate(allObjectsProvider);
+      
+      final message = 'Sync complete: $downloaded files downloaded, $errors errors';
+      debugPrint('[SyncManager] $message');
+      return message;
+      
+    } catch (e, st) {
+      debugPrint('[SyncManager] Manual sync error: $e\n$st');
+      return 'Sync failed: ${e.toString()}';
+    }
+  }
 }

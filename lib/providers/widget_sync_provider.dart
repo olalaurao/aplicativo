@@ -3,12 +3,14 @@
 // Reacts to vault changes and pushes dashboard-style snapshots to Android widgets.
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:googleapis/calendar/v3.dart' as calendar;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:crypto/crypto.dart';
 
 import 'overdue_provider.dart';
 import '../models/content_object.dart';
@@ -38,6 +40,45 @@ import 'settings_provider.dart';
 
 const _maxWidgetDayItems = 50;
 
+// Simple cache to avoid unnecessary widget updates
+class _WidgetDataCache {
+  String? _lastHash;
+  DateTime? _lastUpdateTime;
+  static const _cacheValidDuration = Duration(seconds: 30);
+
+  bool shouldUpdate(String currentHash) {
+    final now = DateTime.now();
+    if (_lastHash == null || _lastHash != currentHash) {
+      return true;
+    }
+    if (_lastUpdateTime != null && 
+        now.difference(_lastUpdateTime!) > _cacheValidDuration) {
+      return true;
+    }
+    return false;
+  }
+
+  void update(String hash) {
+    _lastHash = hash;
+    _lastUpdateTime = DateTime.now();
+  }
+
+  void invalidate() {
+    _lastHash = null;
+    _lastUpdateTime = null;
+  }
+}
+
+final _widgetDataCache = _WidgetDataCache();
+
+// Create a simple hash from data lengths to detect changes
+String _createDataHash(int objectsCount, int pomodoroCount, int blocksCount, int eventsCount, int overdueCount) {
+  final data = '$objectsCount|$pomodoroCount|$blocksCount|$eventsCount|$overdueCount';
+  final bytes = utf8.encode(data);
+  final hash = sha256.convert(bytes);
+  return hash.toString();
+}
+
 class _Debouncer {
   final Duration delay;
   Timer? _timer;
@@ -60,7 +101,7 @@ class _Debouncer {
 }
 
 final widgetSyncProvider = Provider<void>((ref) {
-  final debouncer = _Debouncer(delay: const Duration(milliseconds: 5000));
+  final debouncer = _Debouncer(delay: const Duration(milliseconds: 10000));
 
   // Use select to only watch specific data that affects widgets, not entire vault
   final allObjects = ref.watch(allObjectsProvider.select((data) => data.valueOrNull));
@@ -87,6 +128,22 @@ final widgetSyncProvider = Provider<void>((ref) {
 
   if (allObjects != null) {
     debouncer.run(() async {
+      // Create a simple hash of the data to check if it changed
+      final dataHash = _createDataHash(
+        allObjects.length,
+        pomodoro.history.length,
+        blocks.length,
+        googleEvents.length,
+        overdueItems.length,
+      );
+      
+      // Skip update if data hasn't changed and cache is still valid
+      if (!_widgetDataCache.shouldUpdate(dataHash)) {
+        debugPrint('[WidgetSync] Skipping update - data unchanged and cache valid');
+        return;
+      }
+      
+      debugPrint('[WidgetSync] Updating widgets - data changed or cache expired');
       await _updateAllWidgets(
         allObjects,
         pomodoro.history,
@@ -97,6 +154,8 @@ final widgetSyncProvider = Provider<void>((ref) {
         overdueItems,
         sharedPrefs,
       );
+      
+      _widgetDataCache.update(dataHash);
     });
   }
 
@@ -105,6 +164,10 @@ final widgetSyncProvider = Provider<void>((ref) {
 
 Future<void> forceWidgetSync(ProviderContainer container) async {
   try {
+    // Invalidate cache to force update
+    _widgetDataCache.invalidate();
+    debugPrint('[WidgetSync] Force sync - cache invalidated');
+    
     final allObjects = await container.read(allObjectsProvider.future);
     final pomodoro = container.read(pomodoroProvider);
     final blocks = container.read(dashboardProvider).valueOrNull ?? [];

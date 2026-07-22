@@ -16,6 +16,7 @@ import '../screens/home_screen.dart';
 import '../widgets/command_center_overlay.dart';
 import '../../providers/widget_sync_provider.dart';
 import '../../providers/overdue_provider.dart';
+import '../../services/sync_manager.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -29,12 +30,13 @@ class AppShell extends ConsumerStatefulWidget {
 class _AppShellState extends ConsumerState<AppShell> {
   Widget? _lastListChild;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  DateTime? _lastCommandCenterOverscrollAt;
-  double _commandCenterOverscroll = 0;
-  bool _commandCenterOpenedThisScroll = false;
+  DateTime? _lastCommandCenterTriggerAt;
+  double _horizontalDragDistance = 0;
+  bool _commandCenterOpenedThisSwipe = false;
   DateTime? _lastBackPressTime;
   final Set<String> _dismissedYamlErrorFiles = {};
   bool _yamlDialogOpen = false;
+  bool _isRefreshing = false;
 
   @override
   Widget build(BuildContext context) {
@@ -334,39 +336,64 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   Widget _withCommandCenterOverscroll(BuildContext context, Widget child) {
-    return NotificationListener<ScrollNotification>(
-      onNotification: (notification) {
-        if (notification is ScrollStartNotification) {
-          _commandCenterOverscroll = 0;
-          _commandCenterOpenedThisScroll = false;
-          return false;
-        }
-
-        if (notification is ScrollEndNotification) {
-          _commandCenterOverscroll = 0;
-          _commandCenterOpenedThisScroll = false;
-          return false;
-        }
-
-        if (notification is OverscrollNotification &&
-            notification.metrics.pixels <=
-                notification.metrics.minScrollExtent + 2 &&
-            notification.overscroll < 0 &&
-            !_commandCenterOpenedThisScroll) {
-          _commandCenterOverscroll += notification.overscroll.abs();
+    return RefreshIndicator(
+      onRefresh: _handleRefresh,
+      child: GestureDetector(
+        onHorizontalDragStart: (_) {
+          _horizontalDragDistance = 0;
+          _commandCenterOpenedThisSwipe = false;
+        },
+        onHorizontalDragUpdate: (details) {
+          _horizontalDragDistance += details.delta.dx.abs();
+        },
+        onHorizontalDragEnd: (details) {
           final now = DateTime.now();
-          final last = _lastCommandCenterOverscrollAt;
-          if (_commandCenterOverscroll >= 140 &&
+          final last = _lastCommandCenterTriggerAt;
+          if (_horizontalDragDistance >= 200 &&
+              !_commandCenterOpenedThisSwipe &&
               (last == null || now.difference(last).inSeconds > 1)) {
-            _lastCommandCenterOverscrollAt = now;
-            _commandCenterOpenedThisScroll = true;
+            _lastCommandCenterTriggerAt = now;
+            _commandCenterOpenedThisSwipe = true;
             _openCommandCenter(context);
           }
-        }
-        return false;
-      },
-      child: child,
+          _horizontalDragDistance = 0;
+        },
+        child: child,
+      ),
     );
+  }
+
+  Future<void> _handleRefresh() async {
+    if (_isRefreshing) return;
+    _isRefreshing = true;
+    
+    try {
+      final syncManager = ref.read(syncManagerProvider);
+      final result = await syncManager.performManualSync();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result ?? 'Sync complete'),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sync error: ${e.toString()}'),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      _isRefreshing = false;
+    }
   }
 
   Widget _buildSideRail(
