@@ -28,6 +28,11 @@ enum NavSection {
   routines,
   systems,
   replanning,
+  areas,
+  projects,
+  activities,
+  labels,
+  values,
 }
 
 class NavigationItem {
@@ -154,6 +159,16 @@ class NavigationItem {
         return active ? Icons.settings_suggest_rounded : Icons.settings_suggest_outlined;
       case NavSection.replanning:
         return active ? Icons.event_busy_rounded : Icons.event_busy_outlined;
+      case NavSection.areas:
+        return active ? Icons.category_rounded : Icons.category_outlined;
+      case NavSection.projects:
+        return active ? Icons.assignment_rounded : Icons.assignment_outlined;
+      case NavSection.activities:
+        return active ? Icons.local_activity_rounded : Icons.local_activity_outlined;
+      case NavSection.labels:
+        return active ? Icons.label_rounded : Icons.label_outline_rounded;
+      case NavSection.values:
+        return active ? Icons.star_rounded : Icons.star_outline_rounded;
     }
   }
 

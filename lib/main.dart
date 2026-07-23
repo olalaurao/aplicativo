@@ -77,6 +77,10 @@ import 'ui/screens/tasks_screen.dart';
 import 'ui/screens/values_screen.dart';
 import 'ui/screens/routines_screen.dart';
 import 'ui/screens/systems_screen.dart';
+import 'ui/screens/areas_screen.dart';
+import 'ui/screens/projects_screen.dart';
+import 'ui/screens/activities_screen.dart';
+import 'ui/screens/labels_screen.dart';
 import 'ui/forms/create_social_post_form.dart';
 import 'ui/widgets/pomodoro_floating_clock.dart';
 import 'ui/widgets/notification_popup_overlay.dart';
@@ -1015,6 +1019,22 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/replanning',
             builder: (context, state) => const ReplanningScreen(),
+          ),
+          GoRoute(
+            path: '/areas',
+            builder: (context, state) => const AreasScreen(),
+          ),
+          GoRoute(
+            path: '/projects',
+            builder: (context, state) => const ProjectsScreen(),
+          ),
+          GoRoute(
+            path: '/activities',
+            builder: (context, state) => const ActivitiesScreen(),
+          ),
+          GoRoute(
+            path: '/labels',
+            builder: (context, state) => const LabelsScreen(),
           ),
           GoRoute(
             path: '/overdue',

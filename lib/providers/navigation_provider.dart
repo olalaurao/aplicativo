@@ -173,6 +173,36 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
       route: '/replanning',
       inBottomBar: false,
     ),
+    NavigationItem(
+      section: NavSection.areas,
+      label: 'Areas',
+      route: '/areas',
+      inBottomBar: false,
+    ),
+    NavigationItem(
+      section: NavSection.projects,
+      label: 'Projects',
+      route: '/projects',
+      inBottomBar: false,
+    ),
+    NavigationItem(
+      section: NavSection.activities,
+      label: 'Activities',
+      route: '/activities',
+      inBottomBar: false,
+    ),
+    NavigationItem(
+      section: NavSection.labels,
+      label: 'Labels',
+      route: '/labels',
+      inBottomBar: false,
+    ),
+    NavigationItem(
+      section: NavSection.values,
+      label: 'Values',
+      route: '/values',
+      inBottomBar: false,
+    ),
   ];
 
   Future<void> _save() async {

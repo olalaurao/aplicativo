@@ -1,6 +1,7 @@
 // lib/ui/screens/organize_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../models/organizer_model.dart';
@@ -27,6 +28,41 @@ class OrganizeScreen extends ConsumerStatefulWidget {
 class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
   String _searchQuery = '';
   String _activeFilter = 'All';
+
+  String _getRouteForSection(String title) {
+    switch (title) {
+      case 'Areas':
+        return '/areas';
+      case 'Projetos':
+        return '/projects';
+      case 'Goals':
+        return '/goals';
+      case 'Habits':
+        return '/habits';
+      case 'Trackers':
+        return '/trackers';
+      case 'Pillars':
+        return '/values';
+      case 'Activities':
+        return '/activities';
+      case 'People':
+        return '/people';
+      case 'Labels':
+        return '/labels';
+      case 'Tasks':
+        return '/tasks';
+      case 'Day Themes':
+        return '/day-themes';
+      case 'Time Blocks':
+        return '/time-blocks';
+      case 'Values':
+        return '/values';
+      case 'Routines':
+        return '/routines';
+      default:
+        return '/organize';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -389,35 +425,38 @@ class _OrganizeScreenState extends ConsumerState<OrganizeScreen> {
               ),
               child: Icon(section.icon, size: 20, color: section.color),
             ),
-            title: Row(
-              children: [
-                Text(
-                  section.title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceVariantColor(context),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    section.items.length.toString(),
-                    style: TextStyle(
-                      fontSize: 12,
+            title: GestureDetector(
+              onTap: () => context.go(_getRouteForSection(section.title)),
+              child: Row(
+                children: [
+                  Text(
+                    section.title,
+                    style: const TextStyle(
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: AppTheme.textMutedColor(context),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceVariantColor(context),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      section.items.length.toString(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textMutedColor(context),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             tilePadding: const EdgeInsets.symmetric(
               horizontal: 12,
