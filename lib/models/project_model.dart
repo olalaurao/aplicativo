@@ -5,6 +5,7 @@ import 'reminder_config.dart';
 import 'shared_types.dart';
 import 'task_model.dart';
 import 'kpi_model.dart' as kpi;
+import 'checklist_step.dart';
 
 enum ProjectState { active, paused, completed, archived }
 
@@ -114,6 +115,7 @@ class Project extends Organizer {
   String? objective;       // the why
   String? strategy;        // the how
   List<ProjectPhase> phases; // array grouping Tasks by stage
+  List<ChecklistStep> steps; // actionable checklist steps
   /// V5: set on old file when a scheduled restart creates a new Project
   String? supersededBy;   // WikiLink e.g. "[[new-project-slug]]"
   String? methodLabel;
@@ -162,6 +164,7 @@ class Project extends Organizer {
     this.objective,
     this.strategy,
     List<ProjectPhase>? phases,
+    List<ChecklistStep>? steps,
     this.supersededBy,
     super.parentId,
     super.startDate,
@@ -179,6 +182,7 @@ class Project extends Organizer {
        quickAccessLinks = quickAccessLinks ?? [],
        rotationGroups = rotationGroups ?? [],
        phases = phases ?? [],
+       steps = steps ?? [],
        super(
          organizerType: OrganizerType.project,
          state: state.name,
@@ -244,6 +248,9 @@ class Project extends Organizer {
     if (strategy != null) frontmatter['strategy'] = strategy;
     if (phases.isNotEmpty) {
       frontmatter['phases'] = phases.map((p) => p.toMap()).toList();
+    }
+    if (steps.isNotEmpty) {
+      frontmatter['steps'] = steps.map((s) => s.toMap()).toList();
     }
     if (supersededBy != null) frontmatter['superseded_by'] = supersededBy;
 
@@ -355,6 +362,12 @@ class Project extends Organizer {
           .map((m) => ProjectPhase.fromMap(Map<String, dynamic>.from(m)))
           .toList();
     }
+    if (frontmatter['steps'] is List) {
+      project.steps = (frontmatter['steps'] as List)
+          .whereType<Map>()
+          .map((m) => ChecklistStep.fromMap(Map<String, dynamic>.from(m)))
+          .toList();
+    }
     project.supersededBy = frontmatter['superseded_by']?.toString();
 
     return project;
@@ -383,6 +396,7 @@ class Project extends Organizer {
     DateTime? updatedAt,
     String? obsidianPath,
     List<kpi.KPI>? kpis,
+    List<ChecklistStep>? steps,
   }) {
     return Project(
       id: id,
@@ -416,6 +430,7 @@ class Project extends Organizer {
       objective: objective,
       strategy: strategy,
       phases: phases,
+      steps: steps ?? this.steps,
       supersededBy: supersededBy,
       parentId: parentId ?? this.parentId,
       startDate: startDate ?? this.startDate,
@@ -454,6 +469,7 @@ class Project extends Organizer {
     String? objective,
     String? strategy,
     List<ProjectPhase>? phases,
+    List<ChecklistStep>? steps,
     String? supersededBy,
     String? parentId,
     DateTime? startDate,
@@ -495,6 +511,7 @@ class Project extends Organizer {
       objective: objective ?? this.objective,
       strategy: strategy ?? this.strategy,
       phases: phases ?? this.phases,
+      steps: steps ?? this.steps,
       supersededBy: supersededBy ?? this.supersededBy,
       parentId: parentId ?? this.parentId,
       startDate: startDate ?? this.startDate,

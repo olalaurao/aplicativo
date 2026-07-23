@@ -5367,6 +5367,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             const SizedBox(height: 24),
             ...tracker.sections.expand((s) => s.inputFields).map((field) {
               final val = record.fieldValues[field.id];
+              final refKey = '${field.id}_ref';
+              final refValue = record.fieldValues[refKey];
+              
               return Padding(
                 padding: const EdgeInsets.only(bottom: 24),
                 child: Column(
@@ -5397,6 +5400,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                         ),
                       ),
                     ),
+                    if (refValue != null) ...[
+                      const SizedBox(height: 8),
+                      _RefChip(refMap: refValue),
+                    ],
                   ],
                 ),
               );
@@ -5418,6 +5425,53 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   'Fechar',
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _RefChip({required dynamic refMap}) {
+    if (refMap is! Map) return const SizedBox.shrink();
+    
+    final ref = VaultLinkRef.fromMap(Map<String, dynamic>.from(refMap));
+    
+    return InkWell(
+      onTap: () {
+        // Navigate to the source collection row
+        if (ref.isRow) {
+          // TODO: Implement navigation to collection row
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Navigate to: ${ref.toWikiLink()}')),
+          );
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppTheme.accentColor(context).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: AppTheme.accentColor(context).withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.link_rounded,
+              size: 12,
+              color: AppTheme.accentColor(context),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'From: ${ref.displayTitle}',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.accentColor(context),
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],

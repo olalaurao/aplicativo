@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../models/project_model.dart';
 import '../../../models/task_model.dart';
+import '../../../models/checklist_step.dart';
 import '../../../providers/vault_provider.dart';
 import '../../../services/kpi_engine.dart';
 import '../../../services/project_progress_cache.dart';
 import '../../widgets/property_grid.dart';
+import '../../widgets/actionable_checklist_tile.dart';
 import '../../theme.dart';
 
 /// Project-specific property cards for universal detail view
@@ -125,4 +127,61 @@ Widget _buildPriorityBadge(Project project) {
 
 void _onPropertyTap(BuildContext context, WidgetRef ref, String property, String value) {
   // Property tap handler - can be extended for editing
+}
+
+/// Build the checklist section for Project detail view
+Widget buildProjectChecklistSection(
+  BuildContext context,
+  WidgetRef ref,
+  Project project,
+) {
+  if (project.steps.isEmpty) {
+    return const SizedBox.shrink();
+  }
+
+  final today = DateTime.now();
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Padding(
+        padding: EdgeInsets.fromLTRB(20, 32, 20, 8),
+        child: Text(
+          'Checklist',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+      ),
+      Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: AppTheme.cardDecoration(context),
+        child: Column(
+          children: [
+            ...project.steps.asMap().entries.map((e) {
+              final step = e.value;
+              return ActionableChecklistTile(
+                itemId: step.id,
+                title: step.title,
+                kind: step.kind,
+                linkedObjectSlug: step.linkedObjectSlug,
+                trackerFieldId: step.trackerFieldId,
+                attachedCollectionSlug: step.attachedCollectionSlug,
+                date: today,
+                parentObjectId: project.id,
+                onTaskCreated: (taskSlug) async {
+                  // Persist the new task slug back to the project step
+                  final updatedSteps = List<ChecklistStep>.from(project.steps);
+                  final stepIndex = updatedSteps.indexWhere((s) => s.id == step.id);
+                  if (stepIndex != -1) {
+                    updatedSteps[stepIndex] = step.copyWith(linkedObjectSlug: taskSlug);
+                    final updated = project.copyProjectWith(steps: updatedSteps);
+                    await ref.read(projectsProvider.notifier).updateProject(updated);
+                  }
+                },
+              );
+            }),
+          ],
+        ),
+      ),
+    ],
+  );
 }

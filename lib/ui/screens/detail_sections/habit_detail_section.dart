@@ -1,6 +1,8 @@
 // lib/ui/screens/detail_sections/habit_detail_section.dart
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../models/habit_model.dart';
+import '../../../models/shared_types.dart';
 import '../../widgets/property_grid.dart';
 
 /// Habit-specific property cards for universal detail view
@@ -39,6 +41,83 @@ List<PropertyCard> buildHabitPropertyCards(Habit habit) {
       state: habit.categories.isEmpty ? PropertyCardState.empty : PropertyCardState.normal,
     ));
   }
+
+  // Collection Log card - shown only if there are completion records with linkedRef
+  final collectionLogEntries = habit.completionHistory
+      .where((r) => r.linkedRef != null)
+      .toList();
+  
+  if (collectionLogEntries.isNotEmpty) {
+    // Sort reverse-chronological
+    collectionLogEntries.sort((a, b) => b.date.compareTo(a.date));
+    
+    cards.add(PropertyCard(
+      icon: Icons.link,
+      label: 'Collection Log',
+      state: PropertyCardState.normal,
+      customChild: _CollectionLogList(entries: collectionLogEntries),
+    ));
+  }
   
   return cards;
+}
+
+class _CollectionLogList extends StatelessWidget {
+  final List<CompletionRecord> entries;
+  
+  const _CollectionLogList({required this.entries});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: entries.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 6),
+      itemBuilder: (context, index) {
+        final record = entries[index];
+        final ref = record.linkedRef!;
+        final dateStr = DateFormat('MMM d').format(record.date);
+        
+        return InkWell(
+          onTap: () {
+            // Navigate to the source collection row
+            if (ref.isRow) {
+              // Navigate to note with block reference
+              // TODO: Implement navigation to collection row
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Navigate to: ${ref.toWikiLink()}')),
+              );
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.link_rounded,
+                  size: 12,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '$dateStr — ${ref.displayTitle}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

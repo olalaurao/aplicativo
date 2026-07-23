@@ -140,6 +140,30 @@ class ActionableChecklistTile extends ConsumerWidget {
         pickedRef,
       );
     }
+
+    // Ticket 2: Auto-mirror to linked tracker if configured
+    if (habit.linkedTrackerSlug != null) {
+      final dateStr = date.toIso8601String().split('T').first;
+      final fieldPatch = <String, dynamic>{};
+      
+      if (!isDone) {
+        // Completing the habit - add tracker record
+        fieldPatch['done'] = true;
+        if (pickedRef != null) {
+          fieldPatch['linked_ref'] = pickedRef.displayTitle;
+          fieldPatch['linked_ref_map'] = pickedRef.toMap();
+        }
+      } else {
+        // Un-completing - remove the record by setting done to false
+        fieldPatch['done'] = false;
+      }
+
+      await ref.read(trackingRecordsProvider.notifier).upsertRecordForDate(
+        habit.linkedTrackerSlug!,
+        date,
+        fieldPatch,
+      );
+    }
   }
 
   Future<void> _handleTaskTap(WidgetRef ref) async {

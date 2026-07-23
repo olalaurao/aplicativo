@@ -6,6 +6,7 @@ import '../../../models/task_model.dart';
 import '../../../models/kpi_model.dart' as kpi;
 import '../../widgets/wiki_text_view.dart';
 import '../../theme.dart';
+import 'project_detail_section.dart';
 
 /// Project-specific content section for universal detail view
 List<Widget> buildProjectContentSection(
@@ -141,6 +142,7 @@ List<Widget> buildProjectContentSection(
             ],
             const SizedBox(height: 24),
             buildSnapshotsSection(context, ref, project.id),
+            buildProjectChecklistSection(context, ref, project),
           ],
         ),
       ),

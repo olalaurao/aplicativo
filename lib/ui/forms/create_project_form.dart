@@ -14,12 +14,14 @@ import '../../models/habit_model.dart';
 import '../../models/tracker_model.dart';
 import '../../models/note_model.dart';
 import '../../models/organizer_model.dart';
+import '../../models/checklist_step.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/color_palette_provider.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../widgets/app_switch_tile.dart';
 import '../widgets/date_picker_field.dart';
+import '../widgets/checklist_step_editor.dart';
 import '../../services/collection_row_service.dart';
 import '../theme.dart';
 import 'scheduler_picker.dart';
@@ -52,6 +54,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
   List<kpi_model.KPI> _kpis = [];
   bool _rotationResetRequested = false;
   Scheduler? _scheduler;
+  List<ChecklistStep> _steps = [];
 
   static const _colorSwatches = [
     '#3B82F6',
@@ -93,6 +96,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
       _rotationGroups = List.from(project.rotationGroups);
       _kpis = List.from(project.kpis);
       _scheduler = project.scheduler;
+      _steps = List.from(project.steps);
     } else {
       if (widget.initialOrganizers != null) {
         _organizers = List.from(widget.initialOrganizers!);
@@ -392,6 +396,81 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
                               ),
                             );
                           }),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Checklist Steps
+                  Container(
+                    decoration: AppTheme.cardDecoration(context),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Checklist',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: _addChecklistStep,
+                              icon: const Icon(Icons.add_rounded, size: 18),
+                              label: const Text('Add Step'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        if (_steps.isEmpty)
+                          const Text(
+                            'No checklist steps',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textMuted,
+                            ),
+                          )
+                        else
+                          ReorderableListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _steps.length,
+                            onReorder: (oldIndex, newIndex) {
+                              setState(() {
+                                if (newIndex > oldIndex) {
+                                  newIndex -= 1;
+                                }
+                                final step = _steps.removeAt(oldIndex);
+                                _steps.insert(newIndex, step);
+                              });
+                            },
+                            itemBuilder: (context, index) {
+                              return ChecklistStepEditor(
+                                key: ValueKey(_steps[index].id),
+                                step: _steps[index],
+                                index: index,
+                                onChanged: (title) {
+                                  setState(() {
+                                    _steps[index] = _steps[index].copyWith(title: title);
+                                  });
+                                },
+                                onRemove: () {
+                                  setState(() => _steps.removeAt(index));
+                                },
+                                onStepChanged: (updatedStep) {
+                                  setState(() {
+                                    _steps[index] = updatedStep;
+                                  });
+                                },
+                              );
+                            },
+                          ),
                       ],
                     ),
                   ),
@@ -722,6 +801,15 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
     );
   }
 
+  void _addChecklistStep() {
+    setState(() {
+      _steps.add(ChecklistStep(
+        title: 'New step',
+        kind: 'plain',
+      ));
+    });
+  }
+
   void _addScheduler() {
     showModalBottomSheet(
       context: context,
@@ -983,6 +1071,7 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
       organizers: _organizers,
       kpis: _kpis,
       scheduler: _scheduler,
+      steps: _steps,
     );
 
     project = project.copyProjectWith(
