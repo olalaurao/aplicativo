@@ -161,17 +161,18 @@ class ActionableChecklistTile extends ConsumerWidget {
     if (habit.linkedTrackerSlug != null) {
       final dateStr = date.toIso8601String().split('T').first;
       final fieldPatch = <String, dynamic>{};
+      final fieldId = habit.linkedTrackerFieldId ?? 'done';
       
       if (!isDone) {
         // Completing the habit - add tracker record
-        fieldPatch['done'] = true;
+        fieldPatch[fieldId] = true;
         if (pickedRef != null) {
-          fieldPatch['linked_ref'] = pickedRef.displayTitle;
-          fieldPatch['linked_ref_map'] = pickedRef.toMap();
+          fieldPatch['${fieldId}_linked_ref'] = pickedRef.displayTitle;
+          fieldPatch['${fieldId}_linked_ref_map'] = pickedRef.toMap();
         }
       } else {
         // Un-completing - remove the record by setting done to false
-        fieldPatch['done'] = false;
+        fieldPatch[fieldId] = false;
       }
 
       await ref.read(trackingRecordsProvider.notifier).upsertRecordForDate(
@@ -183,12 +184,28 @@ class ActionableChecklistTile extends ConsumerWidget {
   }
 
   Future<void> _handleTaskTap(WidgetRef ref) async {
+    VaultLinkRef? pickedRef;
+    if (attachedCollectionSlug != null && attachedCollectionSlug!.isNotEmpty) {
+      try {
+        pickedRef = await CollectionItemPickerSheet.show(
+          ref.context,
+          collectionNoteSlug: attachedCollectionSlug!,
+        );
+      } catch (e) {
+        debugPrint('Collection picker error: $e');
+        ScaffoldMessenger.of(ref.context).showSnackBar(
+          SnackBar(content: Text('Error opening collection: $e')),
+        );
+      }
+    }
+
     if (linkedObjectSlug == null) {
       // Create new one-off task
       final task = Task(
         title: title,
         stage: TaskStage.finalized,
         linkedSystem: parentObjectId,
+        completionRef: pickedRef,
       );
       await ref.read(vaultProvider.notifier).createObject(task);
       // Notify caller to persist the new task's slug
@@ -209,6 +226,8 @@ class ActionableChecklistTile extends ConsumerWidget {
     final isDone = task.stage == TaskStage.finalized;
     final updated = task.copyWith(
       stage: isDone ? TaskStage.todo : TaskStage.finalized,
+      completionRef: !isDone ? pickedRef : null,
+      clearCompletionRef: isDone,
     );
     updated.logEvent('stage_change', 'Stage changed via checklist from ${task.stage.name} to ${updated.stage.name}');
     await ref.read(vaultProvider.notifier).updateObject(updated);
@@ -458,6 +477,21 @@ class ActionableChecklistTile extends ConsumerWidget {
   }
 
   Future<void> _handlePomodoroTap(WidgetRef ref) async {
+    VaultLinkRef? pickedRef;
+    if (attachedCollectionSlug != null && attachedCollectionSlug!.isNotEmpty) {
+      try {
+        pickedRef = await CollectionItemPickerSheet.show(
+          ref.context,
+          collectionNoteSlug: attachedCollectionSlug!,
+        );
+      } catch (e) {
+        debugPrint('Collection picker error: $e');
+        ScaffoldMessenger.of(ref.context).showSnackBar(
+          SnackBar(content: Text('Error opening collection: $e')),
+        );
+      }
+    }
+
     final pomodoroState = ref.read(pomodoroProvider);
     final expectedSlug = 'checklist:$parentObjectId:$itemId';
     final existingSession = pomodoroState.history.where(
@@ -496,6 +530,7 @@ class ActionableChecklistTile extends ConsumerWidget {
     if (choice == 'start') {
       // Navigate to Pomodoro screen with linkedItemSlug preset
       GoRouter.of(ref.context).push('/pomodoro?linkedItemSlug=$expectedSlug');
+      // Note: We can't easily pass pickedRef here yet, but that's a larger feature.
     } else if (choice == 'log') {
       int duration = 25;
       await ref.read(pomodoroProvider.notifier).logRetroactiveSession(
@@ -504,6 +539,18 @@ class ActionableChecklistTile extends ConsumerWidget {
         minutesWorked: duration,
         linkedItemId: expectedSlug,
       );
+      // Wait a tick for it to save to history, then attach pickedRef
+      if (pickedRef != null) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        final newState = ref.read(pomodoroProvider);
+        final newSession = newState.history.where(
+          (s) => s.linkedItemSlug == expectedSlug && s.state == PomodoroSessionState.completed,
+        ).firstOrNull;
+        if (newSession != null) {
+          newSession.completionRef = pickedRef;
+          await ref.read(vaultProvider.notifier).updateObject(newSession);
+        }
+      }
     }
   }
 

@@ -4,8 +4,8 @@ import '../../models/checklist_step.dart';
 import '../../models/content_object.dart';
 import '../../models/reminder_config.dart';
 import '../../providers/vault_provider.dart';
+import '../../models/note_model.dart';
 import '../theme.dart';
-import 'collection_item_picker_sheet.dart';
 import 'universal_search_picker.dart';
 
 /// Reusable checklist step editor widget
@@ -277,40 +277,54 @@ class _ChecklistStepEditorState extends State<ChecklistStepEditor> {
                 },
               ),
             ),
-          // Collection attachment for habit and tracker_entry kinds
-          if (widget.step.kind == 'habit' || widget.step.kind == 'tracker_entry')
+          // Collection attachment toggle for all supported kinds
+          if (widget.step.kind == 'habit' || widget.step.kind == 'tracker_entry' || widget.step.kind == 'task' || widget.step.kind == 'pomodoro')
             Padding(
               padding: const EdgeInsets.only(left: 48, top: 8),
-              child: TextButton(
-                onPressed: () async {
-                  final pickedRef = await CollectionItemPickerSheet.show(
-                    context,
-                    collectionNoteSlug: widget.step.attachedCollectionSlug ?? '',
+              child: Consumer(
+                builder: (context, ref, child) {
+                  return TextButton(
+                    onPressed: () async {
+                      final allObjects = ref.read(allObjectsProvider).value ?? [];
+                      final collections = allObjects.whereType<Note>().where((n) => n.subtype == NoteSubtype.collection).toList();
+
+                      final selected = await showDialog<Note>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Attach Collection'),
+                          content: SizedBox(
+                            width: double.maxFinite,
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: collections.length,
+                              itemBuilder: (context, index) => ListTile(
+                                title: Text(collections[index].title),
+                                onTap: () => Navigator.pop(context, collections[index]),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+
+                      if (selected != null) {
+                        widget.onStepChanged(widget.step.copyWith(attachedCollectionSlug: selected.slug));
+                      }
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.folder_open, size: 16),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            widget.step.attachedCollectionSlug ?? 'Attach Collection (optional)',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   );
-                  if (pickedRef != null) {
-                    widget.onStepChanged(widget.step.copyWith(attachedCollectionSlug: pickedRef.noteSlug));
-                  }
                 },
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      widget.step.attachedCollectionSlug != null 
-                          ? Icons.link_rounded 
-                          : Icons.link_off_rounded,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        widget.step.attachedCollectionSlug != null
-                            ? 'Collection attached'
-                            : 'Attach collection',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           // Estimated minutes (optional)

@@ -6,9 +6,7 @@ import '../../models/habit_model.dart';
 import '../../models/checklist_step.dart';
 import '../../models/scheduler.dart';
 import '../../models/template_model.dart';
-import '../../models/note_model.dart';
 import '../../models/tracker_model.dart';
-import '../../models/content_object.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/color_palette_provider.dart';
 import '../../services/collection_row_service.dart';
@@ -26,8 +24,7 @@ import '../widgets/form_section_card.dart';
 import '../widgets/discard_guard.dart';
 import '../widgets/app_color_picker.dart';
 import '../../models/color_palette_model.dart';
-import '../widgets/universal_search_picker.dart';
-
+import '../../models/color_palette_model.dart';
 class CreateHabitForm extends ConsumerStatefulWidget {
   final String? initialTitle;
   final Habit? existingHabit;
@@ -55,6 +52,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
   List<Scheduler> _schedulers = [];
   bool _isNegative = false;
   String? _linkedTrackerSlug;
+  String? _linkedTrackerFieldId;
   String _goalType = 'successful_days';
   HabitStatus _status = HabitStatus.active;
   final List<HabitSlot> _slotConfigs = List.generate(10, (_) => HabitSlot());
@@ -116,6 +114,8 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
       _schedulers = List.from(habit.schedulers);
       _organizers = List.from(habit.organizers);
       _timeBlock = habit.timeBlock;
+      _linkedTrackerSlug = habit.linkedTrackerSlug;
+      _linkedTrackerFieldId = habit.linkedTrackerFieldId;
 
       _habitMode = habit.habitMode;
       _startedAt = habit.startedAt;
@@ -631,7 +631,9 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                         const Divider(height: 24),
                         PropertyRow(
                           label: 'Linked Tracker',
-                          value: _linkedTrackerSlug ?? 'None',
+                          value: _linkedTrackerSlug != null 
+                              ? '$_linkedTrackerSlug${_linkedTrackerFieldId != null ? ' - $_linkedTrackerFieldId' : ''}'
+                              : 'None',
                           valueColor: AppTheme.accentColor(context),
                           onTap: _pickTracker,
                         ),
@@ -1244,7 +1246,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
 
   void _pickTracker() async {
     final allObjects = await ref.read(allObjectsProvider.future);
-    final trackers = allObjects.where((o) => o.type == 'tracker').toList();
+    final trackers = allObjects.whereType<TrackerDefinition>().toList();
     if (!mounted) return;
 
     showModalBottomSheet(
@@ -1259,7 +1261,10 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                   ? Icon(Icons.check, color: AppTheme.accentColor(context))
                   : null,
               onTap: () {
-                setState(() => _linkedTrackerSlug = null);
+                setState(() {
+                  _linkedTrackerSlug = null;
+                  _linkedTrackerFieldId = null;
+                });
                 Navigator.pop(ctx);
               },
             ),
@@ -1269,9 +1274,51 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                 trailing: _linkedTrackerSlug == t.slug
                     ? Icon(Icons.check, color: AppTheme.accentColor(context))
                     : null,
-                onTap: () {
-                  setState(() => _linkedTrackerSlug = t.slug);
+                onTap: () async {
                   Navigator.pop(ctx);
+                  final allFields = <InputField>[];
+                  for (final section in t.sections) {
+                    allFields.addAll(section.inputFields);
+                  }
+                  if (allFields.isEmpty) {
+                    setState(() {
+                      _linkedTrackerSlug = t.slug;
+                      _linkedTrackerFieldId = null;
+                    });
+                    return;
+                  }
+                  if (allFields.length == 1) {
+                    setState(() {
+                      _linkedTrackerSlug = t.slug;
+                      _linkedTrackerFieldId = allFields.first.id;
+                    });
+                    return;
+                  }
+                  
+                  final selectedField = await showDialog<InputField>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Select field'),
+                      content: SizedBox(
+                        width: double.maxFinite,
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: allFields.length,
+                          itemBuilder: (context, index) => ListTile(
+                            title: Text(allFields[index].title),
+                            onTap: () => Navigator.pop(context, allFields[index]),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+
+                  if (selectedField != null) {
+                    setState(() {
+                      _linkedTrackerSlug = t.slug;
+                      _linkedTrackerFieldId = selectedField.id;
+                    });
+                  }
                 },
               ),
             ),
@@ -1437,6 +1484,8 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
               : (_schedulers.first.rules.first.period == 'month' ? 30 : 365))
           : null,
       checklistSections: _useChecklist ? _checklistSections : [],
+      linkedTrackerSlug: _linkedTrackerSlug,
+      linkedTrackerFieldId: _linkedTrackerFieldId,
       flexibilityWindowMinutes: _trackAlignment ? _flexibilityWindowMinutes : null,
     );
     try {
@@ -1633,8 +1682,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
               AppSwitchTile(
                 title: 'Permitir vincular mais de um item',
                 value: allowMultiple,
-                onChanged: (v) =>
-                    setModalState(() => allowMultiple = v ?? allowMultiple),
+                onChanged: (v) => setModalState(() => allowMultiple = v),
                 contentPadding: EdgeInsets.zero,
               ),
               TextField(

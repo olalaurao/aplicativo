@@ -5443,16 +5443,21 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   Widget _RefChip({required dynamic refMap}) {
     if (refMap is! Map) return const SizedBox.shrink();
     
-    final ref = VaultLinkRef.fromMap(Map<String, dynamic>.from(refMap));
+    final refLink = VaultLinkRef.fromMap(Map<String, dynamic>.from(refMap));
     
     return InkWell(
       onTap: () {
         // Navigate to the source collection row
-        if (ref.isRow) {
-          // TODO: Implement navigation to collection row
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Navigate to: ${ref.toWikiLink()}')),
-          );
+        if (refLink.isRow) {
+          final allObjects = ref.read(allObjectsProvider).value ?? [];
+          final note = allObjects.whereType<Note>().where((n) => n.slug == refLink.noteSlug).firstOrNull;
+          if (note != null) {
+            context.push('/detail/${note.id}', extra: note);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Note not found: ${refLink.noteSlug}')),
+            );
+          }
         }
       },
       child: Container(
@@ -5474,7 +5479,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             ),
             const SizedBox(width: 6),
             Text(
-              'From: ${ref.displayTitle}',
+              'From: ${refLink.displayTitle}',
               style: TextStyle(
                 fontSize: 12,
                 color: AppTheme.accentColor(context),

@@ -127,6 +127,7 @@ class Task extends ContentObject {
   int? rotationEveryN;
   int? rotationLastCompletedAtOccurrence;
   Map<String, bool> rotationDailyCompletions = {};
+  VaultLinkRef? completionRef;
   
   // Alignment tracking fields (RA-P1-1)
   int? flexibilityWindowMinutes; // null = alignment tracking off for this task
@@ -202,6 +203,7 @@ class Task extends ContentObject {
     Map<String, bool>? rotationDailyCompletions,
     this.flexibilityWindowMinutes,
     this.relaySteps,
+    this.completionRef,
     DateTime? reminderDate,
   }) : rotationDailyCompletions = rotationDailyCompletions ?? {} {
     if (reminderDate != null) {
@@ -390,6 +392,9 @@ class Task extends ContentObject {
     }
 
     if (scheduler != null) frontmatter['scheduler'] = scheduler!.toMap();
+    if (completionRef != null) {
+      frontmatter['completion_ref'] = completionRef!.toMap();
+    }
 
     // Build sessions list dynamically from subtasks to ensure frontmatter is always in sync with body checklist!
     final List<SubtaskSession> derivedSessions = [];
@@ -573,6 +578,11 @@ class Task extends ContentObject {
         Map<String, dynamic>.from(frontmatter['scheduler'] as Map),
       );
     }
+    if (frontmatter['completion_ref'] != null) {
+      task.completionRef = VaultLinkRef.fromMap(
+        Map<String, dynamic>.from(frontmatter['completion_ref'] as Map),
+      );
+    }
     if (frontmatter['priority'] != null) {
       task.priority = TaskPriority.values.firstWhere(
         (e) => e.name == frontmatter['priority'],
@@ -754,6 +764,8 @@ class Task extends ContentObject {
     Map<String, bool>? rotationDailyCompletions,
     int? flexibilityWindowMinutes,
     List<RelayStep>? relaySteps,
+    VaultLinkRef? completionRef,
+    bool clearCompletionRef = false,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     List<String>? tags,
@@ -807,6 +819,7 @@ class Task extends ContentObject {
           Map<String, bool>.from(this.rotationDailyCompletions),
       flexibilityWindowMinutes: flexibilityWindowMinutes ?? this.flexibilityWindowMinutes,
       relaySteps: relaySteps ?? this.relaySteps,
+      completionRef: clearCompletionRef ? null : (completionRef ?? this.completionRef),
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       tags: tags ?? this.tags,

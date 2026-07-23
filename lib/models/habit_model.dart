@@ -243,6 +243,7 @@ class Habit extends ContentObject {
   List<HabitSlot> slots;
   List<Scheduler> schedulers;
   String? linkedTrackerSlug;
+  String? linkedTrackerFieldId;
   String? timeBlock;
   List<CompletionRecord> completionHistory;
   List<ActionDef> actions;
@@ -292,11 +293,12 @@ class Habit extends ContentObject {
     this.description,
     required this.color,
     this.icon,
+    this.linkedTrackerSlug,
+    this.linkedTrackerFieldId,
     this.completionUnit = 'times',
     this.dailyGoal = 1,
     List<HabitSlot>? slots,
     List<Scheduler>? schedulers,
-    this.linkedTrackerSlug,
     this.timeBlock,
     this.streak = 0,
     List<CompletionRecord>? completionHistory,
@@ -385,6 +387,7 @@ class Habit extends ContentObject {
     List<HabitSlot>? slots,
     List<Scheduler>? schedulers,
     String? linkedTrackerSlug,
+    String? linkedTrackerFieldId,
     String? timeBlock,
     int? streak,
     List<CompletionRecord>? completionHistory,
@@ -416,11 +419,12 @@ class Habit extends ContentObject {
       description: description ?? this.description,
       color: color ?? this.color,
       icon: icon ?? this.icon,
+      linkedTrackerSlug: linkedTrackerSlug ?? this.linkedTrackerSlug,
+      linkedTrackerFieldId: linkedTrackerFieldId ?? this.linkedTrackerFieldId,
       completionUnit: completionUnit ?? this.completionUnit,
       dailyGoal: dailyGoal ?? this.dailyGoal,
       slots: slots ?? this.slots,
       schedulers: schedulers ?? this.schedulers,
-      linkedTrackerSlug: linkedTrackerSlug ?? this.linkedTrackerSlug,
       timeBlock: timeBlock ?? this.timeBlock,
       streak: streak ?? this.streak,
       completionHistory: completionHistory ?? this.completionHistory,
@@ -536,6 +540,9 @@ class Habit extends ContentObject {
     if (linkedTrackerSlug != null) {
       frontmatter['linked_tracker_slug'] = linkedTrackerSlug;
     }
+    if (linkedTrackerFieldId != null) {
+      frontmatter['linked_tracker_field_id'] = linkedTrackerFieldId;
+    }
     if (timeBlock != null) frontmatter['time_block'] = timeBlock;
 
     if (slots.isNotEmpty) {
@@ -640,9 +647,10 @@ class Habit extends ContentObject {
     }
 
     habit.description = frontmatter['description'] as String?;
+    habit.linkedTrackerSlug = frontmatter['linked_tracker_slug'] as String?;
+    habit.linkedTrackerFieldId = frontmatter['linked_tracker_field_id'] as String?;
     habit.icon = frontmatter['icon'] as String?;
     habit.completionUnit = frontmatter['completion_unit'] as String? ?? 'times';
-    habit.linkedTrackerSlug = frontmatter['linked_tracker_slug'] as String?;
     final dg = frontmatter['daily_goal'];
     habit.dailyGoal = dg is int
         ? dg

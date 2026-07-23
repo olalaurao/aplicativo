@@ -1,8 +1,12 @@
 // lib/ui/screens/detail_sections/habit_detail_section.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../models/habit_model.dart';
 import '../../../models/shared_types.dart';
+import '../../../models/note_model.dart';
+import '../../../providers/vault_provider.dart';
 import '../../widgets/property_grid.dart';
 
 /// Habit-specific property cards for universal detail view
@@ -76,13 +80,13 @@ List<PropertyCard> buildHabitPropertyCards(Habit habit) {
   return cards;
 }
 
-class _CollectionLogList extends StatelessWidget {
+class _CollectionLogList extends ConsumerWidget {
   final List<CompletionRecord> entries;
   
   const _CollectionLogList({required this.entries});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -90,18 +94,22 @@ class _CollectionLogList extends StatelessWidget {
       separatorBuilder: (_, __) => const SizedBox(height: 6),
       itemBuilder: (context, index) {
         final record = entries[index];
-        final ref = record.linkedRef!;
+        final refLink = record.linkedRef!;
         final dateStr = DateFormat('MMM d').format(record.date);
         
         return InkWell(
           onTap: () {
             // Navigate to the source collection row
-            if (ref.isRow) {
-              // Navigate to note with block reference
-              // TODO: Implement navigation to collection row
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Navigate to: ${ref.toWikiLink()}')),
-              );
+            if (refLink.isRow) {
+              final allObjects = ref.read(allObjectsProvider).value ?? [];
+              final note = allObjects.whereType<Note>().where((n) => n.slug == refLink.noteSlug).firstOrNull;
+              if (note != null) {
+                context.push('/detail/${note.id}', extra: note);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Note not found: ${refLink.noteSlug}')),
+                );
+              }
             }
           },
           child: Container(
@@ -120,7 +128,7 @@ class _CollectionLogList extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    '$dateStr — ${ref.displayTitle}',
+                    '$dateStr — ${refLink.displayTitle}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context).colorScheme.onSurface,

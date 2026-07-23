@@ -1,4 +1,5 @@
 import 'content_object.dart';
+import 'shared_types.dart';
 
 enum PomodoroSessionState { scheduled, active, paused, completed, cancelled }
 enum PomodoroType { work, shortBreak, longBreak, custom, stopwatch }
@@ -18,6 +19,7 @@ class PomodoroSession extends ContentObject {
   int minutesWorked;
   int minutesBreak;
   PomodoroSessionState state;
+  VaultLinkRef? completionRef;
 
   PomodoroSession({
     super.id,
@@ -33,6 +35,7 @@ class PomodoroSession extends ContentObject {
     this.minutesWorked = 0,
     this.minutesBreak = 0,
     this.state = PomodoroSessionState.scheduled,
+    this.completionRef,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) : super(title: taskTitle, createdAt: createdAt ?? date, updatedAt: updatedAt ?? date);
@@ -59,6 +62,9 @@ class PomodoroSession extends ContentObject {
     frontmatter['minutes_worked'] = minutesWorked;
     frontmatter['minutes_break'] = minutesBreak;
     frontmatter['session_state'] = state.name;
+    if (completionRef != null) {
+      frontmatter['completion_ref'] = completionRef!.toMap();
+    }
     return generateMarkdown(frontmatter, '');
   }
 
@@ -83,6 +89,9 @@ class PomodoroSession extends ContentObject {
         (s) => s.name == (frontmatter['session_state'] ?? frontmatter['state'])?.toString(),
         orElse: () => PomodoroSessionState.completed,
       ),
+      completionRef: frontmatter['completion_ref'] != null
+          ? VaultLinkRef.fromMap(Map<String, dynamic>.from(frontmatter['completion_ref'] as Map))
+          : null,
       createdAt: DateTime.tryParse(frontmatter['created_at']?.toString() ?? ''),
       updatedAt: DateTime.tryParse(frontmatter['updated_at']?.toString() ?? ''),
     );
