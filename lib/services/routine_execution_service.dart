@@ -155,17 +155,7 @@ class RoutineExecutionService {
     return allObjects.where((obj) => obj.id == objectId).firstOrNull;
   }
 
-  /// Check if an item is a habit
-  static bool isHabitItem(RoutineItem item, List<ContentObject> allObjects) {
-    final obj = getReferencedObject(item.referencedObjectId, allObjects);
-    return obj is Habit;
-  }
 
-  /// Check if an item is a task
-  static bool isTaskItem(RoutineItem item, List<ContentObject> allObjects) {
-    final obj = getReferencedObject(item.referencedObjectId, allObjects);
-    return obj is Task;
-  }
 
   /// Get habit completion status for display
   static bool isHabitCompletedToday(Habit habit) {

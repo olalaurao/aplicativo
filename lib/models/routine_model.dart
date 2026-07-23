@@ -4,57 +4,20 @@ import 'organizer_model.dart';
 import 'scheduler.dart';
 import 'reminder_config.dart';
 import 'shared_types.dart';
+import 'checklist_step.dart';
 
-class RoutineItem {
-  final String id;
-  final String referencedObjectId; // WikiLink to any vault object
-  final int order;
-  final bool required;
 
-  RoutineItem({
-    required this.id,
-    required this.referencedObjectId,
-    required this.order,
-    this.required = false,
-  });
-
-  Map<String, dynamic> toMap() => {
-    'id': id,
-    'referenced_object_id': referencedObjectId,
-    'order': order,
-    'required': required,
-  };
-
-  factory RoutineItem.fromMap(Map<String, dynamic> map) => RoutineItem(
-    id: map['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
-    referencedObjectId: map['referenced_object_id']?.toString() ?? '',
-    order: map['order'] as int? ?? 0,
-    required: map['required'] == true,
-  );
-
-  RoutineItem copyWith({
-    String? id,
-    String? referencedObjectId,
-    int? order,
-    bool? required,
-  }) => RoutineItem(
-    id: id ?? this.id,
-    referencedObjectId: referencedObjectId ?? this.referencedObjectId,
-    order: order ?? this.order,
-    required: required ?? this.required,
-  );
-}
 
 class RoutineExecution {
   final DateTime executedAt;
-  final Map<String, bool> itemCompletions; // itemId -> completed status
+  final Map<String, bool> stepCompletions; // stepId -> completed status
   final String? notes;
   final String? moodBefore;
   final String? moodAfter;
 
   RoutineExecution({
     required this.executedAt,
-    required this.itemCompletions,
+    required this.stepCompletions,
     this.notes,
     this.moodBefore,
     this.moodAfter,
@@ -62,7 +25,7 @@ class RoutineExecution {
 
   Map<String, dynamic> toMap() => {
     'executed_at': executedAt.toIso8601String(),
-    'item_completions': itemCompletions,
+    'step_completions': stepCompletions,
     if (notes != null) 'notes': notes,
     if (moodBefore != null) 'mood_before': moodBefore,
     if (moodAfter != null) 'mood_after': moodAfter,
@@ -70,7 +33,7 @@ class RoutineExecution {
 
   factory RoutineExecution.fromMap(Map<String, dynamic> map) => RoutineExecution(
     executedAt: DateTime.tryParse(map['executed_at']?.toString() ?? '') ?? DateTime.now(),
-    itemCompletions: Map<String, bool>.from(map['item_completions'] as Map? ?? {}),
+    stepCompletions: Map<String, bool>.from(map['step_completions'] as Map? ?? {}),
     notes: map['notes']?.toString(),
     moodBefore: map['mood_before']?.toString(),
     moodAfter: map['mood_after']?.toString(),
@@ -78,13 +41,13 @@ class RoutineExecution {
 
   RoutineExecution copyWith({
     DateTime? executedAt,
-    Map<String, bool>? itemCompletions,
+    Map<String, bool>? stepCompletions,
     String? notes,
     String? moodBefore,
     String? moodAfter,
   }) => RoutineExecution(
     executedAt: executedAt ?? this.executedAt,
-    itemCompletions: itemCompletions ?? this.itemCompletions,
+    stepCompletions: stepCompletions ?? this.stepCompletions,
     notes: notes ?? this.notes,
     moodBefore: moodBefore ?? this.moodBefore,
     moodAfter: moodAfter ?? this.moodAfter,
@@ -92,7 +55,7 @@ class RoutineExecution {
 }
 
 class Routine extends Organizer {
-  final List<RoutineItem> items;
+  final List<ChecklistStep> steps;
   final List<RoutineExecution> executionHistory;
   final bool showInPlanner;
   final String? moodTrigger;
@@ -100,7 +63,7 @@ class Routine extends Organizer {
   Routine({
     super.id,
     required super.title,
-    this.items = const [],
+    this.steps = const [],
     this.executionHistory = const [],
     this.showInPlanner = true,
     this.moodTrigger,
@@ -158,8 +121,8 @@ class Routine extends Organizer {
     }
     
     // Routine-specific fields
-    if (items.isNotEmpty) {
-      frontmatter['items'] = items.map((i) => i.toMap()).toList();
+    if (steps.isNotEmpty) {
+      frontmatter['steps'] = steps.map((s) => s.toMap()).toList();
     }
     frontmatter['show_in_planner'] = showInPlanner;
     if (moodTrigger != null) frontmatter['mood_trigger'] = moodTrigger;
@@ -171,8 +134,8 @@ class Routine extends Organizer {
       for (final execution in executionHistory) {
         final dateStr = execution.executedAt.toIso8601String().split('T').first;
         final timeStr = execution.executedAt.toIso8601String().split('T')[1].substring(0, 5);
-        final completedCount = execution.itemCompletions.values.where((v) => v).length;
-        final totalCount = execution.itemCompletions.length;
+        final completedCount = execution.stepCompletions.values.where((v) => v).length;
+        final totalCount = execution.stepCompletions.length;
         
         buffer.writeln('### $dateStr $timeStr');
         buffer.writeln('Completed: $completedCount/$totalCount');
@@ -234,17 +197,17 @@ class Routine extends Organizer {
     }
 
     // Routine-specific fields
-    final routineItems = frontmatter['items'] is List
-        ? (frontmatter['items'] as List)
+    final routineSteps = frontmatter['steps'] is List
+        ? (frontmatter['steps'] as List)
             .whereType<Map>()
-            .map((m) => RoutineItem.fromMap(Map<String, dynamic>.from(m)))
+            .map((m) => ChecklistStep.fromMap(Map<String, dynamic>.from(m)))
             .toList()
-        : <RoutineItem>[];
+        : <ChecklistStep>[];
     final routineShowInPlanner = frontmatter['show_in_planner'] == true;
     final routineMoodTrigger = frontmatter['mood_trigger']?.toString();
 
     return routine.copyWith(
-      items: routineItems,
+      steps: routineSteps,
       showInPlanner: routineShowInPlanner,
       moodTrigger: routineMoodTrigger,
     );
@@ -253,7 +216,7 @@ class Routine extends Organizer {
   Routine copyWith({
     String? title,
     OrganizerType? organizerType,
-    List<RoutineItem>? items,
+    List<ChecklistStep>? steps,
     List<RoutineExecution>? executionHistory,
     bool? showInPlanner,
     String? moodTrigger,
@@ -279,7 +242,7 @@ class Routine extends Organizer {
     return Routine(
       id: id,
       title: title ?? this.title,
-      items: items ?? this.items,
+      steps: steps ?? this.steps,
       executionHistory: executionHistory ?? this.executionHistory,
       showInPlanner: showInPlanner ?? this.showInPlanner,
       moodTrigger: moodTrigger ?? this.moodTrigger,

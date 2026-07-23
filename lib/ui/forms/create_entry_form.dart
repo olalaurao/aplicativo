@@ -532,8 +532,8 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
                       child: ListTile(
                         leading: const Icon(Icons.repeat_rounded, color: AppColors.info),
                         title: Text(routine.title),
-                        subtitle: routine.items.isNotEmpty
-                            ? Text('${routine.items.length} items')
+                        subtitle: routine.steps.isNotEmpty
+                            ? Text('${routine.steps.length} steps')
                             : null,
                         trailing: const Icon(Icons.play_arrow_rounded),
                         onTap: () {

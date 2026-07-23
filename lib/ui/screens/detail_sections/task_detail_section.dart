@@ -54,6 +54,9 @@ List<PropertyCard> buildTaskPropertyCards(
       labelBuilder: (s) => s.name.toUpperCase(),
       onSave: (val) {
         final updated = task.copyWith(stage: val);
+        if (task.stage != val) {
+          updated.logEvent('stage_change', 'Stage changed from ${task.stage.name} to ${val.name}', oldValue: task.stage.name, newValue: val.name);
+        }
         ref.read(vaultProvider.notifier).updateObject(updated);
       },
     ),
@@ -157,6 +160,7 @@ void _showTaskDueDatePicker(BuildContext context, WidgetRef ref, Task task) asyn
   );
   if (picked != null) {
     final updated = task.copyWith(endDate: picked);
+    updated.logEvent('rescheduled', 'Deadline changed from ${task.endDate} to $picked', oldValue: task.endDate?.toString(), newValue: picked.toString());
     ref.read(vaultProvider.notifier).updateObject(updated);
   }
 }

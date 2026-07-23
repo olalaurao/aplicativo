@@ -717,12 +717,15 @@ class _TodayHabitCard extends ConsumerWidget {
                         if (habit.habitMode == HabitMode.pact) ...[
                           Icon(Icons.shield_rounded, size: 13, color: color),
                           const SizedBox(width: 2),
-                          Text(
-                            'Dia $_pactDayCount',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: color,
+                          Flexible(
+                            child: Text(
+                              'Dia $_pactDayCount',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: color,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -733,12 +736,15 @@ class _TodayHabitCard extends ConsumerWidget {
                             color: AppColors.warning,
                           ),
                           const SizedBox(width: 2),
-                          Text(
-                            '${habit.streak} dias',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.warning,
+                          Flexible(
+                            child: Text(
+                              '${habit.streak} dias',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.warning,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           const SizedBox(width: 10),

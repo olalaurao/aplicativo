@@ -8,7 +8,7 @@ import '../providers/pomodoro_provider.dart';
 
 /// Returns whether a checklist item is "done" based on its linked object.
 /// For plain items, the caller should provide local state instead.
-bool computeChecklistItemDone({
+bool computeChecklistStepDone({
   required String kind,
   required String? linkedObjectSlug,
   required String? trackerFieldId,

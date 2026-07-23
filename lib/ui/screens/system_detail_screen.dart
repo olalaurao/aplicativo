@@ -8,10 +8,13 @@ import '../../models/task_model.dart';
 import '../../models/shared_types.dart';
 import '../../providers/systems_provider.dart';
 import '../../providers/vault_provider.dart';
+import '../../services/checklist_item_status.dart';
 import '../theme.dart';
 import '../forms/create_system_form.dart';
 import '../forms/create_task_form.dart';
 import '../widgets/actionable_checklist_tile.dart';
+import '../widgets/property_grid.dart';
+import 'detail_sections/system_detail_section.dart';
 
 class SystemDetailScreen extends ConsumerStatefulWidget {
   final SystemDefinition system;
@@ -73,6 +76,36 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
       linkedSystem: system.id,
     ));
 
+    // Create execution record with step completions
+    final stepCompletions = <String, bool>{};
+    for (final step in system.steps) {
+      if (step.kind == 'plain') {
+        stepCompletions[step.id] = _plainStepsDone.contains(step.id);
+      } else if (step.linkedObjectSlug != null) {
+        // For linked steps, check if the linked object is completed
+        final isDone = computeChecklistStepDone(
+          kind: step.kind,
+          linkedObjectSlug: step.linkedObjectSlug,
+          trackerFieldId: step.trackerFieldId,
+          date: _runStart ?? DateTime.now(),
+          ref: ref,
+          parentObjectId: system.id,
+          itemId: step.id,
+        );
+        stepCompletions[step.id] = isDone;
+      }
+    }
+
+    final execution = SystemExecution(
+      executedAt: _runStart ?? DateTime.now(),
+      stepCompletions: stepCompletions,
+    );
+
+    final updatedSystem = system.copyWith(
+      executionHistory: [...system.executionHistory, execution],
+    );
+    await ref.read(systemsProvider.notifier).updateSystem(updatedSystem);
+
     HapticFeedback.mediumImpact();
 
     setState(() {
@@ -85,12 +118,10 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-            const SizedBox(width: 10),
-            Expanded(child: Text('System concluído em $elapsed min!')),
+            const Icon(Icons.check_circle, color: Colors.green),
+            const SizedBox(width: 8),
+            Text('System executed in ${elapsed}m'),
           ]),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -146,7 +177,10 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
     );
     if (confirmed == true && mounted) {
       await ref.read(systemsProvider.notifier).deleteSystem(_system);
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        // Force navigation back regardless of state
+        Navigator.pop(context);
+      }
     }
   }
 
@@ -421,7 +455,7 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
           ),
 
           SliverToBoxAdapter(
-            child: _buildHistorySection(context, history),
+            child: _buildExecutionHistorySection(context, system),
           ),
 
           // ─── Description ───
@@ -532,8 +566,17 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
     );
   }
 
-  Widget _buildHistorySection(BuildContext context, List<Task> history) {
-    final visibleTasks = history.take(5).toList();
+  Widget _buildExecutionHistorySection(BuildContext context, SystemDefinition system) {
+    final cards = buildSystemPropertyCards(system);
+    final historyCard = cards.firstWhere(
+      (c) => c.label == 'Execution History',
+      orElse: () => PropertyCard(
+        icon: Icons.history,
+        label: 'Execution History',
+        value: 'No history yet',
+        state: PropertyCardState.empty,
+      ),
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -543,7 +586,7 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
           Row(
             children: [
               const Text(
-                'HISTORY',
+                'EXECUTION HISTORY',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
@@ -559,7 +602,7 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  '${history.length}',
+                  '${system.executionHistory.length}',
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -567,46 +610,23 @@ class _SystemDetailScreenState extends ConsumerState<SystemDetailScreen> {
                   ),
                 ),
               ),
-              const Spacer(),
-              if (history.length > 5)
-                TextButton(
-                  onPressed: () => _showAllHistory(context, history),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppTheme.accentColor(context),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    minimumSize: const Size(0, 36),
-                  ),
-                  child: Text('View all (${history.length})'),
-                ),
             ],
           ),
           const SizedBox(height: 12),
           Container(
             width: double.infinity,
-            padding: EdgeInsets.all(history.isEmpty ? 16 : 0),
+            padding: EdgeInsets.all(system.executionHistory.isEmpty ? 16 : 0),
             decoration: AppTheme.cardDecoration(context),
-            child: history.isEmpty
+            child: system.executionHistory.isEmpty
                 ? Text(
-                    'No runs yet. Use Quick Run or Create Task to get started.',
+                    'No runs yet. Use Quick Run to get started.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
                       color: AppTheme.textMutedColor(context),
                     ),
                   )
-                : Column(
-                    children: [
-                      for (var i = 0; i < visibleTasks.length; i++) ...[
-                        _buildHistoryTaskRow(context, visibleTasks[i]),
-                        if (i < visibleTasks.length - 1)
-                          const Divider(
-                            height: 1,
-                            indent: 52,
-                            color: AppColors.divider,
-                          ),
-                      ],
-                    ],
-                  ),
+                : historyCard.customChild ?? const SizedBox.shrink(),
           ),
         ],
       ),

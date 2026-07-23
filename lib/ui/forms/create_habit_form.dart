@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/habit_model.dart';
+import '../../models/checklist_step.dart';
 import '../../models/scheduler.dart';
 import '../../models/template_model.dart';
 import '../../models/note_model.dart';
@@ -12,6 +13,7 @@ import '../../providers/vault_provider.dart';
 import '../../providers/color_palette_provider.dart';
 import '../../services/collection_row_service.dart';
 import '../theme.dart';
+import '../widgets/checklist_step_editor.dart';
 import '../widgets/app_switch_tile.dart';
 import '../../models/shared_types.dart';
 import '../../models/reminder_config.dart';
@@ -135,7 +137,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
               emoji: s.emoji,
               items: s.items
                   .map(
-                    (i) => ChecklistItem(
+                    (i) => ChecklistStep(
                       id: i.id,
                       title: i.title,
                       estimatedMinutes: i.estimatedMinutes,
@@ -1370,6 +1372,14 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
   }
 
   Future<void> _saveHabit() async {
+    // Validate title
+    if (_titleController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a habit title')),
+      );
+      return;
+    }
+
     if (_useChecklist) {
       final hasItems = _checklistSections.any((s) => s.items.isNotEmpty);
       if (!hasItems) {
@@ -1435,8 +1445,24 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
       } else {
         await ref.read(habitsProvider.notifier).addHabit(habit);
       }
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Habit "${habit.title}" ${widget.existingHabit != null ? 'updated' : 'created'}!'),
+          ),
+        );
+      }
     } catch (e) {
       debugPrint('Failed to save habit: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save habit: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -1920,7 +1946,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                       onReorder: (oldIndex, newIndex) {
                         setState(() {
                           if (newIndex > oldIndex) newIndex--;
-                          final items = List<ChecklistItem>.from(section.items);
+                          final items = List<ChecklistStep>.from(section.items);
                           final moved = items.removeAt(oldIndex);
                           items.insert(newIndex, moved);
                           _checklistSections[sectionIndex] = ChecklistSection(
@@ -1933,279 +1959,50 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                       },
                       itemBuilder: (context, itemIndex) {
                         final item = section.items[itemIndex];
-                        return ListTile(
+                        return ChecklistStepEditor(
                           key: ValueKey('item-${item.id}-$itemIndex'),
-                          leading:
-                              const Icon(Icons.drag_handle_rounded, size: 18),
-                          title: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              TextField(
-                                decoration: const InputDecoration(
-                                  hintText: 'Item title',
-                                  isDense: true,
-                                ),
-                                controller: TextEditingController(text: item.title)
-                                  ..selection = TextSelection.collapsed(
-                                    offset: item.title.length,
-                                  ),
-                                onChanged: (v) {
-                                  final items =
-                                      List<ChecklistItem>.from(section.items);
-                                  items[itemIndex] = item.copyWith(title: v);
-                                  _checklistSections[sectionIndex] =
-                                      ChecklistSection(
-                                    id: section.id,
-                                    label: section.label,
-                                    emoji: section.emoji,
-                                    items: items,
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 8),
-                              // Kind selection
-                              SegmentedButton<String>(
-                                segments: const [
-                                  ButtonSegment(
-                                    value: 'plain',
-                                    label: Text('Reminder'),
-                                  ),
-                                  ButtonSegment(
-                                    value: 'habit',
-                                    label: Text('Habit'),
-                                  ),
-                                  ButtonSegment(
-                                    value: 'task',
-                                    label: Text('Task'),
-                                  ),
-                                  ButtonSegment(
-                                    value: 'tracker_entry',
-                                    label: Text('Tracker'),
-                                  ),
-                                  ButtonSegment(
-                                    value: 'pomodoro',
-                                    label: Text('Pomodoro'),
-                                  ),
-                                ],
-                                selected: {item.kind},
-                                onSelectionChanged: (Set<String> selected) {
-                                  final newKind = selected.first;
-                                  final items =
-                                      List<ChecklistItem>.from(section.items);
-                                  items[itemIndex] = item.copyWith(kind: newKind);
-                                  _checklistSections[sectionIndex] =
-                                      ChecklistSection(
-                                    id: section.id,
-                                    label: section.label,
-                                    emoji: section.emoji,
-                                    items: items,
-                                  );
-                                },
-                              ),
-                              if (item.kind == 'task')
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: Text(
-                                    'One-off items only — once checked, this stays checked. For something you\'ll do again tomorrow, use Habit instead.',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.textMuted,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                                ),
-                              // Object picker for non-plain kinds
-                              if (item.kind != 'plain')
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: TextButton(
-                                    onPressed: () async {
-                                      final selected = await showModalBottomSheet<ContentObject>(
-                                        context: context,
-                                        isScrollControlled: true,
-                                        backgroundColor: Colors.transparent,
-                                        builder: (_) => UniversalSearchPickerSheet(
-                                          title: 'Select ${item.kind}',
-                                          initialFilter: item.kind == 'tracker_entry' ? 'tracker' : item.kind,
-                                          showClear: item.kind == 'task',
-                                          onSelected: (obj) => Navigator.pop(context, obj),
-                                        ),
-                                      );
-                                      if (selected != null) {
-                                        final items = List<ChecklistItem>.from(section.items);
-                                        items[itemIndex] = item.copyWith(linkedObjectSlug: selected.slug);
-                                        _checklistSections[sectionIndex] = ChecklistSection(
-                                          id: section.id,
-                                          label: section.label,
-                                          emoji: section.emoji,
-                                          items: items,
-                                        );
-                                      }
-                                    },
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.link, size: 16),
-                                        const SizedBox(width: 4),
-                                        Text(item.linkedObjectSlug ?? 'Link to ${item.kind}'),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              // Field picker for tracker_entry
-                              if (item.kind == 'tracker_entry' && item.linkedObjectSlug != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: TextButton(
-                                    onPressed: () async {
-                                      final trackers = ref.read(trackersProvider);
-                                      final tracker = trackers.where((t) => t.slug == item.linkedObjectSlug).firstOrNull;
-                                      if (tracker == null) return;
-
-                                      final allFields = <InputField>[];
-                                      for (final section in tracker.sections) {
-                                        allFields.addAll(section.inputFields);
-                                      }
-
-                                      final selectedField = await showDialog<InputField>(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          title: const Text('Select field'),
-                                          content: SizedBox(
-                                            width: double.maxFinite,
-                                            child: ListView.builder(
-                                              shrinkWrap: true,
-                                              itemCount: allFields.length,
-                                              itemBuilder: (context, index) => ListTile(
-                                                title: Text(allFields[index].title),
-                                                onTap: () => Navigator.pop(context, allFields[index]),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      );
-
-                                      if (selectedField != null) {
-                                        final items = List<ChecklistItem>.from(section.items);
-                                        items[itemIndex] = item.copyWith(trackerFieldId: selectedField.id);
-                                        _checklistSections[sectionIndex] = ChecklistSection(
-                                          id: section.id,
-                                          label: section.label,
-                                          emoji: section.emoji,
-                                          items: items,
-                                        );
-                                      }
-                                    },
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.tune, size: 16),
-                                        const SizedBox(width: 4),
-                                        Text(item.trackerFieldId ?? 'Select field'),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              // Collection attachment toggle for habit/tracker_entry
-                              if (item.kind == 'habit' || item.kind == 'tracker_entry')
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: TextButton(
-                                    onPressed: () async {
-                                      final notes = ref.read(notesProvider);
-                                      final collections = notes.where((n) => n.subtype == NoteSubtype.collection).toList();
-
-                                      final selected = await showDialog<Note>(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          title: const Text('Attach Collection'),
-                                          content: SizedBox(
-                                            width: double.maxFinite,
-                                            child: ListView.builder(
-                                              shrinkWrap: true,
-                                              itemCount: collections.length,
-                                              itemBuilder: (context, index) => ListTile(
-                                                title: Text(collections[index].title),
-                                                onTap: () => Navigator.pop(context, collections[index]),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      );
-
-                                      if (selected != null) {
-                                        final items = List<ChecklistItem>.from(section.items);
-                                        items[itemIndex] = item.copyWith(attachedCollectionSlug: selected.slug);
-                                        _checklistSections[sectionIndex] = ChecklistSection(
-                                          id: section.id,
-                                          label: section.label,
-                                          emoji: section.emoji,
-                                          items: items,
-                                        );
-                                      }
-                                    },
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.folder_open, size: 16),
-                                        const SizedBox(width: 4),
-                                        Text(item.attachedCollectionSlug ?? 'Attach Collection (optional)'),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          subtitle: TextField(
-                            decoration: const InputDecoration(
-                              hintText: 'Min (optional)',
-                              isDense: true,
-                            ),
-                            keyboardType: TextInputType.number,
-                            controller: TextEditingController(
-                              text: item.estimatedMinutes?.toString() ?? '',
-                            ),
-                            onChanged: (v) {
-                              final items =
-                                  List<ChecklistItem>.from(section.items);
-                              final parsed = v.trim().isEmpty ? null : int.tryParse(v);
-                              items[itemIndex] = ChecklistItem(
-                                id: item.id,
-                                title: item.title,
-                                estimatedMinutes: parsed,
-                                kind: item.kind,
-                                linkedObjectSlug: item.linkedObjectSlug,
-                                trackerFieldId: item.trackerFieldId,
-                                attachedCollectionSlug: item.attachedCollectionSlug,
-                              );
-                              _checklistSections[sectionIndex] =
-                                  ChecklistSection(
+                          step: item,
+                          index: itemIndex,
+                          onChanged: (v) {
+                            setState(() {
+                              final items = List<ChecklistStep>.from(section.items);
+                              items[itemIndex] = item.copyWith(title: v);
+                              _checklistSections[sectionIndex] = ChecklistSection(
                                 id: section.id,
                                 label: section.label,
                                 emoji: section.emoji,
                                 items: items,
                               );
-                            },
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.close_rounded, size: 18),
-                            onPressed: () {
-                              setState(() {
-                                final items =
-                                    List<ChecklistItem>.from(section.items)
-                                      ..removeAt(itemIndex);
-                                _checklistSections[sectionIndex] =
-                                    ChecklistSection(
-                                  id: section.id,
-                                  label: section.label,
-                                  emoji: section.emoji,
-                                  items: items,
-                                );
-                              });
-                            },
-                          ),
+                            });
+                          },
+                          onStepChanged: (newStep) {
+                            setState(() {
+                              final items = List<ChecklistStep>.from(section.items);
+                              items[itemIndex] = newStep;
+                              _checklistSections[sectionIndex] = ChecklistSection(
+                                id: section.id,
+                                label: section.label,
+                                emoji: section.emoji,
+                                items: items,
+                              );
+                            });
+                          },
+                          onRemove: () {
+                            setState(() {
+                              final items = List<ChecklistStep>.from(section.items)..removeAt(itemIndex);
+                              _checklistSections[sectionIndex] = ChecklistSection(
+                                id: section.id,
+                                label: section.label,
+                                emoji: section.emoji,
+                                items: items,
+                              );
+                            });
+                          },
                         );
                       },
                     ),
                     TextButton(
-                      onPressed: () => _addChecklistItem(sectionIndex),
+                      onPressed: () => _addChecklistStep(sectionIndex),
                       child: const Text('+ Add item'),
                     ),
                   ],
@@ -2236,11 +2033,11 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
     });
   }
 
-  void _addChecklistItem(int sectionIndex) {
+  void _addChecklistStep(int sectionIndex) {
     setState(() {
       final section = _checklistSections[sectionIndex];
-      final items = List<ChecklistItem>.from(section.items)
-        ..add(const ChecklistItem(id: 'novo-item', title: ''));
+      final items = List<ChecklistStep>.from(section.items)
+        ..add(ChecklistStep(id: 'novo-item', title: ''));
       _checklistSections[sectionIndex] = ChecklistSection(
         id: section.id,
         label: section.label,

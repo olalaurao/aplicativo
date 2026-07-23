@@ -12,6 +12,7 @@ class ChecklistStep {
   final String? trackerFieldId;      // only for kind == 'tracker_entry'
   final String? attachedCollectionSlug; // Note slug (subtype == collection), optional
   final ReminderConfig? reminderConfig; // Notification config for 'plain' (reminder) kind
+  final int? estimatedMinutes;       // For habit items
 
   ChecklistStep({
     String? id,
@@ -22,6 +23,7 @@ class ChecklistStep {
     this.trackerFieldId,
     this.attachedCollectionSlug,
     this.reminderConfig,
+    this.estimatedMinutes,
   }) : id = id ?? const Uuid().v4();
 
   Map<String, dynamic> toMap() {
@@ -34,6 +36,7 @@ class ChecklistStep {
       if (trackerFieldId != null) 'tracker_field_id': trackerFieldId,
       if (attachedCollectionSlug != null) 'attached_collection_slug': attachedCollectionSlug,
       if (reminderConfig != null) 'reminder_config': reminderConfig!.toMap(),
+      if (estimatedMinutes != null) 'estimated_minutes': estimatedMinutes,
     };
   }
 
@@ -55,6 +58,7 @@ class ChecklistStep {
       trackerFieldId: map['tracker_field_id']?.toString(),
       attachedCollectionSlug: map['attached_collection_slug']?.toString(),
       reminderConfig: parsedReminderConfig,
+      estimatedMinutes: map['estimated_minutes'] as int?,
     );
   }
 
@@ -66,6 +70,7 @@ class ChecklistStep {
     String? trackerFieldId,
     String? attachedCollectionSlug,
     ReminderConfig? reminderConfig,
+    int? estimatedMinutes,
   }) {
     return ChecklistStep(
       id: id,
@@ -76,6 +81,7 @@ class ChecklistStep {
       trackerFieldId: trackerFieldId ?? this.trackerFieldId,
       attachedCollectionSlug: attachedCollectionSlug ?? this.attachedCollectionSlug,
       reminderConfig: reminderConfig ?? this.reminderConfig,
+      estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
     );
   }
 }

@@ -159,7 +159,7 @@ class _WeekOverviewComponentState extends ConsumerState<WeekOverviewComponent> {
                             child: Text(
                               '${date.day}',
                               style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                                color: isToday ? AppColors.surface : AppColors.textPrimary,
+                                color: isToday ? AppTheme.surfaceColor(context) : AppTheme.textPrimaryColor(context),
                                 fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
                               ),
                             ),

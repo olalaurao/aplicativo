@@ -177,7 +177,7 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
                                         style: Theme.of(context).textTheme.bodySmall!.copyWith(
                                           color: isToday
                                             ? AppColors.accent
-                                            : (isCurrentMonth ? AppColors.textPrimary : AppColors.textMuted.withValues(alpha: 0.5)),
+                                            : (isCurrentMonth ? AppTheme.textPrimaryColor(context) : AppTheme.textMutedColor(context).withValues(alpha: 0.5)),
                                           fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
                                         ),
                                       ),

@@ -5,11 +5,13 @@ import '../../models/organizer_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/scheduler.dart';
 import '../../models/reminder_config.dart';
+import '../../models/checklist_step.dart';
 import '../../models/content_object.dart';
 import '../../providers/vault_provider.dart';
 import '../theme.dart';
 import '../widgets/universal_search_picker.dart';
 import '../widgets/reminder_config_sheet.dart';
+import '../widgets/checklist_step_editor.dart';
 import 'scheduler_picker.dart';
 
 class CreateRoutineForm extends ConsumerStatefulWidget {
@@ -24,7 +26,7 @@ class _CreateRoutineFormState extends ConsumerState<CreateRoutineForm> {
   final _titleController = TextEditingController();
   String _selectedColor = '#3B82F6';
   String? _parentId;
-  List<RoutineItem> _items = [];
+  List<ChecklistStep> _steps = [];
   bool _showInPlanner = true;
   String? _moodTrigger;
   Scheduler? _scheduler;
@@ -60,7 +62,7 @@ class _CreateRoutineFormState extends ConsumerState<CreateRoutineForm> {
       _titleController.text = routine.title;
       _selectedColor = routine.color ?? _selectedColor;
       _parentId = routine.parentId;
-      _items = List.from(routine.items);
+      _steps = List.from(routine.steps);
       _showInPlanner = routine.showInPlanner;
       _moodTrigger = routine.moodTrigger;
       _scheduler = routine.scheduler;
@@ -307,7 +309,7 @@ class _CreateRoutineFormState extends ConsumerState<CreateRoutineForm> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Routine Items',
+                        'Routine Steps',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -315,17 +317,17 @@ class _CreateRoutineFormState extends ConsumerState<CreateRoutineForm> {
                         ),
                       ),
                       TextButton(
-                        onPressed: _addItem,
-                        child: const Text('+ Add Item'),
+                        onPressed: _addStep,
+                        child: const Text('+ Add Step'),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  if (_items.isEmpty)
+                  if (_steps.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(16),
                       child: Text(
-                        'No items added yet. Tap "+ Add Item" to include tasks, habits, or other objects.',
+                        'No steps added yet. Tap "+ Add Step" to build your routine.',
                         style: TextStyle(color: AppColors.textMuted),
                       ),
                     )
@@ -333,58 +335,27 @@ class _CreateRoutineFormState extends ConsumerState<CreateRoutineForm> {
                     ReorderableListView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _items.length,
+                      itemCount: _steps.length,
                       onReorder: (oldIndex, newIndex) {
                         setState(() {
                           if (newIndex > oldIndex) newIndex--;
-                          final item = _items.removeAt(oldIndex);
-                          _items.insert(newIndex, item);
-                          // Update order values
-                          for (int i = 0; i < _items.length; i++) {
-                            _items[i] = _items[i].copyWith(order: i);
-                          }
+                          final step = _steps.removeAt(oldIndex);
+                          _steps.insert(newIndex, step);
                         });
                       },
                       itemBuilder: (context, index) {
-                        final item = _items[index];
-                        return Card(
-                          key: ValueKey(item.id),
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            dense: true,
-                            leading: const Icon(Icons.drag_handle, size: 18),
-                            title: Text(
-                              _getObjectTitle(item.referencedObjectId),
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                            subtitle: Text(
-                              item.referencedObjectId,
-                              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: Icon(
-                                    item.required ? Icons.star : Icons.star_border,
-                                    size: 18,
-                                    color: item.required ? AppColors.warning : AppColors.textMuted,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _items[index] = item.copyWith(required: !item.required);
-                                    });
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
-                                  onPressed: () {
-                                    setState(() => _items.removeAt(index));
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
+                        final step = _steps[index];
+                        return ChecklistStepEditor(
+                          key: ValueKey(step.id),
+                          index: index,
+                          step: step,
+                          onChanged: (title) => _updateStepTitle(index, title),
+                          onStepChanged: (newStep) {
+                            setState(() {
+                              _steps[index] = newStep;
+                            });
+                          },
+                          onRemove: () => _removeStep(index),
                         );
                       },
                     ),
@@ -421,13 +392,28 @@ class _CreateRoutineFormState extends ConsumerState<CreateRoutineForm> {
     }
   }
 
-  String _getObjectTitle(String wikiLink) {
-    // Extract title from WikiLink [[title]] or [[title|alias]]
-    final match = RegExp(r'\[\[([^\]|]+)(?:\|[^\]]+)?\]\]').firstMatch(wikiLink);
-    if (match != null) {
-      return match.group(1) ?? wikiLink;
-    }
-    return wikiLink;
+  void _addStep() {
+    setState(() {
+      _steps.add(ChecklistStep(title: ''));
+    });
+    // Focus on the new step after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FocusScope.of(context).requestFocus(FocusNode());
+    });
+  }
+
+  void _removeStep(int index) {
+    setState(() {
+      _steps.removeAt(index);
+    });
+  }
+
+  void _updateStepTitle(int index, String title) {
+    final updated = List<ChecklistStep>.from(_steps);
+    updated[index] = updated[index].copyWith(title: title);
+    setState(() {
+      _steps = updated;
+    });
   }
 
   void _pickScheduler() async {
@@ -484,34 +470,14 @@ class _CreateRoutineFormState extends ConsumerState<CreateRoutineForm> {
     }
   }
 
-  void _addItem() async {
-    final result = await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => UniversalSearchPickerSheet(
-        title: 'Select item',
-        onSelected: (obj) => Navigator.pop(context, obj),
-      ),
-    );
-    if (result != null) {
-      final wikiLink = '[[${result.id}]]';
-      setState(() {
-        _items.add(RoutineItem(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          referencedObjectId: wikiLink,
-          order: _items.length,
-        ));
-      });
-    }
-  }
+
 
   void _saveRoutine() {
     final existing = widget.existingRoutine;
     final routine = Routine(
       id: existing?.id,
       title: _titleController.text.trim(),
-      items: _items,
+      steps: _steps.where((s) => s.title.trim().isNotEmpty).toList(),
       executionHistory: existing?.executionHistory ?? [],
       showInPlanner: _showInPlanner,
       moodTrigger: _moodTrigger,

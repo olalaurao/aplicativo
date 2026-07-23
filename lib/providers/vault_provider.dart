@@ -113,15 +113,20 @@ String getDailyNoteTemplate(
 }
 
 Map<String, String> _habitLabelsFromRef(Ref ref) {
+  // Avoid circular dependency - get labels from allObjects instead
+  final allObjects = ref.read(allObjectsProvider).value ?? [];
+  final habits = allObjects.whereType<Habit>();
   return {
-    for (final habit in ref.read(habitsProvider))
+    for (final habit in habits)
       habit.slug: habit.displayTitle,
   };
 }
 
 Set<String> _pactHabitSlugsFromRef(Ref ref) {
-  return ref
-      .read(habitsProvider)
+  // Avoid circular dependency - get pact slugs from allObjects instead
+  final allObjects = ref.read(allObjectsProvider).value ?? [];
+  final habits = allObjects.whereType<Habit>();
+  return habits
       .where((habit) => habit.habitMode == HabitMode.pact)
       .map((habit) => habit.slug)
       .toSet();
@@ -569,6 +574,7 @@ class HabitsNotifier extends Notifier<List<Habit>> {
       ref.read(allObjectsProvider.notifier).replaceObjectInMemory(updatedHabit);
       
       // Save habit's own .md file with updated completion history
+      updatedHabit.logEvent('habit_toggled', 'Habit toggled on $dateStr (slot $slotIndex)');
       await ref.read(vaultProvider.notifier).updateObject(updatedHabit);
 
       // Write habit completions as flat frontmatter keys (Obsidian format)
@@ -629,11 +635,8 @@ class HabitsNotifier extends Notifier<List<Habit>> {
     }
   }
 
-  Future<void> toggleChecklistItem(
-    Habit habit,
-    DateTime date,
-    String itemId,
-  ) async {
+  Future<void> toggleChecklistStep(
+      Habit habit, DateTime date, String itemId) async {
     if (!habit.isChecklistHabit) return;
     final dateStr = date.toIso8601String().split('T').first;
     final obsidianService = ref.read(obsidianServiceProvider);
@@ -2717,6 +2720,24 @@ class VaultNotifier extends Notifier<void> {
     }
   }
 
+  /// Called when an object is permanently deleted — removes it from memory
+  /// immediately so the UI updates without waiting for a full vault reload.
+  void _removeFromObjectProviders(ContentObject object) {
+    final key = _signatureKeyFor(object);
+    ref.read(allObjectsProvider.notifier).removeObjectInMemory(object.id);
+    ref.invalidate(objectsByTypeProvider(object.type));
+    ref.invalidate(objectsByTypeProvider(key));
+
+    if (object.obsidianPath.startsWith('daily/')) {
+      final dateMatch = RegExp(
+        r'(\d{4}-\d{2}-\d{2})',
+      ).firstMatch(object.obsidianPath);
+      if (dateMatch != null) {
+        ref.invalidate(dailyNoteDataProvider(dateMatch.group(1)!));
+      }
+    }
+  }
+
   Future<void> _updateWidgetsFor(ContentObject object) async {
     if (object is Task) {
       final allObjects = ref.read(allObjectsProvider).value ?? [];
@@ -3184,6 +3205,9 @@ class VaultNotifier extends Notifier<void> {
   }
 
   Future<void> createObject(ContentObject object) async {
+    if (object.eventLog.isEmpty) {
+      object.logEvent('created', 'Object created');
+    }
     await _writeObject(object, operation: SyncOperation.create);
   }
 
@@ -3712,6 +3736,9 @@ class VaultNotifier extends Notifier<void> {
     final syncQueue = ref.read(syncQueueServiceProvider);
 
     if (object.obsidianPath.isNotEmpty) {
+      // Remove from memory immediately for instant UI feedback
+      _removeFromObjectProviders(object);
+
       debugPrint('Deleting: ${object.obsidianPath}');
       final fileName = object.obsidianPath.split('/').last;
       final deletedPath = '_deleted/$fileName';
@@ -3733,7 +3760,6 @@ class VaultNotifier extends Notifier<void> {
       );
 
       await _cancelObjectReminders(object);
-      _invalidateObjectProviders(object);
       await _updateWidgetsFor(object);
     }
   }

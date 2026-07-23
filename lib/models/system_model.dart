@@ -7,6 +7,30 @@ import 'checklist_step.dart';
 // Type alias for backward compatibility
 typedef SystemStep = ChecklistStep;
 
+class SystemExecution {
+  final DateTime executedAt;
+  final Map<String, bool> stepCompletions; // stepId -> completed status
+  final String? notes;
+
+  SystemExecution({
+    required this.executedAt,
+    required this.stepCompletions,
+    this.notes,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'executed_at': executedAt.toIso8601String(),
+    'step_completions': stepCompletions,
+    if (notes != null) 'notes': notes,
+  };
+
+  factory SystemExecution.fromMap(Map<String, dynamic> map) => SystemExecution(
+    executedAt: DateTime.parse(map['executed_at'] as String),
+    stepCompletions: Map<String, bool>.from(map['step_completions'] as Map),
+    notes: map['notes']?.toString(),
+  );
+}
+
 class SystemDefinition extends ContentObject {
   String trigger;
   int estimatedMinutes;
@@ -18,6 +42,7 @@ class SystemDefinition extends ContentObject {
   List<SystemStep> steps;
   String description;
   Scheduler? scheduler;
+  List<SystemExecution> executionHistory;
 
   SystemDefinition({
     super.id,
@@ -30,6 +55,7 @@ class SystemDefinition extends ContentObject {
     this.steps = const [],
     this.description = '',
     this.scheduler,
+    this.executionHistory = const [],
     super.createdAt,
     super.updatedAt,
     super.archived,
@@ -51,6 +77,9 @@ class SystemDefinition extends ContentObject {
     map['steps'] = steps.map((s) => s.toMap()).toList();
     if (scheduler != null) {
       map['scheduler'] = scheduler!.toMap();
+    }
+    if (executionHistory.isNotEmpty) {
+      map['execution_history'] = executionHistory.map((e) => e.toMap()).toList();
     }
 
     return generateMarkdown(map, description);
@@ -82,6 +111,13 @@ class SystemDefinition extends ContentObject {
           .toList();
     }
 
+    if (frontmatter['execution_history'] is List) {
+      system.executionHistory = (frontmatter['execution_history'] as List)
+          .whereType<Map>()
+          .map((m) => SystemExecution.fromMap(Map<String, dynamic>.from(m)))
+          .toList();
+    }
+
     return system;
   }
 
@@ -95,6 +131,7 @@ class SystemDefinition extends ContentObject {
     List<SystemStep>? steps,
     String? description,
     Scheduler? scheduler,
+    List<SystemExecution>? executionHistory,
     bool? archived,
     bool? pinned,
   }) {
@@ -109,6 +146,7 @@ class SystemDefinition extends ContentObject {
       steps: steps ?? this.steps,
       description: description ?? this.description,
       scheduler: scheduler ?? this.scheduler,
+      executionHistory: executionHistory ?? this.executionHistory,
       createdAt: createdAt,
       updatedAt: updatedAt,
       archived: archived ?? this.archived,

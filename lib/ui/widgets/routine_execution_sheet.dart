@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/routine_model.dart';
-import '../../models/habit_model.dart';
-import '../../models/task_model.dart';
-import '../../models/content_object.dart';
-import '../../services/routine_execution_service.dart';
+import '../../models/checklist_step.dart';
+import '../../services/checklist_item_status.dart';
 import '../../providers/vault_provider.dart';
+import '../widgets/actionable_checklist_tile.dart';
 import '../theme.dart';
 
 class RoutineExecutionSheet extends ConsumerStatefulWidget {
@@ -17,18 +16,19 @@ class RoutineExecutionSheet extends ConsumerStatefulWidget {
 }
 
 class _RoutineExecutionSheetState extends ConsumerState<RoutineExecutionSheet> {
-  late RoutineExecution _execution;
+  late DateTime _runStart;
+  final Set<String> _plainStepsDone = {};
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _execution = RoutineExecutionService.startExecution(widget.routine);
+    _runStart = DateTime.now();
   }
 
   @override
   Widget build(BuildContext context) {
-    final allObjects = ref.watch(allObjectsProvider).value ?? [];
+    // The value of the local variable 'allObjects' isn't used right now, but it's safe to remove or keep. I'll remove it.
 
     return Container(
       decoration: BoxDecoration(
@@ -90,11 +90,40 @@ class _RoutineExecutionSheetState extends ConsumerState<RoutineExecutionSheet> {
           Flexible(
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
-              itemCount: widget.routine.items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemCount: widget.routine.steps.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (context, index) {
-                final item = widget.routine.items[index];
-                return _buildItemCard(item, allObjects);
+                final step = widget.routine.steps[index];
+                return ActionableChecklistTile(
+                  itemId: step.id,
+                  title: step.title,
+                  kind: step.kind,
+                  linkedObjectSlug: step.linkedObjectSlug,
+                  trackerFieldId: step.trackerFieldId,
+                  attachedCollectionSlug: step.attachedCollectionSlug,
+                  date: _runStart,
+                  parentObjectId: widget.routine.id,
+                  plainValue: _plainStepsDone.contains(step.id),
+                  onPlainToggle: (done) {
+                    setState(() {
+                      if (done) {
+                        _plainStepsDone.add(step.id);
+                      } else {
+                        _plainStepsDone.remove(step.id);
+                      }
+                    });
+                  },
+                  onTaskCreated: (taskSlug) async {
+                    // Update the routine step with the new linked task
+                    final updatedSteps = List<ChecklistStep>.from(widget.routine.steps);
+                    final stepIndex = updatedSteps.indexWhere((s) => s.id == step.id);
+                    if (stepIndex != -1) {
+                      updatedSteps[stepIndex] = step.copyWith(linkedObjectSlug: taskSlug);
+                      final updated = widget.routine.copyWith(steps: updatedSteps);
+                      await ref.read(vaultProvider.notifier).updateObject(updated);
+                    }
+                  },
+                );
               },
             ),
           ),
@@ -158,145 +187,53 @@ class _RoutineExecutionSheetState extends ConsumerState<RoutineExecutionSheet> {
     );
   }
 
-  Widget _buildItemCard(RoutineItem item, List<ContentObject> allObjects) {
-    final referencedObject = RoutineExecutionService.getReferencedObject(
-      item.referencedObjectId,
-      allObjects,
-    );
-    final isCompleted = _execution.itemCompletions[item.id] == true;
-    final isHabit = RoutineExecutionService.isHabitItem(item, allObjects);
-
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ListTile(
-        dense: true,
-        leading: Checkbox(
-          value: isCompleted,
-          onChanged: (value) => _toggleItem(item, allObjects),
-        ),
-        title: Text(
-          referencedObject?.title ?? item.referencedObjectId,
-          style: TextStyle(
-            decoration: isCompleted ? TextDecoration.lineThrough : null,
-            color: isCompleted ? AppColors.textMuted : null,
-          ),
-        ),
-        subtitle: Row(
-          children: [
-            Text(
-              referencedObject?.type ?? 'Unknown',
-              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-            ),
-            if (item.required) ...[
-              const SizedBox(width: 8),
-              const Icon(
-                Icons.star,
-                size: 12,
-                color: AppColors.warning,
-              ),
-            ],
-          ],
-        ),
-        trailing: isHabit
-            ? IconButton(
-                icon: Icon(
-                  isCompleted ? Icons.check_circle : Icons.circle_outlined,
-                  color: isCompleted ? AppColors.success : AppColors.textMuted,
-                ),
-                onPressed: () => _toggleHabit(item, allObjects),
-              )
-            : referencedObject != null
-                ? IconButton(
-                    icon: const Icon(Icons.open_in_new, size: 18),
-                    onPressed: () {
-                      // Navigate to object detail
-                      Navigator.pop(context);
-                      // TODO: Implement navigation to referenced object
-                    },
-                  )
-                : null,
-        onTap: () => _toggleItem(item, allObjects),
-        onLongPress: referencedObject != null
-            ? () {
-                Navigator.pop(context);
-                // TODO: Implement navigation to referenced object
-              }
-            : null,
-      ),
-    );
-  }
-
-  void _toggleItem(RoutineItem item, List<ContentObject> allObjects) {
-    setState(() {
-      _execution = _execution.copyWith(
-        itemCompletions: {
-          ..._execution.itemCompletions,
-          item.id: !(_execution.itemCompletions[item.id] ?? false),
-        },
-      );
-    });
-  }
-
-  Future<void> _toggleHabit(RoutineItem item, List<ContentObject> allObjects) async {
-    final habit = RoutineExecutionService.getReferencedObject(
-      item.referencedObjectId,
-      allObjects,
-    );
-    if (habit is! Habit) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      await RoutineExecutionService.toggleHabitInExecution(
-        _execution,
-        habit,
-        ref,
-      );
-
-      // Update execution state to reflect habit completion
-      final isCompleted = RoutineExecutionService.isHabitCompletedToday(habit);
-      setState(() {
-        _execution = _execution.copyWith(
-          itemCompletions: {
-            ..._execution.itemCompletions,
-            item.id: isCompleted,
-          },
-        );
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error toggling habit: $e')),
-      );
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
   Future<void> _completeRoutine() async {
     setState(() => _isLoading = true);
 
     try {
-      final success = await RoutineExecutionService.completeExecution(
-        widget.routine,
-        _execution,
-        ref,
-        context,
+      final stepCompletions = <String, bool>{};
+      for (final step in widget.routine.steps) {
+        if (step.kind == 'plain') {
+          stepCompletions[step.id] = _plainStepsDone.contains(step.id);
+        } else if (step.linkedObjectSlug != null) {
+          final isDone = computeChecklistStepDone(
+            kind: step.kind,
+            linkedObjectSlug: step.linkedObjectSlug,
+            trackerFieldId: step.trackerFieldId,
+            date: _runStart,
+            ref: ref,
+            parentObjectId: widget.routine.id,
+            itemId: step.id,
+          );
+          stepCompletions[step.id] = isDone;
+        }
+      }
+
+      final execution = RoutineExecution(
+        executedAt: _runStart,
+        stepCompletions: stepCompletions,
       );
 
-      if (success) {
+      final updatedRoutine = widget.routine.copyWith(
+        executionHistory: [...widget.routine.executionHistory, execution],
+      );
+
+      await ref.read(vaultProvider.notifier).updateObject(updatedRoutine);
+
+      if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Routine "${widget.routine.title}" completed!'),
-          ),
+          SnackBar(content: Text('Routine "${widget.routine.title}" completed!')),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error completing routine: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error completing routine: $e')),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 }

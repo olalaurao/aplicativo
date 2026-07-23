@@ -65,7 +65,7 @@ class ActionableChecklistTile extends ConsumerWidget {
     PomodoroState? pomodoroState,
   ]) {
     if (kind == 'plain') return plainValue ?? false;
-    return computeChecklistItemDone(
+    return computeChecklistStepDone(
       kind: kind,
       linkedObjectSlug: linkedObjectSlug,
       trackerFieldId: trackerFieldId,
@@ -105,13 +105,24 @@ class ActionableChecklistTile extends ConsumerWidget {
   }
 
   Future<void> _handleHabitTap(WidgetRef ref) async {
-    if (linkedObjectSlug == null) return;
+    if (linkedObjectSlug == null) {
+      // Show error message that habit needs to be linked
+      ScaffoldMessenger.of(ref.context).showSnackBar(
+        const SnackBar(content: Text('Please link this step to a habit first in the step settings')),
+      );
+      return;
+    }
 
     final habits = ref.read(habitsProvider);
     final habit = habits.where((h) => h.slug == linkedObjectSlug).firstOrNull;
-    if (habit == null) return;
+    if (habit == null) {
+      ScaffoldMessenger.of(ref.context).showSnackBar(
+        const SnackBar(content: Text('Linked habit not found. Please select a valid habit')),
+      );
+      return;
+    }
 
-    final isDone = computeChecklistItemDone(
+    final isDone = computeChecklistStepDone(
       kind: kind,
       linkedObjectSlug: linkedObjectSlug,
       trackerFieldId: trackerFieldId,
@@ -122,13 +133,18 @@ class ActionableChecklistTile extends ConsumerWidget {
     );
 
     VaultLinkRef? pickedRef;
-    if (attachedCollectionSlug != null) {
-      pickedRef = await CollectionItemPickerSheet.show(
-        ref.context,
-        collectionNoteSlug: attachedCollectionSlug!,
-      );
-      // If user cancelled the picker, don't proceed
-      if (pickedRef == null) return;
+    if (attachedCollectionSlug != null && attachedCollectionSlug!.isNotEmpty) {
+      try {
+        pickedRef = await CollectionItemPickerSheet.show(
+          ref.context,
+          collectionNoteSlug: attachedCollectionSlug!,
+        );
+      } catch (e) {
+        debugPrint('Collection picker error: $e');
+        ScaffoldMessenger.of(ref.context).showSnackBar(
+          SnackBar(content: Text('Error opening collection: $e')),
+        );
+      }
     }
 
     await ref.read(habitsProvider.notifier).toggleHabit(habit, date);
@@ -174,21 +190,28 @@ class ActionableChecklistTile extends ConsumerWidget {
         stage: TaskStage.finalized,
         linkedSystem: parentObjectId,
       );
-      await ref.read(tasksProvider.notifier).addTask(task);
+      await ref.read(vaultProvider.notifier).createObject(task);
       // Notify caller to persist the new task's slug
       onTaskCreated?.call(task.slug);
       return;
     }
 
-    final tasks = ref.read(tasksProvider);
+    final allObjects = ref.read(allObjectsProvider).value ?? [];
+    final tasks = allObjects.whereType<Task>().toList();
     final task = tasks.where((t) => t.slug == linkedObjectSlug).firstOrNull;
-    if (task == null) return;
+    if (task == null) {
+      ScaffoldMessenger.of(ref.context).showSnackBar(
+        const SnackBar(content: Text('Linked task not found')),
+      );
+      return;
+    }
 
     final isDone = task.stage == TaskStage.finalized;
     final updated = task.copyWith(
       stage: isDone ? TaskStage.todo : TaskStage.finalized,
     );
-    await ref.read(tasksProvider.notifier).updateTask(updated);
+    updated.logEvent('stage_change', 'Stage changed via checklist from ${task.stage.name} to ${updated.stage.name}');
+    await ref.read(vaultProvider.notifier).updateObject(updated);
   }
 
   Future<void> _handleTrackerTap(WidgetRef ref) async {
@@ -216,6 +239,9 @@ class ActionableChecklistTile extends ConsumerWidget {
       );
       if (pickedRef != null) {
         value = pickedRef.displayTitle;
+      } else {
+        // If user cancelled picker, use a default value
+        value = 'Completed';
       }
     } else {
       // Show inline input based on field type

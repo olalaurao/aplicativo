@@ -506,3 +506,39 @@ class DataSourceReference {
   }
 }
 
+class EventLogEntry {
+  final DateTime timestamp;
+  final String action;
+  final String description;
+  final String? oldValue;
+  final String? newValue;
+
+  EventLogEntry({
+    required this.timestamp,
+    required this.action,
+    required this.description,
+    this.oldValue,
+    this.newValue,
+  });
+
+  Map<String, dynamic> toMap() {
+    final m = <String, dynamic>{
+      'timestamp': timestamp.toIso8601String(),
+      'action': action,
+      'description': description,
+    };
+    if (oldValue != null) m['old_value'] = oldValue;
+    if (newValue != null) m['new_value'] = newValue;
+    return m;
+  }
+
+  factory EventLogEntry.fromMap(Map<String, dynamic> map) {
+    return EventLogEntry(
+      timestamp: DateTime.tryParse(map['timestamp']?.toString() ?? '') ?? DateTime.now(),
+      action: map['action']?.toString() ?? 'unknown',
+      description: map['description']?.toString() ?? '',
+      oldValue: map['old_value']?.toString(),
+      newValue: map['new_value']?.toString(),
+    );
+  }
+}

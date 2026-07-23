@@ -14,6 +14,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../models/content_object.dart';
 import '../../models/task_model.dart';
 import '../../models/habit_model.dart';
+import '../../models/checklist_step.dart';
 import '../../models/goal_model.dart';
 import '../../models/journal_entry.dart';
 import '../../models/mood_model.dart';
@@ -3164,6 +3165,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       values: TaskStage.values,
       label: (value) => _translateStage(value),
       onSelected: (value) {
+        if (task.stage != value) {
+          task.logEvent('stage_change', 'Stage changed from ${task.stage.name} to ${value.name}', oldValue: task.stage.name, newValue: value.name);
+        }
         task.stage = value;
         ref.read(vaultProvider.notifier).updateObject(task);
       },
@@ -3194,6 +3198,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       values: TaskPriority.values,
       label: (value) => value.name,
       onSelected: (value) {
+        if (task.priority != value) {
+          task.logEvent('priority_change', 'Priority changed from ${task.priority.name} to ${value.name}', oldValue: task.priority.name, newValue: value.name);
+        }
         task.priority = value;
         ref.read(vaultProvider.notifier).updateObject(task);
       },
@@ -4396,7 +4403,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final rawVal = habitsMap[habit.slug];
     final checklistState = habit.resolveChecklistState(rawVal);
     final doneCount = checklistState.values.where((v) => v).length;
-    final total = habit.totalChecklistItems;
+    final total = habit.totalChecklistSteps;
     final progress = total > 0 ? doneCount / total : 0.0;
     final habitColor = _parseColor(habit.color);
 
@@ -4551,7 +4558,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                         onPlainToggle: (done) async {
                           await ref
                               .read(habitsProvider.notifier)
-                              .toggleChecklistItem(habit, today, item.id);
+                              .toggleChecklistStep(habit, today, item.id);
                         },
                         onTaskCreated: (taskSlug) async {
                           // Persist the new task slug back to the habit checklist item
@@ -4559,7 +4566,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                           for (final section in updatedSections) {
                             final itemIndex = section.items.indexWhere((i) => i.id == item.id);
                             if (itemIndex != -1) {
-                              final updatedItems = List<ChecklistItem>.from(section.items);
+                              final updatedItems = List<ChecklistStep>.from(section.items);
                               updatedItems[itemIndex] = item.copyWith(linkedObjectSlug: taskSlug);
                               updatedSections[updatedSections.indexOf(section)] = ChecklistSection(
                                 id: section.id,

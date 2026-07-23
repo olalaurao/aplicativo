@@ -76,6 +76,10 @@ class _CollectionItemPickerSheetState
       setState(() => _isLoading = false);
     } catch (e) {
       debugPrint('CollectionItemPickerSheet parse error: $e');
+      // If parsing fails, still allow adding items with a default schema
+      if (_schema.isEmpty) {
+        _schema = [InputField(id: 'title', title: 'Title', type: InputFieldType.text)];
+      }
       setState(() => _isLoading = false);
     }
   }

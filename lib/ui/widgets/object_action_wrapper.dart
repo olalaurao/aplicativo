@@ -30,6 +30,8 @@ import '../forms/create_project_form.dart';
 import '../forms/create_resource_form.dart';
 import '../forms/create_task_form.dart';
 import '../forms/create_tracker_form.dart';
+import 'template_picker_sheet.dart';
+import 'object_event_log_sheet.dart';
 import '../theme.dart';
 import 'triple_check_sheet.dart';
 import 'universal_search_picker.dart';
@@ -152,6 +154,17 @@ Future<void> showObjectActionSheet(
                   _startPomodoroForObject(context, ref, object);
                 },
               ),
+            ListTile(
+              leading: Icon(
+                Icons.history_rounded,
+                color: AppColors.textSecondary,
+              ),
+              title: const Text('Event History'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                ObjectEventLogSheet.show(context, object);
+              },
+            ),
             ListTile(
               leading: Icon(
                 Icons.archive_outlined,

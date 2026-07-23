@@ -118,7 +118,7 @@ class TodayCompletablesComponent extends ConsumerWidget {
                             item.title,
                             style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                               decoration: item.isCompleted ? TextDecoration.lineThrough : null,
-                              color: item.isCompleted ? AppColors.textMuted : AppColors.textPrimary,
+                              color: item.isCompleted ? AppTheme.textMutedColor(context) : AppTheme.textPrimaryColor(context),
                               fontWeight: FontWeight.w500,
                             ),
                             maxLines: 2,

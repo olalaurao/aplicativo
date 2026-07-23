@@ -23,6 +23,9 @@ abstract class ContentObject {
   /// WikiLinks externos referenciados por este objeto (PARTE 16 + 20).
   /// Gravados como lista de strings `[[slug]]` no frontmatter `links:`.
   List<String> links;
+  
+  /// Registro de auditoria completo (Event Log).
+  List<EventLogEntry> eventLog;
 
   // Conflict fields
   bool hasTypeConflict = false;
@@ -44,6 +47,7 @@ abstract class ContentObject {
     this.order,
     List<ReminderConfig>? reminders,
     List<String>? links,
+    List<EventLogEntry>? eventLog,
   }) : id = id ?? const Uuid().v4(),
        organizers = organizers ?? [],
        categories = categories ?? [],
@@ -51,6 +55,7 @@ abstract class ContentObject {
        aliases = aliases ?? [],
        reminders = reminders ?? [],
        links = links ?? [],
+       eventLog = eventLog ?? [],
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
 
@@ -76,6 +81,7 @@ abstract class ContentObject {
       'organizers': organizers.map((o) => o.toWikiLink()).toList(),
       'reminders': reminders.map((r) => r.toMap()).toList(),
       if (links.isNotEmpty) 'links': links,
+      if (eventLog.isNotEmpty) 'event_log': eventLog.map((e) => e.toMap()).toList(),
       if (isIncomplete) 'is_incomplete': true,
     };
   }
@@ -117,6 +123,25 @@ abstract class ContentObject {
     }
     if (map['links'] != null && map['links'] is List) {
       links = List<String>.from(map['links'] as List);
+    }
+    if (map['event_log'] != null && map['event_log'] is List) {
+      eventLog = (map['event_log'] as List)
+          .map((e) => EventLogEntry.fromMap(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    }
+  }
+
+  void logEvent(String action, String description, {String? oldValue, String? newValue}) {
+    eventLog.add(EventLogEntry(
+      timestamp: DateTime.now(),
+      action: action,
+      description: description,
+      oldValue: oldValue,
+      newValue: newValue,
+    ));
+    // Limit to 50 entries to avoid ballooning the markdown files
+    if (eventLog.length > 50) {
+      eventLog.removeAt(0);
     }
   }
 

@@ -5,8 +5,9 @@ import '../../../models/scheduler.dart';
 import '../../../models/content_object.dart';
 import '../../../providers/vault_provider.dart';
 import '../../theme.dart';
-import '../../widgets/property_grid.dart';
 import '../../widgets/routine_execution_sheet.dart';
+import '../../widgets/actionable_checklist_tile.dart';
+import '../../widgets/property_grid.dart';
 import 'package:intl/intl.dart';
 
 List<PropertyCard> buildRoutinePropertyCards(
@@ -49,8 +50,8 @@ List<PropertyCard> buildRoutinePropertyCards(
   // Item count
   cards.add(PropertyCard(
     icon: Icons.list_alt,
-    label: 'Items',
-    value: '${routine.items.length}',
+    label: 'Steps',
+    value: '${routine.steps.length}',
     onTap: null,
   ));
 
@@ -123,16 +124,43 @@ Widget buildRoutineContentSection(
       ),
       const SizedBox(height: 24),
 
-      if (routine.items.isNotEmpty) ...[
+      if (routine.steps.isNotEmpty) ...[
         const Text(
-          'Routine Items',
+          'Routine Steps',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
         ),
         const SizedBox(height: 12),
-        ...routine.items.map((item) => _buildRoutineItemCard(item, routine, ref, context)),
+        Container(
+          decoration: AppTheme.cardDecoration(context),
+          child: Column(
+            children: [
+              ...routine.steps.asMap().entries.map((e) {
+                final step = e.value;
+                return Column(
+                  children: [
+                    ActionableChecklistTile(
+                      itemId: step.id,
+                      title: step.title,
+                      kind: step.kind,
+                      linkedObjectSlug: step.linkedObjectSlug,
+                      trackerFieldId: step.trackerFieldId,
+                      attachedCollectionSlug: step.attachedCollectionSlug,
+                      date: DateTime.now(),
+                      parentObjectId: routine.id,
+                      plainValue: false, // Read-only here
+                      onPlainToggle: (v) {}, // Disabled in read-only view
+                    ),
+                    if (e.key < routine.steps.length - 1)
+                      const Divider(height: 1, indent: 48, color: AppColors.divider),
+                  ],
+                );
+              }),
+            ],
+          ),
+        ),
         const SizedBox(height: 24),
       ],
       
@@ -153,62 +181,12 @@ Widget buildRoutineContentSection(
   );
 }
 
-Widget _buildRoutineItemCard(
-  RoutineItem item,
-  Routine routine,
-  WidgetRef ref,
-  BuildContext context,
-) {
-  final allObjects = ref.watch(allObjectsProvider).value ?? [];
-  final wikiLink = item.referencedObjectId;
-  
-  // Extract ID from WikiLink [[id]]
-  final idMatch = RegExp(r'\[\[([^\]|]+)\]\]').firstMatch(wikiLink);
-  final objectId = idMatch?.group(1) ?? wikiLink;
-  
-  final referencedObject = allObjects.where((obj) => obj.id == objectId).firstOrNull;
-
-  return Card(
-    margin: const EdgeInsets.only(bottom: 8),
-    child: ListTile(
-      dense: true,
-      leading: Icon(
-        _getIconForType(referencedObject?.type),
-        size: 20,
-        color: AppColors.textSecondary,
-      ),
-      title: Text(
-        referencedObject?.title ?? wikiLink,
-        style: const TextStyle(fontSize: 14),
-      ),
-      subtitle: Text(
-        referencedObject?.type ?? 'Unknown',
-        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (item.required)
-            const Icon(Icons.star, size: 16, color: AppColors.warning),
-          if (referencedObject != null)
-            IconButton(
-              icon: const Icon(Icons.open_in_new, size: 16),
-              onPressed: () {
-                // Navigate to object detail
-                // TODO: Implement navigation to referenced object
-              },
-            ),
-        ],
-      ),
-    ),
-  );
-}
 
 Widget _buildExecutionCard(RoutineExecution execution, BuildContext context) {
   final dateStr = DateFormat('MMM dd, yyyy').format(execution.executedAt);
   final timeStr = DateFormat('HH:mm').format(execution.executedAt);
-  final completedCount = execution.itemCompletions.values.where((v) => v).length;
-  final totalCount = execution.itemCompletions.length;
+  final completedCount = execution.stepCompletions.values.where((v) => v).length;
+  final totalCount = execution.stepCompletions.length;
   final percentage = totalCount > 0 ? (completedCount / totalCount * 100).toInt() : 0;
 
   return Card(

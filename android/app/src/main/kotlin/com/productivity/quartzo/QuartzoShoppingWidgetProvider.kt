@@ -1,4 +1,4 @@
-﻿package com.productivity.quartzo
+package com.productivity.quartzo
 
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -62,8 +62,8 @@ open class QuartzoShoppingWidgetProvider : AppWidgetProvider() {
                 val item = items.getJSONObject(i)
                 val itemView = RemoteViews(context.packageName, R.layout.widget_item_shopping)
                 
-                itemView.setTextViewText(R.id.shopping_title, item.optString("title"))
-                itemView.setTextColor(R.id.shopping_title, QuartzoWidgetUtils.textColor(context))
+                itemView.setTextViewText(R.id.item_title, item.optString("title"))
+                itemView.setTextColor(R.id.item_title, QuartzoWidgetUtils.textColor(context))
                 
                 val completed = item.optBoolean("completed", false)
                 if (completed) {

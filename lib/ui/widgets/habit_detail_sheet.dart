@@ -682,7 +682,7 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
       builder: (ctx) => AlertDialog(
         title: const Text('Excluir Hábito?'),
         content: Text(
-          'Tem certeza que deseja excluir "${habit.displayTitle}"? Esta ação não pode ser desfeita.',
+          'Tem certeza que deseja excluir "${habit.displayTitle}"? Esta ação pode ser desfeita por 30 dias.',
         ),
         actions: [
           TextButton(
@@ -690,10 +690,10 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
             child: const Text('CANCELAR'),
           ),
           TextButton(
-            onPressed: () {
-              ref.read(habitsProvider.notifier).deleteHabit(habit);
-              Navigator.pop(ctx); // Close dialog
-              Navigator.pop(context); // Close sheet
+            onPressed: () async {
+              await ref.read(habitsProvider.notifier).deleteHabit(habit);
+              if (ctx.mounted) Navigator.pop(ctx); // Close dialog
+              if (context.mounted) Navigator.pop(context); // Close sheet
             },
             style: TextButton.styleFrom(
               foregroundColor: AppColors.error,

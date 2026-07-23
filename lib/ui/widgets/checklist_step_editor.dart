@@ -313,6 +313,35 @@ class _ChecklistStepEditorState extends State<ChecklistStepEditor> {
                 ),
               ),
             ),
+          // Estimated minutes (optional)
+          Padding(
+            padding: const EdgeInsets.only(left: 48, top: 8, right: 16),
+            child: Row(
+              children: [
+                const Icon(Icons.timer_outlined, size: 16, color: AppColors.textMuted),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      hintText: 'Estimated min (e.g. 15)',
+                      isDense: true,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                    ),
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(fontSize: 13),
+                    controller: TextEditingController(text: widget.step.estimatedMinutes?.toString() ?? '')
+                      ..selection = TextSelection.collapsed(offset: widget.step.estimatedMinutes?.toString().length ?? 0),
+                    onChanged: (v) {
+                      final parsed = v.trim().isEmpty ? null : int.tryParse(v);
+                      widget.onStepChanged(widget.step.copyWith(estimatedMinutes: parsed));
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

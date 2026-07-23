@@ -363,7 +363,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
                       segment.title,
                       style: Theme.of(context).textTheme.bodySmall!.copyWith(
                         fontWeight: FontWeight.w500,
-                        color: isCompleted ? AppColors.textMuted : AppColors.textPrimary,
+                        color: isCompleted ? AppTheme.textMutedColor(context) : AppTheme.textPrimaryColor(context),
                         decoration: isCompleted ? TextDecoration.lineThrough : null,
                       ),
                       maxLines: 1,

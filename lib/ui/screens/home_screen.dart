@@ -308,7 +308,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           child: Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              border: Border.all(color: AppColors.textMuted.withValues(alpha: 0.3)),
+                              border: Border.all(color: AppTheme.textMutedColor(context).withValues(alpha: 0.3)),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
@@ -342,20 +342,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: Icon(block.visible ? Icons.visibility_rounded : Icons.visibility_off_rounded, color: AppColors.textPrimary),
-                                  style: IconButton.styleFrom(backgroundColor: AppColors.surface),
+                                  icon: Icon(block.visible ? Icons.visibility_rounded : Icons.visibility_off_rounded, color: AppTheme.textPrimaryColor(context)),
+                                  style: IconButton.styleFrom(backgroundColor: AppTheme.surfaceColor(context)),
                                   onPressed: () => ref.read(dashboardProvider.notifier).toggleVisibility(block.id),
                                 ),
                                 const SizedBox(width: 4),
                                 IconButton(
-                                  icon: const Icon(Icons.settings_rounded, color: AppColors.textPrimary),
-                                  style: IconButton.styleFrom(backgroundColor: AppColors.surface),
+                                  icon: Icon(Icons.settings_rounded, color: AppTheme.textPrimaryColor(context)),
+                                  style: IconButton.styleFrom(backgroundColor: AppTheme.surfaceColor(context)),
                                   onPressed: () => DashboardComponentConfigSheet.show(context, block),
                                 ),
                                 const SizedBox(width: 4),
                                 IconButton(
                                   icon: const Icon(Icons.delete_rounded, color: AppColors.error),
-                                  style: IconButton.styleFrom(backgroundColor: AppColors.surface),
+                                  style: IconButton.styleFrom(backgroundColor: AppTheme.surfaceColor(context)),
                                   onPressed: () => ref.read(dashboardProvider.notifier).removeBlock(block.id),
                                 ),
                               ],
@@ -410,7 +410,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final (icon, color, tooltip) = switch (status) {
           SyncStatus.synced   => (Icons.cloud_done_rounded,   AppColors.success, 'Synced'),
           SyncStatus.syncing  => (Icons.cloud_sync_rounded,   AppTheme.accentColor(context), 'Syncing…'),
-          SyncStatus.offline  => (Icons.cloud_off_rounded,    AppColors.textMuted, 'Offline — will sync when back online'),
+          SyncStatus.offline  => (Icons.cloud_off_rounded,    AppTheme.textMutedColor(context), 'Offline — will sync when back online'),
           SyncStatus.error    => (Icons.cloud_off_rounded,    AppColors.error, 'Sync error — tap for details'),
           SyncStatus.conflict => (Icons.warning_amber_rounded, AppColors.warning, 'Sync conflict — tap to resolve'),
         };
@@ -582,9 +582,9 @@ class _SummaryTile extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.textMuted,
+                  color: AppTheme.textMutedColor(context),
                 ),
               ),
             ],

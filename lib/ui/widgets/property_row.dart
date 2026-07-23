@@ -50,15 +50,17 @@ class PropertyRow extends StatelessWidget {
             if (trailing != null)
               trailing!
             else
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: valueColor ?? (onTap != null ? AppTheme.accentColor(context) : AppColors.textPrimary),
+              Flexible(
+                child: Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: valueColor ?? (onTap != null ? AppTheme.accentColor(context) : AppColors.textPrimary),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             if (onTap != null && trailing == null) ...[
               const SizedBox(width: 4),
