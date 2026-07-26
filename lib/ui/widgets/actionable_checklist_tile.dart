@@ -165,14 +165,14 @@ class ActionableChecklistTile extends ConsumerWidget {
       
       if (!isDone) {
         // Completing the habit - add tracker record
-        fieldPatch[fieldId] = true;
+        fieldPatch[fieldId] = pickedRef?.displayTitle ?? true;
         if (pickedRef != null) {
-          fieldPatch['${fieldId}_linked_ref'] = pickedRef.displayTitle;
-          fieldPatch['${fieldId}_linked_ref_map'] = pickedRef.toMap();
+          fieldPatch['${fieldId}_ref'] = pickedRef.toMap();
         }
       } else {
         // Un-completing - remove the record by setting done to false
         fieldPatch[fieldId] = false;
+        fieldPatch['${fieldId}_ref'] = null;
       }
 
       await ref.read(trackingRecordsProvider.notifier).upsertRecordForDate(

@@ -48,6 +48,7 @@ import '../../models/content_object.dart';
 import 'universal_detail_view.dart';
 import '../widgets/triple_check_sheet.dart';
 import '../../providers/overdue_provider.dart';
+import '../widgets/quick_capture_bar.dart';
 
 List<Task> rotationTasksForDay(
   DateTime date,
@@ -350,9 +351,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
+      body: Column(
+        children: [
+          Expanded(
+            child: CustomScrollView(
+              controller: _scrollController,
+              slivers: [
           SliverAppBar(
             toolbarHeight: activeTheme != null ? 60.0 : 48.0,
             title: Column(
@@ -439,6 +443,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                           final timeStr = DateFormat('HH:mm').format(time);
                           final isBacklog =
                               task.stage == TaskStage.idea ||
+                              task.stage == TaskStage.backlog ||
                               (task.startDate == null && task.endDate == null);
 
                           // Sugerir duração com base em estimatedMinutes se disponível
@@ -560,6 +565,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             SliverToBoxAdapter(child: _buildBacklogPanel()),
 
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          ],
+        )),
+      SafeArea(
+        top: false,
+        child: const QuickCaptureBar.inline(),
+      ),
         ],
       ),
       floatingActionButton: _showJumpToNowFab && _isTimeline && _viewMode == 0
@@ -586,6 +597,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
         .where(
           (t) =>
               (t.stage == TaskStage.idea ||
+                  t.stage == TaskStage.backlog ||
                   (t.startDate == null && t.deadline == null)) &&
               t.stage != TaskStage.finalized,
         )
@@ -2165,6 +2177,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
         .where(
           (t) =>
               (t.stage == TaskStage.idea ||
+                  t.stage == TaskStage.backlog ||
                   (t.startDate == null && t.deadline == null)) &&
               t.stage != TaskStage.finalized,
         )

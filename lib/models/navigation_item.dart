@@ -32,7 +32,7 @@ enum NavSection {
   projects,
   activities,
   labels,
-  values,
+  coreValues,
 }
 
 class NavigationItem {
@@ -41,6 +41,7 @@ class NavigationItem {
   final String route;
   bool inBottomBar;
   final bool isCustom;
+  final bool hidden; // For hiding items from both nav bar and more screen
   final String? id; // For shortcuts (objectId or organizerId)
   final String? type; // For shortcuts (e.g., 'task', 'goal', 'area')
   final Map<String, String>? queryParams; // For filters, searches, etc.
@@ -51,6 +52,7 @@ class NavigationItem {
     required this.route,
     this.inBottomBar = true,
     this.isCustom = false,
+    this.hidden = false,
     this.id,
     this.type,
     this.queryParams,
@@ -167,7 +169,7 @@ class NavigationItem {
         return active ? Icons.local_activity_rounded : Icons.local_activity_outlined;
       case NavSection.labels:
         return active ? Icons.label_rounded : Icons.label_outline_rounded;
-      case NavSection.values:
+      case NavSection.coreValues:
         return active ? Icons.star_rounded : Icons.star_outline_rounded;
     }
   }
@@ -179,6 +181,7 @@ class NavigationItem {
       'route': route,
       'inBottomBar': inBottomBar,
       'isCustom': isCustom,
+      'hidden': hidden,
       'id': id,
       'type': type,
       'queryParams': queryParams,
@@ -203,6 +206,7 @@ class NavigationItem {
       route: map['route'],
       inBottomBar: map['inBottomBar'] ?? true,
       isCustom: map['isCustom'] ?? false,
+      hidden: map['hidden'] ?? false,
       id: map['id'],
       type: map['type'],
       queryParams: queryParams,

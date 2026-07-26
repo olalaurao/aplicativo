@@ -125,7 +125,7 @@ class _AreaCard extends ConsumerWidget {
 
   const _AreaCard({super.key, required this.area});
 
-  Color _areaColor(String? rawColor) {
+  Color _areaColor(BuildContext context, String? rawColor) {
     if (rawColor == null || rawColor.trim().isEmpty) {
       return AppTheme.accentColor(context);
     }
@@ -141,7 +141,7 @@ class _AreaCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final color = _areaColor(area.color);
+    final color = _areaColor(context, area.color);
 
     return InkWell(
       onTap: () => Navigator.push(

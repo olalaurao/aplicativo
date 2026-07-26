@@ -171,4 +171,51 @@ class PermissionService {
     }
     return true; // iOS handles via pickers
   }
+
+  /// Returns true if the user has already granted SYSTEM_ALERT_WINDOW for
+  /// the floating quick-capture bubble. Uses permission_handler directly
+  /// (no extra native channel call needed — same underlying permission).
+  static Future<bool> isOverlayPermissionGranted() async {
+    if (!Platform.isAndroid) return false;
+    return Permission.systemAlertWindow.isGranted;
+  }
+
+  /// Shows an explanatory dialog specific to the floating bubble (different
+  /// copy from the Pomodoro/alarm "display over lock screen" context), then
+  /// redirects to the system settings page for SYSTEM_ALERT_WINDOW.
+  static Future<void> requestOverlayPermission(BuildContext context) async {
+    if (!Platform.isAndroid) return;
+    if (!context.mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Allow display over other apps'),
+        content: const Text(
+          'Quartzo needs this to show the floating quick-add button '
+          'outside the app. You\'ll be taken to system settings — look '
+          'for Quartzo and enable \'Allow display over other apps\'.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Not now'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      // Reuse existing native channel method — same OS setting page.
+      try {
+        await _channel.invokeMethod('requestSystemAlertWindow');
+      } catch (_) {
+        await Permission.systemAlertWindow.request();
+      }
+    }
+  }
 }

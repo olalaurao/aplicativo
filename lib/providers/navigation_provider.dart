@@ -198,7 +198,7 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
       inBottomBar: false,
     ),
     NavigationItem(
-      section: NavSection.values,
+      section: NavSection.coreValues,
       label: 'Values',
       route: '/values',
       inBottomBar: false,
@@ -273,6 +273,7 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
   static NavigationItem _copyItem(
     NavigationItem item, {
     bool? inBottomBar,
+    bool? hidden,
     String? label,
     Map<String, String>? queryParams,
   }) {
@@ -282,6 +283,7 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
       route: item.route,
       inBottomBar: inBottomBar ?? item.inBottomBar,
       isCustom: item.isCustom,
+      hidden: hidden ?? item.hidden,
       id: item.id,
       type: item.type,
       queryParams: queryParams ?? item.queryParams,
@@ -350,6 +352,34 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
     }
 
     state = AsyncData(_normalizeItems(toggled));
+    await _save();
+  }
+
+  Future<void> toggleHidden(dynamic idOrSection) async {
+    final current = state.valueOrNull ?? [];
+    NavigationItem? target;
+    for (final item in current) {
+      if ((idOrSection is NavSection && item.section == idOrSection) ||
+          (idOrSection is String && item.id == idOrSection)) {
+        target = item;
+        break;
+      }
+    }
+    if (target == null ||
+        target.section == NavSection.home ||
+        target.section == NavSection.more) {
+      return;
+    }
+
+    final toggled = [
+      for (final item in current)
+        if (_sameItem(item, target))
+          _copyItem(item, hidden: !item.hidden)
+        else
+          item,
+    ];
+
+    state = AsyncData(toggled);
     await _save();
   }
 

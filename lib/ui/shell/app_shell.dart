@@ -9,7 +9,7 @@ import '../../providers/navigation_provider.dart';
 import '../../models/navigation_item.dart';
 import '../../providers/vault_provider.dart';
 import '../../models/content_object.dart';
-import '../widgets/create_menu_sheet.dart';
+import '../widgets/quick_capture_bar.dart';
 import '../../providers/history_provider.dart';
 import '../screens/universal_detail_view.dart';
 import '../screens/home_screen.dart';
@@ -42,7 +42,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget build(BuildContext context) {
     final navItemsAsync = ref.watch(navigationProvider);
     final navItems = navItemsAsync.valueOrNull ?? [];
-    final bottomBarItems = navItems.where((item) => item.inBottomBar).toList();
+    final bottomBarItems = navItems.where((item) => item.inBottomBar && !item.hidden).toList();
     ref.watch(widgetSyncProvider);
     
     // Watch for YAML parsing errors and show dialog
@@ -146,7 +146,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           ),
           _CreateNewItemIntent: CallbackAction<_CreateNewItemIntent>(
             onInvoke: (intent) {
-              showCreateMenu(context);
+              showQuickCapture(context);
               return null;
             },
           ),
@@ -236,7 +236,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                   floatingActionButton: location.startsWith('/shopping') ? null : GestureDetector(
                     onLongPress: () => _openCommandCenter(context),
                     child: FloatingActionButton(
-                      onPressed: () => showCreateMenu(context),
+                      onPressed: () => showQuickCapture(context),
                       child: const Icon(Icons.add_rounded),
                     ),
                   ),
@@ -475,7 +475,7 @@ class _AppShellState extends ConsumerState<AppShell> {
             padding: EdgeInsets.symmetric(horizontal: isSpacious ? 16 : 8),
             child: isSpacious
                 ? InkWell(
-                    onTap: () => showCreateMenu(context),
+                    onTap: () => showQuickCapture(context),
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -514,7 +514,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                     ),
                   )
                 : IconButton.filled(
-                    onPressed: () => showCreateMenu(context),
+                    onPressed: () => showQuickCapture(context),
                     icon: const Icon(Icons.add_rounded),
                     style: IconButton.styleFrom(
                       backgroundColor: AppTheme.accentColor(context),

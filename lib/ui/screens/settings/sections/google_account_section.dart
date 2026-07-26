@@ -164,12 +164,23 @@ class _GoogleAccountSectionState extends ConsumerState<GoogleAccountSection> {
               style: const TextStyle(fontSize: 12),
             ),
             trailing: isSignedIn
-                ? TextButton(
-                    onPressed: () => authService.signOut(),
-                    child: const Text(
-                      'DISCONNECT',
-                      style: TextStyle(fontSize: 11, color: AppColors.error),
-                    ),
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                        color: AppColors.textMuted,
+                        onPressed: () => ref.invalidate(calendar_auth.googleCalendarListProvider),
+                        tooltip: 'Refresh Calendars',
+                      ),
+                      TextButton(
+                        onPressed: () => authService.signOut(),
+                        child: const Text(
+                          'DISCONNECT',
+                          style: TextStyle(fontSize: 11, color: AppColors.error),
+                        ),
+                      ),
+                    ],
                   )
                 : TextButton(
                     onPressed: () => authService.signIn(),
@@ -217,7 +228,7 @@ class _GoogleAccountSectionState extends ConsumerState<GoogleAccountSection> {
                         title: Text(title),
                         subtitle: calendar.primary == true
                             ? const Text('Primary calendar')
-                            : Text(id),
+                            : null,
                         trailing: Switch.adaptive(
                           value: enabled.contains(id),
                           onChanged: (_) => ref

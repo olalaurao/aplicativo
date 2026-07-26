@@ -34,6 +34,9 @@ import 'services/resource_metadata_service.dart';
 import 'services/widget_service.dart';
 import 'services/permission_service.dart';
 import 'services/pomodoro_bg_service.dart';
+import 'services/capture_bubble_service.dart';
+import 'providers/overlay_bridge_provider.dart';
+import 'ui/widgets/quick_capture_bar.dart';
 
 import 'ui/shell/app_shell.dart';
 import 'ui/screens/home_screen.dart';
@@ -335,6 +338,13 @@ class _BootstrapAppState extends State<BootstrapApp> {
     _lifecycleListener = AppLifecycleListener(
       onResume: () {
         debugPrint('[AppLifecycle] Resumed - refreshing widgets');
+        // Stop/hide the overlay bubble — the in-app FAB covers the same job
+        // while the app is open. Also reset the per-session dismiss flag so
+        // backgrounding again will show the bubble.
+        if (Platform.isAndroid) {
+          unawaited(CaptureOverlayService.stop());
+          OverlayBridgeService.resetSessionDismiss();
+        }
         // Debounce widget sync to avoid cascade with sync
         Future.delayed(const Duration(seconds: 2), () {
           unawaited(forceWidgetSync(widget.container));
@@ -348,6 +358,8 @@ class _BootstrapAppState extends State<BootstrapApp> {
               .checkPersonContactsNow();
         });
       },
+      onPause: _onAppBackgrounded,
+      onHide: _onAppBackgrounded,
     );
     _initShareIntentHandling();
     unawaited(_checkPendingWidgetUriFromNative());
@@ -381,6 +393,22 @@ class _BootstrapAppState extends State<BootstrapApp> {
     _shareIntentSub?.cancel();
     _midnightTimer?.cancel();
     super.dispose();
+  }
+
+  /// Called when the app is backgrounded (onPause or onHide).
+  /// Starts the overlay bubble if the feature is enabled and permission is granted.
+  Future<void> _onAppBackgrounded() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final settings = widget.container.read(settingsProvider);
+      if (!settings.floatingCaptureBubbleEnabled) return;
+      if (OverlayBridgeService.sessionDismissed) return;
+      final granted = await PermissionService.isOverlayPermissionGranted();
+      if (!granted) return;
+      await CaptureOverlayService.start();
+    } catch (e) {
+      debugPrint('[AppLifecycle] Failed to start capture bubble: $e');
+    }
   }
 
   void _initShareIntentHandling() {
@@ -778,6 +806,24 @@ Future<void> _initApp(ProviderContainer container) async {
         debugPrint('Startup init failed: pomodoro_bg_init: $e');
       }
     }
+
+    // Overlay bridge — listen for tap events from the capture bubble isolate.
+    // Must be initialized AFTER the navigator key is ready so showQuickCapture
+    // can find a BuildContext to push the sheet. We use the root navigator key.
+    if (Platform.isAndroid) {
+      try {
+        OverlayBridgeService.init(
+          onOpenCapture: () {
+            final context = _rootNavigatorKey.currentContext;
+            if (context != null && context.mounted) {
+              showQuickCapture(context);
+            }
+          },
+        );
+      } catch (e) {
+        debugPrint('Startup init failed: overlay_bridge_init: $e');
+      }
+    }
   });
 }
 
@@ -873,7 +919,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/create/habit',
-            builder: (context, state) => const CreateHabitForm(),
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return CreateHabitForm(
+                initialTitle: extra?['initialTitle'] as String?,
+              );
+            },
           ),
           GoRoute(
             path: '/create/goal',

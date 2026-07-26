@@ -25,6 +25,7 @@ import '../widgets/universal_search_picker.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/nlp_task_parser.dart';
+import '../widgets/nlp_chips.dart';
 
 class CreateTaskForm extends ConsumerStatefulWidget {
   final String? initialTitle;
@@ -1865,126 +1866,13 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
             ],
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              if (parsed.startDate != null)
-                _nlpChip(
-                  icon: Icons.calendar_today_rounded,
-                  label: DateFormat('dd/MM/yyyy').format(parsed.startDate!),
-                  color: AppTheme.accentColor(context),
-                ),
-              if (parsed.scheduledTime != null)
-                _nlpChip(
-                  icon: Icons.access_time_rounded,
-                  label: parsed.scheduledTime!.format(context),
-                  color: AppTheme.accentColor(context),
-                ),
-              if (parsed.priority != null)
-                _nlpChip(
-                  icon: Icons.flag_rounded,
-                  label: _priorityLabel(parsed.priority!),
-                  color: _priorityColor(parsed.priority!),
-                ),
-              if (parsed.scheduler != null)
-                _nlpChip(
-                  icon: Icons.repeat_rounded,
-                  label: _schedulerLabel(parsed.scheduler!),
-                  color: AppTheme.accentColor(context),
-                ),
-            ],
-          ),
+          // Chips rendered via shared NlpChipsRow (read-only in full form)
+          NlpChipsRow(parsed: parsed),
         ],
       ),
     );
   }
 
-  Widget _nlpChip({
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _priorityLabel(TaskPriority priority) {
-    switch (priority) {
-      case TaskPriority.high:
-        return 'High';
-      case TaskPriority.medium:
-        return 'Medium';
-      case TaskPriority.low:
-        return 'Low';
-      case TaskPriority.none:
-        return 'None';
-    }
-  }
-
-  String _schedulerLabel(Scheduler scheduler) {
-    if (scheduler.rules.isEmpty) return 'Non-recurring';
-    final rule = scheduler.rules.first;
-    switch (rule.repeatType) {
-      case RepeatType.numberOfDays:
-        if (rule.interval == 1) return 'Daily';
-        return 'Every ${rule.interval} days';
-      case RepeatType.daysOfWeek:
-        if (rule.daysOfWeek != null && rule.daysOfWeek!.isNotEmpty) {
-          final days = rule.daysOfWeek!
-              .map((d) {
-                switch (d) {
-                  case '1':
-                    return 'Seg';
-                  case '2':
-                    return 'Ter';
-                  case '3':
-                    return 'Qua';
-                  case '4':
-                    return 'Qui';
-                  case '5':
-                    return 'Sex';
-                  case '6':
-                    return 'Sáb';
-                  case '7':
-                    return 'Dom';
-                  default:
-                    return d;
-                }
-              })
-              .join(', ');
-          return 'Toda semana ($days)';
-        }
-        return 'Semanal';
-      case RepeatType.numberOfWeeks:
-        return 'A cada ${rule.interval ?? 1} semanas';
-      case RepeatType.numberOfMonths:
-        return 'A cada ${rule.interval ?? 1} meses';
-      default:
-        return 'Recorrente';
-    }
-  }
 
   void _showTemplatePicker() async {
     final templates = ref

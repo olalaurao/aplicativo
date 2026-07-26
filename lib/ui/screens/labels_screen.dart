@@ -125,7 +125,7 @@ class _LabelCard extends ConsumerWidget {
 
   const _LabelCard({super.key, required this.label});
 
-  Color _labelColor(String? rawColor) {
+  Color _labelColor(BuildContext context, String? rawColor) {
     if (rawColor == null || rawColor.trim().isEmpty) {
       return AppTheme.textSecondaryColor(context);
     }
@@ -141,7 +141,7 @@ class _LabelCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final color = _labelColor(label.color);
+    final color = _labelColor(context, label.color);
 
     return InkWell(
       onTap: () => Navigator.push(

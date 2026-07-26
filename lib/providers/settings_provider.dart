@@ -109,6 +109,9 @@ class AppSettings {
   // ── Notification appearance config ──
   final Map<String, String> notificationAppearanceConfig; // Stores notification colors and button visibility
 
+  // ── Floating quick-capture bubble (Android only) ──
+  final bool floatingCaptureBubbleEnabled;
+
   AppSettings({
     required this.vaultName,
     this.vaultPath = '',
@@ -175,6 +178,7 @@ class AppSettings {
     this.showDayDialLegend = true,
     this.lastSuccessfulSyncTime,
     this.notificationAppearanceConfig = const {},
+    this.floatingCaptureBubbleEnabled = false,
   });
 
   /// All saved filters deserialized.
@@ -273,6 +277,7 @@ class AppSettings {
     bool? showDayDialLegend,
     DateTime? lastSuccessfulSyncTime,
     Map<String, String>? notificationAppearanceConfig,
+    bool? floatingCaptureBubbleEnabled,
   }) {
     return AppSettings(
       vaultName: vaultName ?? this.vaultName,
@@ -354,6 +359,7 @@ class AppSettings {
       showDayDialLegend: showDayDialLegend ?? this.showDayDialLegend,
       lastSuccessfulSyncTime: lastSuccessfulSyncTime ?? this.lastSuccessfulSyncTime,
       notificationAppearanceConfig: notificationAppearanceConfig ?? this.notificationAppearanceConfig,
+      floatingCaptureBubbleEnabled: floatingCaptureBubbleEnabled ?? this.floatingCaptureBubbleEnabled,
     );
   }
 }
@@ -515,6 +521,8 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
           return const <String, String>{};
         }
       }(),
+      floatingCaptureBubbleEnabled:
+          prefs.getBool('floatingCaptureBubbleEnabled') ?? false,
     );
   }
 
@@ -869,6 +877,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> updatePomodoroSounds(bool value) async {
     await _prefs.setBool('pomodoroSounds', value);
     state = state.copyWith(pomodoroSounds: value);
+  }
+
+  Future<void> updateFloatingCaptureBubbleEnabled(bool value) async {
+    await _prefs.setBool('floatingCaptureBubbleEnabled', value);
+    state = state.copyWith(floatingCaptureBubbleEnabled: value);
   }
 
   Future<void> updatePlannerColorMode(String mode) async {

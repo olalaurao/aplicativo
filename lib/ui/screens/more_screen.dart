@@ -24,6 +24,9 @@ class MoreScreen extends ConsumerStatefulWidget {
 
 class _MoreScreenState extends ConsumerState<MoreScreen> {
   bool _isEditingNav = false;
+  bool _showHidden = false;
+  bool _isNavContentExpanded = false;
+  bool _isQuickAccessExpanded = false;
 
   @override
   Widget build(BuildContext context) {
@@ -32,12 +35,14 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
 
     // Items to show in this screen: everything NOT in the bottom bar,
     // EXCEPT home and more itself (which are always present elsewhere)
+    // Also filter out hidden items unless in edit mode with showHidden enabled
     final inMoreItems = navItems
         .where(
           (it) =>
               it.section != NavSection.home &&
               it.section != NavSection.more &&
-              !it.inBottomBar,
+              !it.inBottomBar &&
+              (!_isEditingNav || _showHidden ? true : !it.hidden),
         )
         .toList();
     final hasDayThemeInNav = inMoreItems.any(
@@ -95,17 +100,47 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               delegate: SliverChildListDelegate([
                 _buildSyncRow(context),
                 const SizedBox(height: 24),
-                _buildSectionHeader('Navigation & Content'),
-                if (_isEditingNav) ...[
+                _buildSectionHeader(
+                  'Navigation & Content',
+                  isExpanded: _isNavContentExpanded,
+                  onToggle: () => setState(() => _isNavContentExpanded = !_isNavContentExpanded),
+                ),
+                if (_isNavContentExpanded) ...[
+                  if (_isEditingNav) ...[
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Text(
-                      'Drag to reorder. Eye icon pins to footer. Shortcuts can be deleted.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.accentColor(context),
-                        fontWeight: FontWeight.w500,
-                      ),
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Drag to reorder. Eye icon pins to footer. Shortcuts can be deleted.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.accentColor(context),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const Spacer(),
+                        Row(
+                          children: [
+                            Text(
+                              'Show hidden',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: _showHidden
+                                    ? AppTheme.accentColor(context)
+                                    : AppColors.textMuted,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Switch(
+                              value: _showHidden,
+                              onChanged: (value) => setState(() => _showHidden = value),
+                              activeColor: AppTheme.accentColor(context),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                   ReorderableListView(
@@ -166,60 +201,66 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                       ),
                     ),
                 ],
+                ],
 
                 const SizedBox(height: 24),
-                _buildSectionHeader('Quick Access'),
-                const SizedBox(height: 12),
-                _buildMenuRow(
-                  context,
-                  'Shopping List',
-                  Icons.shopping_cart_outlined,
-                  AppColors.habitBlue,
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ShoppingListScreen(),
-                      ),
-                    );
-                  },
+                _buildSectionHeader(
+                  'Quick Access',
+                  isExpanded: _isQuickAccessExpanded,
+                  onToggle: () => setState(() => _isQuickAccessExpanded = !_isQuickAccessExpanded),
                 ),
-
-                if (!hasDayThemeInNav) ...[
-                  const SizedBox(height: 8),
+                if (_isQuickAccessExpanded) ...[
+                  const SizedBox(height: 12),
                   _buildMenuRow(
                     context,
-                    'Day Themes & Blocks',
-                    Icons.wb_sunny_rounded,
-                    AppColors.warning,
+                    'Shopping List',
+                    Icons.shopping_cart_outlined,
+                    AppColors.habitBlue,
                     () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const DayThemeScreen(),
+                          builder: (_) => const ShoppingListScreen(),
                         ),
                       );
                     },
                   ),
-                ],
 
-                const SizedBox(height: 8),
-                _buildMenuRow(
-                  context,
-                  'Vault Files',
-                  Icons.folder_copy_outlined,
-                  AppColors.textMuted,
-                  () {
-                    Navigator.push(
+                  if (!hasDayThemeInNav) ...[
+                    const SizedBox(height: 8),
+                    _buildMenuRow(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => const VaultFilesScreen(),
-                      ),
-                    );
-                  },
-                ),
+                      'Day Themes & Blocks',
+                      Icons.wb_sunny_rounded,
+                      AppColors.warning,
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const DayThemeScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
 
-                const SizedBox(height: 8),
+                  const SizedBox(height: 8),
+                  _buildMenuRow(
+                    context,
+                    'Vault Files',
+                    Icons.folder_copy_outlined,
+                    AppColors.textMuted,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const VaultFilesScreen(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 8),
                 _buildMenuRow(
                   context,
                   'Pillars',
@@ -257,6 +298,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                     );
                   },
                 ),
+                ],
               ]),
             ),
           ),
@@ -265,18 +307,44 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(String title, {bool? isExpanded, VoidCallback? onToggle}) {
+    final text = Text(
+      title.toUpperCase(),
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        color: AppColors.textMuted,
+        letterSpacing: 1.2,
+      ),
+    );
+
+    if (isExpanded != null && onToggle != null) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4, top: 8),
+        child: InkWell(
+          onTap: onToggle,
+          borderRadius: BorderRadius.circular(4),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                text,
+                const SizedBox(width: 4),
+                Icon(
+                  isExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 16,
+                  color: AppColors.textMuted,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12, top: 8),
-      child: Text(
-        title.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          color: AppColors.textMuted,
-          letterSpacing: 1.2,
-        ),
-      ),
+      child: text,
     );
   }
 
@@ -345,7 +413,11 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
         onTap: _isEditingNav ? null : () => context.go(item.route),
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          decoration: AppTheme.cardDecoration(context),
+          decoration: item.hidden && _isEditingNav
+              ? AppTheme.cardDecoration(context).copyWith(
+                  border: Border.all(color: AppColors.textMuted.withValues(alpha: 0.3)),
+                )
+              : AppTheme.cardDecoration(context),
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
@@ -404,9 +476,10 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                       item.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
+                        color: item.hidden && _isEditingNav ? AppColors.textMuted : null,
                       ),
                     ),
                     if (item.isCustom)
@@ -425,12 +498,28 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                 ),
               ),
               if (_isEditingNav) ...[
-                if (canToggle)
+                if (canToggle) ...[
+                  IconButton(
+                    icon: Icon(
+                      item.hidden
+                          ? Icons.visibility_off_rounded
+                          : Icons.visibility_rounded,
+                      color: item.hidden
+                          ? AppColors.textMuted
+                          : AppTheme.accentColor(context),
+                      size: 20,
+                    ),
+                    onPressed: () => ref
+                        .read(navigationProvider.notifier)
+                        .toggleHidden(
+                          item.isCustom ? item.id : item.section,
+                        ),
+                  ),
                   IconButton(
                     icon: Icon(
                       item.inBottomBar
-                          ? Icons.visibility_rounded
-                          : Icons.visibility_off_rounded,
+                          ? Icons.push_pin_rounded
+                          : Icons.push_pin_outlined,
                       color: item.inBottomBar
                           ? AppTheme.accentColor(context)
                           : AppColors.textMuted,
@@ -441,7 +530,8 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                         .toggleInBottomBar(
                           item.isCustom ? item.id : item.section,
                         ),
-                  )
+                  ),
+                ]
                 else
                   const Padding(
                     padding: EdgeInsets.all(12),
