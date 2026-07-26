@@ -1794,82 +1794,27 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     final parsed = NlpTaskParser.parse(text);
     if (!parsed.hasAnyDetection) return const SizedBox.shrink();
 
-    return Container(
-      margin: const EdgeInsets.only(top: 8, bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppTheme.accentColor(context).withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.auto_awesome_rounded,
-                size: 16,
-                color: AppTheme.accentColor(context),
-              ),
-              const SizedBox(width: 6),
-              const Text(
-                'Sugestões inteligentes detectadas',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _titleController.text = parsed.cleanTitle;
-                    if (parsed.startDate != null) {
-                      _startDate = parsed.startDate;
-                      _endDate = parsed.endDate;
-                    }
-                    if (parsed.scheduledTime != null) {
-                      _scheduledTime = parsed.scheduledTime;
-                      _allDay = false;
-                    }
-                    if (parsed.priority != null) {
-                      _priority = parsed.priority!;
-                    }
-                    if (parsed.scheduler != null) {
-                      _scheduler = parsed.scheduler;
-                    }
-                  });
-                },
-                icon: Icon(
-                  Icons.check_rounded,
-                  size: 14,
-                  color: AppTheme.accentColor(context),
-                ),
-                label: Text(
-                  'Aplicar',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.accentColor(context),
-                  ),
-                ),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Chips rendered via shared NlpChipsRow (read-only in full form)
-          NlpChipsRow(parsed: parsed),
-        ],
-      ),
+    return NlpSuggestionsPanel(
+      parsed: parsed,
+      onApply: () {
+        setState(() {
+          _titleController.text = parsed.cleanTitle;
+          if (parsed.startDate != null) {
+            _startDate = parsed.startDate;
+            _endDate = parsed.endDate;
+          }
+          if (parsed.scheduledTime != null) {
+            _scheduledTime = parsed.scheduledTime;
+            _allDay = false;
+          }
+          if (parsed.priority != null) {
+            _priority = parsed.priority!;
+          }
+          if (parsed.scheduler != null) {
+            _scheduler = parsed.scheduler;
+          }
+        });
+      },
     );
   }
 

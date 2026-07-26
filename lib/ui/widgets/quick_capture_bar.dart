@@ -12,6 +12,9 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/task_model.dart';
+import '../../models/event_model.dart';
+import '../../models/habit_model.dart';
+import '../../models/goal_model.dart';
 import '../../models/shared_types.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/nlp_task_parser.dart';
@@ -238,13 +241,117 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
           );
         }
       }
-    } else {
-      // Non-task types open the full creation form with the typed title
-      if (widget._isSheet) Navigator.pop(ctx);
-      ctx.push(
-        _selectedType.createRoute,
-        extra: {'initialTitle': cleanTitle},
-      );
+    } else if (_selectedType == QuickCaptureType.goal) {
+      setState(() => _saving = true);
+      try {
+        final goal = Goal(
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          title: cleanTitle,
+          deadline: _effectiveDate ?? _extraDate,
+        );
+        await ref.read(vaultProvider.notifier).createObject(goal);
+        if (mounted) {
+          if (widget._isSheet) Navigator.of(context).pop();
+          _titleController.clear();
+          setState(() {
+            _parsed = null;
+            _dateDiscarded = false;
+            _timeDiscarded = false;
+            _priorityDiscarded = false;
+            _schedulerDiscarded = false;
+            _detailsExpanded = false;
+            _extraDate = null;
+            _extraPriority = TaskPriority.none;
+            _extraOrganizers = [];
+            _extraNotes = '';
+            _saving = false;
+          });
+        }
+      } catch (e) {
+        setState(() => _saving = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving: $e')));
+        }
+      }
+    } else if (_selectedType == QuickCaptureType.habit) {
+      setState(() => _saving = true);
+      try {
+        final habit = Habit(
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          title: cleanTitle,
+          color: '#6366F1',
+          schedulers: _effectiveScheduler != null ? [_effectiveScheduler!] : [],
+        );
+        await ref.read(vaultProvider.notifier).createObject(habit);
+        if (mounted) {
+          if (widget._isSheet) Navigator.of(context).pop();
+          _titleController.clear();
+          setState(() {
+            _parsed = null;
+            _dateDiscarded = false;
+            _timeDiscarded = false;
+            _priorityDiscarded = false;
+            _schedulerDiscarded = false;
+            _detailsExpanded = false;
+            _extraDate = null;
+            _extraPriority = TaskPriority.none;
+            _extraOrganizers = [];
+            _extraNotes = '';
+            _saving = false;
+          });
+        }
+      } catch (e) {
+        setState(() => _saving = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving: $e')));
+        }
+      }
+    } else if (_selectedType == QuickCaptureType.event) {
+      if (_effectiveDate != null) {
+        setState(() => _saving = true);
+        try {
+          final event = Event(
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+            title: cleanTitle,
+            date: _effectiveDate!,
+            timeOfDay: _effectiveTime != null
+                ? '${_effectiveTime!.hour.toString().padLeft(2, '0')}:${_effectiveTime!.minute.toString().padLeft(2, '0')}'
+                : null,
+          );
+          await ref.read(vaultProvider.notifier).createObject(event);
+          if (mounted) {
+            if (widget._isSheet) Navigator.of(context).pop();
+            _titleController.clear();
+            setState(() {
+              _parsed = null;
+              _dateDiscarded = false;
+              _timeDiscarded = false;
+              _priorityDiscarded = false;
+              _schedulerDiscarded = false;
+              _detailsExpanded = false;
+              _extraDate = null;
+              _extraPriority = TaskPriority.none;
+              _extraOrganizers = [];
+              _extraNotes = '';
+              _saving = false;
+            });
+          }
+        } catch (e) {
+          setState(() => _saving = false);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving: $e')));
+          }
+        }
+      } else {
+        if (widget._isSheet) Navigator.pop(ctx);
+        ctx.push(
+          _selectedType.createRoute,
+          extra: {'initialTitle': cleanTitle},
+        );
+      }
     }
   }
 

@@ -358,8 +358,18 @@ class _BootstrapAppState extends State<BootstrapApp> {
               .checkPersonContactsNow();
         });
       },
-      onPause: _onAppBackgrounded,
-      onHide: _onAppBackgrounded,
+      onInactive: () {
+        debugPrint('[AppLifecycle] Inactive triggered');
+        _onAppBackgrounded();
+      },
+      onPause: () {
+        debugPrint('[AppLifecycle] Pause triggered');
+        _onAppBackgrounded();
+      },
+      onHide: () {
+        debugPrint('[AppLifecycle] Hide triggered');
+        _onAppBackgrounded();
+      },
     );
     _initShareIntentHandling();
     unawaited(_checkPendingWidgetUriFromNative());
@@ -399,12 +409,20 @@ class _BootstrapAppState extends State<BootstrapApp> {
   /// Starts the overlay bubble if the feature is enabled and permission is granted.
   Future<void> _onAppBackgrounded() async {
     if (!Platform.isAndroid) return;
+    debugPrint('[AppLifecycle] _onAppBackgrounded triggered');
     try {
       final settings = widget.container.read(settingsProvider);
+      debugPrint('[AppLifecycle] settings.floatingCaptureBubbleEnabled = ${settings.floatingCaptureBubbleEnabled}');
       if (!settings.floatingCaptureBubbleEnabled) return;
+      
+      debugPrint('[AppLifecycle] sessionDismissed = ${OverlayBridgeService.sessionDismissed}');
       if (OverlayBridgeService.sessionDismissed) return;
+      
       final granted = await PermissionService.isOverlayPermissionGranted();
+      debugPrint('[AppLifecycle] isOverlayPermissionGranted = $granted');
       if (!granted) return;
+      
+      debugPrint('[AppLifecycle] Calling CaptureOverlayService.start()');
       await CaptureOverlayService.start();
     } catch (e) {
       debugPrint('[AppLifecycle] Failed to start capture bubble: $e');

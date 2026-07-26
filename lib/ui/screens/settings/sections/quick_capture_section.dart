@@ -24,6 +24,31 @@ class QuickCaptureSection extends ConsumerStatefulWidget {
 
 class _QuickCaptureSectionState extends ConsumerState<QuickCaptureSection> {
   bool _checkingPermission = false;
+  late final AppLifecycleListener _lifecycleListener;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen for app resume to re-check permission in case the user
+    // is coming back from the system settings screen.
+    _lifecycleListener = AppLifecycleListener(
+      onResume: _onResumed,
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycleListener.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onResumed() async {
+    if (!Platform.isAndroid) return;
+    // If the toggle is off, check if permission was granted in the background
+    // and we were waiting for it. Actually, if permission is now granted,
+    // we don't automatically turn it on unless they were just checking.
+    // We'll handle it inside _handleToggle by using a flag or just polling.
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,30 +112,35 @@ class _QuickCaptureSectionState extends ConsumerState<QuickCaptureSection> {
       } else {
         // Show explanatory dialog then redirect to system settings.
         if (!context.mounted) return;
+        
+        // Wait for the dialog to close. If they click 'Open Settings', it launches intent.
         await PermissionService.requestOverlayPermission(context);
 
-        // Re-check after user returns from system settings.
-        // (AppLifecycleListener.onResume fires when the user comes back.)
-        await Future.delayed(const Duration(milliseconds: 500));
-        final grantedAfter =
-            await PermissionService.isOverlayPermissionGranted();
-
-        if (grantedAfter) {
-          await notifier.updateFloatingCaptureBubbleEnabled(true);
-        } else {
-          // Permission still denied — revert toggle and show explanation.
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Permission not granted. Enable "Allow display over other '
-                  'apps" for Quartzo in system settings to use this feature.',
-                ),
-                duration: Duration(seconds: 4),
-              ),
-            );
+        // We poll for up to 60 seconds while the user is in settings.
+        // When they grant it, we immediately save and stop spinning.
+        for (int i = 0; i < 60; i++) {
+          await Future.delayed(const Duration(seconds: 1));
+          if (!mounted) return;
+          
+          final isNowGranted = await PermissionService.isOverlayPermissionGranted();
+          if (isNowGranted) {
+            await notifier.updateFloatingCaptureBubbleEnabled(true);
+            if (mounted) setState(() => _checkingPermission = false);
+            return;
           }
-          // Toggle stays off (we never saved enabled=true).
+        }
+
+        // If after 60 seconds they didn't grant it, revert toggle and show explanation.
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Permission not granted. Enable "Allow display over other '
+                'apps" for Quartzo in system settings to use this feature.',
+              ),
+              duration: Duration(seconds: 4),
+            ),
+          );
         }
       }
     } finally {

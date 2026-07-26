@@ -1,4 +1,4 @@
-﻿// lib/ui/widgets/nlp_chips.dart
+// lib/ui/widgets/nlp_chips.dart
 //
 // Shared NLP chip rendering — used by both CreateTaskForm and QuickCaptureBar.
 // Pure display: no state, no providers.
@@ -211,3 +211,81 @@ class NlpChipsRow extends StatelessWidget {
     );
   }
 }
+
+// ─── NlpSuggestionsPanel ─────────────────────────────────────────────────────
+
+class NlpSuggestionsPanel extends StatelessWidget {
+  final ParsedNlpTask parsed;
+  final VoidCallback onApply;
+
+  const NlpSuggestionsPanel({
+    super.key,
+    required this.parsed,
+    required this.onApply,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!parsed.hasAnyDetection) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppTheme.accentColor(context).withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.auto_awesome_rounded,
+                size: 16,
+                color: AppTheme.accentColor(context),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                'Smart suggestions detected',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: onApply,
+                icon: Icon(
+                  Icons.check_rounded,
+                  size: 14,
+                  color: AppTheme.accentColor(context),
+                ),
+                label: Text(
+                  'Apply',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.accentColor(context),
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          NlpChipsRow(parsed: parsed),
+        ],
+      ),
+    );
+  }
+}
+
