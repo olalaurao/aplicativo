@@ -29,9 +29,9 @@ import '../models/resource_model.dart';
 import '../models/day_dial_model.dart';
 import '../models/event_model.dart';
 import '../models/shared_types.dart';
-import '../services/scheduler_service.dart';
 import '../services/widget_service.dart';
 import '../services/day_dial_aggregator.dart';
+import '../services/timeline_aggregator_service.dart';
 import 'dashboard_provider.dart';
 import 'pomodoro_provider.dart';
 import 'vault_provider.dart';
@@ -326,18 +326,6 @@ Map<String, dynamic> _buildCalendarSnapshot(
 ]) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
-  final tasks = objects.whereType<Task>().toList();
-  final habits = objects.whereType<Habit>().toList();
-  final reminders = objects.whereType<Reminder>().toList();
-  final organizerObjects = objects
-      .where(
-        (object) =>
-            object is Organizer ||
-            object is Goal ||
-            object.type == 'project' ||
-            object.type == 'person',
-      )
-      .toList();
 
   const mode = 'week';
   const dayHeaders = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
@@ -348,10 +336,7 @@ Map<String, dynamic> _buildCalendarSnapshot(
     final focusDay = today.add(Duration(days: offset));
     final items = _dayItems(
       focusDay,
-      tasks,
-      habits,
-      reminders,
-      organizerObjects,
+      objects,
       googleEvents,
       settings,
     );
@@ -378,10 +363,7 @@ Map<String, dynamic> _buildCalendarSnapshot(
       final date = focusMonday.add(Duration(days: i));
       final dayItems = _dayItems(
         date,
-        tasks,
-        habits,
-        reminders,
-        organizerObjects,
+        objects,
         googleEvents,
         settings,
       );
@@ -405,10 +387,7 @@ Map<String, dynamic> _buildCalendarSnapshot(
         : focusMonday;
     final selectedItems = _dayItems(
       selectedDate,
-      tasks,
-      habits,
-      reminders,
-      organizerObjects,
+      objects,
       googleEvents,
       settings,
     );
@@ -446,10 +425,7 @@ Map<String, dynamic> _buildCalendarSnapshot(
       final dayItems = isCurrentMonth
           ? _dayItems(
               date,
-              tasks,
-              habits,
-              reminders,
-              organizerObjects,
+              objects,
               googleEvents,
               settings,
             )
@@ -505,9 +481,6 @@ Map<String, dynamic> _buildMonthSnapshot(
 ) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
-  final tasks = objects.whereType<Task>().toList();
-  final habits = objects.whereType<Habit>().toList();
-  final reminders = objects.whereType<Reminder>().toList();
   final organizerObjects = objects
       .where(
         (object) =>
@@ -536,10 +509,7 @@ Map<String, dynamic> _buildMonthSnapshot(
     var dayItems = isCurrentMonth
         ? _dayItems(
             date,
-            tasks,
-            habits,
-            reminders,
-            organizerObjects,
+            objects,
             googleEvents,
             settings,
           )
@@ -640,34 +610,21 @@ String _typeColor(String type) {
 
 List<Map<String, dynamic>> _dayItems(
   DateTime date,
-  List<Task> tasks,
-  List<Habit> habits,
-  List<Reminder> reminders,
-  List<ContentObject> organizerObjects,
+  List<ContentObject> allObjects,
   List<calendar.Event> googleEvents,
   AppSettings settings,
 ) {
   final items = <Map<String, dynamic>>[];
+  final dayAggregation = TimelineAggregatorService.aggregateForDate(date, allObjects);
 
   if (settings.calendarWidgetShowTasks) {
-    for (final task in tasks) {
-      bool isScheduled = false;
-      if (task.endDate != null && _isSameDay(task.endDate!, date)) {
-        isScheduled = true;
-      } else if (task.startDate != null && _isSameDay(task.startDate!, date)) {
-        isScheduled = true;
-      } else if (task.scheduler != null &&
-          SchedulerService.shouldFire(task.scheduler!, date)) {
-        isScheduled = true;
-      }
-      if (!isScheduled) continue;
-
+    for (final task in dayAggregation.allTasks) {
       items.add({
         'type': 'task',
         'id': task.id,
         'title': _displayTitle(task),
         'time': task.scheduledTime ?? (task.allDay ? 'Dia inteiro' : '00:00'),
-        'subtitle': _organizerLabel(task, organizerObjects),
+        'subtitle': _organizerLabel(task, allObjects),
         'sort': _sortTime(task.scheduledTime),
         'completed': task.isCompleted,
         'linkUri': 'Quartzo:///detail/${task.id}',
@@ -677,33 +634,23 @@ List<Map<String, dynamic>> _dayItems(
     }
   }
 
-  for (final reminder in reminders) {
-    final firesToday =
-        _isSameDay(reminder.time, date) ||
-        (reminder.scheduler != null &&
-            SchedulerService.shouldFire(reminder.scheduler!, date));
-    if (!firesToday || reminder.isCompleted) continue;
+  for (final reminder in dayAggregation.reminders) {
+    if (reminder.isCompleted) continue;
     items.add({
       'type': 'reminder',
       'id': reminder.id,
       'title': reminder.title,
       'time': DateFormat('HH:mm').format(reminder.time),
-      'subtitle': _organizerLabel(reminder, organizerObjects),
+      'subtitle': _organizerLabel(reminder, allObjects),
       'sort': _sortTime(DateFormat('HH:mm').format(reminder.time)),
       'linkUri': 'Quartzo:///detail/${reminder.id}',
     });
   }
 
   if (settings.calendarWidgetShowHabits) {
-    for (final habit in habits) {
+    for (final habit in dayAggregation.habits) {
       if (habit.status != HabitStatus.active) continue;
       if (habit.isNegative) continue; // F2.6: Exclude negative habits from widgets
-      final scheduled =
-          habit.schedulers.isEmpty ||
-          habit.schedulers.any(
-            (scheduler) => SchedulerService.shouldFire(scheduler, date),
-          );
-      if (!scheduled) continue;
       final slotTimes = habit.slots
           .map((slot) => slot.primaryReminderTime ?? _timeOfDate(slot.time))
           .where((t) => t != null)
@@ -715,7 +662,7 @@ List<Map<String, dynamic>> _dayItems(
           'id': habit.id,
           'title': _displayTitle(habit),
           'time': '00:00',
-          'subtitle': _organizerLabel(habit, organizerObjects),
+          'subtitle': _organizerLabel(habit, allObjects),
           'sort': 0,
           'completed': completed,
           'linkUri': 'Quartzo:///detail/${habit.id}',
@@ -733,7 +680,7 @@ List<Map<String, dynamic>> _dayItems(
             'id': habit.id,
             'title': _displayTitle(habit),
             'time': time,
-            'subtitle': _organizerLabel(habit, organizerObjects),
+            'subtitle': _organizerLabel(habit, allObjects),
             'sort': _sortTime(time),
             'completed': completed,
             'linkUri': 'Quartzo:///detail/${habit.id}',
@@ -959,25 +906,10 @@ Map<String, dynamic> _buildTasksSnapshot(
 ) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
-  final tasks = allObjects.whereType<Task>().toList();
-  final habits = allObjects.whereType<Habit>().toList();
-  final reminders = allObjects.whereType<Reminder>().toList();
-  final organizerObjects = allObjects
-      .where(
-        (object) =>
-            object is Organizer ||
-            object is Goal ||
-            object.type == 'project' ||
-            object.type == 'person',
-      )
-      .toList();
 
   final items = _dayItems(
     today,
-    tasks,
-    habits,
-    reminders,
-    organizerObjects,
+    allObjects,
     [],
     settings,
   );

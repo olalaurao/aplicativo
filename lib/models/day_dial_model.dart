@@ -11,6 +11,7 @@ enum DialSegmentKind {
   pomodoroCompleted,// Completed Pomodoro session (historical, read-only)
   habitSlot,        // A habit's scheduled slot for the day (from HabitSlot.primaryReminderTime)
   reminder,         // Standalone reminder (not a habit reminder)
+  rotationZone,     // Active Project rotation zone with due tasks
   dayTheme,         // Day Theme background band
   sleep,            // Derived idle/sleep band (optional)
 }

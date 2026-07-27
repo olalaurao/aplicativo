@@ -7,6 +7,52 @@ import '../models/goal_model.dart';
 import '../models/note_model.dart';
 import '../models/pillar_model.dart';
 import '../models/action_menu_item_model.dart';
+import '../models/event_model.dart';
+import '../models/reminder_model.dart';
+import '../models/people_model.dart';
+import '../models/organizer_model.dart';
+import '../models/system_model.dart';
+import '../models/pomodoro_session.dart';
+import '../models/tracker_model.dart';
+import '../models/project_model.dart';
+import 'scheduler_service.dart';
+import 'rotation_service.dart';
+
+class DayAggregation {
+  final DateTime date;
+  final List<Task> tasks; // normal + recurring
+  final List<Task> rotationTasks;
+  final List<Project> rotationProjects;
+  final List<Habit> habits;
+  final List<Event> events;
+  final List<Reminder> reminders;
+  final List<Organizer> timeBlocks;
+  final List<JournalEntry> journalEntries;
+  final List<SystemDefinition> systems;
+  final List<PomodoroSession> pomodoros;
+  final List<TrackingRecord> trackerRecords;
+  final List<Goal> goals;
+  final List<Person> peopleToContact;
+
+  DayAggregation({
+    required this.date,
+    required this.tasks,
+    required this.rotationTasks,
+    required this.rotationProjects,
+    required this.habits,
+    required this.events,
+    required this.reminders,
+    required this.timeBlocks,
+    required this.journalEntries,
+    required this.systems,
+    required this.pomodoros,
+    required this.trackerRecords,
+    required this.goals,
+    required this.peopleToContact,
+  });
+
+  List<Task> get allTasks => [...tasks, ...rotationTasks];
+}
 
 enum TodayItemOrigin {
   created,  // 🕐
@@ -92,6 +138,200 @@ class TimelineWindow {
 }
 
 class TimelineAggregatorService {
+  static DayAggregation aggregateForDate(DateTime date, List<ContentObject> allObjects) {
+    final dateOnly = DateTime(date.year, date.month, date.day);
+    
+    final tasks = <Task>[];
+    final rotationTasks = <Task>[];
+    final rotationProjects = <Project>[];
+    final habits = <Habit>[];
+    final events = <Event>[];
+    final reminders = <Reminder>[];
+    final timeBlocks = <Organizer>[];
+    final journalEntries = <JournalEntry>[];
+    final systems = <SystemDefinition>[];
+    final pomodoros = <PomodoroSession>[];
+    final trackerRecords = <TrackingRecord>[];
+    final goals = <Goal>[];
+    final peopleToContact = <Person>[];
+
+    final projects = allObjects.whereType<Project>().toList();
+    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final allTimeBlocks = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.timeBlock).toList();
+
+    bool isThemeActive(String themeId, DateTime d) {
+      const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      final dayName = weekDayNames[d.weekday - 1];
+      return dayThemes.any((theme) => theme.id == themeId && theme.daysOfWeek.contains(dayName));
+    }
+
+    bool isBlockActive(String blockId, DateTime d) {
+      return allTimeBlocks.any((block) {
+        if (block.id != blockId) return false;
+        return dayThemes.any((theme) {
+          if (!theme.organizers.any((ref) => ref.matches(block.id, block.slug, block.title))) return false;
+          return isThemeActive(theme.id, d);
+        });
+      });
+    }
+
+    bool isItemScheduled(String linkedItemId, DateTime d) {
+      final targetSlug = linkedItemId.replaceAll('[[', '').replaceAll(']]', '').trim().toLowerCase();
+      final allTasks = allObjects.whereType<Task>().toList();
+      final allReminders = allObjects.whereType<Reminder>().toList();
+
+      final hasLinkedTask = allTasks.any((t) {
+        final isScheduled =
+            (t.startDate != null && t.startDate!.year == d.year && t.startDate!.month == d.month && t.startDate!.day == d.day) ||
+            (t.deadline != null && t.deadline!.year == d.year && t.deadline!.month == d.month && t.deadline!.day == d.day) ||
+            (t.scheduler != null &&
+                SchedulerService.shouldFire(
+                  t.scheduler!,
+                  d,
+                  isThemeActive: isThemeActive,
+                  isBlockActive: isBlockActive,
+                ));
+        if (!isScheduled) return false;
+        return t.id == linkedItemId ||
+            t.slug == targetSlug ||
+            t.organizers.any((o) => o.slug == targetSlug || o.title.toLowerCase() == targetSlug);
+      });
+      if (hasLinkedTask) return true;
+
+      final hasLinkedReminder = allReminders.any((r) {
+        final isScheduled =
+            (r.time.year == d.year && r.time.month == d.month && r.time.day == d.day) ||
+            (r.scheduler != null &&
+                SchedulerService.shouldFire(
+                  r.scheduler!,
+                  d,
+                  isThemeActive: isThemeActive,
+                  isBlockActive: isBlockActive,
+                ));
+        if (!isScheduled) return false;
+        return r.id == linkedItemId ||
+            r.slug == targetSlug ||
+            r.organizers.any((o) => o.slug == targetSlug || o.title.toLowerCase() == targetSlug);
+      });
+      return hasLinkedReminder;
+    }
+
+    for (final obj in allObjects) {
+      if (obj is Task && obj.archived == false) {
+        if (obj.scheduler != null && SchedulerService.shouldFire(obj.scheduler!, dateOnly, isThemeActive: isThemeActive, isBlockActive: isBlockActive, isItemScheduled: isItemScheduled)) {
+          tasks.add(obj);
+        } else {
+          bool include = false;
+          if (obj.startDate != null) {
+            final start = DateTime(obj.startDate!.year, obj.startDate!.month, obj.startDate!.day);
+            if (obj.endDate != null) {
+              final end = DateTime(obj.endDate!.year, obj.endDate!.month, obj.endDate!.day);
+              if (!dateOnly.isBefore(start) && !dateOnly.isAfter(end)) include = true;
+            } else if (start == dateOnly) {
+              include = true;
+            }
+          }
+          if (include) tasks.add(obj);
+        }
+      }
+      if (obj is Habit) {
+        final scheduledToday = obj.schedulers.isEmpty
+            ? true
+            : obj.schedulers.any((s) => SchedulerService.shouldFire(s, dateOnly, isThemeActive: isThemeActive, isBlockActive: isBlockActive, isItemScheduled: isItemScheduled));
+        if (scheduledToday && obj.status == HabitStatus.active && !obj.isNegative) habits.add(obj);
+      }
+      if (obj is Event) {
+        final start = DateTime(obj.startDatetime.year, obj.startDatetime.month, obj.startDatetime.day);
+        final endDt = obj.endDatetime ?? obj.startDatetime;
+        final end = DateTime(endDt.year, endDt.month, endDt.day);
+        if (!dateOnly.isBefore(start) && !dateOnly.isAfter(end)) events.add(obj);
+      }
+      if (obj is Reminder && !obj.isCompleted) {
+        final rDate = DateTime(obj.time.year, obj.time.month, obj.time.day);
+        if (rDate == dateOnly || rDate.isBefore(dateOnly)) reminders.add(obj);
+      }
+      if (obj is Organizer && obj.organizerType == OrganizerType.timeBlock) {
+        timeBlocks.add(obj); 
+      }
+      if (obj is JournalEntry) {
+        if (obj.date.year == dateOnly.year && obj.date.month == dateOnly.month && obj.date.day == dateOnly.day) {
+          journalEntries.add(obj);
+        }
+      }
+      if (obj is SystemDefinition) {
+        systems.add(obj);
+      }
+      if (obj is PomodoroSession) {
+        final pDate = obj.date;
+        if (pDate.year == dateOnly.year && pDate.month == dateOnly.month && pDate.day == dateOnly.day) {
+          pomodoros.add(obj);
+        }
+      }
+      if (obj is TrackingRecord) {
+        if (obj.date.year == dateOnly.year && obj.date.month == dateOnly.month && obj.date.day == dateOnly.day) {
+          trackerRecords.add(obj);
+        }
+      }
+      if (obj is Goal) {
+        if (obj.startDate != null && obj.startDate!.year == dateOnly.year && obj.startDate!.month == dateOnly.month && obj.startDate!.day == dateOnly.day) {
+          goals.add(obj);
+        } else if (obj.deadline != null && obj.deadline!.year == dateOnly.year && obj.deadline!.month == dateOnly.month && obj.deadline!.day == dateOnly.day) {
+          goals.add(obj);
+        }
+      }
+      if (obj is Person) {
+        if (obj.lastContactDate != null && obj.contactFrequency != null) {
+          final nextContact = obj.lastContactDate!.add(obj.contactFrequency!);
+          if (nextContact.year == dateOnly.year && nextContact.month == dateOnly.month && nextContact.day == dateOnly.day) {
+            peopleToContact.add(obj);
+          }
+        }
+      }
+    }
+
+    for (final project in projects) {
+      if (!project.hasRotation) continue;
+      final status = RotationService.computeActiveStatus(project, now: dateOnly);
+      if (status == null) continue;
+
+      bool addedProject = false;
+      final tasksInGroup = RotationService.rotationTasksForGroup(project, status.group, allObjects.whereType<Task>().toList());
+      for (final task in tasksInGroup) {
+        if (task.archived || task.stage == TaskStage.finalized) continue;
+        final include = switch (task.rotationFrequencyType) {
+          RotationFrequencyType.daily => true,
+          RotationFrequencyType.oncePerPeriod => !RotationService.isDoneThisOccurrence(task, status),
+          RotationFrequencyType.everyNRotations => RotationService.isDueNow(task, status) && !RotationService.isDoneThisOccurrence(task, status),
+          RotationFrequencyType.none => false,
+        };
+        if (include) {
+          rotationTasks.add(task);
+          if (!addedProject) {
+            rotationProjects.add(project);
+            addedProject = true;
+          }
+        }
+      }
+    }
+
+    return DayAggregation(
+      date: dateOnly,
+      tasks: tasks,
+      rotationTasks: rotationTasks,
+      rotationProjects: rotationProjects,
+      habits: habits,
+      events: events,
+      reminders: reminders,
+      timeBlocks: timeBlocks,
+      journalEntries: journalEntries,
+      systems: systems,
+      pomodoros: pomodoros,
+      trackerRecords: trackerRecords,
+      goals: goals,
+      peopleToContact: peopleToContact,
+    );
+  }
+
   /// Build timeline items from a list of content objects within a window
   static List<TodayItem> buildTimeline(
     List<ContentObject> objects,

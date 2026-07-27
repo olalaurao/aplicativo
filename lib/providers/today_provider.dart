@@ -8,17 +8,9 @@ final todayAggregatorServiceProvider = Provider<TodayAggregatorService>((ref) {
 });
 
 final todayItemsProvider = Provider.autoDispose.family<List<TodayItem>, DateTime>((ref, date) {
-  // Selectively watch only the types that matter for Today's view
-  final allObjects = ref.watch(allObjectsProvider.select((async) {
-    final list = async.valueOrNull ?? [];
-    return list.where((o) =>
-        o.type == 'task' ||
-        o.type == 'goal' ||
-        o.type == 'habit' ||
-        o.type == 'routine' ||
-        o.type == 'note' ||
-        o.type == 'reminder').toList();
-  }));
+  final allObjects = ref.watch(
+    allObjectsProvider.select((async) => async.valueOrNull ?? []),
+  );
   
   final settings = ref.watch(settingsProvider);
   final aggregator = ref.watch(todayAggregatorServiceProvider);

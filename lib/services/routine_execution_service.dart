@@ -12,7 +12,7 @@ class RoutineExecutionService {
   static RoutineExecution startExecution(Routine routine) {
     return RoutineExecution(
       executedAt: DateTime.now(),
-      itemCompletions: {},
+      stepCompletions: {},
     );
   }
 
@@ -78,8 +78,8 @@ class RoutineExecutionService {
     BuildContext context,
   ) async {
     // Calculate incomplete items
-    final incompleteItems = routine.items
-        .where((item) => execution.itemCompletions[item.id] != true)
+    final incompleteItems = routine.steps
+        .where((item) => execution.stepCompletions[item.id] != true)
         .toList();
     
     if (incompleteItems.isEmpty) {
@@ -125,11 +125,11 @@ class RoutineExecutionService {
   }) async {
     // If markAllAsDone, mark all items as completed
     if (markAllAsDone) {
-      final updatedCompletions = Map<String, bool>.from(execution.itemCompletions);
-      for (final item in routine.items) {
+      final updatedCompletions = Map<String, bool>.from(execution.stepCompletions);
+      for (final item in routine.steps) {
         updatedCompletions[item.id] = true;
       }
-      execution = execution.copyWith(itemCompletions: updatedCompletions);
+      execution = execution.copyWith(stepCompletions: updatedCompletions);
     }
     
     // Add execution to history

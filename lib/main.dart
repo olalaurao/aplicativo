@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +21,9 @@ import 'package:uuid/uuid.dart';
 import 'ui/theme.dart';
 import 'models/task_model.dart';
 import 'models/habit_model.dart';
+import 'models/event_model.dart';
+import 'models/goal_model.dart';
+import 'models/reminder_model.dart';
 import 'models/template_model.dart';
 import 'models/content_object.dart';
 import 'models/shopping_list_model.dart' as shopping_list_model;
@@ -35,8 +39,8 @@ import 'services/widget_service.dart';
 import 'services/permission_service.dart';
 import 'services/pomodoro_bg_service.dart';
 import 'services/capture_bubble_service.dart';
+import 'overlay/capture_bubble_overlay.dart' as capture_bubble_overlay;
 import 'providers/overlay_bridge_provider.dart';
-import 'ui/widgets/quick_capture_bar.dart';
 
 import 'ui/shell/app_shell.dart';
 import 'ui/screens/home_screen.dart';
@@ -88,6 +92,11 @@ import 'ui/forms/create_social_post_form.dart';
 import 'ui/widgets/pomodoro_floating_clock.dart';
 import 'ui/widgets/notification_popup_overlay.dart';
 import 'features/overdue/replanning/replanning_screen.dart';
+
+@pragma('vm:entry-point')
+void overlayMain() {
+  capture_bubble_overlay.overlayMain();
+}
 
 @pragma('vm:entry-point')
 Future<void> homeWidgetInteractiveCallback(Uri? uri) async {
@@ -159,20 +168,29 @@ Future<void> _handleWidgetToggleUri(
     final title = uri.queryParameters['title'];
     if (title != null && title.isNotEmpty) {
       final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final newTask = Task(
-        id: const Uuid().v4(),
-        title: title,
-        createdAt: now,
-        updatedAt: now,
-        stage: TaskStage.todo,
-        endDate: today,
-        allDay: true,
+      final objectType = uri.queryParameters['object_type'] ?? 'task';
+      final object = _buildQuickAddObject(
+        objectType,
+        title,
+        now,
+        dueDate: _parseQuickAddDate(uri.queryParameters['due_date']),
+        priority: _parseQuickAddPriority(uri.queryParameters['priority']),
+        notes: uri.queryParameters['notes'],
       );
-      await container.read(vaultProvider.notifier).createObject(newTask);
+      await container.read(vaultProvider.notifier).createObject(object);
       await forceWidgetSync(container);
-      debugPrint('[WidgetCallback] quick add task: $title');
+      debugPrint('[WidgetCallback] quick add $objectType: $title');
     }
+    return;
+  }
+
+  if (type == 'quick_add_open_editor') {
+    _openQuickAddEditor(uri);
+    return;
+  }
+
+  if (type == 'notification_action') {
+    await _handleNativeNotificationAction(uri, container);
     return;
   }
 
@@ -243,6 +261,42 @@ Future<void> _handleWidgetToggleUri(
     debugPrint('[WidgetCallback] habit toggled: $objectId');
   }
   await WidgetService.refreshAllWidgets();
+}
+
+Future<void> _handleNativeNotificationAction(
+  Uri uri,
+  ProviderContainer container,
+) async {
+  final action = uri.queryParameters['action'];
+  final payload = uri.queryParameters['payload'];
+  if (action == null || action.isEmpty || payload == null || payload.isEmpty) {
+    return;
+  }
+
+  final notificationId = int.tryParse(
+    uri.queryParameters['notification_id'] ?? '',
+  );
+  if (notificationId != null && notificationId != 0) {
+    await NotificationService().cancelNotification(notificationId);
+  }
+
+  final prefs = container.read(sharedPreferencesProvider);
+  final pending = prefs.getStringList('notification_actions') ?? [];
+  pending.add(
+    jsonEncode({
+      'action': action,
+      'payload': payload,
+      'notification_id': notificationId,
+      'created_at': DateTime.now().toIso8601String(),
+    }),
+  );
+  await prefs.setStringList('notification_actions', pending);
+
+  await container
+      .read(vaultProvider.notifier)
+      .processPendingNotificationActions();
+  await forceWidgetSync(container);
+  debugPrint('[WidgetCallback] notification action $action');
 }
 
 void main() async {
@@ -338,11 +392,18 @@ class _BootstrapAppState extends State<BootstrapApp> {
     _lifecycleListener = AppLifecycleListener(
       onResume: () {
         debugPrint('[AppLifecycle] Resumed - refreshing widgets');
-        // Stop/hide the overlay bubble — the in-app FAB covers the same job
-        // while the app is open. Also reset the per-session dismiss flag so
-        // backgrounding again will show the bubble.
         if (Platform.isAndroid) {
-          unawaited(CaptureOverlayService.stop());
+          final settings = widget.container.read(settingsProvider);
+          if (settings.floatingCaptureBubbleEnabled) {
+            // Ensure service is running, but hide the bubble while in-app.
+            unawaited(
+              CaptureOverlayService.start().then((_) {
+                CaptureOverlayService.hide();
+              }),
+            );
+          } else {
+            unawaited(CaptureOverlayService.stop());
+          }
           OverlayBridgeService.resetSessionDismiss();
         }
         // Debounce widget sync to avoid cascade with sync
@@ -391,7 +452,9 @@ class _BootstrapAppState extends State<BootstrapApp> {
         // Invalidate only date-dependent providers instead of entire vault
         final todayStr = currentDate.toIso8601String().split('T').first;
         widget.container.invalidate(dailyNoteDataProvider(todayStr));
-        widget.container.invalidate(vaultProvider); // Still needed for habit streaks, overdue tasks, etc.
+        widget.container.invalidate(
+          vaultProvider,
+        ); // Still needed for habit streaks, overdue tasks, etc.
         unawaited(forceWidgetSync(widget.container));
       }
     });
@@ -412,18 +475,28 @@ class _BootstrapAppState extends State<BootstrapApp> {
     debugPrint('[AppLifecycle] _onAppBackgrounded triggered');
     try {
       final settings = widget.container.read(settingsProvider);
-      debugPrint('[AppLifecycle] settings.floatingCaptureBubbleEnabled = ${settings.floatingCaptureBubbleEnabled}');
+      debugPrint(
+        '[AppLifecycle] settings.floatingCaptureBubbleEnabled = ${settings.floatingCaptureBubbleEnabled}',
+      );
       if (!settings.floatingCaptureBubbleEnabled) return;
-      
-      debugPrint('[AppLifecycle] sessionDismissed = ${OverlayBridgeService.sessionDismissed}');
+
+      debugPrint(
+        '[AppLifecycle] sessionDismissed = ${OverlayBridgeService.sessionDismissed}',
+      );
       if (OverlayBridgeService.sessionDismissed) return;
-      
+
       final granted = await PermissionService.isOverlayPermissionGranted();
       debugPrint('[AppLifecycle] isOverlayPermissionGranted = $granted');
       if (!granted) return;
-      
-      debugPrint('[AppLifecycle] Calling CaptureOverlayService.start()');
-      await CaptureOverlayService.start();
+
+      final active = await CaptureOverlayService.isActive();
+      debugPrint('[AppLifecycle] CaptureOverlayService.isActive = $active');
+      if (!active) {
+        await CaptureOverlayService.start();
+      }
+
+      debugPrint('[AppLifecycle] Calling CaptureOverlayService.show()');
+      await CaptureOverlayService.show();
     } catch (e) {
       debugPrint('[AppLifecycle] Failed to start capture bubble: $e');
     }
@@ -644,7 +717,7 @@ Future<void> _initApp(ProviderContainer container) async {
         .read(allObjectsProvider.future)
         .then((objects) async {
           debugPrint('[Startup] Vault loaded: ${objects.length} objects.');
-          
+
           // Start sync AFTER vault loads to avoid conflicts and reduce startup load
           try {
             container.read(syncManagerProvider).start();
@@ -652,7 +725,7 @@ Future<void> _initApp(ProviderContainer container) async {
           } catch (e) {
             debugPrint('Startup init failed: sync_manager_start: $e');
           }
-          
+
           Future.delayed(const Duration(seconds: 3), () {
             container.read(peopleProvider.notifier).checkPersonContactsNow();
           });
@@ -826,16 +899,14 @@ Future<void> _initApp(ProviderContainer container) async {
     }
 
     // Overlay bridge — listen for tap events from the capture bubble isolate.
-    // Must be initialized AFTER the navigator key is ready so showQuickCapture
-    // can find a BuildContext to push the sheet. We use the root navigator key.
     if (Platform.isAndroid) {
       try {
         OverlayBridgeService.init(
           onOpenCapture: () {
-            final context = _rootNavigatorKey.currentContext;
-            if (context != null && context.mounted) {
-              showQuickCapture(context);
-            }
+            unawaited(_openNativeQuickAddPopup());
+          },
+          onQuickAdd: (data) {
+            unawaited(_createOverlayQuickAdd(container, data));
           },
         );
       } catch (e) {
@@ -857,6 +928,146 @@ Future<void> _emitAgentDebugLog({
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
+
+Future<void> _createOverlayQuickAdd(
+  ProviderContainer container,
+  Map<String, dynamic> data,
+) async {
+  final title = data['title']?.toString().trim() ?? '';
+  if (title.isEmpty) return;
+
+  final type = data['type']?.toString() ?? 'task';
+  final now = DateTime.now();
+  final object = _buildQuickAddObject(
+    type,
+    title,
+    now,
+    dueDate: _parseQuickAddDate(data['due_date']?.toString()),
+    priority: _parseQuickAddPriority(data['priority']?.toString()),
+    notes: data['notes']?.toString(),
+  );
+
+  try {
+    await container.read(vaultProvider.notifier).createObject(object);
+    unawaited(forceWidgetSync(container));
+    debugPrint('[OverlayBridge] quick add created: $type "$title"');
+  } catch (e) {
+    debugPrint('[OverlayBridge] quick add create failed: $e');
+  }
+}
+
+DateTime? _parseQuickAddDate(String? value) {
+  if (value == null || value.trim().isEmpty) return null;
+  return DateTime.tryParse(value);
+}
+
+TaskPriority _parseQuickAddPriority(String? value) {
+  return TaskPriority.values.firstWhere(
+    (priority) => priority.name == value,
+    orElse: () => TaskPriority.none,
+  );
+}
+
+ContentObject _buildQuickAddObject(
+  String type,
+  String title,
+  DateTime now, {
+  DateTime? dueDate,
+  TaskPriority priority = TaskPriority.none,
+  String? notes,
+}) {
+  final cleanNotes = notes?.trim();
+  final hasNotes = cleanNotes != null && cleanNotes.isNotEmpty;
+
+  switch (type) {
+    case 'event':
+      return Event(
+        title: title,
+        date: dueDate ?? now,
+        note: hasNotes ? cleanNotes : null,
+        createdAt: now,
+        updatedAt: now,
+      );
+    case 'habit':
+      return Habit(
+        title: title,
+        description: hasNotes ? cleanNotes : null,
+        habitStartDate: dueDate,
+        color: '#F97316',
+        createdAt: now,
+        updatedAt: now,
+      );
+    case 'goal':
+      return Goal(
+        title: title,
+        description: hasNotes ? cleanNotes : null,
+        deadline: dueDate,
+        createdAt: now,
+        updatedAt: now,
+      );
+    case 'reminder':
+      return Reminder(
+        title: title,
+        time: dueDate ?? now,
+        notes: hasNotes ? cleanNotes : null,
+        createdAt: now,
+        updatedAt: now,
+      );
+    case 'task':
+    default:
+      return Task(
+        id: const Uuid().v4(),
+        title: title,
+        stage: TaskStage.idea,
+        priority: priority,
+        startDate: dueDate,
+        endDate: dueDate,
+        notes: hasNotes ? [cleanNotes] : [],
+        createdAt: now,
+        updatedAt: now,
+        duration: 15,
+      );
+  }
+}
+
+void _openQuickAddEditor(Uri uri) {
+  final objectType = uri.queryParameters['object_type'] ?? 'task';
+  final title = uri.queryParameters['title'];
+  final dueDate = _parseQuickAddDate(uri.queryParameters['due_date']);
+  final priority = _parseQuickAddPriority(uri.queryParameters['priority']);
+  final notes = uri.queryParameters['notes'];
+
+  final route = switch (objectType) {
+    'event' => '/create/event',
+    'habit' => '/create/habit',
+    'goal' => '/create/goal',
+    'reminder' => '/create/reminder',
+    _ => '/create/task',
+  };
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final context = _rootNavigatorKey.currentContext;
+    if (context == null) return;
+    context.push(
+      route,
+      extra: {
+        if (title != null && title.isNotEmpty) 'initialTitle': title,
+        if (dueDate != null) 'initialDate': dueDate,
+        if (priority != TaskPriority.none) 'initialPriority': priority,
+        if (notes != null && notes.trim().isNotEmpty) 'initialNotes': notes,
+      },
+    );
+  });
+}
+
+Future<void> _openNativeQuickAddPopup() async {
+  try {
+    const channel = MethodChannel('com.productivity.Quartzo/settings');
+    await channel.invokeMethod<bool>('startQuickAddPopup');
+  } catch (e) {
+    debugPrint('[OverlayBridge] startQuickAddPopup failed: $e');
+  }
+}
 
 /// NavigatorObserver that keeps CrashReportService updated with the current route.
 class _CrashRouteObserver extends NavigatorObserver {
@@ -933,7 +1144,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/create/task',
-            builder: (context, state) => const CreateTaskForm(),
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return CreateTaskForm(
+                initialTitle: extra?['initialTitle'] as String?,
+                initialDate: extra?['initialDate'] as DateTime?,
+                initialNotes: extra?['initialNotes'] as String?,
+              );
+            },
           ),
           GoRoute(
             path: '/create/habit',
@@ -964,7 +1182,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/create/reminder',
-            builder: (context, state) => const CreateReminderForm(),
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return CreateReminderForm(
+                initialTitle: extra?['initialTitle'] as String?,
+                initialDate: extra?['initialDate'] as DateTime?,
+              );
+            },
           ),
           GoRoute(
             path: '/create-project',

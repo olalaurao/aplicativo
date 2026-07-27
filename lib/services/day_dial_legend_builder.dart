@@ -64,6 +64,7 @@ String _categoryKeyFor(DialSegment s) {
     DialSegmentKind.sleep => 'Sleep',
     DialSegmentKind.habitSlot => 'Habits',
     DialSegmentKind.reminder => 'Reminders',
+    DialSegmentKind.rotationZone => 'Rotation',
   };
 }
 
@@ -84,5 +85,6 @@ IconData _iconForKind(DialSegmentKind kind) {
     DialSegmentKind.sleep => Icons.bedtime,
     DialSegmentKind.habitSlot => Icons.refresh,
     DialSegmentKind.reminder => Icons.notifications,
+    DialSegmentKind.rotationZone => Icons.rotate_right,
   };
 }

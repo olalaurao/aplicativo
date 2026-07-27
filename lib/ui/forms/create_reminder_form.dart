@@ -10,14 +10,16 @@ import '../../models/template_model.dart';
 import '../../models/organizer_model.dart';
 import '../../providers/vault_provider.dart';
 import '../widgets/app_switch_tile.dart';
-import '../widgets/date_picker_field.dart';
 import '../theme.dart';
 import 'scheduler_picker.dart';
 import '../widgets/wiki_link_controller.dart';
 import '../widgets/organizer_picker_modal.dart';
 
 class CreateReminderForm extends ConsumerStatefulWidget {
-  const CreateReminderForm({super.key});
+  final String? initialTitle;
+  final DateTime? initialDate;
+
+  const CreateReminderForm({super.key, this.initialTitle, this.initialDate});
 
   @override
   ConsumerState<CreateReminderForm> createState() => _CreateReminderFormState();
@@ -41,7 +43,13 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
   @override
   void initState() {
     super.initState();
-    _titleController = WikiLinkTextController(context: context);
+    _titleController = WikiLinkTextController(
+      context: context,
+      text: widget.initialTitle,
+    );
+    if (widget.initialDate != null) {
+      _date = widget.initialDate!;
+    }
   }
 
   @override
@@ -67,7 +75,9 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Descartar alterações?'),
-            content: const Text('Você possui alterações não salvas. Deseja sair mesmo assim?'),
+            content: const Text(
+              'Você possui alterações não salvas. Deseja sair mesmo assim?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -85,305 +95,324 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
           Navigator.pop(context, result);
         }
       },
-      child:  Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: Column(
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.copy_all_rounded,
-                      color: AppTheme.accentColor(context),
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: Column(
+          children: [
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                    tooltip: 'Usar Template',
-                    onPressed: _showTemplatePicker,
-                  ),
-                  const Spacer(),
-                  const Text(
-                    'New Reminder',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: hasTitle ? _saveReminder : null,
-                    child: Text(
-                      'Add',
+                    IconButton(
+                      icon: Icon(
+                        Icons.copy_all_rounded,
+                        color: AppTheme.accentColor(context),
+                      ),
+                      tooltip: 'Usar Template',
+                      onPressed: _showTemplatePicker,
+                    ),
+                    const Spacer(),
+                    const Text(
+                      'New Reminder',
                       style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: hasTitle
-                            ? AppTheme.accentColor(context)
-                            : AppColors.textMuted,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-                ],
+                    const Spacer(),
+                    TextButton(
+                      onPressed: hasTitle ? _saveReminder : null,
+                      child: Text(
+                        'Add',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: hasTitle
+                              ? AppTheme.accentColor(context)
+                              : AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
 
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: _titleController,
-                    onChanged: (_) { if (mounted) setState(() {}); },
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: 'Remind me to...',
-                      hintStyle: TextStyle(
-                        color: AppColors.textMuted,
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _titleController,
+                      onChanged: (_) {
+                        if (mounted) setState(() {});
+                      },
+                      style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
                       ),
-                      border: InputBorder.none,
+                      decoration: const InputDecoration(
+                        hintText: 'Remind me to...',
+                        hintStyle: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        border: InputBorder.none,
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _metadataChip(
-                          icon: Icons.event_outlined,
-                          label: DateFormat('MMM d').format(_date),
-                          onTap: _pickDate,
-                        ),
-                        const SizedBox(width: 8),
-                        _metadataChip(
-                          icon: Icons.access_time_rounded,
-                          label: _time?.format(context) ?? 'Time',
-                          onTap: _pickTime,
-                          isActive: _time != null,
-                        ),
-                        const SizedBox(width: 8),
-                        _metadataChip(
-                          icon: Icons.repeat_rounded,
-                          label: _scheduler != null ? 'Recurring' : 'Repeat',
-                          onTap: _pickRepeat,
-                          isActive: _scheduler != null,
-                        ),
-                        const SizedBox(width: 8),
-                        _metadataChip(
-                          icon: Icons.layers_outlined,
-                          label: _organizers.isEmpty
-                              ? 'Organizers'
-                              : '${_organizers.length} organizers',
-                          onTap: _pickOrganizers,
-                          isActive: _organizers.isNotEmpty,
-                        ),
-                        const SizedBox(width: 8),
-                        _metadataChip(
-                          icon: Icons.view_timeline_outlined,
-                          label: _timeBlock ?? 'Time block',
-                          onTap: _pickTimeBlock,
-                          isActive: _timeBlock != null,
-                        ),
-                      ],
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _metadataChip(
+                            icon: Icons.event_outlined,
+                            label: DateFormat('MMM d').format(_date),
+                            onTap: _pickDate,
+                          ),
+                          const SizedBox(width: 8),
+                          _metadataChip(
+                            icon: Icons.access_time_rounded,
+                            label: _time?.format(context) ?? 'Time',
+                            onTap: _pickTime,
+                            isActive: _time != null,
+                          ),
+                          const SizedBox(width: 8),
+                          _metadataChip(
+                            icon: Icons.repeat_rounded,
+                            label: _scheduler != null ? 'Recurring' : 'Repeat',
+                            onTap: _pickRepeat,
+                            isActive: _scheduler != null,
+                          ),
+                          const SizedBox(width: 8),
+                          _metadataChip(
+                            icon: Icons.layers_outlined,
+                            label: _organizers.isEmpty
+                                ? 'Organizers'
+                                : '${_organizers.length} organizers',
+                            onTap: _pickOrganizers,
+                            isActive: _organizers.isNotEmpty,
+                          ),
+                          const SizedBox(width: 8),
+                          _metadataChip(
+                            icon: Icons.view_timeline_outlined,
+                            label: _timeBlock ?? 'Time block',
+                            onTap: _pickTimeBlock,
+                            isActive: _timeBlock != null,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-                  // Notification Settings
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Tipo de Notificação',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
+                    // Notification Settings
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Tipo de Notificação',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            _buildTypeChip(
-                              NotificationType.push,
-                              'Push',
-                              Icons.notifications_active_rounded,
-                            ),
-                            const SizedBox(width: 8),
-                            _buildTypeChip(
-                              NotificationType.popup,
-                              'Popup',
-                              Icons.picture_in_picture_rounded,
-                            ),
-                            const SizedBox(width: 8),
-                            _buildTypeChip(
-                              NotificationType.alarm,
-                              'Alarme',
-                              Icons.alarm_rounded,
-                            ),
-                          ],
-                        ),
-                        if (_type == NotificationType.alarm) ...[
-                          const SizedBox(height: 16),
-                          AppSwitchTile(
-                            title: 'Tocar no silencioso',
-                            value: _ringOnSilent,
-                            onChanged: (val) => setState(() => _ringOnSilent = val),
-                            contentPadding: EdgeInsets.zero,
-                          ),
+                          const SizedBox(height: 12),
                           Row(
                             children: [
-                              const Text('Soneca (min):', style: TextStyle(fontSize: 14)),
-                              const SizedBox(width: 16),
-                              DropdownButton<int>(
-                                value: _snoozeMinutes,
-                                items: [5, 10, 15, 30]
-                                    .map((m) => DropdownMenuItem(value: m, child: Text('$m')))
-                                    .toList(),
-                                onChanged: (val) =>
-                                    setState(() => _snoozeMinutes = val ?? 10),
+                              _buildTypeChip(
+                                NotificationType.push,
+                                'Push',
+                                Icons.notifications_active_rounded,
+                              ),
+                              const SizedBox(width: 8),
+                              _buildTypeChip(
+                                NotificationType.popup,
+                                'Popup',
+                                Icons.picture_in_picture_rounded,
+                              ),
+                              const SizedBox(width: 8),
+                              _buildTypeChip(
+                                NotificationType.alarm,
+                                'Alarme',
+                                Icons.alarm_rounded,
+                              ),
+                            ],
+                          ),
+                          if (_type == NotificationType.alarm) ...[
+                            const SizedBox(height: 16),
+                            AppSwitchTile(
+                              title: 'Tocar no silencioso',
+                              value: _ringOnSilent,
+                              onChanged: (val) =>
+                                  setState(() => _ringOnSilent = val),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            Row(
+                              children: [
+                                const Text(
+                                  'Soneca (min):',
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                                const SizedBox(width: 16),
+                                DropdownButton<int>(
+                                  value: _snoozeMinutes,
+                                  items: [5, 10, 15, 30]
+                                      .map(
+                                        (m) => DropdownMenuItem(
+                                          value: m,
+                                          child: Text('$m'),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (val) => setState(
+                                    () => _snoozeMinutes = val ?? 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                'Completable',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const Spacer(),
+                              Switch(
+                                value: _completable,
+                                onChanged: (v) =>
+                                    setState(() => _completable = v),
+                                activeThumbColor: AppTheme.accentColor(context),
                               ),
                             ],
                           ),
                         ],
-                      ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            const Text(
-                              'Completable',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Checklist',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
                             ),
-                            const Spacer(),
-                            Switch(
-                              value: _completable,
-                              onChanged: (v) =>
-                                  setState(() => _completable = v),
-                              activeThumbColor: AppTheme.accentColor(context),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  Container(
-                    decoration: AppTheme.cardDecoration(context),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Checklist',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        ..._checkboxes.asMap().entries.map((entry) {
-                          if (_checkboxControllers.length <= entry.key) {
-                            _checkboxControllers.add(
-                              WikiLinkTextController(
-                                context: context,
-                                text: entry.value,
-                              ),
-                            );
-                          }
-                          final controller = _checkboxControllers[entry.key];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.check_box_outline_blank,
-                                  size: 20,
-                                  color: AppColors.textMuted,
+                          const SizedBox(height: 12),
+                          ..._checkboxes.asMap().entries.map((entry) {
+                            if (_checkboxControllers.length <= entry.key) {
+                              _checkboxControllers.add(
+                                WikiLinkTextController(
+                                  context: context,
+                                  text: entry.value,
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: TextField(
-                                    controller: controller,
-                                    onChanged: (v) =>
-                                        _checkboxes[entry.key] = v,
-                                    style: const TextStyle(fontSize: 15),
-                                    decoration: const InputDecoration(
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                      contentPadding: EdgeInsets.zero,
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.close_rounded,
-                                    size: 16,
+                              );
+                            }
+                            final controller = _checkboxControllers[entry.key];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.check_box_outline_blank,
+                                    size: 20,
                                     color: AppColors.textMuted,
                                   ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _checkboxes.removeAt(entry.key);
-                                      _checkboxControllers
-                                          .removeAt(entry.key)
-                                          .dispose();
-                                    });
-                                  },
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                        GestureDetector(
-                          onTap: _addCheckbox,
-                          child: const Text(
-                            'Add item',
-                            style: TextStyle(
-                              color: AppColors.textMuted,
-                              fontSize: 14,
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: controller,
+                                      onChanged: (v) =>
+                                          _checkboxes[entry.key] = v,
+                                      style: const TextStyle(fontSize: 15),
+                                      decoration: const InputDecoration(
+                                        border: InputBorder.none,
+                                        isDense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      size: 16,
+                                      color: AppColors.textMuted,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _checkboxes.removeAt(entry.key);
+                                        _checkboxControllers
+                                            .removeAt(entry.key)
+                                            .dispose();
+                                      });
+                                    },
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                          GestureDetector(
+                            onTap: _addCheckbox,
+                            child: const Text(
+                              'Add item',
+                              style: TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ));
+    );
   }
 
   Widget _buildTypeChip(NotificationType type, String label, IconData icon) {
@@ -393,7 +422,9 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.accentColor(context) : AppColors.surfaceVariant,
+          color: isSelected
+              ? AppTheme.accentColor(context)
+              : AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
@@ -426,7 +457,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
       _time?.hour ?? 0,
       _time?.minute ?? 0,
     );
-    
+
     final reminder = Reminder(
       title: _titleController.text.trim(),
       time: time,
@@ -446,7 +477,7 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
         ),
       ],
     );
-    
+
     ref.read(remindersProvider.notifier).addReminder(reminder);
 
     Navigator.pop(context);
@@ -515,7 +546,8 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
         _titleController.text = template.frontmatterDefaults['title'] as String;
       }
       if (template.frontmatterDefaults.containsKey('completable')) {
-        _completable = template.frontmatterDefaults['completable'] as bool? ?? true;
+        _completable =
+            template.frontmatterDefaults['completable'] as bool? ?? true;
       }
       if (template.body.isNotEmpty) {
         final lines = template.body.split('\n');
@@ -547,7 +579,9 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
               : AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isActive ? AppTheme.accentColor(context) : Colors.transparent,
+            color: isActive
+                ? AppTheme.accentColor(context)
+                : Colors.transparent,
           ),
         ),
         child: Row(
@@ -556,7 +590,9 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
             Icon(
               icon,
               size: 18,
-              color: isActive ? AppTheme.accentColor(context) : AppColors.textSecondary,
+              color: isActive
+                  ? AppTheme.accentColor(context)
+                  : AppColors.textSecondary,
             ),
             const SizedBox(width: 8),
             Text(
@@ -564,7 +600,9 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: isActive ? AppTheme.accentColor(context) : AppColors.textSecondary,
+                color: isActive
+                    ? AppTheme.accentColor(context)
+                    : AppColors.textSecondary,
               ),
             ),
           ],

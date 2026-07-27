@@ -1,4 +1,4 @@
-﻿import 'package:quartzo/models/habit_model.dart';
+import 'package:quartzo/models/habit_model.dart';
 import 'package:quartzo/models/analysis_model.dart';
 import 'package:quartzo/models/journal_entry.dart';
 
@@ -7,6 +7,7 @@ import 'package:quartzo/models/mood_model.dart';
 import 'package:quartzo/models/note_model.dart';
 import 'package:quartzo/models/organizer_model.dart';
 import 'package:quartzo/models/people_model.dart';
+import 'package:quartzo/models/pillar_model.dart';
 import 'package:quartzo/models/project_model.dart';
 import 'package:quartzo/models/reminder_model.dart';
 import 'package:quartzo/models/resource_model.dart';
@@ -14,6 +15,7 @@ import 'package:quartzo/models/shared_types.dart';
 import 'package:quartzo/models/snapshot_model.dart';
 import 'package:quartzo/models/social_post.dart';
 import 'package:quartzo/models/task_model.dart';
+import 'package:quartzo/models/relay_step.dart';
 import 'package:quartzo/models/tracker_model.dart';
 import 'package:quartzo/models/kpi_model.dart' as kpi_model;
 import 'package:quartzo/models/dashboard_block.dart';
@@ -69,9 +71,30 @@ void main() {
         defaultType: 'project',
       );
 
-      expect(reference.toWikiLink(), '[[launch]]');
+      // Typed references serialize as [[type/slug]] per spec
+      expect(reference.toWikiLink(), '[[project/launch]]');
       expect(parsed.type, 'project');
       expect(parsed.slug, 'launch');
+    });
+
+    test('relay steps preserve labels in roundtrip', () {
+      final task = Task(
+        title: 'Task with steps',
+        relaySteps: [
+          RelayStep(label: 'Custom Step 1', durationMinutes: 25),
+          RelayStep(label: 'Another Step', durationMinutes: 5),
+        ],
+      );
+      final md = task.toMarkdown();
+      final parsed = Task.fromMarkdown(
+        MarkdownParser.parseFrontmatter(md),
+        MarkdownParser.extractBody(md),
+      );
+      
+      expect(parsed.relaySteps, isNotNull);
+      expect(parsed.relaySteps!.length, 2);
+      expect(parsed.relaySteps![0].label, 'Custom Step 1');
+      expect(parsed.relaySteps![1].label, 'Another Step');
     });
 
     test('type signatures match wiki-link category list values', () {
@@ -324,6 +347,30 @@ Texto original.
       expect(parsed.sections.single.title, 'Night');
       expect(parsed.sections.single.inputFields.single.id, 'hours');
       expect(parsed.sections.single.inputFields.single.unit, 'h');
+    });
+
+    test('TrackingRecord preserves boolean checkbox values', () {
+      final record = TrackingRecord(
+        title: 'Daily Meds',
+        trackerId: 'meds',
+        date: DateTime(2026, 7, 27),
+        fieldValues: {
+          'took_vitamins': true,
+          'had_headache': false,
+          'notes': 'Felt good',
+        },
+      );
+
+      final markdown = record.toMarkdown();
+      final parsed = TrackingRecord.fromMarkdown(
+        MarkdownParser.parseFrontmatter(markdown),
+        MarkdownParser.extractBody(markdown),
+      );
+
+      expect(parsed.trackerId, 'meds');
+      expect(parsed.fieldValues['took_vitamins'], isTrue);
+      expect(parsed.fieldValues['had_headache'], isFalse);
+      expect(parsed.fieldValues['notes'], 'Felt good');
     });
 
     test('planner and organizer object types preserve key fields', () {

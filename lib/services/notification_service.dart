@@ -179,15 +179,17 @@ class NotificationService with WidgetsBindingObserver {
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
-    
+
     // Request notification permissions explicitly
     final granted = await android?.requestNotificationsPermission();
-    debugPrint('NotificationService: notification permission granted: $granted');
-    
+    debugPrint(
+      'NotificationService: notification permission granted: $granted',
+    );
+
     // Also request POST_NOTIFICATIONS permission for Android 13+
     if (Platform.isAndroid) {
       try {
-        final result = await PermissionService.requestAllPermissions();
+        await PermissionService.requestAllPermissions();
         debugPrint('NotificationService: permissions requested');
       } catch (e) {
         debugPrint('NotificationService: permission request failed: $e');
@@ -230,35 +232,21 @@ class NotificationService with WidgetsBindingObserver {
 
     final payload = response.payload ?? '';
     final notifType = _extractNotifType(payload);
-    final title = _extractField(payload, 'title') ?? 'Reminder';
-    final body = _extractField(payload, 'body') ?? '';
-    final objectId = _extractField(payload, 'oid');
 
     // Cancel any foreground timer for this ID to avoid double-show
     if (response.id != null) {
       _cancelForegroundTimer(response.id!);
     }
 
-    // Delay slightly to let navigator initialize
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (notifType == 'alarm') {
-        showAlarmScreen(
-          title: Uri.decodeComponent(title),
-          body: Uri.decodeComponent(body),
-          type: _parseAlarmType(_extractField(payload, 'subtype')),
-          objectId: objectId,
+    if (notifType == 'alarm' || notifType == 'popup') {
+      unawaited(
+        _openNativeNotificationPopup(
+          payload: payload,
           notificationId: response.id,
-        );
-      } else if (notifType == 'popup') {
-        showPopupScreen(
-          title: Uri.decodeComponent(title),
-          body: Uri.decodeComponent(body),
-          type: _parsePopupScreenType(_extractField(payload, 'subtype')),
-          objectId: objectId,
-          notificationId: response.id,
-        );
-      }
-    });
+        ),
+      );
+      return;
+    }
   }
 
   static String? _extractField(String payload, String key) {
@@ -269,32 +257,6 @@ class NotificationService with WidgetsBindingObserver {
 
   static String _extractNotifType(String payload) {
     return _extractField(payload, 'ntype') ?? 'push';
-  }
-
-  static AlarmType _parseAlarmType(String? subtype) {
-    switch (subtype) {
-      case 'task':
-        return AlarmType.task;
-      case 'event':
-        return AlarmType.event;
-      case 'reminder':
-        return AlarmType.reminder;
-      default:
-        return AlarmType.alarm;
-    }
-  }
-
-  static PopupScreenType _parsePopupScreenType(String? subtype) {
-    switch (subtype) {
-      case 'task':
-        return PopupScreenType.task;
-      case 'event':
-        return PopupScreenType.event;
-      case 'habit':
-        return PopupScreenType.habit;
-      default:
-        return PopupScreenType.reminder;
-    }
   }
 
   Future<void> _createNotificationChannels() async {
@@ -578,8 +540,8 @@ class NotificationService with WidgetsBindingObserver {
       vibrationPattern: isAlarm
           ? Int64List.fromList(<int>[0, 500, 200, 500])
           : (isPopup
-              ? Int64List.fromList(<int>[0, 300, 200, 300])
-              : Int64List.fromList(<int>[0, 250, 150, 250])),
+                ? Int64List.fromList(<int>[0, 300, 200, 300])
+                : Int64List.fromList(<int>[0, 250, 150, 250])),
       audioAttributesUsage: isAlarm || isPopup
           ? AudioAttributesUsage.alarm
           : AudioAttributesUsage.notification,
@@ -598,7 +560,7 @@ class NotificationService with WidgetsBindingObserver {
     );
 
     // iOS notification respects playSound flag - force true for all types
-    final iosDetails = DarwinNotificationDetails(
+    const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true, // Force sound for all notification types
@@ -717,26 +679,17 @@ class NotificationService with WidgetsBindingObserver {
     // Cancel the system notification — we're showing the UI directly
     cancelNotification(id);
 
-    // Bring the app to the foreground if in background
-    _bringAppToForeground();
-
-    if (entry.type == NotificationType.alarm) {
-      showAlarmScreen(
-        title: entry.title,
-        body: entry.body,
-        type: AlarmType.alarm,
-        objectId: entry.objectId,
-        notificationId: id,
-      );
-    } else if (entry.type == NotificationType.popup) {
-      showPopupScreen(
-        title: entry.title,
-        body: entry.body,
-        type: PopupScreenType.reminder,
-        objectId: entry.objectId,
-        notificationId: id,
-      );
-    }
+    final payload = _buildEnrichedPayload(
+      originalPayload: entry.objectId,
+      title: entry.title,
+      body: entry.body,
+      notifType: entry.type == NotificationType.alarm ? 'alarm' : 'popup',
+      id: id,
+      snoozeMinutes: entry.snoozeMinutes,
+    );
+    unawaited(
+      _openNativeNotificationPopup(payload: payload, notificationId: id),
+    );
   }
 
   String _buildEnrichedPayload({
@@ -918,9 +871,9 @@ class NotificationService with WidgetsBindingObserver {
       enableVibration: true,
       vibrationPattern: Int64List.fromList(<int>[0, 250, 150, 250]),
       actions: [
-        AndroidNotificationAction('done', 'Concluído'),
-        AndroidNotificationAction('snooze', 'Adiar'),
-        AndroidNotificationAction('dismiss', 'Dispensar'),
+        const AndroidNotificationAction('done', 'Concluído'),
+        const AndroidNotificationAction('snooze', 'Adiar'),
+        const AndroidNotificationAction('dismiss', 'Dispensar'),
       ],
     );
     const iosDetails = DarwinNotificationDetails(
@@ -1024,6 +977,25 @@ class NotificationService with WidgetsBindingObserver {
       await channel.invokeMethod('bringAppToForeground');
     } catch (e) {
       debugPrint('NotificationService: bringAppToForeground failed: $e');
+    }
+  }
+
+  Future<void> _openNativeNotificationPopup({
+    required String payload,
+    int? notificationId,
+  }) async {
+    if (!Platform.isAndroid) return;
+    try {
+      const channel = MethodChannel('com.productivity.Quartzo/settings');
+      await channel.invokeMethod('startNativeNotificationPopup', {
+        'payload': payload,
+        'notification_id':
+            notificationId ?? _extractNotificationId(payload) ?? 0,
+      });
+    } catch (e) {
+      debugPrint(
+        'NotificationService: startNativeNotificationPopup failed: $e',
+      );
     }
   }
 

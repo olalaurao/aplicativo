@@ -27,9 +27,9 @@ class SystemsNotifier extends Notifier<List<SystemDefinition>> {
             .reduce((a, b) => a.isAfter(b) ? a : b);
     if (linked.isNotEmpty) {
       final totalMin = linked
-          .where((t) => t.estimatedMinutes != null && t.estimatedMinutes! > 0)
-          .map((t) => t.estimatedMinutes!)
-          .fold(0, (a, b) => a + b);
+          .where((t) => t.duration > 0)
+          .map((t) => t.duration)
+          .fold<int>(0, (a, b) => a + b);
       system.averageMinutes = totalMin ~/ linked.length;
     } else {
       system.averageMinutes = 0;

@@ -11,8 +11,8 @@ import '../../models/pomodoro_session.dart';
 import '../../services/checklist_item_status.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/pomodoro_provider.dart';
+import '../theme.dart';
 import 'collection_item_picker_sheet.dart';
-import 'package:flutter_quill/flutter_quill.dart' as quill;
 
 class ActionableChecklistTile extends ConsumerWidget {
   final String itemId;
@@ -108,7 +108,11 @@ class ActionableChecklistTile extends ConsumerWidget {
     if (linkedObjectSlug == null) {
       // Show error message that habit needs to be linked
       ScaffoldMessenger.of(ref.context).showSnackBar(
-        const SnackBar(content: Text('Please link this step to a habit first in the step settings')),
+        const SnackBar(
+          content: Text(
+            'Please link this step to a habit first in the step settings',
+          ),
+        ),
       );
       return;
     }
@@ -117,7 +121,9 @@ class ActionableChecklistTile extends ConsumerWidget {
     final habit = habits.where((h) => h.slug == linkedObjectSlug).firstOrNull;
     if (habit == null) {
       ScaffoldMessenger.of(ref.context).showSnackBar(
-        const SnackBar(content: Text('Linked habit not found. Please select a valid habit')),
+        const SnackBar(
+          content: Text('Linked habit not found. Please select a valid habit'),
+        ),
       );
       return;
     }
@@ -141,28 +147,25 @@ class ActionableChecklistTile extends ConsumerWidget {
         );
       } catch (e) {
         debugPrint('Collection picker error: $e');
-        ScaffoldMessenger.of(ref.context).showSnackBar(
-          SnackBar(content: Text('Error opening collection: $e')),
-        );
+        ScaffoldMessenger.of(
+          ref.context,
+        ).showSnackBar(SnackBar(content: Text('Error opening collection: $e')));
       }
     }
 
     await ref.read(habitsProvider.notifier).toggleHabit(habit, date);
 
     if (pickedRef != null) {
-      await ref.read(habitsProvider.notifier).setHabitCompletionRef(
-        habit,
-        date,
-        pickedRef,
-      );
+      await ref
+          .read(habitsProvider.notifier)
+          .setHabitCompletionRef(habit, date, pickedRef);
     }
 
     // Ticket 2: Auto-mirror to linked tracker if configured
     if (habit.linkedTrackerSlug != null) {
-      final dateStr = date.toIso8601String().split('T').first;
       final fieldPatch = <String, dynamic>{};
       final fieldId = habit.linkedTrackerFieldId ?? 'done';
-      
+
       if (!isDone) {
         // Completing the habit - add tracker record
         fieldPatch[fieldId] = pickedRef?.displayTitle ?? true;
@@ -175,11 +178,9 @@ class ActionableChecklistTile extends ConsumerWidget {
         fieldPatch['${fieldId}_ref'] = null;
       }
 
-      await ref.read(trackingRecordsProvider.notifier).upsertRecordForDate(
-        habit.linkedTrackerSlug!,
-        date,
-        fieldPatch,
-      );
+      await ref
+          .read(trackingRecordsProvider.notifier)
+          .upsertRecordForDate(habit.linkedTrackerSlug!, date, fieldPatch);
     }
   }
 
@@ -193,9 +194,9 @@ class ActionableChecklistTile extends ConsumerWidget {
         );
       } catch (e) {
         debugPrint('Collection picker error: $e');
-        ScaffoldMessenger.of(ref.context).showSnackBar(
-          SnackBar(content: Text('Error opening collection: $e')),
-        );
+        ScaffoldMessenger.of(
+          ref.context,
+        ).showSnackBar(SnackBar(content: Text('Error opening collection: $e')));
       }
     }
 
@@ -217,9 +218,9 @@ class ActionableChecklistTile extends ConsumerWidget {
     final tasks = allObjects.whereType<Task>().toList();
     final task = tasks.where((t) => t.slug == linkedObjectSlug).firstOrNull;
     if (task == null) {
-      ScaffoldMessenger.of(ref.context).showSnackBar(
-        const SnackBar(content: Text('Linked task not found')),
-      );
+      ScaffoldMessenger.of(
+        ref.context,
+      ).showSnackBar(const SnackBar(content: Text('Linked task not found')));
       return;
     }
 
@@ -229,7 +230,10 @@ class ActionableChecklistTile extends ConsumerWidget {
       completionRef: !isDone ? pickedRef : null,
       clearCompletionRef: isDone,
     );
-    updated.logEvent('stage_change', 'Stage changed via checklist from ${task.stage.name} to ${updated.stage.name}');
+    updated.logEvent(
+      'stage_change',
+      'Stage changed via checklist from ${task.stage.name} to ${updated.stage.name}',
+    );
     await ref.read(vaultProvider.notifier).updateObject(updated);
   }
 
@@ -237,13 +241,17 @@ class ActionableChecklistTile extends ConsumerWidget {
     if (linkedObjectSlug == null || trackerFieldId == null) return;
 
     final trackers = ref.read(trackersProvider);
-    final tracker = trackers.where((t) => t.slug == linkedObjectSlug).firstOrNull;
+    final tracker = trackers
+        .where((t) => t.slug == linkedObjectSlug)
+        .firstOrNull;
     if (tracker == null) return;
 
     // Find the field definition
     InputField? field;
     for (final section in tracker.sections) {
-      field = section.inputFields.where((f) => f.id == trackerFieldId).firstOrNull;
+      field = section.inputFields
+          .where((f) => f.id == trackerFieldId)
+          .firstOrNull;
       if (field != null) break;
     }
     if (field == null) return;
@@ -275,11 +283,9 @@ class ActionableChecklistTile extends ConsumerWidget {
       fieldPatch['${trackerFieldId!}_ref'] = pickedRef.toMap();
     }
 
-    await ref.read(trackingRecordsProvider.notifier).upsertRecordForDate(
-      linkedObjectSlug!,
-      date,
-      fieldPatch,
-    );
+    await ref
+        .read(trackingRecordsProvider.notifier)
+        .upsertRecordForDate(linkedObjectSlug!, date, fieldPatch);
   }
 
   Future<dynamic> _showInlineInput(WidgetRef ref, InputField field) async {
@@ -366,12 +372,12 @@ class ActionableChecklistTile extends ConsumerWidget {
 
   Future<String?> _showSelectionPicker(WidgetRef ref, InputField field) async {
     List<String> options = field.options ?? [];
-    
+
     // Resolve options from collection if optionsSourceCollectionSlug is set
     if (field.optionsSourceCollectionSlug != null) {
       options = _getCollectionOptions(ref, field.optionsSourceCollectionSlug!);
     }
-    
+
     if (options.isEmpty) return null;
 
     return showDialog<String>(
@@ -404,7 +410,7 @@ class ActionableChecklistTile extends ConsumerWidget {
       final data = jsonDecode(collection.body);
       final schemaData = data is Map ? data['schema'] : null;
       final itemData = data is Map ? data['items'] : null;
-      
+
       if (schemaData is! List || itemData is! List) return [];
 
       final schema = schemaData
@@ -417,7 +423,8 @@ class ActionableChecklistTile extends ConsumerWidget {
         if (item is Map) {
           // Find first text-type property value by iterating schema
           for (final prop in schema) {
-            if (prop.type != InputFieldType.text && prop.type != InputFieldType.selection) {
+            if (prop.type != InputFieldType.text &&
+                prop.type != InputFieldType.selection) {
               continue;
             }
             final value = item[prop.id];
@@ -449,12 +456,14 @@ class ActionableChecklistTile extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   IconButton(
-                    onPressed: () => setState(() => minutes = (minutes - 5).clamp(5, 120)),
+                    onPressed: () =>
+                        setState(() => minutes = (minutes - 5).clamp(5, 120)),
                     icon: const Icon(Icons.remove),
                   ),
                   Text('$minutes min'),
                   IconButton(
-                    onPressed: () => setState(() => minutes = (minutes + 5).clamp(5, 120)),
+                    onPressed: () =>
+                        setState(() => minutes = (minutes + 5).clamp(5, 120)),
                     icon: const Icon(Icons.add),
                   ),
                 ],
@@ -486,21 +495,27 @@ class ActionableChecklistTile extends ConsumerWidget {
         );
       } catch (e) {
         debugPrint('Collection picker error: $e');
-        ScaffoldMessenger.of(ref.context).showSnackBar(
-          SnackBar(content: Text('Error opening collection: $e')),
-        );
+        ScaffoldMessenger.of(
+          ref.context,
+        ).showSnackBar(SnackBar(content: Text('Error opening collection: $e')));
       }
     }
 
     final pomodoroState = ref.read(pomodoroProvider);
     final expectedSlug = 'checklist:$parentObjectId:$itemId';
-    final existingSession = pomodoroState.history.where(
-      (s) => s.linkedItemSlug == expectedSlug && s.state == PomodoroSessionState.completed,
-    ).firstOrNull;
+    final existingSession = pomodoroState.history
+        .where(
+          (s) =>
+              s.linkedItemSlug == expectedSlug &&
+              s.state == PomodoroSessionState.completed,
+        )
+        .firstOrNull;
 
     if (existingSession != null) {
       // Navigate to Pomodoro screen to show session details
-      GoRouter.of(ref.context).push('/pomodoro?sessionId=${existingSession.id}');
+      GoRouter.of(
+        ref.context,
+      ).push('/pomodoro?sessionId=${existingSession.id}');
       return;
     }
 
@@ -533,19 +548,25 @@ class ActionableChecklistTile extends ConsumerWidget {
       // Note: We can't easily pass pickedRef here yet, but that's a larger feature.
     } else if (choice == 'log') {
       int duration = 25;
-      await ref.read(pomodoroProvider.notifier).logRetroactiveSession(
-        occurredAt: date,
-        blocksCompleted: 1,
-        minutesWorked: duration,
-        linkedItemId: expectedSlug,
-      );
+      await ref
+          .read(pomodoroProvider.notifier)
+          .logRetroactiveSession(
+            occurredAt: date,
+            blocksCompleted: 1,
+            minutesWorked: duration,
+            linkedItemId: expectedSlug,
+          );
       // Wait a tick for it to save to history, then attach pickedRef
       if (pickedRef != null) {
         await Future.delayed(const Duration(milliseconds: 100));
         final newState = ref.read(pomodoroProvider);
-        final newSession = newState.history.where(
-          (s) => s.linkedItemSlug == expectedSlug && s.state == PomodoroSessionState.completed,
-        ).firstOrNull;
+        final newSession = newState.history
+            .where(
+              (s) =>
+                  s.linkedItemSlug == expectedSlug &&
+                  s.state == PomodoroSessionState.completed,
+            )
+            .firstOrNull;
         if (newSession != null) {
           newSession.completionRef = pickedRef;
           await ref.read(vaultProvider.notifier).updateObject(newSession);
@@ -559,9 +580,13 @@ class ActionableChecklistTile extends ConsumerWidget {
     // Watch providers to ensure reactive updates
     final habits = kind == 'habit' ? ref.watch(habitsProvider) : null;
     final tasks = kind == 'task' ? ref.watch(tasksProvider) : null;
-    final trackingRecords = kind == 'tracker_entry' ? ref.watch(trackingRecordsProvider) : null;
-    final pomodoroState = kind == 'pomodoro' ? ref.watch(pomodoroProvider) : null;
-    
+    final trackingRecords = kind == 'tracker_entry'
+        ? ref.watch(trackingRecordsProvider)
+        : null;
+    final pomodoroState = kind == 'pomodoro'
+        ? ref.watch(pomodoroProvider)
+        : null;
+
     final isDone = _isDone(ref, habits, tasks, trackingRecords, pomodoroState);
     final icon = _getKindIcon();
 
@@ -569,13 +594,42 @@ class ActionableChecklistTile extends ConsumerWidget {
       label: "Mark '$title' as done",
       button: true,
       child: ListTile(
-        leading: Icon(icon, size: 20),
-        title: Text(title),
-        trailing: Checkbox(
-          value: isDone,
-          onChanged: (_) => _handleTap(ref),
+        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+        leading: Icon(
+          isDone
+              ? Icons.check_circle_rounded
+              : Icons.radio_button_unchecked_rounded,
+          size: AppIconSize.md,
+          color: isDone
+              ? AppTheme.accentColor(context)
+              : AppColors.textMuted.withValues(alpha: 0.35),
         ),
+        title: Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: AppTextSize.md,
+            fontWeight: FontWeight.w600,
+            decoration: isDone
+                ? TextDecoration.lineThrough
+                : TextDecoration.none,
+            color: isDone ? AppColors.textMuted : null,
+          ),
+        ),
+        trailing: kind == 'plain'
+            ? null
+            : Icon(
+                icon,
+                size: AppIconSize.sm,
+                color: AppColors.textMuted.withValues(alpha: 0.55),
+              ),
         onTap: () => _handleTap(ref),
+        minLeadingWidth: AppIconSize.md,
+        visualDensity: VisualDensity.compact,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppBorderRadius.md),
+        ),
       ),
     );
   }

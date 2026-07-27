@@ -33,7 +33,7 @@ class CaptureOverlayService {
     }
   }
 
-  /// Stops the overlay service.
+  /// Stops the overlay service completely.
   static Future<void> stop() async {
     if (!Platform.isAndroid) return;
     try {
@@ -43,6 +43,26 @@ class CaptureOverlayService {
       }
     } catch (e) {
       debugPrint('[CaptureOverlayService] stop failed: $e');
+    }
+  }
+
+  /// Sends a message to the overlay isolate to hide the bubble widget.
+  static Future<void> hide() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await FlutterOverlayWindow.shareData('hide');
+    } catch (e) {
+      debugPrint('[CaptureOverlayService] hide failed: $e');
+    }
+  }
+
+  /// Sends a message to the overlay isolate to show the bubble widget.
+  static Future<void> show() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await FlutterOverlayWindow.shareData('show');
+    } catch (e) {
+      debugPrint('[CaptureOverlayService] show failed: $e');
     }
   }
 

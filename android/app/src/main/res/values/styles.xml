@@ -33,6 +33,14 @@
         <item name="android:textColor">@color/quartzo_text_primary</item>
     </style>
 
+    <style name="QuartzoNotificationOverlayTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+
     <!-- Widget Text Styles -->
     <style name="QuartzoWidgetDay">
         <item name="android:layout_width">0dp</item>

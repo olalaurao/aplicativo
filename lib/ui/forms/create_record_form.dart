@@ -40,7 +40,11 @@ class _CreateRecordFormState extends ConsumerState<CreateRecordForm> {
     _values.clear();
     for (final section in _selectedTracker!.sections) {
       for (var field in section.inputFields) {
-        _values[field.id] = field.defaultValue;
+        if (field.type == InputFieldType.checkbox) {
+          _values[field.id] = field.defaultValue ?? false;
+        } else {
+          _values[field.id] = field.defaultValue;
+        }
       }
     }
   }

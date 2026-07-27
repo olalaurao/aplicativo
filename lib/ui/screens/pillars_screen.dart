@@ -9,6 +9,9 @@ import '../forms/create_pillar_form.dart';
 import 'universal_detail_view.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../utils/object_icons.dart';
+import '../../models/saved_filter.dart';
+import '../widgets/filterable_list_header.dart';
+import '../utils/filter_sort_utils.dart';
 
 class PillarsScreen extends ConsumerStatefulWidget {
   const PillarsScreen({super.key});
@@ -19,13 +22,23 @@ class PillarsScreen extends ConsumerStatefulWidget {
 
 class _PillarsScreenState extends ConsumerState<PillarsScreen> {
   String _searchQuery = '';
+  SavedFilter? _activeFilter;
+  List<SavedFilter> _savedFilters = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(
+        () => _savedFilters = ref.read(settingsProvider).filtersFor('pillar'),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final allPillars = ref.watch(pillarsProvider);
-    final pillars = allPillars
-        .where((o) => o.title.toLowerCase().contains(_searchQuery.toLowerCase()))
-        .toList();
+    final rawPillars = ref.watch(pillarsProvider);
+    final pillars = FilterSortUtils.applyFilterAndSort(rawPillars, _searchQuery, _activeFilter).cast<Pillar>();
 
     return Scaffold(
       appBar: AppBar(
@@ -34,45 +47,30 @@ class _PillarsScreenState extends ConsumerState<PillarsScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: Colors.transparent,
-        actions: [
-          IconButton(
-            icon: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppTheme.accentColor(context).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.add_rounded,
-                size: 20,
-                color: AppTheme.accentColor(context),
-              ),
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const CreatePillarForm(),
-                ),
-              );
-            },
-          ),
-        ],
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(20),
-            child: TextField(
-              onChanged: (value) => setState(() => _searchQuery = value),
-              decoration: InputDecoration(
-                hintText: 'Search pillars...',
-                prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                filled: true,
-                fillColor: AppTheme.surfaceVariantColor(context),
-              ),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+            child: FilterableListHeader(
+              targetType: 'pillar',
+              searchQuery: _searchQuery,
+              activeFilter: _activeFilter,
+              savedFilters: _savedFilters,
+              availableProperties: PillarFilterProperties.all,
+              onSearchChanged: (v) => setState(() => _searchQuery = v),
+              onFilterChanged: (f) => setState(() {
+                _activeFilter = f;
+                _savedFilters = ref.read(settingsProvider).filtersFor('pillar');
+              }),
+              onAddPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CreatePillarForm(),
+                  ),
+                );
+              },
             ),
           ),
           Expanded(

@@ -42,6 +42,7 @@ import '../widgets/quartzo_chart.dart';
 import '../widgets/rich_text_editor.dart';
 import '../widgets/outline_editor.dart';
 import '../widgets/property_grid.dart';
+import '../widgets/project_rotation_detail.dart';
 import '../widgets/collection_view.dart';
 import '../widgets/object_action_wrapper.dart';
 import '../../models/note_model.dart';
@@ -165,6 +166,13 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       });
     }
 
+    if (currentObject is Project && currentObject.rotationGroups.isNotEmpty) {
+      return ProjectRotationDetailScreen(
+        projectId: currentObject.id,
+        initialProject: currentObject,
+      );
+    }
+
     final mentionsAsync = ref.watch(backlinksProvider(currentObject.id));
     final conflictGroup = _conflictGroupFor(
       currentObject,
@@ -246,7 +254,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                         ),
                         const SizedBox(width: 8),
                         const Text(
-                          'Conexões',
+                          'Connections',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -281,7 +289,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                                       ),
                                     );
 
-                                    return ListTile(
+                                    final tile = ListTile(
                                       leading: CircleAvatar(
                                         backgroundColor: AppTheme.accentColor(
                                           context,
@@ -325,6 +333,79 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                                             )
                                           : null,
                                     );
+
+                                    Widget child = tile;
+                                    if (object is Task && linkedObj is Project && linkedObj.hasRotation) {
+                                      final task = object as Task;
+                                      if (task.rotationGroupId == null || task.rotationFrequencyType == RotationFrequencyType.none) {
+                                        child = Column(
+                                          children: [
+                                            tile,
+                                            Container(
+                                              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.warning.withValues(alpha: 0.1),
+                                                borderRadius: BorderRadius.circular(AppBorderRadius.sm),
+                                                border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Row(
+                                                    children: [
+                                                      Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.warning),
+                                                      SizedBox(width: 8),
+                                                      Expanded(
+                                                        child: Text(
+                                                          'This task is linked to a rotating project but has no zone or frequency configured.',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: AppColors.warning,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 12),
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.end,
+                                                    children: [
+                                                      TextButton(
+                                                        onPressed: () {
+                                                          final newTask = task.copyWith();
+                                                          newTask.organizers.removeWhere((o) => o.slug == refObj.slug);
+                                                          ref.read(vaultProvider.notifier).updateObject(newTask);
+                                                        },
+                                                        style: TextButton.styleFrom(
+                                                          foregroundColor: AppColors.textSecondary,
+                                                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                                                          minimumSize: Size.zero,
+                                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                        ),
+                                                        child: const Text('Remove link', style: TextStyle(fontSize: 12)),
+                                                      ),
+                                                      const SizedBox(width: 16),
+                                                      FilledButton(
+                                                        onPressed: () => _editObject(context),
+                                                        style: FilledButton.styleFrom(
+                                                          backgroundColor: AppColors.warning,
+                                                          foregroundColor: AppColors.surface,
+                                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                                                          minimumSize: const Size(0, 32),
+                                                        ),
+                                                        child: const Text('Configure', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      }
+                                    }
+                                    return child;
                                   },
                                 ),
                                 if (idx != object.organizers.length - 1)
@@ -731,8 +812,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                   const SizedBox(width: 12),
                   Text(
                     (object as Note).isChecklist
-                        ? 'Reverter para Nota'
-                        : 'Converter para Checklist',
+                        ? 'Revert to Note'
+                        : 'Convert to Checklist',
                   ),
                 ],
               ),
@@ -755,7 +836,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 children: [
                   Icon(Icons.copy_all_rounded, size: 18),
                   SizedBox(width: 12),
-                  Text('Salvar como Template'),
+                  Text('Save as Template'),
                 ],
               ),
             );
@@ -766,7 +847,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 children: [
                   Icon(Icons.swap_horiz_rounded, size: 18),
                   SizedBox(width: 12),
-                  Text('Alterar Tipo'),
+                  Text('Change Type'),
                 ],
               ),
             );
@@ -777,7 +858,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 children: [
                   Icon(Icons.call_merge_rounded, size: 18),
                   SizedBox(width: 12),
-                  Text('Mesclar com outra nota'),
+                  Text('Merge with another note'),
                 ],
               ),
             );
@@ -1086,10 +1167,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       final allObjects =
           ref.watch(allObjectsProvider.select((async) => async.valueOrNull)) ??
           [];
-      final tasks = allObjects
-          .whereType<Task>()
-          .where((t) => t.organizers.any((o) => o.slug == project.slug))
-          .toList();
+      final allTasks = allObjects.whereType<Task>().toList();
+      final tasks = RotationService.tasksForProject(project, allTasks);
       final progress = ProjectProgressCache.getProgress(
         project.id,
         project,
@@ -1952,12 +2031,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   }
 
   String _typeSubtitle(ContentObject obj) {
-    if (obj is Resource) return 'Recurso · ${obj.mediaType}';
+    if (obj is Resource) return 'Resource · ${obj.mediaType}';
     if (obj is Project && obj.methodLabel != null) {
-      return 'Projeto · ${obj.methodLabel}';
+      return 'Project · ${obj.methodLabel}';
     }
     if (obj is Task && obj.endDate != null) {
-      return 'Tarefa · ${DateFormat('d MMM').format(obj.endDate!)}';
+      return 'Task · ${DateFormat('d MMM').format(obj.endDate!)}';
     }
     return _typeLabel(obj);
   }
@@ -2105,14 +2184,14 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   Color _statusColorForTask(TaskStage stage) => switch (stage) {
     TaskStage.idea => AppColors.textMuted,
     TaskStage.todo => AppColors.info,
-    TaskStage.inProgress => AppColors.habitOrange,
+    TaskStage.inProgress => AppTheme.accentColor(context),
     TaskStage.pending => AppColors.warning,
     TaskStage.finalized => AppColors.success,
     TaskStage.backlog => AppColors.textMuted,
   };
 
   Color _resourceStatusColor(ResourceStatus status) => switch (status) {
-    ResourceStatus.inProgress => AppColors.habitOrange,
+    ResourceStatus.inProgress => AppTheme.accentColor(context),
     ResourceStatus.completed => AppColors.success,
     ResourceStatus.toConsume => AppColors.info,
     ResourceStatus.dropped => AppColors.error,
@@ -2130,7 +2209,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
     if (obj is Goal) {
       return switch (obj.state) {
-        GoalStatus.active => AppColors.habitOrange,
+        GoalStatus.active => AppTheme.accentColor(context),
         GoalStatus.completed => AppColors.success,
         GoalStatus.onHold => AppColors.textMuted,
         GoalStatus.cancelled => AppColors.error,
@@ -2147,7 +2226,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       return switch (obj.status) {
         IdeaStatus.raw => AppColors.textMuted,
         IdeaStatus.developing => AppColors.info,
-        IdeaStatus.readyToAct => AppColors.habitOrange,
+        IdeaStatus.readyToAct => AppTheme.accentColor(context),
         IdeaStatus.converted => AppColors.success,
         IdeaStatus.dropped => AppColors.error,
       };
@@ -2295,12 +2374,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Aplicar System à Tarefa',
+              'Apply System to Task',
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
             Text(
-              'Os steps do System serão adicionados como subtasks.',
+              'The System steps will be added as subtasks.',
               style: TextStyle(
                 fontSize: 13,
                 color: AppTheme.textMutedColor(ctx),
@@ -2342,14 +2421,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     ...task.subtasks,
                     ...system.steps.map((s) => Subtask(title: s.title)),
                   ];
-                  final updatedTask = task.copyWith(
-                    subtasks: newSubtasks,
-                    estimatedMinutes:
-                        task.estimatedMinutes ??
-                        (system.estimatedMinutes > 0
-                            ? system.estimatedMinutes
-                            : null),
-                  );
+                  final updatedTask = task.copyWith(subtasks: newSubtasks);
                   await ref
                       .read(vaultProvider.notifier)
                       .updateObject(updatedTask);
@@ -2467,23 +2539,23 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Mesclar notas?'),
+        title: const Text('Merge notes?'),
         content: Text(
-          'Todas as conexões de "${object.title}" serão redirecionadas para '
-          '"${target.title}". O conteúdo será anexado à nota correta e a nota '
-          'errada será movida para a lixeira.',
+          'All connections from "${object.title}" will be redirected to '
+          '"${target.title}". The content will be appended to the correct note '
+          'and the wrong note will be moved to the trash.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancelar'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(
               foregroundColor: AppTheme.accentColor(context),
             ),
-            child: const Text('Mesclar'),
+            child: const Text('Merge'),
           ),
         ],
       ),
@@ -2539,18 +2611,18 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Salvar como Template'),
+        title: const Text('Save as Template'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Digite o nome para este template:'),
+            const Text('Enter a name for this template:'),
             const SizedBox(height: 8),
             TextField(
               controller: titleController,
               autofocus: true,
               decoration: const InputDecoration(
-                hintText: 'Nome do Template',
+                hintText: 'Template Name',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -2609,9 +2681,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final system = SystemDefinition(
       title: task.title,
       trigger: '',
-      estimatedMinutes: (task.estimatedMinutes ?? 0) > 0
-          ? task.estimatedMinutes!
-          : 0,
+      estimatedMinutes: task.duration,
       steps: steps,
       description: task.notes.join('\n'),
     );
@@ -3161,12 +3231,17 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   void _showTaskStatePicker(BuildContext context, WidgetRef ref, Task task) {
     _showOptionSheet<TaskStage>(
       context: context,
-      title: 'Estado da Tarefa',
+      title: 'Task State',
       values: TaskStage.values,
       label: (value) => _translateStage(value),
       onSelected: (value) {
         if (task.stage != value) {
-          task.logEvent('stage_change', 'Stage changed from ${task.stage.name} to ${value.name}', oldValue: task.stage.name, newValue: value.name);
+          task.logEvent(
+            'stage_change',
+            'Stage changed from ${task.stage.name} to ${value.name}',
+            oldValue: task.stage.name,
+            newValue: value.name,
+          );
         }
         task.stage = value;
         ref.read(vaultProvider.notifier).updateObject(task);
@@ -3199,7 +3274,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       label: (value) => value.name,
       onSelected: (value) {
         if (task.priority != value) {
-          task.logEvent('priority_change', 'Priority changed from ${task.priority.name} to ${value.name}', oldValue: task.priority.name, newValue: value.name);
+          task.logEvent(
+            'priority_change',
+            'Priority changed from ${task.priority.name} to ${value.name}',
+            oldValue: task.priority.name,
+            newValue: value.name,
+          );
         }
         task.priority = value;
         ref.read(vaultProvider.notifier).updateObject(task);
@@ -3550,7 +3630,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       case 'habit':
         return AppColors.habitGreen;
       case 'goal':
-        return AppColors.habitOrange;
+        return AppTheme.accentColor(context);
       case 'entry':
         return AppColors.habitPurple;
       case 'event':
@@ -3624,28 +3704,16 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final entries = kpi.dataSource.sourceType == DataSourceType.entry
         ? ref.watch(allEntriesProvider.select((entries) => entries.toList()))
         : <JournalEntry>[];
-    final moods = (kpi.dataSource.sourceType == DataSourceType.journalMood ||
-        (kpi.sourceType == KPISourceType.others &&
-            (kpi.calculationMode == 'mood_average' ||
-                kpi.calculationMode == 'mood_trend')))
+    final moods =
+        (kpi.dataSource.sourceType == DataSourceType.journalMood ||
+            (kpi.sourceType == KPISourceType.others &&
+                (kpi.calculationMode == 'mood_average' ||
+                    kpi.calculationMode == 'mood_trend')))
         ? ref.watch(moodsProvider)
         : <MoodDefinition>[];
     final allObjects =
         ref.watch(allObjectsProvider.select((async) => async.valueOrNull)) ??
         [];
-    final notes = kpi.dataSource.sourceType == DataSourceType.collection
-        ? allObjects
-              .whereType<Note>()
-              .where((n) => n.id == kpi.sourceId)
-              .toList()
-        : <Note>[];
-    // subtasks and timeSpent need to scan ALL tasks to find those linked to the organizer
-    final tasks =
-        (kpi.dataSource.sourceType == DataSourceType.subtasks ||
-            kpi.dataSource.sourceType == DataSourceType.timeSpent)
-        ? allObjects.whereType<Task>().toList()
-        : <Task>[];
-
     final currentValue = KPIEngine.calculateKPIValue(
       kpi: kpi,
       habits: habits,
@@ -3689,7 +3757,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: const Text(
-                    'Atingido',
+                    'Achieved',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -3816,21 +3884,21 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
             ],
             decoration: const InputDecoration(
-              labelText: 'Quantidade',
+              labelText: 'Amount',
               border: OutlineInputBorder(),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar'),
+              child: const Text('Cancel'),
             ),
             FilledButton(
               onPressed: () {
                 final parsed = double.tryParse(controller.text.trim());
                 Navigator.pop(dialogContext, parsed);
               },
-              child: const Text('Adicionar'),
+              child: const Text('Add'),
             ),
           ],
         );
@@ -3892,7 +3960,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
   }
 
   Widget _buildTimeEstimateCard(BuildContext context, Task task) {
-    final estimated = task.estimatedMinutes ?? 0;
+    final estimated = task.duration;
     final actual = task.actualMinutes;
 
     double progress = 0;
@@ -4077,7 +4145,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             Expanded(
               child: Text(
                 'Snapshots / Reflections',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -4147,8 +4218,6 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       final entries = ref.read(allEntriesProvider);
       final moods = ref.read(moodsProvider);
       final allObjects = ref.read(allObjectsProvider).value ?? [];
-      final notes = allObjects.whereType<Note>().toList();
-      final tasks = allObjects.whereType<Task>().toList();
 
       for (final kpi in goal.kpis) {
         currentKPIs[kpi.title] = KPIEngine.calculateKPIValue(
@@ -4356,12 +4425,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Sinopse',
+              'Synopsis',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             TextButton(
               onPressed: () => setState(() => _isEditing = !_isEditing),
-              child: Text(_isEditing ? 'Concluir' : 'Editar'),
+              child: Text(_isEditing ? 'Done' : 'Edit'),
             ),
           ],
         ),
@@ -4485,21 +4554,67 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '$doneCount de $total tarefas',
+                  '$doneCount of $total tasks',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const Text(
-                  'hoje',
+                  'today',
                   style: TextStyle(color: AppColors.textMuted),
                 ),
               ],
             ),
             const SizedBox(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppTheme.accentColor(context).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppBorderRadius.lg),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        '$doneCount of $total tasks',
+                        style: TextStyle(
+                          color: AppTheme.accentColor(context),
+                          fontSize: AppTextSize.sm,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const Spacer(),
+                      const Text(
+                        'today',
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: AppTextSize.xs,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppBorderRadius.xs),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: AppSpacing.xs,
+                      color: AppTheme.accentColor(context),
+                      backgroundColor: AppTheme.accentColor(
+                        context,
+                      ).withValues(alpha: 0.18),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
             if (total == 0)
               Center(
                 child: TextButton(
                   onPressed: () => _handleAction(context, ref, 'edit'),
-                  child: const Text('Adicionar seções de checklist'),
+                  child: const Text('Add checklist sections'),
                 ),
               )
             else
@@ -4507,83 +4622,128 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 final sectionDone = section.items
                     .where((item) => checklistState[item.id] == true)
                     .length;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Row(
-                        children: [
-                          if (section.emoji != null) ...[
-                            Text(
-                              section.emoji!,
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                            const SizedBox(width: 6),
-                          ],
-                          Text(
-                            section.label.toUpperCase(),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.8,
-                              color: AppColors.textMuted,
-                            ),
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                  child: Container(
+                    decoration: AppTheme.cardDecoration(context),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.md,
+                            AppSpacing.md,
+                            AppSpacing.md,
+                            AppSpacing.xs,
                           ),
-                          const Spacer(),
-                          Text(
-                            '$sectionDone/${section.items.length}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textMuted,
-                            ),
+                          child: Row(
+                            children: [
+                              if (section.emoji != null) ...[
+                                Text(
+                                  section.emoji!,
+                                  style: const TextStyle(
+                                    fontSize: AppTextSize.md,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.xs),
+                              ],
+                              Expanded(
+                                child: Text(
+                                  section.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: AppTextSize.md,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '$sectionDone/${section.items.length}',
+                                style: const TextStyle(
+                                  fontSize: AppTextSize.sm,
+                                  color: AppColors.textMuted,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        ...section.items.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final item = entry.value;
+                          final title = item.estimatedMinutes != null
+                              ? '${item.title} (${item.estimatedMinutes} min)'
+                              : item.title;
+                          return DecoratedBox(
+                            decoration: BoxDecoration(
+                              border: index < section.items.length - 1
+                                  ? Border(
+                                      bottom: BorderSide(
+                                        color: Theme.of(
+                                          context,
+                                        ).dividerColor.withValues(alpha: 0.35),
+                                        width: AppBorder.thin,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            child: ActionableChecklistTile(
+                              itemId: item.id,
+                              title: title,
+                              kind: item.kind,
+                              linkedObjectSlug: item.linkedObjectSlug,
+                              trackerFieldId: item.trackerFieldId,
+                              attachedCollectionSlug:
+                                  item.attachedCollectionSlug,
+                              date: today,
+                              parentObjectId: habit.id,
+                              plainValue: checklistState[item.id],
+                              onPlainToggle: (done) async {
+                                await ref
+                                    .read(habitsProvider.notifier)
+                                    .toggleChecklistStep(habit, today, item.id);
+                              },
+                              onTaskCreated: (taskSlug) async {
+                                // Persist the new task slug back to the habit checklist item
+                                final updatedSections =
+                                    List<ChecklistSection>.from(
+                                      habit.checklistSections,
+                                    );
+                                for (final section in updatedSections) {
+                                  final itemIndex = section.items.indexWhere(
+                                    (i) => i.id == item.id,
+                                  );
+                                  if (itemIndex != -1) {
+                                    final updatedItems =
+                                        List<ChecklistStep>.from(section.items);
+                                    updatedItems[itemIndex] = item.copyWith(
+                                      linkedObjectSlug: taskSlug,
+                                    );
+                                    updatedSections[updatedSections.indexOf(
+                                      section,
+                                    )] = ChecklistSection(
+                                      id: section.id,
+                                      label: section.label,
+                                      emoji: section.emoji,
+                                      items: updatedItems,
+                                    );
+                                    break;
+                                  }
+                                }
+                                final updated = habit.copyWith(
+                                  checklistSections: updatedSections,
+                                );
+                                await ref
+                                    .read(habitsProvider.notifier)
+                                    .updateHabit(updated);
+                              },
+                            ),
+                          );
+                        }),
+                      ],
                     ),
-                    ...section.items.map((item) {
-                      final title = item.estimatedMinutes != null
-                          ? '${item.title} (${item.estimatedMinutes} min)'
-                          : item.title;
-                      return ActionableChecklistTile(
-                        itemId: item.id,
-                        title: title,
-                        kind: item.kind,
-                        linkedObjectSlug: item.linkedObjectSlug,
-                        trackerFieldId: item.trackerFieldId,
-                        attachedCollectionSlug: item.attachedCollectionSlug,
-                        date: today,
-                        parentObjectId: habit.id,
-                        plainValue: checklistState[item.id],
-                        onPlainToggle: (done) async {
-                          await ref
-                              .read(habitsProvider.notifier)
-                              .toggleChecklistStep(habit, today, item.id);
-                        },
-                        onTaskCreated: (taskSlug) async {
-                          // Persist the new task slug back to the habit checklist item
-                          final updatedSections = List<ChecklistSection>.from(habit.checklistSections);
-                          for (final section in updatedSections) {
-                            final itemIndex = section.items.indexWhere((i) => i.id == item.id);
-                            if (itemIndex != -1) {
-                              final updatedItems = List<ChecklistStep>.from(section.items);
-                              updatedItems[itemIndex] = item.copyWith(linkedObjectSlug: taskSlug);
-                              updatedSections[updatedSections.indexOf(section)] = ChecklistSection(
-                                id: section.id,
-                                label: section.label,
-                                emoji: section.emoji,
-                                items: updatedItems,
-                              );
-                              break;
-                            }
-                          }
-                          final updated = habit.copyWith(checklistSections: updatedSections);
-                          await ref.read(habitsProvider.notifier).updateHabit(updated);
-                        },
-                      );
-                    }),
-                    const SizedBox(height: 8),
-                  ],
+                  ),
                 );
               }),
           ],
@@ -4682,10 +4842,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
 
     final labels = {
-      'manha': '🌅 Manhã',
-      'tarde': '☀️ Tarde',
-      'noite': '🌙 Noite',
-      'indefinido': 'Indefinido',
+      'manha': '🌅 Morning',
+      'tarde': '☀️ Afternoon',
+      'noite': '🌙 Night',
+      'indefinido': 'Unscheduled',
     };
 
     List<bool> slotStates = [];
@@ -4734,7 +4894,9 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                       done
                           ? Icons.check_circle_rounded
                           : Icons.radio_button_unchecked_rounded,
-                      color: done ? AppColors.habitOrange : AppColors.textMuted,
+                      color: done
+                          ? AppTheme.accentColor(context)
+                          : AppColors.textMuted,
                     ),
                     title: Text(
                       slot.label ?? 'Slot ${idx + 1}',
@@ -4767,7 +4929,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     List<Task> allTasks,
   ) {
     final activeStatus = RotationService.computeActiveStatus(project);
-    final rotationTasks = allTasks.where((t) => t.isRotationTask).toList();
+    final rotationTasks = RotationService.rotationTasksForProject(
+      project,
+      allTasks,
+    );
     final filtered = _rotationTaskFilter == null
         ? rotationTasks
         : rotationTasks.where((t) {
@@ -4793,8 +4958,8 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             Expanded(
               child: Text(
                 activeStatus != null
-                    ? 'Próxima rotação: ${activeStatus.group.name}'
-                    : 'Rotação de zonas',
+                    ? 'Next rotation: ${activeStatus.group.name}'
+                    : 'Zone rotation',
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppColors.textMuted,
@@ -4805,14 +4970,34 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             ),
             TextButton(
               onPressed: () => navigateToRotationOverview(context, project.id),
-              child: const Text('Ver rotação completa'),
+              child: const Text('View full rotation'),
             ),
           ],
         ),
         const SizedBox(height: 8),
-        const Text(
-          'Tarefas por Grupo',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                project.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: AppTextSize.xxl,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+        Text(
+          '${project.methodLabel ?? 'Rotation'} · ${rotationTasks.length} scheduled tasks',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: AppTextSize.sm,
+            color: AppColors.textMuted,
+          ),
         ),
         const SizedBox(height: 12),
         SingleChildScrollView(
@@ -4820,63 +5005,131 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           child: Row(
             children: [
               _rotationFilterChip('Todas', null),
-              _rotationFilterChip('Diária', 'daily'),
-              _rotationFilterChip('1x no período', 'oncePerPeriod'),
-              _rotationFilterChip('Por frequência', 'everyNRotations'),
+              _rotationFilterChip('Daily', 'daily'),
+              _rotationFilterChip('Once per period', 'oncePerPeriod'),
+              _rotationFilterChip('By frequency', 'everyNRotations'),
             ],
           ),
         ),
         const SizedBox(height: 16),
         ...groups.map((group) {
           final groupTasks = filtered
-              .where((t) => t.rotationGroupId == group.id)
+              .where(
+                (t) => RotationService.taskBelongsToRotationGroup(t, group),
+              )
               .toList();
           if (groupTasks.isEmpty) return const SizedBox.shrink();
-          final isActive = activeStatus?.group.id == group.id;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    if (group.emoji != null) Text(group.emoji!),
-                    const SizedBox(width: 6),
-                    Text(
-                      group.name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (isActive) ...[
-                      const SizedBox(width: 8),
-                      _badge('ativa agora', color: AppColors.success),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 8),
-                ...groupTasks.map(
-                  (task) => _buildRotationTaskRow(
-                    context,
-                    ref,
-                    project,
-                    task,
-                    activeStatus,
-                  ),
-                ),
-              ],
-            ),
+          return _buildProjectRotationGroupCard(
+            context,
+            ref,
+            project,
+            group,
+            groupTasks,
+            activeStatus,
           );
         }),
         if (activeStatus != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            _rotationFooterText(project, activeStatus),
-            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppTheme.accentColor(context).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppBorderRadius.lg),
+            ),
+            child: Text(
+              _rotationFooterText(project, activeStatus),
+              style: TextStyle(
+                fontSize: AppTextSize.sm,
+                color: AppTheme.accentColor(context),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildProjectRotationGroupCard(
+    BuildContext context,
+    WidgetRef ref,
+    Project project,
+    RotationGroup group,
+    List<Task> tasks,
+    RotationStatus? activeStatus,
+  ) {
+    final isActive = activeStatus?.group.id == group.id;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(AppBorderRadius.md),
+            onTap: () => navigateToRotationZone(
+              context,
+              projectId: project.id,
+              groupId: group.id,
+              isPreview: !isActive,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+              child: Row(
+                children: [
+                  if (group.emoji != null) Text(group.emoji!),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      group.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: AppTextSize.lg,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  if (isActive) _badge('active now', color: AppColors.success),
+                ],
+              ),
+            ),
+          ),
+          Container(
+            decoration: AppTheme.cardDecoration(context),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                ...tasks.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final task = entry.value;
+                  return DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: index < tasks.length - 1
+                          ? Border(
+                              bottom: BorderSide(
+                                color: Theme.of(
+                                  context,
+                                ).dividerColor.withValues(alpha: 0.35),
+                                width: AppBorder.thin,
+                              ),
+                            )
+                          : null,
+                    ),
+                    child: _buildRotationTaskRow(
+                      context,
+                      ref,
+                      project,
+                      task,
+                      activeStatus,
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -4911,12 +5164,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       final todayKey =
           '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}';
       trailing = task.rotationDailyCompletions[todayKey] == true
-          ? 'feito'
+          ? 'done'
           : DateFormat('d MMM').format(DateTime.now());
     } else if (activeStatus != null &&
         task.rotationFrequencyType == RotationFrequencyType.oncePerPeriod) {
       trailing = RotationService.isDoneThisOccurrence(task, activeStatus)
-          ? 'feito'
+          ? 'done'
           : DateFormat('d MMM').format(activeStatus.periodEnd);
     } else if (task.rotationFrequencyType ==
         RotationFrequencyType.everyNRotations) {
@@ -4925,22 +5178,52 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     }
 
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       leading: Container(
-        width: 10,
-        height: 10,
+        width: AppSpacing.sm,
+        height: AppSpacing.sm,
         decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
       ),
-      title: Text(task.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      title: Text(
+        task.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontWeight: FontWeight.w700),
+      ),
+      subtitle: Text(
+        _rotationTaskSubtitle(task, activeStatus),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: AppTextSize.xs,
+          color: AppColors.textMuted,
+        ),
+      ),
       trailing: Text(
         trailing,
-        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+        style: TextStyle(
+          fontSize: AppTextSize.xs,
+          color: trailing == 'done'
+              ? AppTheme.accentColor(context)
+              : AppColors.textMuted,
+          fontWeight: trailing == 'done' ? FontWeight.w700 : FontWeight.w500,
+        ),
       ),
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => UniversalDetailView(object: task)),
       ),
     );
+  }
+
+  String _rotationTaskSubtitle(Task task, RotationStatus? activeStatus) {
+    return switch (task.rotationFrequencyType) {
+      RotationFrequencyType.daily => 'Daily',
+      RotationFrequencyType.oncePerPeriod => '1× per rotation',
+      RotationFrequencyType.everyNRotations =>
+        'Every ${task.rotationEveryN ?? 1} rotations',
+      RotationFrequencyType.none => '',
+    };
   }
 
   String _rotationFooterText(Project project, RotationStatus activeStatus) {
@@ -4950,11 +5233,15 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
     final allObjects = ref.read(allObjectsProvider).value ?? [];
     final taskCount = allObjects
         .whereType<Task>()
-        .where((t) => t.rotationGroupId == next.group.id)
+        .where(
+          (t) =>
+              RotationService.taskLinkedToProject(t, project) &&
+              RotationService.taskBelongsToRotationGroup(t, next.group),
+        )
         .length;
-    return 'Próxima rotação: ${next.group.emoji ?? ''} ${next.group.name} · '
+    return 'Next rotation\n${next.group.emoji ?? ''} ${next.group.name} · '
         '${DateFormat('d MMM').format(next.startsAt)}–${DateFormat('d MMM').format(next.endsAt)} · '
-        '$taskCount tarefas';
+        '$taskCount tasks';
   }
 
   Widget _personGoogleEventBanner(
@@ -5240,7 +5527,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       case 'habit':
         return AppColors.habitGreen;
       case 'goal':
-        return AppColors.habitOrange;
+        return AppTheme.accentColor(context);
       case 'project':
         return AppColors.primaryLight;
       case 'note':
@@ -5376,7 +5663,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               final val = record.fieldValues[field.id];
               final refKey = '${field.id}_ref';
               final refValue = record.fieldValues[refKey];
-              
+
               return Padding(
                 padding: const EdgeInsets.only(bottom: 24),
                 child: Column(
@@ -5442,15 +5729,18 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
 
   Widget _RefChip({required dynamic refMap}) {
     if (refMap is! Map) return const SizedBox.shrink();
-    
+
     final refLink = VaultLinkRef.fromMap(Map<String, dynamic>.from(refMap));
-    
+
     return InkWell(
       onTap: () {
         // Navigate to the source collection row
         if (refLink.isRow) {
           final allObjects = ref.read(allObjectsProvider).value ?? [];
-          final note = allObjects.whereType<Note>().where((n) => n.slug == refLink.noteSlug).firstOrNull;
+          final note = allObjects
+              .whereType<Note>()
+              .where((n) => n.slug == refLink.noteSlug)
+              .firstOrNull;
           if (note != null) {
             context.push('/detail/${note.id}', extra: note);
           } else {

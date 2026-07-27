@@ -24,11 +24,29 @@ class SystemExecution {
     if (notes != null) 'notes': notes,
   };
 
-  factory SystemExecution.fromMap(Map<String, dynamic> map) => SystemExecution(
-    executedAt: DateTime.parse(map['executed_at'] as String),
-    stepCompletions: Map<String, bool>.from(map['step_completions'] as Map),
-    notes: map['notes']?.toString(),
-  );
+  factory SystemExecution.fromMap(Map<String, dynamic> map) {
+    final rawCompletions = map['step_completions'];
+    final completions = <String, bool>{};
+    if (rawCompletions is Map) {
+      rawCompletions.forEach((key, value) {
+        final normalized = value.toString().trim().toLowerCase();
+        completions[key.toString()] =
+            value == true ||
+            normalized == 'true' ||
+            normalized == 'done' ||
+            normalized == 'completed' ||
+            normalized == '1';
+      });
+    }
+
+    return SystemExecution(
+      executedAt:
+          DateTime.tryParse(map['executed_at']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      stepCompletions: completions,
+      notes: map['notes']?.toString(),
+    );
+  }
 }
 
 class SystemDefinition extends ContentObject {
@@ -42,6 +60,7 @@ class SystemDefinition extends ContentObject {
   List<SystemStep> steps;
   String description;
   Scheduler? scheduler;
+  String? scheduledTime;
   List<SystemExecution> executionHistory;
 
   SystemDefinition({
@@ -55,6 +74,7 @@ class SystemDefinition extends ContentObject {
     this.steps = const [],
     this.description = '',
     this.scheduler,
+    this.scheduledTime,
     this.executionHistory = const [],
     super.createdAt,
     super.updatedAt,
@@ -78,8 +98,13 @@ class SystemDefinition extends ContentObject {
     if (scheduler != null) {
       map['scheduler'] = scheduler!.toMap();
     }
+    if (scheduledTime != null) {
+      map['scheduled_time'] = scheduledTime;
+    }
     if (executionHistory.isNotEmpty) {
-      map['execution_history'] = executionHistory.map((e) => e.toMap()).toList();
+      map['execution_history'] = executionHistory
+          .map((e) => e.toMap())
+          .toList();
     }
 
     return generateMarkdown(map, description);
@@ -93,13 +118,19 @@ class SystemDefinition extends ContentObject {
     final system = SystemDefinition(
       title: frontmatter['title']?.toString() ?? 'Sem título',
       trigger: frontmatter['trigger']?.toString() ?? '',
-      estimatedMinutes: int.tryParse(frontmatter['estimated_minutes']?.toString() ?? '0') ?? 0,
+      estimatedMinutes:
+          int.tryParse(frontmatter['estimated_minutes']?.toString() ?? '0') ??
+          0,
       description: body.trim(),
       obsidianPath: filePath,
     );
 
+    system.scheduledTime = frontmatter['scheduled_time']?.toString();
+
     if (frontmatter['scheduler'] != null && frontmatter['scheduler'] is Map) {
-      system.scheduler = Scheduler.fromMap(Map<String, dynamic>.from(frontmatter['scheduler'] as Map));
+      system.scheduler = Scheduler.fromMap(
+        Map<String, dynamic>.from(frontmatter['scheduler'] as Map),
+      );
     }
 
     system.loadBaseMap(frontmatter);
@@ -131,6 +162,7 @@ class SystemDefinition extends ContentObject {
     List<SystemStep>? steps,
     String? description,
     Scheduler? scheduler,
+    String? scheduledTime,
     List<SystemExecution>? executionHistory,
     bool? archived,
     bool? pinned,
@@ -146,6 +178,7 @@ class SystemDefinition extends ContentObject {
       steps: steps ?? this.steps,
       description: description ?? this.description,
       scheduler: scheduler ?? this.scheduler,
+      scheduledTime: scheduledTime ?? this.scheduledTime,
       executionHistory: executionHistory ?? this.executionHistory,
       createdAt: createdAt,
       updatedAt: updatedAt,

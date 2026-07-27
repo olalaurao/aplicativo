@@ -5,6 +5,7 @@
 // (the widget itself also guards with Platform.isAndroid as a safety net).
 
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -109,6 +110,7 @@ class _QuickCaptureSectionState extends ConsumerState<QuickCaptureSection> {
       if (granted) {
         // Already have permission — enable directly.
         await notifier.updateFloatingCaptureBubbleEnabled(true);
+        unawaited(CaptureOverlayService.start().then((_) => CaptureOverlayService.hide()));
       } else {
         // Show explanatory dialog then redirect to system settings.
         if (!context.mounted) return;
@@ -125,6 +127,7 @@ class _QuickCaptureSectionState extends ConsumerState<QuickCaptureSection> {
           final isNowGranted = await PermissionService.isOverlayPermissionGranted();
           if (isNowGranted) {
             await notifier.updateFloatingCaptureBubbleEnabled(true);
+            unawaited(CaptureOverlayService.start().then((_) => CaptureOverlayService.hide()));
             if (mounted) setState(() => _checkingPermission = false);
             return;
           }

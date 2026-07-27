@@ -9,6 +9,11 @@ import '../widgets/empty_state.dart';
 import '../widgets/overdue_section.dart';
 import '../forms/create_organizer_form.dart';
 import 'organizer_detail_screen.dart';
+import '../../providers/settings_provider.dart';
+import '../../models/saved_filter.dart';
+import '../widgets/filter_sort_sheet.dart';
+import '../widgets/filterable_list_header.dart';
+import '../utils/filter_sort_utils.dart';
 
 class ProjectsScreen extends ConsumerStatefulWidget {
   const ProjectsScreen({super.key});
@@ -18,13 +23,30 @@ class ProjectsScreen extends ConsumerStatefulWidget {
 }
 
 class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
+  String _searchQuery = '';
+  SavedFilter? _activeFilter;
+  List<SavedFilter> _savedFilters = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(
+        () => _savedFilters = ref.read(settingsProvider).filtersFor('project'),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final allObjects = ref.watch(allObjectsProvider).value ?? [];
-    final projects = allObjects
+    final rawProjects = allObjects
         .whereType<Organizer>()
         .where((o) => o.organizerType == OrganizerType.project)
         .toList();
+    
+    final projects = FilterSortUtils.applyFilterAndSort(rawProjects, _searchQuery, _activeFilter);
+
     final activeProjects = projects
         .where((p) => p.state == 'active')
         .toList();
@@ -56,6 +78,21 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: FilterableListHeader(
+                targetType: 'project',
+                searchQuery: _searchQuery,
+                activeFilter: _activeFilter,
+                savedFilters: _savedFilters,
+                availableProperties: ProjectFilterProperties.all,
+                onSearchChanged: (v) => setState(() => _searchQuery = v),
+                onFilterChanged: (f) => setState(() {
+                  _activeFilter = f;
+                  _savedFilters = ref.read(settingsProvider).filtersFor('project');
+                }),
               ),
             ),
             Padding(

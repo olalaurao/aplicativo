@@ -48,6 +48,7 @@ import '../services/widget_service.dart';
 import '../services/dataview_generator.dart';
 import 'pomodoro_provider.dart';
 import '../services/google_drive_sync_service.dart';
+import '../services/rotation_service.dart';
 import 'vault_isolate.dart';
 
 // Provider for YAML parsing errors
@@ -63,9 +64,10 @@ class YamlErrorNotifier extends StateNotifier<List<Map<String, String>>> {
   }
 }
 
-final _yamlErrorsProvider = StateNotifierProvider<YamlErrorNotifier, List<Map<String, String>>>((ref) {
-  return YamlErrorNotifier();
-});
+final _yamlErrorsProvider =
+    StateNotifierProvider<YamlErrorNotifier, List<Map<String, String>>>((ref) {
+      return YamlErrorNotifier();
+    });
 
 final yamlErrorsProvider = _yamlErrorsProvider;
 
@@ -116,10 +118,7 @@ Map<String, String> _habitLabelsFromRef(Ref ref) {
   // Avoid circular dependency - get labels from allObjects instead
   final allObjects = ref.read(allObjectsProvider).value ?? [];
   final habits = allObjects.whereType<Habit>();
-  return {
-    for (final habit in habits)
-      habit.slug: habit.displayTitle,
-  };
+  return {for (final habit in habits) habit.slug: habit.displayTitle};
 }
 
 Set<String> _pactHabitSlugsFromRef(Ref ref) {
@@ -166,7 +165,9 @@ final backupServiceProvider = Provider<BackupService>((ref) {
 final groupedObjectsProvider = Provider<Map<String, List<ContentObject>>>((
   ref,
 ) {
-  final asyncAll = ref.watch(allObjectsProvider.select((async) => async.valueOrNull));
+  final asyncAll = ref.watch(
+    allObjectsProvider.select((async) => async.valueOrNull),
+  );
   final all = asyncAll ?? [];
   final map = <String, List<ContentObject>>{};
   for (final obj in all) {
@@ -199,42 +200,59 @@ final objectsByTypeProvider = Provider.family<List<ContentObject>, String>((
 // Widgets that only need to READ objects should use these instead of allObjectsProvider.
 // This prevents unnecessary rebuilds when unrelated object types change.
 
-final tasksListProvider = Provider<List<Task>>((ref) =>
-    ref.watch(objectsByTypeProvider('task')).cast<Task>());
+final tasksListProvider = Provider<List<Task>>(
+  (ref) => ref.watch(objectsByTypeProvider('task')).cast<Task>(),
+);
 
-final habitsListProvider = Provider<List<Habit>>((ref) =>
-    ref.watch(objectsByTypeProvider('habit')).cast<Habit>());
+final habitsListProvider = Provider<List<Habit>>(
+  (ref) => ref.watch(objectsByTypeProvider('habit')).cast<Habit>(),
+);
 
-final goalsListProvider = Provider<List<Goal>>((ref) =>
-    ref.watch(objectsByTypeProvider('goal')).cast<Goal>());
+final goalsListProvider = Provider<List<Goal>>(
+  (ref) => ref.watch(objectsByTypeProvider('goal')).cast<Goal>(),
+);
 
-final notesListProvider = Provider<List<Note>>((ref) =>
-    ref.watch(objectsByTypeProvider('note')).cast<Note>());
+final notesListProvider = Provider<List<Note>>(
+  (ref) => ref.watch(objectsByTypeProvider('note')).cast<Note>(),
+);
 
-final organizersListProvider = Provider<List<Organizer>>((ref) =>
-    ref.watch(objectsByTypeProvider('organizer')).cast<Organizer>());
+final organizersListProvider = Provider<List<Organizer>>(
+  (ref) => ref.watch(objectsByTypeProvider('organizer')).cast<Organizer>(),
+);
 
-final resourcesListProvider = Provider<List<Resource>>((ref) =>
-    ref.watch(objectsByTypeProvider('resource')).cast<Resource>());
+final resourcesListProvider = Provider<List<Resource>>(
+  (ref) => ref.watch(objectsByTypeProvider('resource')).cast<Resource>(),
+);
 
-final ideasListProvider = Provider<List<IdeaDefinition>>((ref) =>
-    ref.watch(objectsByTypeProvider('idea')).cast<IdeaDefinition>());
+final ideasListProvider = Provider<List<IdeaDefinition>>(
+  (ref) => ref.watch(objectsByTypeProvider('idea')).cast<IdeaDefinition>(),
+);
 
-final journalEntriesListProvider = Provider<List<JournalEntry>>((ref) =>
-    ref.watch(allObjectsProvider.select((a) =>
-        a.valueOrNull?.whereType<JournalEntry>().toList() ?? [])));
+final journalEntriesListProvider = Provider<List<JournalEntry>>(
+  (ref) => ref.watch(
+    allObjectsProvider.select(
+      (a) => a.valueOrNull?.whereType<JournalEntry>().toList() ?? [],
+    ),
+  ),
+);
 
-final trackersListProvider = Provider<List<TrackerDefinition>>((ref) =>
-    ref.watch(objectsByTypeProvider('tracker_definition')).cast<TrackerDefinition>());
+final trackersListProvider = Provider<List<TrackerDefinition>>(
+  (ref) => ref
+      .watch(objectsByTypeProvider('tracker_definition'))
+      .cast<TrackerDefinition>(),
+);
 
-final moodDefsListProvider = Provider<List<MoodDefinition>>((ref) =>
-    ref.watch(objectsByTypeProvider('mood_definition')).cast<MoodDefinition>());
-
+final moodDefsListProvider = Provider<List<MoodDefinition>>(
+  (ref) => ref
+      .watch(objectsByTypeProvider('mood_definition'))
+      .cast<MoodDefinition>(),
+);
 
 final conflictingObjectsProvider = Provider<Map<String, List<ContentObject>>>((
   ref,
 ) {
-  final objects = ref.watch(allObjectsProvider.select((async) => async.valueOrNull)) ?? [];
+  final objects =
+      ref.watch(allObjectsProvider.select((async) => async.valueOrNull)) ?? [];
   final byKey = <String, List<ContentObject>>{};
 
   for (final object in objects) {
@@ -262,10 +280,12 @@ final conflictingObjectsProvider = Provider<Map<String, List<ContentObject>>>((
   );
 });
 
-final typeConflictedObjectsProvider = Provider.autoDispose<List<ContentObject>>((ref) {
-  final all = ref.watch(allObjectsProvider).valueOrNull ?? [];
-  return all.where((obj) => obj.hasTypeConflict).toList();
-});
+final typeConflictedObjectsProvider = Provider.autoDispose<List<ContentObject>>(
+  (ref) {
+    final all = ref.watch(allObjectsProvider).valueOrNull ?? [];
+    return all.where((obj) => obj.hasTypeConflict).toList();
+  },
+);
 
 Future<void> _cancelHabitSlotReminderNotification(
   Habit habit,
@@ -387,9 +407,10 @@ class TasksNotifier extends Notifier<List<Task>> {
     // Invalidate cache for all projects this task is linked to
     final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
     final projects = allObjects.whereType<Project>().toList();
-    
+
     for (final project in projects) {
-      if (project.taskLinks.contains(task.slug) || project.taskLinks.contains(task.id) ||
+      if (project.taskLinks.contains(task.slug) ||
+          project.taskLinks.contains(task.id) ||
           task.organizers.any((org) => org.slug == project.slug)) {
         ProjectProgressCache.invalidateForProject(project.id);
       }
@@ -572,9 +593,12 @@ class HabitsNotifier extends Notifier<List<Habit>> {
           if (h.id == updatedHabit.id) updatedHabit else h,
       ];
       ref.read(allObjectsProvider.notifier).replaceObjectInMemory(updatedHabit);
-      
+
       // Save habit's own .md file with updated completion history
-      updatedHabit.logEvent('habit_toggled', 'Habit toggled on $dateStr (slot $slotIndex)');
+      updatedHabit.logEvent(
+        'habit_toggled',
+        'Habit toggled on $dateStr (slot $slotIndex)',
+      );
       await ref.read(vaultProvider.notifier).updateObject(updatedHabit);
 
       // Write habit completions as flat frontmatter keys (Obsidian format)
@@ -636,7 +660,10 @@ class HabitsNotifier extends Notifier<List<Habit>> {
   }
 
   Future<void> toggleChecklistStep(
-      Habit habit, DateTime date, String itemId) async {
+    Habit habit,
+    DateTime date,
+    String itemId,
+  ) async {
     if (!habit.isChecklistHabit) return;
     final dateStr = date.toIso8601String().split('T').first;
     final obsidianService = ref.read(obsidianServiceProvider);
@@ -676,7 +703,7 @@ class HabitsNotifier extends Notifier<List<Habit>> {
           if (h.id == updatedHabit.id) updatedHabit else h,
       ];
       ref.read(allObjectsProvider.notifier).replaceObjectInMemory(updatedHabit);
-      
+
       // Save habit's own .md file with updated completion history
       await ref.read(vaultProvider.notifier).updateObject(updatedHabit);
 
@@ -740,7 +767,8 @@ class HabitsNotifier extends Notifier<List<Habit>> {
 
     final path = 'daily/$dateStr.md';
     final content = await obsidianService.readFile(path);
-    if (content == null) return; // toggleHabit must have run first to create the note
+    if (content == null)
+      return; // toggleHabit must have run first to create the note
 
     final frontmatter = MarkdownParser.parseFrontmatter(content);
     final body = MarkdownParser.extractBody(content);
@@ -768,7 +796,10 @@ class HabitsNotifier extends Notifier<List<Habit>> {
       trackers: MarkdownParser.parseTrackerRecords(frontmatter),
       pomodoros: MarkdownParser.parsePomodoros(body),
     );
-    await obsidianService.writeFile(path, generateMarkdown(frontmatter, newBody));
+    await obsidianService.writeFile(
+      path,
+      generateMarkdown(frontmatter, newBody),
+    );
 
     // Refresh in-memory completionHistory so the UI updates without a full reload.
     final habit_ = state.where((h) => h.id == habit.id).firstOrNull ?? habit;
@@ -790,7 +821,10 @@ class HabitsNotifier extends Notifier<List<Habit>> {
       );
     }
     final updated = habit_.copyWith(completionHistory: history);
-    state = [for (final h in state) if (h.id == updated.id) updated else h];
+    state = [
+      for (final h in state)
+        if (h.id == updated.id) updated else h,
+    ];
     ref.read(allObjectsProvider.notifier).replaceObjectInMemory(updated);
 
     ref.invalidate(dailyNoteDataProvider(dateStr));
@@ -936,7 +970,11 @@ class HabitsNotifier extends Notifier<List<Habit>> {
     }
 
     // Update habit's completion history and save its .md file
-    final updatedHabit = _updateHabitCompletionState(habit, date, habitsMap[habit.slug]);
+    final updatedHabit = _updateHabitCompletionState(
+      habit,
+      date,
+      habitsMap[habit.slug],
+    );
     state = [
       for (final h in state)
         if (h.id == updatedHabit.id) updatedHabit else h,
@@ -997,35 +1035,37 @@ final habitsProvider = NotifierProvider<HabitsNotifier, List<Habit>>(() {
 class OrganizersNotifier extends Notifier<List<Organizer>> {
   @override
   List<Organizer> build() {
-    final areas = ref
-        .watch(objectsByTypeProvider('area'))
-        .cast<Organizer>();
+    final areas = ref.watch(objectsByTypeProvider('area')).cast<Organizer>();
     final projects = ref
         .watch(objectsByTypeProvider('project'))
         .cast<Organizer>();
     final activities = ref
         .watch(objectsByTypeProvider('activity'))
         .cast<Organizer>();
-    final people = ref
-        .watch(objectsByTypeProvider('person'))
-        .cast<Organizer>();
-    final labels = ref
-        .watch(objectsByTypeProvider('label'))
-        .cast<Organizer>();
+    final people = ref.watch(objectsByTypeProvider('person')).cast<Organizer>();
+    final labels = ref.watch(objectsByTypeProvider('label')).cast<Organizer>();
     final dayThemes = ref
         .watch(objectsByTypeProvider('dayTheme'))
         .cast<Organizer>();
     final timeBlocks = ref
         .watch(objectsByTypeProvider('timeBlock'))
         .cast<Organizer>();
-    final values = ref
-        .watch(objectsByTypeProvider('value'))
-        .cast<Organizer>();
+    final values = ref.watch(objectsByTypeProvider('value')).cast<Organizer>();
     final routines = ref
         .watch(objectsByTypeProvider('routine'))
         .cast<Organizer>();
 
-    return [...areas, ...projects, ...activities, ...people, ...labels, ...dayThemes, ...timeBlocks, ...values, ...routines];
+    return [
+      ...areas,
+      ...projects,
+      ...activities,
+      ...people,
+      ...labels,
+      ...dayThemes,
+      ...timeBlocks,
+      ...values,
+      ...routines,
+    ];
   }
 
   Future<void> addOrganizer(Organizer organizer) async {
@@ -1308,7 +1348,7 @@ class GoalsNotifier extends Notifier<List<Goal>> {
       allObjects: allObjects,
     );
     final updatedGoal = goal.copyWith(kpis: updatedKpis);
-    
+
     state = [
       for (final g in state)
         if (g.id == goal.id) updatedGoal else g,
@@ -1441,9 +1481,10 @@ class ActionMenuItemsNotifier extends Notifier<List<ActionMenuItem>> {
   }
 }
 
-final actionMenuItemsProvider = NotifierProvider<ActionMenuItemsNotifier, List<ActionMenuItem>>(() {
-  return ActionMenuItemsNotifier();
-});
+final actionMenuItemsProvider =
+    NotifierProvider<ActionMenuItemsNotifier, List<ActionMenuItem>>(() {
+      return ActionMenuItemsNotifier();
+    });
 
 class RemindersNotifier extends Notifier<List<Reminder>> {
   @override
@@ -1472,7 +1513,9 @@ final remindersProvider = NotifierProvider<RemindersNotifier, List<Reminder>>(
 );
 
 final aggregatedRemindersProvider = Provider.autoDispose<List<Reminder>>((ref) {
-  final asyncAll = ref.watch(allObjectsProvider.select((async) => async.valueOrNull));
+  final asyncAll = ref.watch(
+    allObjectsProvider.select((async) => async.valueOrNull),
+  );
   final all = asyncAll ?? [];
   final List<Reminder> results = [];
 
@@ -1499,7 +1542,9 @@ final aggregatedRemindersProvider = Provider.autoDispose<List<Reminder>>((ref) {
   return results;
 });
 
-final organizerListProvider = Provider.autoDispose<List<OrganizerReference>>((ref) {
+final organizerListProvider = Provider.autoDispose<List<OrganizerReference>>((
+  ref,
+) {
   final asyncValue = ref.watch(allObjectsProvider);
   final data = asyncValue.valueOrNull;
   if (data != null) {
@@ -1543,16 +1588,22 @@ class TrackingRecordsNotifier extends Notifier<List<TrackingRecord>> {
     Map<String, dynamic> fieldPatch,
   ) async {
     final dateStr = date.toIso8601String().split('T').first;
-    final existing = state.where((r) =>
-      r.trackerId == trackerId &&
-      r.date.toIso8601String().split('T').first == dateStr,
-    ).firstOrNull;
+    final existing = state
+        .where(
+          (r) =>
+              r.trackerId == trackerId &&
+              r.date.toIso8601String().split('T').first == dateStr,
+        )
+        .firstOrNull;
 
     if (existing != null) {
       final updated = existing.copyWith(
         fieldValues: {...existing.fieldValues, ...fieldPatch},
       );
-      state = [for (final r in state) if (r.id == updated.id) updated else r];
+      state = [
+        for (final r in state)
+          if (r.id == updated.id) updated else r,
+      ];
       await ref.read(vaultProvider.notifier).updateObject(updated);
     } else {
       final record = TrackingRecord(
@@ -1901,7 +1952,8 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
     // platform channels that are unavailable inside an isolate.
     final prefs = ref.read(sharedPreferencesProvider);
     const entryTypeMigrationKey = 'entry_type_migration_done';
-    final needsEntryTypeMigration = prefs.getBool(entryTypeMigrationKey) != true;
+    final needsEntryTypeMigration =
+        prefs.getBool(entryTypeMigrationKey) != true;
 
     // 3. Offload listing, reading, parsing and post-processing to the background isolate.
     final supportDir = await getApplicationSupportDirectory();
@@ -1928,7 +1980,7 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
     if (parsedVault.yamlErrors.isNotEmpty) {
       // Store errors in a provider for UI display
       ref.read(_yamlErrorsProvider.notifier).setErrors(parsedVault.yamlErrors);
-      
+
       for (final error in parsedVault.yamlErrors) {
         final filePath = error['file'] ?? 'unknown file';
         final errorMessage = error['error'] ?? 'Unknown error';
@@ -1959,7 +2011,49 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
       ref.read(_dailyNoteDataMapProvider.notifier).state = parsedVault.dailyMap;
     });
 
+    // 5. Auto-advance rotation zones that have timed out (runs after state is set)
+    Future.microtask(() => _advanceRotationZones());
+
     return parsedVault.objects;
+  }
+
+  /// Checks every rotation project and advances the zone if the period has
+  /// expired (timeout-based advance). Runs silently on app startup.
+  Future<void> _advanceRotationZones() async {
+    final objects = state.valueOrNull;
+    if (objects == null) return;
+    final service = ref.read(obsidianServiceProvider);
+    final allTasks = objects.whereType<Task>().toList();
+    final rotationProjects = objects
+        .whereType<Project>()
+        .where((p) => p.hasRotation)
+        .toList();
+
+    for (final project in rotationProjects) {
+      try {
+        final result = RotationService.checkAndAdvanceZone(project, allTasks);
+        // Only persist when the zone actually advanced or needed bootstrap/reset
+        if (result.advanced ||
+            (project.rotationCurrentGroupId == null && result.updated.rotationCurrentGroupId != null)) {
+          await service.writeFile(
+            result.updated.obsidianPath,
+            result.updated.toMarkdown(),
+          );
+          replaceObjectInMemory(result.updated);
+          if (result.advanced) {
+            debugPrint(
+              '[Rotation] Zone advanced for "${project.title}": '
+              '${result.nextGroup?.name ?? '?'}'
+              '${result.viaTimeout ? " (timeout)" : " (tasks done)"}',
+            );
+          } else {
+            debugPrint('[Rotation] Zone bootstrapped for "${project.title}"');
+          }
+        }
+      } catch (e) {
+        debugPrint('[Rotation] Error advancing zone for "${project.title}": $e');
+      }
+    }
   }
 
   Future<void> updateObject(ContentObject object) async {
@@ -2052,20 +2146,35 @@ final backlinksProvider = FutureProvider.family<List<ContentObject>, String>((
 
   final obsidianService = ref.read(obsidianServiceProvider);
   final rawFiles = await obsidianService.searchRawMarkdownFiles(targetKeys);
-  
-  final mappedPaths = allObjects.map((o) => o.obsidianPath.replaceAll('\\', '/')).toSet();
-  
-  final rawObjects = rawFiles.where((file) {
-    final relPath = file.path.replaceAll('\\', '/').split('/${obsidianService.vaultDir?.path.split(Platform.pathSeparator).last ?? ''}/').last;
-    return !mappedPaths.contains(relPath);
-  }).map((file) {
-    final relPath = file.path.replaceAll('\\', '/').split('/${obsidianService.vaultDir?.path.split(Platform.pathSeparator).last ?? ''}/').last;
-    return RawMarkdownFile(
-      title: file.path.split(Platform.pathSeparator).last,
-      body: '',
-      obsidianPath: relPath,
-    );
-  }).toList();
+
+  final mappedPaths = allObjects
+      .map((o) => o.obsidianPath.replaceAll('\\', '/'))
+      .toSet();
+
+  final rawObjects = rawFiles
+      .where((file) {
+        final relPath = file.path
+            .replaceAll('\\', '/')
+            .split(
+              '/${obsidianService.vaultDir?.path.split(Platform.pathSeparator).last ?? ''}/',
+            )
+            .last;
+        return !mappedPaths.contains(relPath);
+      })
+      .map((file) {
+        final relPath = file.path
+            .replaceAll('\\', '/')
+            .split(
+              '/${obsidianService.vaultDir?.path.split(Platform.pathSeparator).last ?? ''}/',
+            )
+            .last;
+        return RawMarkdownFile(
+          title: file.path.split(Platform.pathSeparator).last,
+          body: '',
+          obsidianPath: relPath,
+        );
+      })
+      .toList();
 
   final mappedResults = allObjects.where((obj) {
     if (obj.id == targetId) return false;
@@ -3835,7 +3944,9 @@ class VaultNotifier extends Notifier<void> {
         payload: {
           ...Map<String, dynamic>.from(frontmatter),
           'obsidian_path': originalPath,
-          'slug': frontmatter['slug']?.toString() ?? fileName.replaceAll(RegExp(r'\.md$'), ''),
+          'slug':
+              frontmatter['slug']?.toString() ??
+              fileName.replaceAll(RegExp(r'\.md$'), ''),
         },
       ),
     );
@@ -4344,7 +4455,137 @@ final inboxProvider = AsyncNotifierProvider<InboxNotifier, List<InboxItem>>(
   () => InboxNotifier(),
 );
 
-final inboxCountProvider = Provider<int>((ref) {
-  return ref.watch(inboxProvider).valueOrNull?.length ?? 0;
+enum InboxQueueKind { inbox, idea, task, project, goal }
+
+class InboxQueueItem {
+  final String id;
+  final String title;
+  final InboxQueueKind kind;
+  final DateTime? createdAt;
+  final String subtitle;
+  final ContentObject source;
+
+  const InboxQueueItem({
+    required this.id,
+    required this.title,
+    required this.kind,
+    required this.createdAt,
+    required this.subtitle,
+    required this.source,
+  });
+}
+
+bool _isOpenInboxIdea(IdeaDefinition idea) {
+  return !idea.archived &&
+      !idea.isConverted &&
+      idea.status != IdeaStatus.converted &&
+      idea.status != IdeaStatus.dropped &&
+      idea.targetDate == null;
+}
+
+bool _isLooseBacklogTask(Task task, Set<String> rotationProjectSlugs) {
+  if (task.archived) return false;
+  if (task.stage != TaskStage.idea && task.stage != TaskStage.backlog) return false;
+  if (task.startDate != null || task.endDate != null) return false;
+  if (task.rotationGroupId != null) return false; // rotation tasks are auto-scheduled
+  // Also exclude tasks that are linked to a rotation project via organizer
+  if (task.organizers.any(
+    (o) => o.type == 'project' && rotationProjectSlugs.contains(o.slug),
+  )) return false;
+  return true;
+}
+
+bool _isUnstartedProject(Project project) {
+  return !project.archived &&
+      project.projectState == ProjectState.active &&
+      project.startDate == null &&
+      project.endDate == null;
+}
+
+bool _isUnstartedGoal(Goal goal) {
+  return !goal.archived &&
+      goal.state == GoalStatus.active &&
+      goal.startDate == null &&
+      goal.deadline == null;
+}
+
+final unifiedInboxQueueProvider = Provider<List<InboxQueueItem>>((ref) {
+  final inboxItems =
+      ref.watch(inboxProvider).valueOrNull ?? const <InboxItem>[];
+  final allObjects =
+      ref.watch(allObjectsProvider).valueOrNull ?? const <ContentObject>[];
+
+  // Build set of slugs for projects that use rotation — tasks linked to these
+  // are auto-scheduled by zone and should not appear as loose backlog.
+  final rotationProjectSlugs = allObjects
+      .whereType<Project>()
+      .where((p) => p.hasRotation)
+      .map((p) => p.slug)
+      .toSet();
+
+  final queue = <InboxQueueItem>[
+    for (final item in inboxItems)
+      if (!item.archived && !item.obsidianPath.contains('_deleted'))
+        InboxQueueItem(
+          id: item.id,
+          title: item.title,
+          kind: InboxQueueKind.inbox,
+          createdAt: item.createdAt,
+          subtitle: 'Captured, not triaged',
+          source: item,
+        ),
+    for (final idea in allObjects.whereType<IdeaDefinition>())
+      if (_isOpenInboxIdea(idea))
+        InboxQueueItem(
+          id: idea.id,
+          title: idea.title,
+          kind: InboxQueueKind.idea,
+          createdAt: idea.createdAt,
+          subtitle: 'Idea without target date',
+          source: idea,
+        ),
+    for (final task in allObjects.whereType<Task>())
+      if (_isLooseBacklogTask(task, rotationProjectSlugs))
+        InboxQueueItem(
+          id: task.id,
+          title: task.title,
+          kind: InboxQueueKind.task,
+          createdAt: task.createdAt,
+          subtitle: task.stage == TaskStage.backlog
+              ? 'Task in backlog'
+              : 'Task idea',
+          source: task,
+        ),
+    for (final project in allObjects.whereType<Project>())
+      if (_isUnstartedProject(project))
+        InboxQueueItem(
+          id: project.id,
+          title: project.title,
+          kind: InboxQueueKind.project,
+          createdAt: project.createdAt,
+          subtitle: 'Project without start or end date',
+          source: project,
+        ),
+    for (final goal in allObjects.whereType<Goal>())
+      if (_isUnstartedGoal(goal))
+        InboxQueueItem(
+          id: goal.id,
+          title: goal.title,
+          kind: InboxQueueKind.goal,
+          createdAt: goal.createdAt,
+          subtitle: 'Goal without start or deadline',
+          source: goal,
+        ),
+  ];
+
+  queue.sort((a, b) {
+    final aDate = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final bDate = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    return aDate.compareTo(bDate);
+  });
+  return queue;
 });
 
+final inboxCountProvider = Provider<int>((ref) {
+  return ref.watch(unifiedInboxQueueProvider).length;
+});

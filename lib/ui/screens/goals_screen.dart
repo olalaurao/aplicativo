@@ -17,6 +17,11 @@ import '../widgets/overdue_section.dart';
 import '../widgets/incomplete_badge.dart';
 import '../forms/create_goal_form.dart';
 import 'universal_detail_view.dart';
+import '../../providers/settings_provider.dart';
+import '../../models/saved_filter.dart';
+import '../widgets/filter_sort_sheet.dart';
+import '../widgets/filterable_list_header.dart';
+import '../utils/filter_sort_utils.dart';
 
 class GoalsScreen extends ConsumerStatefulWidget {
   const GoalsScreen({super.key});
@@ -26,9 +31,25 @@ class GoalsScreen extends ConsumerStatefulWidget {
 }
 
 class _GoalsScreenState extends ConsumerState<GoalsScreen> {
+  String _searchQuery = '';
+  SavedFilter? _activeFilter;
+  List<SavedFilter> _savedFilters = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(
+        () => _savedFilters = ref.read(settingsProvider).filtersFor('goal'),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final goals = ref.watch(goalsListProvider);
+    final rawGoals = ref.watch(goalsListProvider);
+    final goals = FilterSortUtils.applyFilterAndSort(rawGoals, _searchQuery, _activeFilter);
+
     final activeGoals = goals
         .where((g) => g.state == GoalStatus.active && !g.archived)
         .toList();
@@ -63,6 +84,21 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: FilterableListHeader(
+                targetType: 'goal',
+                searchQuery: _searchQuery,
+                activeFilter: _activeFilter,
+                savedFilters: _savedFilters,
+                availableProperties: GoalFilterProperties.all,
+                onSearchChanged: (v) => setState(() => _searchQuery = v),
+                onFilterChanged: (f) => setState(() {
+                  _activeFilter = f;
+                  _savedFilters = ref.read(settingsProvider).filtersFor('goal');
+                }),
               ),
             ),
             Padding(

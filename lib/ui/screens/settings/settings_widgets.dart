@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../theme.dart';
+import '../../theme.dart';
 
 /// Reusable widget for a single settings row with consistent styling
 class SettingsRow extends StatelessWidget {
@@ -39,7 +39,7 @@ class SettingsRow extends StatelessWidget {
       ),
       subtitle: subtitle != null
           ? Text(
-              subtitle,
+              subtitle!,
               style: const TextStyle(fontSize: 12),
             )
           : null,
@@ -76,7 +76,7 @@ class SettingsSwitchRow extends StatelessWidget {
       ),
       subtitle: subtitle != null
           ? Text(
-              subtitle,
+              subtitle!,
               style: const TextStyle(fontSize: 12),
             )
           : null,

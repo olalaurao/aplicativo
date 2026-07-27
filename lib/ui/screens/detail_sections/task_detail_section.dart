@@ -63,9 +63,9 @@ List<PropertyCard> buildTaskPropertyCards(
   ));
   cards.add(PropertyCard(
     icon: Icons.hourglass_empty,
-    label: 'Tempo estimado',
-    value: task.estimatedMinutes != null ? '${task.estimatedMinutes} min' : 'Não definido',
-    state: task.estimatedMinutes == null ? PropertyCardState.empty : PropertyCardState.normal,
+    label: 'Duração',
+    value: '${task.duration} min',
+    state: PropertyCardState.normal,
   ));
   cards.add(PropertyCard(
     icon: Icons.hourglass_full,

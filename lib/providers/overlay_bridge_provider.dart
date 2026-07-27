@@ -9,6 +9,8 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
@@ -16,6 +18,8 @@ class OverlayBridgeService {
   OverlayBridgeService._();
 
   static StreamSubscription<dynamic>? _sub;
+  static ReceivePort? _receivePort;
+  static const String _portName = 'quartzo_quick_capture_overlay_bridge';
 
   // Whether the user dismissed the bubble via drag-to-dismiss for this session.
   // The Settings toggle stays enabled; this only blocks re-showing within the
@@ -27,18 +31,39 @@ class OverlayBridgeService {
   /// Call once from _initApp (after Android platform check).
   /// [onOpenCapture] is called when the bubble is tapped — it should call
   /// showQuickCapture(context) or equivalent.
-  static void init({required VoidCallback onOpenCapture}) {
+  static void init({
+    required VoidCallback onOpenCapture,
+    ValueChanged<Map<String, dynamic>>? onQuickAdd,
+  }) {
     if (!Platform.isAndroid) return;
     _sub?.cancel();
-    _sub = FlutterOverlayWindow.overlayListener.listen((data) {
-      debugPrint('[OverlayBridge] received: $data');
-      if (data == 'open_capture') {
-        onOpenCapture();
-      } else if (data == 'dismiss_session') {
-        _sessionDismissed = true;
-        debugPrint('[OverlayBridge] bubble dismissed for this session');
-      }
+    _receivePort?.close();
+    IsolateNameServer.removePortNameMapping(_portName);
+    _receivePort = ReceivePort();
+    IsolateNameServer.registerPortWithName(_receivePort!.sendPort, _portName);
+    _receivePort!.listen((data) {
+      _handleData(data, onOpenCapture, onQuickAdd);
     });
+
+    _sub = FlutterOverlayWindow.overlayListener.listen((data) {
+      _handleData(data, onOpenCapture, onQuickAdd);
+    });
+  }
+
+  static void _handleData(
+    dynamic data,
+    VoidCallback onOpenCapture,
+    ValueChanged<Map<String, dynamic>>? onQuickAdd,
+  ) {
+    debugPrint('[OverlayBridge] received: $data');
+    if (data == 'open_capture') {
+      onOpenCapture();
+    } else if (data == 'dismiss_session') {
+      _sessionDismissed = true;
+      debugPrint('[OverlayBridge] bubble dismissed for this session');
+    } else if (data is Map && data['action'] == 'quick_add_create') {
+      onQuickAdd?.call(Map<String, dynamic>.from(data));
+    }
   }
 
   /// Resets the per-session dismiss flag. Call this when the app comes to
@@ -51,5 +76,8 @@ class OverlayBridgeService {
   static void dispose() {
     _sub?.cancel();
     _sub = null;
+    _receivePort?.close();
+    _receivePort = null;
+    IsolateNameServer.removePortNameMapping(_portName);
   }
 }

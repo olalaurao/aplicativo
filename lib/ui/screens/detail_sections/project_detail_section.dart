@@ -11,6 +11,7 @@ import '../../../services/project_progress_cache.dart';
 import '../../widgets/property_grid.dart';
 import '../../widgets/actionable_checklist_tile.dart';
 import '../../theme.dart';
+import '../../../services/rotation_service.dart';
 
 /// Project-specific property cards for universal detail view
 List<PropertyCard> buildProjectPropertyCards(
@@ -183,5 +184,146 @@ Widget buildProjectChecklistSection(
         ),
       ),
     ],
+  );
+}
+
+Widget buildProjectZonesSection(
+  BuildContext context,
+  WidgetRef ref,
+  Project project,
+) {
+  if (!project.hasRotation || project.rotationGroups.isEmpty) {
+    return const SizedBox.shrink();
+  }
+
+  final activeStatus = RotationService.computeActiveStatus(project);
+  final upcoming = RotationService.upcomingGroups(project, count: 1);
+  final nextGroup = upcoming.isNotEmpty ? upcoming.first : null;
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Padding(
+        padding: EdgeInsets.fromLTRB(20, 24, 20, 16),
+        child: Text(
+          'Zonas (Rotação)',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (activeStatus != null)
+              _buildZoneCard(context, activeStatus.group, 'Zona Ativa', isActive: true, status: activeStatus),
+            if (activeStatus != null && nextGroup != null)
+              const SizedBox(height: 12),
+            if (nextGroup != null)
+              _buildZoneCard(context, nextGroup.group, 'Próxima Zona'),
+            const SizedBox(height: 20),
+            const Text(
+              'Todas as Zonas',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: project.rotationGroups.map((g) {
+                final isCurrent = activeStatus?.group.id == g.id;
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isCurrent
+                        ? AppTheme.accentColor(context).withValues(alpha: 0.1)
+                        : AppTheme.surfaceVariantColor(context),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isCurrent
+                          ? AppTheme.accentColor(context)
+                          : Colors.transparent,
+                    ),
+                  ),
+                  child: Text(
+                    '${g.emoji ?? ''} ${g.name}'.trim(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
+                      color: isCurrent
+                          ? AppTheme.accentColor(context)
+                          : AppTheme.textSecondaryColor(context),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildZoneCard(BuildContext context, RotationGroup group, String title, {bool isActive = false, RotationStatus? status}) {
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: AppTheme.cardDecoration(context).copyWith(
+      border: isActive
+          ? Border.all(
+              color: AppTheme.accentColor(context).withValues(alpha: 0.5),
+              width: 1,
+            )
+          : null,
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: isActive
+                    ? AppTheme.accentColor(context)
+                    : AppColors.textSecondary,
+              ),
+            ),
+            if (isActive && status != null) ...[
+              const Spacer(),
+              Text(
+                'Dia ${status.dayOfPeriod} de ${group.periodDays}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            if (group.emoji != null) ...[
+              Text(group.emoji!, style: const TextStyle(fontSize: 24)),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: Text(
+                group.name,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
   );
 }

@@ -46,6 +46,11 @@ Sourced from a batch of real usage notes (WhatsApp messages, late June 2026). Pu
 
 ## CHANGELOG — V5.3 → V5.4
 
+- **Daily Surface Aggregation (2026-07 fix):** Planner, dashboard timeline/completables, Week/Month overview, Day Dial and native widgets must derive "what is on this day" from one shared aggregation rule. This includes normal/recurring Tasks, active Project rotation-zone Tasks, Systems, Events, Habits, Reminders, Tracking Records, Journal Entries, Time Blocks and Pomodoros. If one day surface shows an item and another does not, treat it as a regression.
+- **Project Rotation Blocks (2026-07 fix):** Projects with `rotationGroups` render as a planned rotation-zone block for the active zone. The block stores default `rotation_scheduled_time`/`rotation_duration_minutes` on the Project, with `rotation_schedule_overrides` for single-day and single-occurrence adjustments. Rotation task due-date math must account for the target zone's position in the cycle; zones in different periods must never show the same next occurrence unless they are explicitly `all zones`.
+- **Organizer Color Deprecation (2026-07 fix):** Organizer color picking is removed from UI. Legacy `Organizer.color` stays readable/writable for old vault files, but Planner/dashboard/widgets must resolve colors as explicit object color → `TypeSignature.colorHex` → theme fallback. Do not use organizer color as the visual source for day surfaces.
+- **Roundtrip Regression Coverage (2026-07 fix):** Rotation metadata/schedule overrides, tracker checkbox records (`true` and `false`), and Task `relaySteps` labels require save→parse tests whenever touched. Checkbox records must never save `null` because the UI failed to render an input control.
+
 - **Pillars, Values & Action Menu Items — audit pass (2026-07):** verified live against `main` after Pillar/Value/Action Menu Item were implemented. Confirmed working: `Pillar` (Content Object, touch log, no completion state), `Value` (Organizer subtype with `statement`), `ActionMenuItem` (standalone, reusable, links to Pillars/Values via `organizers`). Found one live P0 bug (`OrganizersNotifier` casts Pillar objects to `Organizer`, which crashes — Pillar is not an Organizer subtype) and several gaps (no UI to create an Action Menu Item or attach one to a Pillar; no UI to log a `PillarTouch` at all; Pillar's timeline isn't wired to the existing `ObjectTimelineFeed`/`backlinksProvider`; Routine has no parsing dispatch and silently fails to load). Full ticket breakdown in `quartzo_pilares_valores_spec.md`.
 
 - **Sync Conflict Root-Cause Audit (2026-07):** verified live against `main` after repeated user-reported false sync conflicts. Root cause confirmed: `baseHash` (the 3-way-merge common-ancestor hash in `file_sync_state`) was never advanced after a successful local->remote push in 3 locations in `sync_manager.dart` (`processQueue` callback, and two branches of `_runFullSync`), while every other successful-sync path in the codebase (including all 3 conflict-resolution flows in `sync_conflicts_screen.dart`) correctly advances it. This caused a self-reinforcing loop: a device's own successful push would look like an external "remote change" on the next sync cycle, and any subsequent local edit would then read as a false local+remote conflict. **Fixed** in `sync_manager.dart` (all 3 call sites now set `baseHash` to the newly-pushed hash). A one-time `file_sync_state` cleanup and a secondary fix (removing `GoogleDriveSyncService`'s internal, unregistered, silently auto-merging conflict path in favor of routing everything through `SyncManager`'s single conflict-registration pipeline) shipped alongside. A third, lower-priority finding (conflict detection is skipped entirely when no `baseHash` exists yet — e.g. fresh install — a silent-overwrite risk rather than a false-conflict one) was deliberately deferred; see PART 12.
@@ -999,6 +1004,10 @@ Every object — content or organizer — inherits these base properties (alread
 - `pinned`
 - `order`
 
+**Vault source-of-truth rule:** for every vault content object and organizer, the `.md` file plus YAML frontmatter is the canonical state. In-memory providers, caches, native widget payloads, search indexes, and UI lists are derived projections. If a value cannot be rebuilt from Markdown after an app restart, it is not real app state and must not be used as the only source for user data.
+
+**OrganizerReference persistence rule:** `organizers` are structural links and must preserve their target type when written. New writes use typed WikiLinks such as `[[project/launch]]`, `[[area/health]]`, `[[value/curiosity]]`, and `[[routine/morning]]`. The parser must continue to accept legacy untyped links such as `[[launch]]`; when resolving in a known context (for example "tasks belonging to this Project"), matching must use target `id`, `slug`, and `title`, not only the stored `OrganizerReference.type`. Every change to organizer/link persistence must include a save → parse → resolve test.
+
 **On `categories` vs. `organizers` vs. `links`:** `categories` is a personal, cross-cutting classification the user defines for themselves (e.g., grouping Resources by media type, or tagging anything with a personal label like "2026 goals"). It's freeform text, but each category value **can also resolve to a link** — i.e., a category can point to any vault object, not just be a plain string. This makes `categories` effectively a lightweight, user-facing subset of the linking system, distinct in intent from the structural `organizers` hierarchy. `categories` is available on every object (it's already a base field in code), not just Resource — but each screen only surfaces the categories that are meaningful for that type (e.g. Resources shows "Media type" as its primary categories use case; other objects can use it freely for personal organization).
 
 **Depends-on stays separate:** `depends_on` on Task remains its own field, not folded into `links`, because it changes actual app behavior (blocking) rather than being a passive reference.
@@ -1240,7 +1249,7 @@ referenced_dates:
 pact_refs:
   - "[[write-100-words]]"
 organizers:
-  - "[[area-writing]]"
+  - "[[area/writing]]"
 archived: false
 created_at: 2026-05-24T18:30:00
 updated_at: 2026-05-24T18:30:00
@@ -1376,6 +1385,8 @@ Project is documented fully as an Organizer in Part 10, but note here the proper
 **New screens:**
 - `RotationOverviewScreen` — shows current active zone, day of period, and upcoming schedule
 - `RotationZoneDetailScreen` — zone-specific task list and completion tracking
+
+**Rotation UI routing rule:** Projects opened from `/projects` or `/organizer/:id` render through `OrganizerDetailScreen`; Projects opened from `/detail/:id` render through `UniversalDetailView`. Any Project Rotation/FlyLady UI must therefore be shared by both paths. The canonical shared screen is `ProjectRotationDetailScreen`, used for Projects with `rotationGroups`. Reference screenshots may be in Portuguese, but app UI text must stay in English. Visual colors must come from the user's theme (`AppTheme`, `AppColors`, `Theme.of(context)`) or `RotationGroup.colorHex`; do not copy fixed purple/orange values from screenshots.
 
 **Task integration:** Tasks can be assigned to rotation groups via:
 - `rotationGroupId` — reference to the parent RotationGroup
@@ -1871,7 +1882,7 @@ For every successful lookup, the app populates: `cover_image`, `title` (kept in 
 - `tasks` — array of WikiLinks to child Tasks
 - `scheduler` — recurrence, see "restart" behavior in Part 2 (creates a new file, doesn't reset in place)
 - `total_pomodoro_time` (derived), `quick_access`
-- **`organizers`** — Project's own place in the Area/Activity hierarchy (this was missing from V4's property list despite the hierarchy requiring it; now explicit: `organizers: ["[[area-work]]"]` or `["[[activity-x]]"]`)
+- **`organizers`** — Project's own place in the Area/Activity hierarchy (this was missing from V4's property list despite the hierarchy requiring it; now explicit: `organizers: ["[[area/work]]"]` or `["[[activity/x]]"]`)
 - `superseded_by` — set on the old file when a scheduled restart creates a new one
 
 Everything else (detail view layout, menu items including "Take Snapshot," calendar activity view) is unchanged from V4.
@@ -2306,12 +2317,14 @@ created_at: 2026-05-19T09:00:00
 updated_at: 2026-05-19T14:00:00
 archived: false
 is_incomplete: false   # derived — true while any required property is missing (Part 1.4)
-organizers: []
+organizers: []          # typed WikiLinks, e.g. [[project/launch]]
 links: []
 reminders: []
 # TYPE-SPECIFIC PROPERTIES FOLLOW
 ---
 ```
+
+`organizers` is always stored as WikiLinks, not as app-only IDs. New files must include the organizer type in the WikiLink path (`[[project/launch]]`). Existing files with untyped organizer links (`[[launch]]`) remain valid legacy data and must keep resolving after reload.
 
 **Complete `type` enum (V4's version was missing several values already used elsewhere in the same document — this is now exhaustive):**
 

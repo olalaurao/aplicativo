@@ -35,6 +35,10 @@ class CreateTaskForm extends ConsumerStatefulWidget {
   final List<OrganizerReference>? initialOrganizers;
   final DateTime? initialDate;
   final TimeOfDay? initialTime;
+  final TaskPriority? initialPriority;
+  final String? initialNotes;
+  final String? initialRotationGroupId;
+  final RotationFrequencyType? initialRotationFrequencyType;
   const CreateTaskForm({
     super.key,
     this.initialTitle,
@@ -44,6 +48,10 @@ class CreateTaskForm extends ConsumerStatefulWidget {
     this.initialOrganizers,
     this.initialDate,
     this.initialTime,
+    this.initialPriority,
+    this.initialNotes,
+    this.initialRotationGroupId,
+    this.initialRotationFrequencyType,
   });
 
   @override
@@ -71,20 +79,21 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
   List<String> _dependsOn = [];
   List<String> _socialRefs = [];
   Scheduler? _scheduler;
-  int? _estimatedMinutes;
   String? _linkedSystem;
   String? _rotationGroupId;
   RotationFrequencyType _rotationFrequencyType = RotationFrequencyType.none;
   int? _rotationEveryN;
   final _rotationEveryNController = TextEditingController();
-  
+
   // Alignment tracking (RA-P1-1)
   bool _trackAlignment = false;
   int? _flexibilityWindowMinutes;
-  
+
   // Focus Relay (RA-P1-3)
   bool _useRelay = false;
   List<RelayStep> _relaySteps = [];
+  final List<TextEditingController> _relayLabelControllers = [];
+  final List<TextEditingController> _relayDurationControllers = [];
 
   @override
   void initState() {
@@ -134,17 +143,19 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       _timeBlock = task.timeBlock;
       _dependsOn = List.from(task.dependsOn);
       _socialRefs = List.from(task.links);
-      _estimatedMinutes = task.estimatedMinutes;
       _linkedSystem = task.linkedSystem;
       _rotationGroupId = task.rotationGroupId;
       _rotationFrequencyType = task.rotationFrequencyType;
       _rotationEveryN = task.rotationEveryN;
-      _rotationEveryNController.text =
-          task.rotationEveryN?.toString() ?? '';
+      _rotationEveryNController.text = task.rotationEveryN?.toString() ?? '';
       _trackAlignment = task.flexibilityWindowMinutes != null;
       _flexibilityWindowMinutes = task.flexibilityWindowMinutes;
       _useRelay = task.hasRelaySteps;
-      _relaySteps = task.relaySteps ?? [];
+      _relaySteps = task.relaySteps?.map((e) => e.copyWith()).toList() ?? [];
+      for (final step in _relaySteps) {
+        _relayLabelControllers.add(TextEditingController(text: step.label));
+        _relayDurationControllers.add(TextEditingController(text: step.durationMinutes.toString()));
+      }
     } else {
       // Use initialDate and initialTime if provided
       if (widget.initialDate != null) {
@@ -163,6 +174,19 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       if (widget.initialOrganizers != null) {
         _organizers = List.from(widget.initialOrganizers!);
       }
+      if (widget.initialPriority != null) {
+        _priority = widget.initialPriority!;
+      }
+      if (widget.initialNotes != null &&
+          widget.initialNotes!.trim().isNotEmpty) {
+        _notesContent = widget.initialNotes!.trim();
+      }
+      if (widget.initialRotationGroupId != null) {
+        _rotationGroupId = widget.initialRotationGroupId;
+        _rotationFrequencyType =
+            widget.initialRotationFrequencyType ??
+            RotationFrequencyType.oncePerPeriod;
+      }
     }
   }
 
@@ -170,15 +194,19 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
   void dispose() {
     _titleController.dispose();
     _rotationEveryNController.dispose();
+    for (final c in _relayLabelControllers) c.dispose();
+    for (final c in _relayDurationControllers) c.dispose();
     super.dispose();
   }
 
   Project? _findRotationProject() {
     final projects = ref.read(projectsProvider);
     for (final org in _organizers) {
-      if (org.type != 'project') continue;
       for (final project in projects) {
-        if (project.slug == org.slug && project.hasRotation) return project;
+        if (project.hasRotation &&
+            org.matches(project.id, project.slug, project.title)) {
+          return project;
+        }
       }
     }
     return null;
@@ -205,7 +233,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                 onPressed: () => Navigator.maybePop(context),
               ),
               title: Text(
-                widget.existingTask != null ? 'Editar Tarefa' : 'Nova Tarefa',
+                widget.existingTask != null ? 'Edit Task' : 'New Task',
                 style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w600,
@@ -248,10 +276,12 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                 TextButton(
                   onPressed: hasTitle ? _saveTask : null,
                   child: Text(
-                    'Salvar',
+                    'Save',
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
-                      color: hasTitle ? AppTheme.accentColor(context) : AppColors.textMuted,
+                      color: hasTitle
+                          ? AppTheme.accentColor(context)
+                          : AppColors.textMuted,
                     ),
                   ),
                 ),
@@ -394,8 +424,11 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                 const Spacer(),
                                 Switch.adaptive(
                                   value: _trackAlignment,
-                                  onChanged: (v) => setState(() => _trackAlignment = v),
-                                  activeThumbColor: AppTheme.accentColor(context),
+                                  onChanged: (v) =>
+                                      setState(() => _trackAlignment = v),
+                                  activeThumbColor: AppTheme.accentColor(
+                                    context,
+                                  ),
                                 ),
                               ],
                             ),
@@ -413,17 +446,24 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                 spacing: 8,
                                 runSpacing: 8,
                                 children: [5, 10, 15, 30].map((minutes) {
-                                  final isSelected = _flexibilityWindowMinutes == minutes;
+                                  final isSelected =
+                                      _flexibilityWindowMinutes == minutes;
                                   return FilterChip(
                                     label: Text('${minutes}m'),
                                     selected: isSelected,
                                     onSelected: (selected) {
                                       setState(() {
-                                        _flexibilityWindowMinutes = selected ? minutes : null;
+                                        _flexibilityWindowMinutes = selected
+                                            ? minutes
+                                            : null;
                                       });
                                     },
-                                    selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.15),
-                                    checkmarkColor: AppTheme.accentColor(context),
+                                    selectedColor: AppTheme.accentColor(
+                                      context,
+                                    ).withValues(alpha: 0.15),
+                                    checkmarkColor: AppTheme.accentColor(
+                                      context,
+                                    ),
                                   );
                                 }).toList(),
                               ),
@@ -469,6 +509,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                             ...List.generate(_relaySteps.length, (index) {
                               final step = _relaySteps[index];
                               return Container(
+                                key: ValueKey(step.id),
                                 margin: const EdgeInsets.only(bottom: 8),
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
@@ -479,15 +520,22 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                   children: [
                                     Expanded(
                                       child: TextFormField(
-                                        initialValue: step.label,
+                                        controller: _relayLabelControllers[index],
                                         decoration: InputDecoration(
                                           isDense: true,
-                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 8,
+                                              ),
                                           border: const OutlineInputBorder(),
                                           labelText: 'Step ${index + 1}',
                                         ),
                                         onChanged: (value) {
-                                          _relaySteps[index] = step.copyWith(label: value);
+                                          _relaySteps[index] =
+                                              _relaySteps[index].copyWith(
+                                                label: value,
+                                              );
                                         },
                                       ),
                                     ),
@@ -495,28 +543,41 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                     SizedBox(
                                       width: 70,
                                       child: TextFormField(
+                                        controller: _relayDurationControllers[index],
                                         keyboardType: TextInputType.number,
-                                        initialValue: step.durationMinutes.toString(),
                                         decoration: const InputDecoration(
                                           isDense: true,
-                                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                          contentPadding: EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 8,
+                                          ),
                                           border: OutlineInputBorder(),
                                           labelText: 'min',
                                         ),
                                         onChanged: (value) {
                                           final parsed = int.tryParse(value);
                                           if (parsed != null && parsed > 0) {
-                                            _relaySteps[index] = step.copyWith(durationMinutes: parsed);
+                                            _relaySteps[index] =
+                                                _relaySteps[index].copyWith(
+                                                  durationMinutes: parsed,
+                                                );
                                           }
                                         },
                                       ),
                                     ),
                                     const SizedBox(width: 8),
                                     IconButton(
-                                      icon: const Icon(Icons.delete_outline, size: 18),
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        size: 18,
+                                      ),
                                       onPressed: () {
                                         setState(() {
                                           _relaySteps.removeAt(index);
+                                          _relayLabelControllers[index].dispose();
+                                          _relayLabelControllers.removeAt(index);
+                                          _relayDurationControllers[index].dispose();
+                                          _relayDurationControllers.removeAt(index);
                                         });
                                       },
                                     ),
@@ -527,10 +588,13 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                             TextButton.icon(
                               onPressed: () {
                                 setState(() {
-                                  _relaySteps.add(RelayStep(
-                                    label: 'Step ${_relaySteps.length + 1}',
-                                    durationMinutes: 25,
-                                  ));
+                                  final newStep = RelayStep(
+                                      label: 'Step ${_relaySteps.length + 1}',
+                                      durationMinutes: 25,
+                                  );
+                                  _relaySteps.add(newStep);
+                                  _relayLabelControllers.add(TextEditingController(text: newStep.label));
+                                  _relayDurationControllers.add(TextEditingController(text: newStep.durationMinutes.toString()));
                                 });
                               },
                               icon: const Icon(Icons.add, size: 18),
@@ -613,18 +677,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                                 : AppColors.textMuted,
                             onTap: _editPomodoros,
                           ),
-                          const Divider(height: 24),
-                          // Tempo Estimado
-                          PropertyRow(
-                            label: 'Tempo Estimado',
-                            value: _estimatedMinutes != null
-                                ? '$_estimatedMinutes min'
-                                : 'Não estimado',
-                            valueColor: _estimatedMinutes != null
-                                ? AppTheme.accentColor(context)
-                                : AppColors.textMuted,
-                            onTap: _editEstimatedTime,
-                          ),
+
                           const Divider(height: 24),
                           // Repeat / Scheduler
                           PropertyRow(
@@ -633,13 +686,14 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                             valueColor: _scheduler != null
                                 ? AppTheme.accentColor(context)
                                 : AppColors.textMuted,
-                            onTap: _rotationFrequencyType !=
+                            onTap:
+                                _rotationFrequencyType !=
                                     RotationFrequencyType.none
                                 ? () {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text(
-                                          'Remova a rotação para usar Repeat.',
+                                          'Remove rotation to use Repeat.',
                                         ),
                                       ),
                                     );
@@ -660,15 +714,16 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
 
                     // ─── Connections Card ───
                     FormSectionCard(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                      ),
                       child: OrganizerSelectorField(
                         selectedOrganizers: _organizers,
                         onChanged: (val) => setState(() {
                           _organizers = val;
                           if (_findRotationProject() == null) {
                             _rotationGroupId = null;
-                            _rotationFrequencyType =
-                                RotationFrequencyType.none;
+                            _rotationFrequencyType = RotationFrequencyType.none;
                             _rotationEveryN = null;
                             _rotationEveryNController.clear();
                           }
@@ -854,12 +909,16 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                 height: 36,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: selected ? AppTheme.accentColor(context) : Colors.transparent,
+                  color: selected
+                      ? AppTheme.accentColor(context)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: selected
                       ? [
                           BoxShadow(
-                            color: AppTheme.accentColor(context).withValues(alpha: 0.3),
+                            color: AppTheme.accentColor(
+                              context,
+                            ).withValues(alpha: 0.3),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -964,7 +1023,11 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
               constraints: const BoxConstraints(),
             ),
           if (subtask.slug != null)
-            Icon(Icons.link_rounded, size: 16, color: AppTheme.accentColor(context)),
+            Icon(
+              Icons.link_rounded,
+              size: 16,
+              color: AppTheme.accentColor(context),
+            ),
           IconButton(
             onPressed: () => setState(() => _subtasks.removeAt(index)),
             icon: const Icon(
@@ -1080,7 +1143,9 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
               : AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? AppTheme.accentColor(context) : Colors.transparent,
+            color: isSelected
+                ? AppTheme.accentColor(context)
+                : Colors.transparent,
           ),
         ),
         child: Text(
@@ -1088,7 +1153,9 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: isSelected ? AppTheme.accentColor(context) : AppColors.textSecondary,
+            color: isSelected
+                ? AppTheme.accentColor(context)
+                : AppColors.textSecondary,
           ),
         ),
       ),
@@ -1145,7 +1212,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => UniversalSearchPickerSheet(
-        title: 'Adicionar referência',
+        title: 'Add reference',
         initialFilter: 'social_post',
         onSelected: (obj) {
           if (obj is SocialPost) {
@@ -1195,7 +1262,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     final result = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Duração'),
+        title: const Text('Duration'),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -1205,23 +1272,24 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () {
               final val = int.tryParse(controller.text.trim());
               Navigator.pop(ctx, val);
             },
-            child: const Text('Salvar'),
+            child: const Text('Save'),
           ),
         ],
       ),
     );
 
+    controller.dispose();
     if (result != null && result > 0) {
+      if (!mounted) return;
       setState(() => _durationMinutes = result);
     }
-    controller.dispose();
   }
 
   Future<void> _editPomodoros() async {
@@ -1231,71 +1299,34 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
     final result = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Blocos Pomodoro'),
+        title: const Text('Pomodoro Blocks'),
         content: TextField(
           controller: controller,
           autofocus: true,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(suffixText: 'blocos'),
+          decoration: const InputDecoration(suffixText: 'blocks'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () {
               final val = int.tryParse(controller.text.trim());
               Navigator.pop(ctx, val);
             },
-            child: const Text('Salvar'),
+            child: const Text('Save'),
           ),
         ],
       ),
     );
 
+    controller.dispose();
     if (result != null) {
+      if (!mounted) return;
       setState(() => _pomodoroCount = result > 0 ? result : null);
     }
-    controller.dispose();
-  }
-
-  Future<void> _editEstimatedTime() async {
-    final initialValue = _estimatedMinutes ?? 0;
-    final controller = TextEditingController(
-      text: initialValue > 0 ? initialValue.toString() : '',
-    );
-
-    final result = await showDialog<int>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Tempo Estimado'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(suffixText: 'min'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final val = int.tryParse(controller.text.trim());
-              Navigator.pop(ctx, val);
-            },
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null) {
-      setState(() => _estimatedMinutes = result > 0 ? result : null);
-    }
-    controller.dispose();
   }
 
   Widget _buildReminderSection() {
@@ -1310,7 +1341,10 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
             ),
             const Spacer(),
             IconButton(
-              icon: Icon(Icons.add_rounded, color: AppTheme.accentColor(context)),
+              icon: Icon(
+                Icons.add_rounded,
+                color: AppTheme.accentColor(context),
+              ),
               onPressed: _addReminder,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
@@ -1412,8 +1446,22 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
   }
 
   void _saveTask() async {
+    final rotProject = _findRotationProject();
+    if (rotProject != null && (_rotationGroupId == null || _rotationFrequencyType == RotationFrequencyType.none)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a zone and frequency for the linked rotating project, or remove the link.'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+
     final hasDateRange = _dateRange != null && _dateRange!.trim().isNotEmpty;
-    if (_endDate == null && _stage != TaskStage.idea) {
+    if (_endDate == null &&
+        _stage != TaskStage.idea &&
+        _findRotationProject() == null) {
       final result = await showDialog<String>(
         context: context,
         barrierDismissible: true,
@@ -1477,22 +1525,23 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       timeBlock: _timeBlock,
       dependsOn: _dependsOn,
       links: _socialRefs,
-      estimatedMinutes: _estimatedMinutes,
       linkedSystem: _linkedSystem,
       rotationGroupId: _rotationFrequencyType != RotationFrequencyType.none
           ? _rotationGroupId
           : null,
       rotationFrequencyType: _rotationFrequencyType,
-      rotationEveryN: _rotationFrequencyType ==
-              RotationFrequencyType.everyNRotations
+      rotationEveryN:
+          _rotationFrequencyType == RotationFrequencyType.everyNRotations
           ? int.tryParse(_rotationEveryNController.text.trim()) ??
-              _rotationEveryN
+                _rotationEveryN
           : null,
       rotationLastCompletedAtOccurrence:
           widget.existingTask?.rotationLastCompletedAtOccurrence,
       rotationDailyCompletions:
           widget.existingTask?.rotationDailyCompletions ?? {},
-      flexibilityWindowMinutes: _trackAlignment ? _flexibilityWindowMinutes : null,
+      flexibilityWindowMinutes: _trackAlignment
+          ? _flexibilityWindowMinutes
+          : null,
       relaySteps: _useRelay ? _relaySteps : null,
     );
 
@@ -1535,7 +1584,9 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
           ),
           TextButton(
             onPressed: () {
-              ref.read(vaultProvider.notifier).deleteObject(widget.existingTask!);
+              ref
+                  .read(vaultProvider.notifier)
+                  .deleteObject(widget.existingTask!);
               Navigator.pop(ctx);
               Navigator.pop(context);
             },
@@ -1667,11 +1718,15 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         children: [
           Row(
             children: [
-              Icon(Icons.sync_rounded, size: 18, color: AppTheme.accentColor(context)),
+              Icon(
+                Icons.sync_rounded,
+                size: 18,
+                color: AppTheme.accentColor(context),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Rotação — ${project.title}',
+                  'Rotation — ${project.title}',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -1684,47 +1739,109 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Mutuamente exclusivo com Repeat.',
+            'Mutually exclusive with Repeat.',
             style: TextStyle(fontSize: 12, color: AppColors.textMuted),
           ),
           const SizedBox(height: 16),
+          if (_rotationGroupId == null ||
+              _rotationFrequencyType == RotationFrequencyType.none) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.35),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'This task is linked to a rotating project, but no zone/frequency is set.',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          if (groups.isEmpty) return;
+                          setState(() {
+                            _rotationGroupId = groups.first.id;
+                            _rotationFrequencyType =
+                                RotationFrequencyType.oncePerPeriod;
+                          });
+                        },
+                        child: const Text('Edit rotation'),
+                      ),
+                      TextButton(
+                        onPressed: () => setState(() {
+                          _organizers.removeWhere(
+                            (org) => org.matches(
+                              project.id,
+                              project.slug,
+                              project.title,
+                            ),
+                          );
+                          _rotationGroupId = null;
+                          _rotationFrequencyType = RotationFrequencyType.none;
+                          _rotationEveryN = null;
+                          _rotationEveryNController.clear();
+                        }),
+                        child: const Text('Remove project/rotation'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           DropdownButtonFormField<String>(
+            value: _rotationGroupId,
             decoration: const InputDecoration(
-              labelText: 'Zona',
+              labelText: 'Zone',
               border: OutlineInputBorder(),
             ),
-            items: groups
-                .map(
-                  (g) => DropdownMenuItem(
-                    value: g.id,
-                    child: Text(
-                      '${g.emoji != null ? '${g.emoji} ' : ''}${g.name}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+            items: [
+              const DropdownMenuItem(value: 'all', child: Text('All zones')),
+              ...groups.map(
+                (g) => DropdownMenuItem(
+                  value: g.id,
+                  child: Text(
+                    '${g.emoji != null ? '${g.emoji} ' : ''}${g.name}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                )
-                .toList(),
+                ),
+              ),
+            ],
             onChanged: (v) => setState(() => _rotationGroupId = v),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<RotationFrequencyType>(
+            value: _rotationFrequencyType == RotationFrequencyType.none
+                ? null
+                : _rotationFrequencyType,
             decoration: const InputDecoration(
-              labelText: 'Tipo de frequência',
+              labelText: 'Frequency type',
               border: OutlineInputBorder(),
             ),
             items: const [
               DropdownMenuItem(
                 value: RotationFrequencyType.daily,
-                child: Text('Diária'),
+                child: Text('Daily'),
               ),
               DropdownMenuItem(
                 value: RotationFrequencyType.oncePerPeriod,
-                child: Text('Uma vez no período'),
+                child: Text('Once per period'),
               ),
               DropdownMenuItem(
                 value: RotationFrequencyType.everyNRotations,
-                child: Text('Por frequência'),
+                child: Text('By frequency'),
               ),
             ],
             onChanged: (v) {
@@ -1746,7 +1863,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
               controller: _rotationEveryNController,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
-                labelText: 'A cada N rotações',
+                labelText: 'Every N rotations',
                 border: OutlineInputBorder(),
               ),
               onChanged: (v) => _rotationEveryN = int.tryParse(v),
@@ -1763,7 +1880,7 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
                   _rotationEveryN = null;
                   _rotationEveryNController.clear();
                 }),
-                child: const Text('Remover rotação'),
+                child: const Text('Remove rotation'),
               ),
             ),
           ],
@@ -1817,7 +1934,6 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
       },
     );
   }
-
 
   void _showTemplatePicker() async {
     final templates = ref

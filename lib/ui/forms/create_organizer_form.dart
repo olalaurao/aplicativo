@@ -6,12 +6,10 @@ import '../../models/shared_types.dart';
 import '../../models/scheduler.dart';
 import '../../models/reminder_config.dart';
 import '../../providers/vault_provider.dart';
-import '../../providers/color_palette_provider.dart';
 import '../widgets/organizer_selector_field.dart';
 import '../theme.dart';
 import 'scheduler_picker.dart';
 import 'create_routine_form.dart';
-import '../../models/color_palette_model.dart';
 
 class CreateOrganizerForm extends ConsumerStatefulWidget {
   final OrganizerType? initialType;
@@ -27,7 +25,6 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
   final _titleController = TextEditingController();
   final _statementController = TextEditingController();
   OrganizerType _type = OrganizerType.area;
-  String _selectedColor = '#3B82F6';
   String? _parentId;
   List<OrganizerReference> _organizers = [];
   
@@ -38,19 +35,6 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
   Scheduler? _scheduler;
   List<ReminderConfig> _reminders = [];
 
-  static const _colors = [
-    '#DC2626',
-    '#F97316',
-    '#F59E0B',
-    '#10B981',
-    '#14B8A6',
-    '#3B82F6',
-    '#6366F1',
-    '#8B5CF6',
-    '#EC4899',
-    '#6B7280',
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -60,7 +44,6 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
       _titleController.text = organizer.title;
       _statementController.text = organizer.statement ?? '';
       _type = organizer.organizerType;
-      _selectedColor = organizer.color ?? _selectedColor;
       _parentId = organizer.parentId;
       _organizers = List.from(organizer.organizers);
       _daysOfWeek = List.from(organizer.daysOfWeek);
@@ -179,77 +162,7 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
                   ),
 
                   const SizedBox(height: 24),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Cor',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 44,
-                    child: Consumer(
-                      builder: (context, ref, _) {
-                        final palette = ref.watch(colorPaletteProvider);
-                        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-                        
-                        // Use custom palette colors, or fall back to default
-                        final colorHexes = isDarkMode && palette.useSeparateDarkPalette
-                            ? palette.darkHexes
-                            : palette.lightHexes;
-                        
-                        final colorsToUse = colorHexes.isNotEmpty
-                            ? colorHexes
-                            : _colors;
-                        
-                        return ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: colorsToUse.length,
-                          separatorBuilder: (_, _) => const SizedBox(width: 8),
-                          itemBuilder: (context, index) {
-                            final hex = colorsToUse[index];
-                            final color = PaletteColor.parseHex(hex);
-                            final selected = _selectedColor == hex;
-                            return GestureDetector(
-                              onTap: () => setState(() => _selectedColor = hex),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: selected
-                                      ? Border.all(color: Colors.white, width: 3)
-                                      : null,
-                                  boxShadow: selected
-                                      ? [
-                                          BoxShadow(
-                                            color: color.withValues(alpha: 0.5),
-                                            blurRadius: 8,
-                                          ),
-                                        ]
-                                      : [],
-                                ),
-                                child: selected
-                                    ? const Icon(
-                                        Icons.check_rounded,
-                                        color: Colors.white,
-                                        size: 18,
-                                      )
-                                    : null,
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
 
-                  const SizedBox(height: 24),
                   const Text(
                     'Parente (Família)',
                     style: TextStyle(
@@ -625,7 +538,7 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
       id: existing?.id,
       title: _titleController.text.trim(),
       organizerType: _type,
-      color: _selectedColor,
+      color: null,
       parentId: _parentId,
       startDate: existing?.startDate,
       endDate: existing?.endDate,
@@ -653,14 +566,6 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
         content: Text('Organizador "${organizer.title}" salvo com sucesso!'),
       ),
     );
-  }
-
-  Color _parseColor(String hex) {
-    try {
-      return Color(int.parse(hex.replaceAll('#', '0xFF')));
-    } catch (_) {
-      return AppTheme.accentColor(context);
-    }
   }
 
   void _pickScheduler() async {

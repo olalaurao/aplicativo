@@ -121,6 +121,26 @@
             android:windowIsTranslucent="true"
             android:windowIsFloating="true" />
 
+        <activity
+            android:name=".NativePopupNotificationActivity"
+            android:exported="false"
+            android:theme="@style/QuartzoWidgetDialogTheme"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:windowIsTranslucent="true"
+            android:windowIsFloating="true" />
+
+        <activity
+            android:name=".NativeAlarmNotificationActivity"
+            android:exported="false"
+            android:theme="@style/QuartzoNotificationOverlayTheme"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true" />
+
         <service
             android:name=".QuartzoCalendarItemsService"
             android:exported="false"

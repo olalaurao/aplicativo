@@ -74,7 +74,7 @@ List<Widget> buildTaskContentSection(
               ),
             ],
             // ── V2.8.3 Time Estimates vs Actuals ──
-            if (task.estimatedMinutes != null ||
+            if (task.duration > 0 ||
                 task.actualMinutes > 0 ||
                 (task.pomodoroCount != null &&
                     task.pomodoroCount! > 0)) ...[

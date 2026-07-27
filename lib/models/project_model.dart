@@ -45,6 +45,33 @@ class RotationGroup {
   );
 }
 
+class RotationScheduleOverride {
+  final String scopeKey;
+  final String? scheduledTime;
+  final int? durationMinutes;
+
+  const RotationScheduleOverride({
+    required this.scopeKey,
+    this.scheduledTime,
+    this.durationMinutes,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'scope_key': scopeKey,
+    if (scheduledTime != null) 'scheduled_time': scheduledTime,
+    if (durationMinutes != null) 'duration_minutes': durationMinutes,
+  };
+
+  factory RotationScheduleOverride.fromMap(Map<String, dynamic> map) =>
+      RotationScheduleOverride(
+        scopeKey: map['scope_key']?.toString() ?? '',
+        scheduledTime: map['scheduled_time']?.toString(),
+        durationMinutes: map['duration_minutes'] is num
+            ? (map['duration_minutes'] as num).toInt()
+            : int.tryParse(map['duration_minutes']?.toString() ?? ''),
+      );
+}
+
 /// A phase groups Tasks by stage within a Project.
 /// Each phase has a name and a list of WikiLinks to child Tasks.
 class ProjectPhase {
@@ -111,6 +138,9 @@ class Project extends Organizer {
   String? rotationCurrentGroupId;
   DateTime? rotationCurrentPeriodStart;
   int rotationCycleNumber = 1;
+  String? rotationScheduledTime;
+  int? rotationDurationMinutes;
+  List<RotationScheduleOverride> rotationScheduleOverrides = [];
   /// V5: absorbed from Goal's plan_mode
   String? objective;       // the why
   String? strategy;        // the how
@@ -160,6 +190,9 @@ class Project extends Organizer {
     this.rotationCurrentGroupId,
     this.rotationCurrentPeriodStart,
     this.rotationCycleNumber = 1,
+    this.rotationScheduledTime,
+    this.rotationDurationMinutes,
+    List<RotationScheduleOverride>? rotationScheduleOverrides,
     this.methodLabel,
     this.objective,
     this.strategy,
@@ -181,6 +214,7 @@ class Project extends Organizer {
        taskLinks = taskLinks ?? [],
        quickAccessLinks = quickAccessLinks ?? [],
        rotationGroups = rotationGroups ?? [],
+       rotationScheduleOverrides = rotationScheduleOverrides ?? [],
        phases = phases ?? [],
        steps = steps ?? [],
        super(
@@ -240,6 +274,16 @@ class Project extends Organizer {
     }
     if (rotationCycleNumber != 1) {
       frontmatter['rotation_cycle_number'] = rotationCycleNumber;
+    }
+    if (rotationScheduledTime != null) {
+      frontmatter['rotation_scheduled_time'] = rotationScheduledTime;
+    }
+    if (rotationDurationMinutes != null) {
+      frontmatter['rotation_duration_minutes'] = rotationDurationMinutes;
+    }
+    if (rotationScheduleOverrides.isNotEmpty) {
+      frontmatter['rotation_schedule_overrides'] =
+          rotationScheduleOverrides.map((o) => o.toMap()).toList();
     }
     if (methodLabel != null) frontmatter['method_label'] = methodLabel;
 
@@ -347,6 +391,23 @@ class Project extends Organizer {
           DateTime.tryParse(frontmatter['rotation_current_period_start'].toString());
     }
     project.rotationCycleNumber = frontmatter['rotation_cycle_number'] as int? ?? 1;
+    project.rotationScheduledTime = frontmatter['rotation_scheduled_time']?.toString();
+    final rotationDuration = frontmatter['rotation_duration_minutes'];
+    project.rotationDurationMinutes = rotationDuration is num
+        ? rotationDuration.toInt()
+        : int.tryParse(rotationDuration?.toString() ?? '');
+    if (frontmatter['rotation_schedule_overrides'] is List) {
+      project.rotationScheduleOverrides =
+          (frontmatter['rotation_schedule_overrides'] as List)
+              .whereType<Map>()
+              .map(
+                (m) => RotationScheduleOverride.fromMap(
+                  Map<String, dynamic>.from(m),
+                ),
+              )
+              .where((o) => o.scopeKey.isNotEmpty)
+              .toList();
+    }
     project.methodLabel = frontmatter['method_label']?.toString();
 
     // V5: Plan-mode fields
@@ -426,6 +487,9 @@ class Project extends Organizer {
       rotationCurrentGroupId: rotationCurrentGroupId,
       rotationCurrentPeriodStart: rotationCurrentPeriodStart,
       rotationCycleNumber: rotationCycleNumber,
+      rotationScheduledTime: rotationScheduledTime,
+      rotationDurationMinutes: rotationDurationMinutes,
+      rotationScheduleOverrides: rotationScheduleOverrides,
       methodLabel: methodLabel,
       objective: objective,
       strategy: strategy,
@@ -465,6 +529,9 @@ class Project extends Organizer {
     String? rotationCurrentGroupId,
     DateTime? rotationCurrentPeriodStart,
     int? rotationCycleNumber,
+    String? rotationScheduledTime,
+    int? rotationDurationMinutes,
+    List<RotationScheduleOverride>? rotationScheduleOverrides,
     String? methodLabel,
     String? objective,
     String? strategy,
@@ -507,6 +574,10 @@ class Project extends Organizer {
       rotationCurrentGroupId: rotationCurrentGroupId ?? this.rotationCurrentGroupId,
       rotationCurrentPeriodStart: rotationCurrentPeriodStart ?? this.rotationCurrentPeriodStart,
       rotationCycleNumber: rotationCycleNumber ?? this.rotationCycleNumber,
+      rotationScheduledTime: rotationScheduledTime ?? this.rotationScheduledTime,
+      rotationDurationMinutes: rotationDurationMinutes ?? this.rotationDurationMinutes,
+      rotationScheduleOverrides:
+          rotationScheduleOverrides ?? this.rotationScheduleOverrides,
       methodLabel: methodLabel ?? this.methodLabel,
       objective: objective ?? this.objective,
       strategy: strategy ?? this.strategy,

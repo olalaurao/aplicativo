@@ -1,6 +1,7 @@
 // lib/ui/screens/organizer_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/project_model.dart';
 import '../../models/organizer_model.dart';
 import 'package:intl/intl.dart';
 import '../../models/content_object.dart';
@@ -12,6 +13,7 @@ import '../../providers/settings_provider.dart';
 import '../theme.dart';
 import '../utils/object_icons.dart';
 import '../widgets/object_action_wrapper.dart';
+import '../widgets/project_rotation_detail.dart';
 import '../widgets/social_post_grid_card.dart';
 import 'social_post_detail.dart';
 import 'universal_detail_view.dart';
@@ -149,6 +151,14 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final organizer = widget.organizer;
+    if (organizer is Project && organizer.rotationGroups.isNotEmpty) {
+      return ProjectRotationDetailScreen(
+        projectId: organizer.id,
+        initialProject: organizer,
+      );
+    }
+
     final associatedItemsAsync = ref.watch(
       backlinksProvider(widget.organizer.id),
     );
@@ -179,7 +189,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
             ),
             actions: [
               IconButton(
-                tooltip: 'Editar',
+                tooltip: 'Edit',
                 icon: const Icon(Icons.edit_outlined, size: 20),
                 onPressed: () {
                   Navigator.push(
@@ -192,7 +202,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
                 },
               ),
               IconButton(
-                tooltip: 'Ver detalhes',
+                tooltip: 'View details',
                 icon: const Icon(Icons.info_outline_rounded, size: 20),
                 onPressed: () {
                   Navigator.push(
@@ -522,7 +532,12 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
   ) {
     return itemsAsync.when(
       data: (items) {
-        final filteredItems = items.where((item) => !item.archived && !item.obsidianPath.contains('_deleted')).toList();
+        final filteredItems = items
+            .where(
+              (item) =>
+                  !item.archived && !item.obsidianPath.contains('_deleted'),
+            )
+            .toList();
         final periodFilteredItems = _filterItemsByPeriod(filteredItems);
         if (periodFilteredItems.isEmpty) {
           return _buildEmptyState(
@@ -664,7 +679,10 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
         final socialPosts = _postsForOrganizer();
         final visibleItems = items
             .where((item) => item is! SocialPost && item.type != 'social_post')
-            .where((item) => !item.archived && !item.obsidianPath.contains('_deleted'))
+            .where(
+              (item) =>
+                  !item.archived && !item.obsidianPath.contains('_deleted'),
+            )
             .toList();
         if (visibleItems.isEmpty && socialPosts.isEmpty) {
           return _buildEmptyState(
@@ -762,7 +780,11 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
   }
 
   Widget _buildOutgoingList(BuildContext context, List<ContentObject> items) {
-    final filteredItems = items.where((item) => !item.archived && !item.obsidianPath.contains('_deleted')).toList();
+    final filteredItems = items
+        .where(
+          (item) => !item.archived && !item.obsidianPath.contains('_deleted'),
+        )
+        .toList();
     if (filteredItems.isEmpty) {
       return _buildEmptyState(
         'No outgoing links',
@@ -1092,9 +1114,12 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
   IconData _typeIcon(OrganizerType type) {
     // Use Object Identification icons if available, otherwise fallback to hardcoded icons
     final settings = ref.read(settingsProvider);
-    final iconData = ObjectIcons.iconDataForTypeWithSignatures(type.name, settings.typeSignatures);
+    final iconData = ObjectIcons.iconDataForTypeWithSignatures(
+      type.name,
+      settings.typeSignatures,
+    );
     if (iconData != null) return iconData;
-    
+
     // Fallback to hardcoded icons
     switch (type) {
       case OrganizerType.area:
@@ -1173,7 +1198,7 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
       case 'habit':
         return AppColors.habitGreen;
       case 'goal':
-        return AppColors.habitOrange;
+        return AppTheme.accentColor(context);
       case 'entry':
         return AppColors.habitPurple;
       case 'event':
@@ -1212,19 +1237,19 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
       case 'event':
         return 'Events';
       case 'area':
-        return 'Áreas';
+        return 'Areas';
       case 'project':
-        return 'Projetos';
+        return 'Projects';
       case 'activity':
-        return 'Atividades';
+        return 'Activities';
       case 'label':
-        return 'Etiquetas';
+        return 'Labels';
       case 'person':
-        return 'Pessoas';
+        return 'People';
       case 'reminder':
-        return 'Lembretes';
+        return 'Reminders';
       case 'system':
-        return 'Sistemas';
+        return 'Systems';
       case 'social_post':
         return 'Posts';
       default:
@@ -1299,80 +1324,70 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
             ),
             const SizedBox(width: 12),
             chipButton(
-              label: 'Tarefa',
+              label: 'Task',
               icon: Icons.check_circle_outline,
               color: AppColors.info,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => CreateTaskForm(
-                    initialOrganizers: [refRef],
-                  ),
+                  builder: (_) => CreateTaskForm(initialOrganizers: [refRef]),
                 ),
               ),
             ),
             chipButton(
-              label: 'Nota',
+              label: 'Note',
               icon: Icons.article_outlined,
               color: AppColors.habitPurple,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => CreateNoteForm(
-                    initialOrganizers: [refRef],
-                  ),
+                  builder: (_) => CreateNoteForm(initialOrganizers: [refRef]),
                 ),
               ),
             ),
             chipButton(
-              label: 'Objetivo',
+              label: 'Goal',
               icon: Icons.flag_outlined,
-              color: AppColors.habitOrange,
+              color: AppTheme.accentColor(context),
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => CreateGoalForm(
-                    initialOrganizers: [refRef],
-                  ),
+                  builder: (_) => CreateGoalForm(initialOrganizers: [refRef]),
                 ),
               ),
             ),
             chipButton(
-              label: 'Hábito',
+              label: 'Habit',
               icon: Icons.cached_rounded,
               color: AppColors.habitGreen,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => CreateHabitForm(
-                    initialOrganizers: [refRef],
-                  ),
+                  builder: (_) => CreateHabitForm(initialOrganizers: [refRef]),
                 ),
               ),
             ),
             chipButton(
-              label: 'Recurso',
+              label: 'Resource',
               icon: Icons.auto_stories_rounded,
               color: AppColors.habitPink,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => CreateResourceForm(
-                    initialOrganizers: [refRef],
-                  ),
+                  builder: (_) =>
+                      CreateResourceForm(initialOrganizers: [refRef]),
                 ),
               ),
             ),
             chipButton(
-              label: 'Projeto',
+              label: 'Project',
               icon: Icons.folder_outlined,
               color: AppTheme.accentColor(context),
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => CreateProjectForm(
-                    initialOrganizers: [refRef],
-                  ),
+                  builder: (_) =>
+                      CreateProjectForm(initialOrganizers: [refRef]),
                 ),
               ),
             ),
@@ -1382,7 +1397,3 @@ class _OrganizerDetailScreenState extends ConsumerState<OrganizerDetailScreen>
     );
   }
 }
-
-
-
-

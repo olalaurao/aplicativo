@@ -16,6 +16,18 @@
 3. **Unificação WHAT e WHEN**: Tasks representam tanto O QUE quanto QUANDO. O agendamento (datas, horários, blocos de tempo) é integrado diretamente ao objeto Task. Não existem mais Calendar Sessions separadas.
 4. **Dualidade Content/Organizer**: Tasks, Goals, Habits e Trackers são tanto objetos de conteúdo quanto organizadores. Outros objetos podem ser associados a eles via `organizers`.
 5. **Inglês como idioma primário da UI**
+
+### Fonte de Verdade e Roundtrip de Dados — CRÍTICO
+
+- Para objetos do vault, o arquivo `.md` com frontmatter YAML é a fonte canônica. Providers, caches, listas em memória, widgets nativos e snapshots são apenas projeções derivadas e devem poder ser reconstruídos a partir dos `.md`.
+- Toda alteração de modelo deve ter roundtrip explícito: `toMarkdown()`/`toBaseMap()` escreve uma chave, `fromMarkdown()`/`loadBaseMap()` lê a mesma chave, e pelo menos um teste cobre salvar → parsear → filtrar/renderizar.
+- `OrganizerReference` deve preservar tipo ao persistir: grave links tipados como `[[project/slug]]`, `[[area/slug]]`, `[[value/slug]]`, etc. Links antigos sem tipo (`[[slug]]`) continuam válidos e devem ser resolvidos por `id`, `slug` ou `title` quando o contexto já sabe o tipo esperado.
+- Nunca filtre vínculo estrutural apenas por `OrganizerReference.type` quando dados legados podem ter sido reabertos como `label`. Para Project/Area/Value/etc., use `OrganizerReference.matches(org.id, org.slug, org.title)` ou um helper central equivalente.
+- Se uma tela funciona antes de reiniciar o app mas quebra depois, suspeite primeiro de perda de informação no roundtrip Markdown/frontmatter.
+- Itens do dia devem usar uma agregação única/reutilizável. Planner, dashboard, Day Dial e widgets nativos precisam enxergar os mesmos objetos: Tasks normais/recorrentes, tasks de Project com zona rotativa, Systems, Events, Habits, Reminders, Tracking Records, Journal Entries, Time Blocks e Pomodoros.
+- Projects com `rotationGroups` devem aparecer no dia como um bloco de zona planejável derivado do Project; tasks da zona ativa continuam derivadas via `RotationService`. Mudanças de horário/duração da zona devem persistir no Markdown do Project como padrão futuro, override de ocorrência ou override de dia.
+- Não reintroduza picker de cor para `Organizer`. Campos legados `Organizer.color` podem ser lidos/escritos para compatibilidade, mas superfícies do dia devem usar: cor explícita do objeto, depois `TypeSignature.colorHex`, depois cor do tema.
+- Mudanças em rotação, checkbox de tracker record e `relaySteps` de task exigem testes de roundtrip e de renderização/filtro quando afetarem Planner/dashboard/widgets.
 ---
 
 ## 2. STACK TECNOLÓGICA
@@ -177,6 +189,14 @@ vault/
 ## 4. DETAIL SECTIONS MODULARES
 
 O `universal_detail_view.dart` foi modularizado em arquivos separados por tipo de conteúdo em `ui/screens/detail_sections/`. Cada arquivo contém funções que constroem as property cards específicas para aquele tipo de objeto.
+
+### Navegação Real de Project e Organizer — CRÍTICO
+
+Projects são `Organizer`s. Abrir um Project a partir de `/projects` ou `/organizer/:id` passa por `OrganizerDetailScreen`, não por `UniversalDetailView`. A rota `/detail/:id` usa `UniversalDetailView`.
+
+Quando uma UI de Project precisa aparecer para o usuário, implemente-a nos dois caminhos ou extraia para um componente/tela compartilhada e faça `OrganizerDetailScreen` e `UniversalDetailView` delegarem para ela. Para Project com `rotationGroups`, a tela compartilhada canônica é `ProjectRotationDetailScreen`.
+
+Telas FlyLady/Rotation usam screenshots em português apenas como referência visual; toda UI final do app deve estar em inglês. Cores dessas telas devem vir de `AppTheme.accentColor(context)`, `Theme.of(context)`, `AppColors` ou `RotationGroup.colorHex`, nunca de roxo/laranja hardcoded copiado do print.
 
 ### Arquivos de Detail Section
 
@@ -1221,7 +1241,7 @@ sono:
 ### 08:30
 Acordei bem disposta.
 mood:: [[good]]
-organizers:: [[saude]]
+organizers:: [[area/saude]]
 #manha
 
 ---
@@ -1229,7 +1249,7 @@ organizers:: [[saude]]
 ### 14:30
 Reunião produtiva.
 mood:: [[neutral]]
-organizers:: [[trabalho]]
+organizers:: [[area/trabalho]]
 
 ---
 
@@ -1260,7 +1280,7 @@ organizers:: [[trabalho]]
 3. **Trackers**: YAML aninhado. Chave externa = `tracker_slug`, internas = `field_slug`
 4. **Journal entries**: Headings `### HH:MM` sob `## Journal Entries`
 5. **Mood**: Inline Dataview `mood:: [[slug]]` — cria backlink no Obsidian
-6. **Organizers**: Inline Dataview `organizers:: [[slug1]], [[slug2]]`
+6. **Organizers**: Inline Dataview com WikiLinks tipados `organizers:: [[area/slug1]], [[project/slug2]]`. O parser aceita legado `[[slug]]`.
 7. **Tags**: `#tag` no corpo da entry
 
 ### 8.3 Regras de Escrita
@@ -1269,6 +1289,8 @@ organizers:: [[trabalho]]
 - **NUNCA** altere campos de frontmatter que você não reconhece — preserve-os
 - **SEMPRE** preserve a ordem das seções no body (`## Journal Entries` → `## Habits` → `## Trackers` → `## Tasks` → `## Pomodoros`)
 - **SEMPRE** gere slugs em kebab-case: `minha-tarefa-importante.md`
+- **SEMPRE** grave `organizers` como WikiLinks tipados (`[[project/projeto-alpha]]`, `[[area/saude]]`). Ao ler, aceite também o formato legado sem tipo (`[[projeto-alpha]]`) e resolva por slug/id/title.
+- **SEMPRE** teste roundtrip para novos campos: o dado precisa sobreviver a salvar no `.md`, reiniciar/recarregar e reaparecer nos filtros e telas derivadas.
 
 ---
 

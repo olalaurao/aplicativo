@@ -31,6 +31,7 @@ class _CreateRoutineFormState extends ConsumerState<CreateRoutineForm> {
   String? _moodTrigger;
   Scheduler? _scheduler;
   List<ReminderConfig> _reminders = [];
+  bool _stepsExpanded = true;
 
   static const _colors = [
     '#DC2626',
@@ -308,12 +309,25 @@ class _CreateRoutineFormState extends ConsumerState<CreateRoutineForm> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Routine Steps',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
+                      GestureDetector(
+                        onTap: () => setState(() => _stepsExpanded = !_stepsExpanded),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _stepsExpanded ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded,
+                              color: AppTheme.textPrimaryColor(context),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Routine Steps',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       TextButton(
@@ -322,43 +336,48 @@ class _CreateRoutineFormState extends ConsumerState<CreateRoutineForm> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  if (_steps.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Text(
-                        'No steps added yet. Tap "+ Add Step" to build your routine.',
-                        style: TextStyle(color: AppColors.textMuted),
-                      ),
-                    )
-                  else
-                    ReorderableListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _steps.length,
-                      onReorder: (oldIndex, newIndex) {
-                        setState(() {
-                          if (newIndex > oldIndex) newIndex--;
-                          final step = _steps.removeAt(oldIndex);
-                          _steps.insert(newIndex, step);
-                        });
-                      },
-                      itemBuilder: (context, index) {
-                        final step = _steps[index];
-                        return ChecklistStepEditor(
-                          key: ValueKey(step.id),
-                          index: index,
-                          step: step,
-                          onChanged: (title) => _updateStepTitle(index, title),
-                          onStepChanged: (newStep) {
+                  if (_stepsExpanded) ...[
+                    const SizedBox(height: 12),
+                    if (_steps.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text(
+                          'No steps added yet. Tap "+ Add Step" to build your routine.',
+                          style: TextStyle(color: AppColors.textMuted),
+                        ),
+                      )
+                    else
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 350),
+                        child: ReorderableListView.builder(
+                          shrinkWrap: true,
+                          buildDefaultDragHandles: false,
+                          itemCount: _steps.length,
+                          onReorder: (oldIndex, newIndex) {
                             setState(() {
-                              _steps[index] = newStep;
+                              if (newIndex > oldIndex) newIndex--;
+                              final step = _steps.removeAt(oldIndex);
+                              _steps.insert(newIndex, step);
                             });
                           },
-                          onRemove: () => _removeStep(index),
-                        );
-                      },
-                    ),
+                          itemBuilder: (context, index) {
+                            final step = _steps[index];
+                            return ChecklistStepEditor(
+                              key: ValueKey(step.id),
+                              index: index,
+                              step: step,
+                              onChanged: (title) => _updateStepTitle(index, title),
+                              onStepChanged: (newStep) {
+                                setState(() {
+                                  _steps[index] = newStep;
+                                });
+                              },
+                              onRemove: () => _removeStep(index),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
 
                   const SizedBox(height: 24),
                   const Text(

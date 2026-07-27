@@ -15,17 +15,17 @@ enum RotationFrequencyType { none, daily, oncePerPeriod, everyNRotations }
 
 /// Triple Check answer for a single dimension (head/heart/hand)
 enum TripleCheckAnswer {
-  yes,     // Sim
-  unsure,  // Incerto
-  no,      // Não
+  yes, // Sim
+  unsure, // Incerto
+  no, // Não
 }
 
 /// Stores the result of a Triple Check diagnostic on a Task.
 class TripleCheck {
-  final TripleCheckAnswer head;    // A tarefa faz sentido agora?
-  final TripleCheckAnswer heart;   // Você está animado com isso?
-  final TripleCheckAnswer hand;    // Você tem o que precisa para começar?
-  final String diagnosis;          // Auto-generated diagnosis text
+  final TripleCheckAnswer head; // A tarefa faz sentido agora?
+  final TripleCheckAnswer heart; // Você está animado com isso?
+  final TripleCheckAnswer hand; // Você tem o que precisa para começar?
+  final String diagnosis; // Auto-generated diagnosis text
   final DateTime checkedAt;
 
   const TripleCheck({
@@ -66,12 +66,15 @@ class TripleCheck {
         orElse: () => TripleCheckAnswer.yes,
       );
     }
+
     return TripleCheck(
       head: parseAnswer('head'),
       heart: parseAnswer('heart'),
       hand: parseAnswer('hand'),
       diagnosis: m['diagnosis']?.toString() ?? '',
-      checkedAt: DateTime.tryParse(m['checked_at']?.toString() ?? '') ?? DateTime.now(),
+      checkedAt:
+          DateTime.tryParse(m['checked_at']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 
@@ -105,6 +108,7 @@ class Task extends ContentObject {
   List<Comment> comments;
   String? reflection;
   bool untilDone;
+
   /// V5: date_range and until_done are mutually exclusive; date_range takes precedence.
   /// When dateRange is set, untilDone is ignored on read and cleared on save.
   String? dateRange; // e.g. '2026-01-01/2026-01-31'
@@ -119,7 +123,6 @@ class Task extends ContentObject {
   int? pomodoroCount;
   String? timeBlock;
   List<String> dependsOn = const [];
-  int? estimatedMinutes;
   TripleCheck? tripleCheck;
   String? linkedSystem;
   String? rotationGroupId;
@@ -128,16 +131,19 @@ class Task extends ContentObject {
   int? rotationLastCompletedAtOccurrence;
   Map<String, bool> rotationDailyCompletions = {};
   VaultLinkRef? completionRef;
-  
+
   // Alignment tracking fields (RA-P1-1)
   int? flexibilityWindowMinutes; // null = alignment tracking off for this task
 
   // Focus Relay fields (RA-P1-3)
-  List<RelayStep>? relaySteps; // null = use flat Pomodoro, non-null = use Relay mode
+  List<RelayStep>?
+  relaySteps; // null = use flat Pomodoro, non-null = use Relay mode
 
-  bool get isRotationTask => rotationFrequencyType != RotationFrequencyType.none;
+  bool get isRotationTask =>
+      rotationFrequencyType != RotationFrequencyType.none;
   bool get hasDateRange => dateRange != null && dateRange!.trim().isNotEmpty;
-  bool get isAlignmentTrackable => flexibilityWindowMinutes != null && scheduledTime != null;
+  bool get isAlignmentTrackable =>
+      flexibilityWindowMinutes != null && scheduledTime != null;
   bool get hasRelaySteps => relaySteps != null && relaySteps!.isNotEmpty;
 
   void normalizeDateRangeAndUntilDone({bool logWarning = false}) {
@@ -185,19 +191,18 @@ class Task extends ContentObject {
     super.updatedAt,
     super.obsidianPath,
     super.reminders,
-    exportedCalendarId,
-    linkedGoogleEventId,
-    linkedGoogleEventTitle,
-    linkedGoogleEventDate,
-    linkedGoogleEventUrl,
-    pomodoroCount,
-    timeBlock,
-    dependsOn = const [],
-    estimatedMinutes,
-    tripleCheck,
-    linkedSystem,
-    rotationGroupId,
-    rotationFrequencyType = RotationFrequencyType.none,
+    this.exportedCalendarId,
+    this.linkedGoogleEventId,
+    this.linkedGoogleEventTitle,
+    this.linkedGoogleEventDate,
+    this.linkedGoogleEventUrl,
+    this.pomodoroCount,
+    this.timeBlock,
+    this.dependsOn = const [],
+    this.tripleCheck,
+    this.linkedSystem,
+    this.rotationGroupId,
+    this.rotationFrequencyType = RotationFrequencyType.none,
     this.rotationEveryN,
     this.rotationLastCompletedAtOccurrence,
     Map<String, bool>? rotationDailyCompletions,
@@ -354,9 +359,6 @@ class Task extends ContentObject {
       // V5: date_range wins — never write until_done when date_range is set
       frontmatter.remove('until_done');
     }
-    if (estimatedMinutes != null) {
-      frontmatter['estimated_minutes'] = estimatedMinutes;
-    }
     if (reflection != null && reflection!.isNotEmpty) {
       frontmatter['reflection'] = reflection;
     }
@@ -376,7 +378,8 @@ class Task extends ContentObject {
         RotationFrequencyType.none => 'none',
       };
     }
-    if (rotationEveryN != null) frontmatter['rotation_every_n'] = rotationEveryN;
+    if (rotationEveryN != null)
+      frontmatter['rotation_every_n'] = rotationEveryN;
     if (rotationLastCompletedAtOccurrence != null) {
       frontmatter['rotation_last_completed_at_occurrence'] =
           rotationLastCompletedAtOccurrence;
@@ -459,7 +462,8 @@ class Task extends ContentObject {
           final fields = StringBuffer();
           if (subtask.dueDate != null) {
             final d = subtask.dueDate!;
-            final dateStr = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+            final dateStr =
+                '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
             fields.write(' [due:: $dateStr]');
           }
           if (subtask.priority != null && subtask.priority != 'none') {
@@ -558,10 +562,6 @@ class Task extends ContentObject {
     task.dateRange = frontmatter['date_range']?.toString();
     // V5: if date_range is present, until_done is ignored
     task.normalizeDateRangeAndUntilDone(logWarning: true);
-    final em = frontmatter['estimated_minutes'];
-    task.estimatedMinutes = em is num
-        ? em.toInt()
-        : int.tryParse(em?.toString() ?? '');
     // Parse Triple Check block
     if (frontmatter['triple_check'] is Map) {
       try {
@@ -600,14 +600,17 @@ class Task extends ContentObject {
         (e) =>
             e.name == rotType ||
             e.name == rotType.replaceAll('_', '') ||
-            (rotType == 'once_per_period' && e == RotationFrequencyType.oncePerPeriod) ||
-            (rotType == 'every_n_rotations' && e == RotationFrequencyType.everyNRotations),
+            (rotType == 'once_per_period' &&
+                e == RotationFrequencyType.oncePerPeriod) ||
+            (rotType == 'every_n_rotations' &&
+                e == RotationFrequencyType.everyNRotations),
         orElse: () => RotationFrequencyType.none,
       );
     }
     final rotN = frontmatter['rotation_every_n'];
-    task.rotationEveryN =
-        rotN is num ? rotN.toInt() : int.tryParse(rotN?.toString() ?? '');
+    task.rotationEveryN = rotN is num
+        ? rotN.toInt()
+        : int.tryParse(rotN?.toString() ?? '');
     final rotLast = frontmatter['rotation_last_completed_at_occurrence'];
     task.rotationLastCompletedAtOccurrence = rotLast is num
         ? rotLast.toInt()
@@ -666,12 +669,16 @@ class Task extends ContentObject {
         // Extrair campos Tasks Plugin inline: [due:: ...] [priority:: ...]
         DateTime? dueDate;
         String? subtaskPriority;
-        final dueMatch = RegExp(r'\[due::\s*(\d{4}-\d{2}-\d{2})\]').firstMatch(content);
+        final dueMatch = RegExp(
+          r'\[due::\s*(\d{4}-\d{2}-\d{2})\]',
+        ).firstMatch(content);
         if (dueMatch != null) {
           dueDate = DateTime.tryParse(dueMatch.group(1)!);
           content = content.replaceAll(dueMatch.group(0)!, '').trim();
         }
-        final priorityMatch = RegExp(r'\[priority::\s*(\w+)\]').firstMatch(content);
+        final priorityMatch = RegExp(
+          r'\[priority::\s*(\w+)\]',
+        ).firstMatch(content);
         if (priorityMatch != null) {
           subtaskPriority = priorityMatch.group(1)?.toLowerCase();
           content = content.replaceAll(priorityMatch.group(0)!, '').trim();
@@ -753,7 +760,6 @@ class Task extends ContentObject {
     int? pomodoroCount,
     String? timeBlock,
     List<String>? dependsOn,
-    int? estimatedMinutes,
     TripleCheck? tripleCheck,
     bool clearTripleCheck = false,
     String? linkedSystem,
@@ -806,20 +812,24 @@ class Task extends ContentObject {
       pomodoroCount: pomodoroCount ?? this.pomodoroCount,
       timeBlock: timeBlock ?? this.timeBlock,
       dependsOn: dependsOn ?? this.dependsOn,
-      estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
       tripleCheck: clearTripleCheck ? null : (tripleCheck ?? this.tripleCheck),
       linkedSystem: linkedSystem ?? this.linkedSystem,
       rotationGroupId: rotationGroupId ?? this.rotationGroupId,
       rotationFrequencyType:
           rotationFrequencyType ?? this.rotationFrequencyType,
       rotationEveryN: rotationEveryN ?? this.rotationEveryN,
-      rotationLastCompletedAtOccurrence: rotationLastCompletedAtOccurrence ??
+      rotationLastCompletedAtOccurrence:
+          rotationLastCompletedAtOccurrence ??
           this.rotationLastCompletedAtOccurrence,
-      rotationDailyCompletions: rotationDailyCompletions ??
+      rotationDailyCompletions:
+          rotationDailyCompletions ??
           Map<String, bool>.from(this.rotationDailyCompletions),
-      flexibilityWindowMinutes: flexibilityWindowMinutes ?? this.flexibilityWindowMinutes,
+      flexibilityWindowMinutes:
+          flexibilityWindowMinutes ?? this.flexibilityWindowMinutes,
       relaySteps: relaySteps ?? this.relaySteps,
-      completionRef: clearCompletionRef ? null : (completionRef ?? this.completionRef),
+      completionRef: clearCompletionRef
+          ? null
+          : (completionRef ?? this.completionRef),
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       tags: tags ?? this.tags,
@@ -836,7 +846,9 @@ class Task extends ContentObject {
     if (stage == TaskStage.finalized || stage == TaskStage.idea) return false;
     // Already recently checked → don't show badge
     if (tripleCheck != null) {
-      final daysSinceCheck = DateTime.now().difference(tripleCheck!.checkedAt).inDays;
+      final daysSinceCheck = DateTime.now()
+          .difference(tripleCheck!.checkedAt)
+          .inDays;
       if (daysSinceCheck < 7) return false;
     }
     // Check if stuck for 7+ days (use updatedAt as proxy)

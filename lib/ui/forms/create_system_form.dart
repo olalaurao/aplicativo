@@ -27,6 +27,8 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
   List<SystemStep> _steps = [];
   List<OrganizerReference> _organizers = [];
   Scheduler? _scheduler;
+  String? _scheduledTime;
+  bool _stepsExpanded = true;
 
   @override
   void initState() {
@@ -39,6 +41,7 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
     _steps = existing != null ? List.from(existing.steps) : [];
     _organizers = existing != null ? List.from(existing.organizers) : [];
     _scheduler = existing?.scheduler;
+    _scheduledTime = existing?.scheduledTime;
   }
 
   @override
@@ -175,6 +178,23 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
     if (result != null) setState(() => _scheduler = result);
   }
 
+  Future<void> _pickScheduledTime() async {
+    final t = await showTimePicker(
+      context: context,
+      initialTime: _scheduledTime != null
+          ? TimeOfDay(
+              hour: int.parse(_scheduledTime!.split(':')[0]),
+              minute: int.parse(_scheduledTime!.split(':')[1]),
+            )
+          : TimeOfDay.now(),
+    );
+    if (t != null) {
+      final hh = t.hour.toString().padLeft(2, '0');
+      final mm = t.minute.toString().padLeft(2, '0');
+      setState(() => _scheduledTime = '$hh:$mm');
+    }
+  }
+
   String _getScheduleSummary(Scheduler s) {
     if (s.rules.isEmpty) return 'Sem regras';
     final r = s.rules.first;
@@ -206,6 +226,7 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
       lastRun: widget.existingSystem?.lastRun,
       averageMinutes: widget.existingSystem?.averageMinutes ?? 0,
       scheduler: _scheduler,
+      scheduledTime: _scheduledTime,
       createdAt: widget.existingSystem?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
       obsidianPath: widget.existingSystem?.obsidianPath ?? '',
@@ -389,6 +410,42 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                             ],
                           ),
                         ),
+                        const Divider(height: 12),
+                        GestureDetector(
+                          onTap: _pickScheduledTime,
+                          child: Row(
+                            children: [
+                              const Text(
+                                'Horário',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                              ),
+                              const Spacer(),
+                              Expanded(
+                                child: Text(
+                                  _scheduledTime ?? 'Nenhum',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: _scheduledTime != null ? AppTheme.accentColor(context) : AppColors.textMuted,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.right,
+                                ),
+                              ),
+                              if (_scheduledTime != null)
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.textMuted),
+                                  onPressed: () => setState(() => _scheduledTime = null),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                )
+                              else ...[
+                                const SizedBox(width: 4),
+                                const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
+                              ],
+                            ],
+                          ),
+                        ),
                         const Divider(height: 24),
                         // Estimated duration
                         GestureDetector(
@@ -432,9 +489,22 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                       children: [
                         Row(
                           children: [
-                            const Text(
-                              'Steps',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                            GestureDetector(
+                              onTap: () => setState(() => _stepsExpanded = !_stepsExpanded),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _stepsExpanded ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded,
+                                    color: AppTheme.textPrimaryColor(context),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Steps',
+                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
                             ),
                             const Spacer(),
                             IconButton(
@@ -445,44 +515,49 @@ class _CreateSystemFormState extends ConsumerState<CreateSystemForm> {
                             ),
                           ],
                         ),
-                        if (_steps.isEmpty) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            'Nenhum step ainda. Adicione o passo-a-passo do seu System.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppTheme.textMutedColor(context),
+                        if (_stepsExpanded) ...[
+                          if (_steps.isEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Nenhum step ainda. Adicione o passo-a-passo do seu System.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.textMutedColor(context),
+                              ),
                             ),
-                          ),
-                        ] else ...[
-                          const SizedBox(height: 12),
-                          ReorderableListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            onReorder: (oldIndex, newIndex) {
-                              setState(() {
-                                if (newIndex > oldIndex) newIndex--;
-                                final step = _steps.removeAt(oldIndex);
-                                _steps.insert(newIndex, step);
-                              });
-                            },
-                            itemCount: _steps.length,
-                            itemBuilder: (ctx, index) {
-                              final step = _steps[index];
-                              return ChecklistStepEditor(
-                                key: ValueKey(step.id),
-                                index: index,
-                                step: step,
-                                onChanged: (title) => _updateStepTitle(index, title),
-                                onStepChanged: (s) {
-                                  final updated = List<SystemStep>.from(_steps);
-                                  updated[index] = s;
-                                  setState(() => _steps = updated);
+                          ] else ...[
+                            const SizedBox(height: 12),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxHeight: 350),
+                              child: ReorderableListView.builder(
+                                shrinkWrap: true,
+                                buildDefaultDragHandles: false,
+                                onReorder: (oldIndex, newIndex) {
+                                  setState(() {
+                                    if (newIndex > oldIndex) newIndex--;
+                                    final step = _steps.removeAt(oldIndex);
+                                    _steps.insert(newIndex, step);
+                                  });
                                 },
-                                onRemove: () => _removeStep(index),
-                              );
-                            },
-                          ),
+                                itemCount: _steps.length,
+                                itemBuilder: (ctx, index) {
+                                  final step = _steps[index];
+                                  return ChecklistStepEditor(
+                                    key: ValueKey(step.id),
+                                    index: index,
+                                    step: step,
+                                    onChanged: (title) => _updateStepTitle(index, title),
+                                    onStepChanged: (s) {
+                                      final updated = List<SystemStep>.from(_steps);
+                                      updated[index] = s;
+                                      setState(() => _steps = updated);
+                                    },
+                                    onRemove: () => _removeStep(index),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
                         ],
                       ],
                     ),

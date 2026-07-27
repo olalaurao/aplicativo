@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/settings_provider.dart';
+import '../../providers/today_aggregation_provider.dart';
 import '../../providers/vault_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
@@ -199,155 +200,21 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
       'Sat',
       'Sun',
     ][_selectedDate.weekday - 1];
+
+
+    final dayAggregation = ref.watch(todayAggregationProvider(_selectedDate));
+    final dayTasks = dayAggregation.allTasks;
+    final activeTimeBlocks = dayAggregation.timeBlocks;
+
     final activeTheme = dayThemes.cast<Organizer?>().firstWhere(
       (theme) => theme != null && theme.daysOfWeek.contains(dayName),
       orElse: () => null,
     );
-    final activeTimeBlocks =
-        activeTheme == null
-              ? <Organizer>[]
-              : timeBlocks
-                    .where((block) => activeTheme.organizers.any((ref) => ref.matches(block.id, block.slug, block.title)))
-                    .toList()
-          ..sort((a, b) {
-            final aStart = a.timeRanges.isEmpty
-                ? 24 * 60
-                : (a.timeRanges.first.startHour * 60) +
-                      a.timeRanges.first.startMinute;
-            final bStart = b.timeRanges.isEmpty
-                ? 24 * 60
-                : (b.timeRanges.first.startHour * 60) +
-                      b.timeRanges.first.startMinute;
-            return aStart.compareTo(bStart);
-          });
 
-    bool isThemeActive(String themeId, DateTime date) {
-      const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      final dayName = weekDayNames[date.weekday - 1];
-      return dayThemes.any(
-        (theme) => theme.id == themeId && theme.daysOfWeek.contains(dayName),
-      );
-    }
-
-    bool isBlockActive(String blockId, DateTime date) {
-      return timeBlocks.any((block) {
-        if (block.id != blockId) return false;
-        return dayThemes.any((theme) {
-          if (!theme.organizers.any((ref) => ref.matches(block.id, block.slug, block.title))) return false;
-          return isThemeActive(theme.id, date);
-        });
-      });
-    }
-
-    bool isItemScheduled(String linkedItemId, DateTime date) {
-      final targetSlug = linkedItemId
-          .replaceAll('[[', '')
-          .replaceAll(']]', '')
-          .trim()
-          .toLowerCase();
-      final reminders = ref.read(remindersProvider);
-
-      final hasLinkedTask = tasks.any((t) {
-        final isScheduled =
-            (t.startDate != null && _isSameDay(t.startDate!, date)) ||
-            (t.deadline != null && _isSameDay(t.deadline!, date)) ||
-            (t.scheduler != null &&
-                SchedulerService.shouldFire(
-                  t.scheduler!,
-                  date,
-                  isThemeActive: isThemeActive,
-                  isBlockActive: isBlockActive,
-                ));
-        if (!isScheduled) return false;
-        return t.id == linkedItemId ||
-            t.slug == targetSlug ||
-            t.organizers.any(
-              (o) =>
-                  o.slug == targetSlug || o.title.toLowerCase() == targetSlug,
-            );
-      });
-      if (hasLinkedTask) return true;
-
-      final hasLinkedReminder = reminders.any((r) {
-        final isScheduled =
-            _isSameDay(r.time, date) ||
-            (r.scheduler != null &&
-                SchedulerService.shouldFire(
-                  r.scheduler!,
-                  date,
-                  isThemeActive: isThemeActive,
-                  isBlockActive: isBlockActive,
-                ));
-        if (!isScheduled) return false;
-        return r.id == linkedItemId ||
-            r.slug == targetSlug ||
-            r.organizers.any(
-              (o) =>
-                  o.slug == targetSlug || o.title.toLowerCase() == targetSlug,
-            );
-      });
-      return hasLinkedReminder;
-    }
-
-    final baseDayTasks = tasks.where((t) {
-      // Check if task starts today
-      if (t.startDate != null && _isSameDay(t.startDate!, _selectedDate)) {
-        return true;
-      }
-      // Check if task ends today (deadline)
-      if (t.deadline != null && _isSameDay(t.deadline!, _selectedDate)) {
-        return true;
-      }
-      if (t.stage == TaskStage.finalized) return false;
-      if (t.scheduler != null &&
-          SchedulerService.shouldFire(
-            t.scheduler!,
-            _selectedDate,
-            isThemeActive: isThemeActive,
-            isBlockActive: isBlockActive,
-            isItemScheduled: isItemScheduled,
-          )) {
-        return true;
-      }
-      return false;
-    }).toList();
-
-    final dayTasks = mergeDayTasksWithRotation(
-      baseDayTasks,
-      _selectedDate,
-      tasks,
-      projects,
-    );
-
-    final dayHabits = habits.where((h) {
-      for (final s in h.schedulers) {
-        if (SchedulerService.shouldFire(
-          s,
-          _selectedDate,
-          isThemeActive: isThemeActive,
-          isBlockActive: isBlockActive,
-          isItemScheduled: isItemScheduled,
-        )) {
-          return true;
-        }
-      }
-      return false;
-    }).toList();
-
-    final dayContactReminders = people.where((p) {
-      if (p.lastContactDate == null || p.contactFrequency == null) return false;
-      final nextContact = p.lastContactDate!.add(p.contactFrequency!);
-      return _isSameDay(nextContact, _selectedDate);
-    }).toList();
-
-    final dayEntries = ref
-        .watch(allEntriesProvider)
-        .where((e) => _isSameDay(e.date, _selectedDate))
-        .toList();
-    final dayRecords = ref
-        .watch(trackingRecordsProvider)
-        .where((r) => _isSameDay(r.date, _selectedDate))
-        .toList();
+    final dayHabits = dayAggregation.habits;
+    final dayEntries = dayAggregation.journalEntries;
+    final dayRecords = dayAggregation.trackerRecords;
+    final dayContactReminders = dayAggregation.peopleToContact;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -375,9 +242,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color:
-                          _parsePlannerColor(activeTheme.color) ??
-                          AppTheme.accentColor(context),
+                      color: AppTheme.accentColor(context),
                     ),
                   ),
               ],
@@ -396,8 +261,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             bottom: PreferredSize(
               preferredSize: Size.fromHeight(
                 _showActionsPanel 
-                    ? (_viewMode == 0 ? 240 : 120)
-                    : (_viewMode == 0 ? 180 : 60),
+                    ? (_viewMode == 0 ? 200 : 100)
+                    : (_viewMode == 0 ? 130 : 50),
               ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -448,10 +313,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
 
                           // Sugerir duração com base em estimatedMinutes se disponível
                           final targetDuration =
-                              (task.estimatedMinutes != null &&
-                                  task.estimatedMinutes! > 0)
-                              ? task.estimatedMinutes!
-                              : task.duration;
+                              task.duration > 0 ? task.duration : 15;
 
                           final updated = task.copyWith(
                             scheduledTime: timeStr,
@@ -543,6 +405,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                               );
                         },
                         colorMode: ref.watch(settingsProvider.select((s) => s.plannerColorMode)),
+                        rotationProjects: dayAggregation.rotationProjects,
+                        rotationTasks: dayAggregation.rotationTasks,
                       ),
                     ),
                   )
@@ -567,10 +431,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         )),
-      SafeArea(
-        top: false,
-        child: const QuickCaptureBar.inline(),
-      ),
         ],
       ),
       floatingActionButton: _showJumpToNowFab && _isTimeline && _viewMode == 0
@@ -2777,6 +2637,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
       case DialSegmentKind.dayTheme:
         icon = ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.dayTheme, typeSignatures);
         break;
+      case DialSegmentKind.rotationZone:
+        icon = Icons.rotate_right;
+        break;
       case DialSegmentKind.sleep:
         icon = Icons.bedtime;
         break;
@@ -2792,6 +2655,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
       DialSegmentKind.reminder => Icons.notifications,
       DialSegmentKind.dayTheme => Icons.wb_sunny,
       DialSegmentKind.sleep => Icons.bedtime,
+      DialSegmentKind.rotationZone => Icons.rotate_right,
     };
   }
 
@@ -3557,19 +3421,5 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  Color? _parsePlannerColor(String? color) {
-    if (color == null || color.trim().isEmpty) return null;
-    try {
-      final colorStr = color.trim().replaceAll('#', '');
-      if (colorStr.length == 6) {
-        return Color(int.parse('0xFF$colorStr'));
-      }
-      if (colorStr.length == 8) {
-        return Color(int.parse('0x$colorStr'));
-      }
-    } catch (_) {
-      debugPrint('Invalid planner color: $color');
-    }
-    return null;
-  }
+
 }

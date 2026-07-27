@@ -65,7 +65,8 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
   @override
   void initState() {
     super.initState();
-    _draft = widget.currentFilter ??
+    _draft =
+        widget.currentFilter ??
         SavedFilter(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           name: 'Novo filtro',
@@ -125,10 +126,7 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: [
-                        ...saved.map(_savedChip),
-                        _addSavedChip(),
-                      ],
+                      children: [...saved.map(_savedChip), _addSavedChip()],
                     ),
                   ),
                 ),
@@ -215,6 +213,43 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
                     ),
                   ),
                 ),
+                // ── Propriedades visíveis ──
+                _section(
+                  'PROPRIEDADES NA LISTA',
+                  child: Column(
+                    children: [
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        value: _draft.includeSortProperty,
+                        activeThumbColor: AppTheme.accentColor(context),
+                        title: const Text(
+                          'Mostrar propriedade de ordenação',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          _sortPropertyLabel(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textMutedColor(context),
+                          ),
+                        ),
+                        onChanged: (value) => setState(
+                          () => _draft = _draft.copyWith(
+                            includeSortProperty: value,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _visiblePropertySelector(),
+                    ],
+                  ),
+                ),
                 // ── Visualização ──
                 _section(
                   'VISUALIZAÇÃO',
@@ -294,14 +329,14 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
         margin: const EdgeInsets.only(right: 6),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color:
-              isActive
-                  ? AppTheme.accentColor(context).withValues(alpha: 0.15)
-                  : AppTheme.surfaceVariantColor(context),
-          border:
-              isActive
-                  ? Border.all(color: AppTheme.accentColor(context).withValues(alpha: 0.3))
-                  : null,
+          color: isActive
+              ? AppTheme.accentColor(context).withValues(alpha: 0.15)
+              : AppTheme.surfaceVariantColor(context),
+          border: isActive
+              ? Border.all(
+                  color: AppTheme.accentColor(context).withValues(alpha: 0.3),
+                )
+              : null,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
@@ -309,8 +344,9 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color:
-                isActive ? AppTheme.accentColor(context) : AppTheme.textSecondaryColor(context),
+            color: isActive
+                ? AppTheme.accentColor(context)
+                : AppTheme.textSecondaryColor(context),
           ),
         ),
       ),
@@ -362,7 +398,8 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
                 // Row 1: Property selector
                 _labelledDropdown<String>(
                   label: 'Propriedade',
-                  value: widget.availableProperties.any(
+                  value:
+                      widget.availableProperties.any(
                         (p) => p.key == rule.property,
                       )
                       ? rule.property
@@ -398,22 +435,23 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
                       child: _labelledDropdown<FilterOperator>(
                         label: 'Operador',
                         value: rule.op,
-                        items: [
-                          FilterOperator.equals,
-                          FilterOperator.notEquals,
-                          FilterOperator.contains,
-                          FilterOperator.isEmpty,
-                        ]
-                            .map(
-                              (op) => DropdownMenuItem(
-                                value: op,
-                                child: Text(
-                                  _opLabel(op),
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            )
-                            .toList(),
+                        items:
+                            [
+                                  FilterOperator.equals,
+                                  FilterOperator.notEquals,
+                                  FilterOperator.contains,
+                                  FilterOperator.isEmpty,
+                                ]
+                                .map(
+                                  (op) => DropdownMenuItem(
+                                    value: op,
+                                    child: Text(
+                                      _opLabel(op),
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
                         onChanged: (val) {
                           if (val == null) return;
                           final rules = _draft.rules.toList();
@@ -477,9 +515,7 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: AppTheme.dividerColor(context),
-            ),
+            border: Border.all(color: AppTheme.dividerColor(context)),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<T>(
@@ -600,20 +636,19 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
     final active = _draft.sortAscending == ascending;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(
-          () => _draft = _draft.copyWith(sortAscending: ascending),
-        ),
+        onTap: () =>
+            setState(() => _draft = _draft.copyWith(sortAscending: ascending)),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 9),
           decoration: BoxDecoration(
-            color:
-                active
-                    ? AppTheme.accentColor(context).withValues(alpha: 0.12)
-                    : AppTheme.surfaceVariantColor(context),
-            border:
-                active
-                    ? Border.all(color: AppTheme.accentColor(context).withValues(alpha: 0.3))
-                    : null,
+            color: active
+                ? AppTheme.accentColor(context).withValues(alpha: 0.12)
+                : AppTheme.surfaceVariantColor(context),
+            border: active
+                ? Border.all(
+                    color: AppTheme.accentColor(context).withValues(alpha: 0.3),
+                  )
+                : null,
             borderRadius: BorderRadius.circular(9),
           ),
           child: Center(
@@ -622,10 +657,9 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color:
-                    active
-                        ? AppTheme.accentColor(context)
-                        : AppTheme.textSecondaryColor(context),
+                color: active
+                    ? AppTheme.accentColor(context)
+                    : AppTheme.textSecondaryColor(context),
               ),
             ),
           ),
@@ -642,14 +676,14 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 9),
           decoration: BoxDecoration(
-            color:
-                active
-                    ? AppTheme.accentColor(context).withValues(alpha: 0.12)
-                    : AppTheme.surfaceVariantColor(context),
-            border:
-                active
-                    ? Border.all(color: AppTheme.accentColor(context).withValues(alpha: 0.3))
-                    : null,
+            color: active
+                ? AppTheme.accentColor(context).withValues(alpha: 0.12)
+                : AppTheme.surfaceVariantColor(context),
+            border: active
+                ? Border.all(
+                    color: AppTheme.accentColor(context).withValues(alpha: 0.3),
+                  )
+                : null,
             borderRadius: BorderRadius.circular(9),
           ),
           child: Center(
@@ -658,10 +692,9 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color:
-                    active
-                        ? AppTheme.accentColor(context)
-                        : AppTheme.textSecondaryColor(context),
+                color: active
+                    ? AppTheme.accentColor(context)
+                    : AppTheme.textSecondaryColor(context),
               ),
             ),
           ),
@@ -670,12 +703,97 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
     );
   }
 
+  Widget _visiblePropertySelector() {
+    if (widget.availableProperties.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: widget.availableProperties.map((property) {
+        final selected = _draft.visibleProperties.contains(property.key);
+        return FilterChip(
+          selected: selected,
+          label: Text(
+            property.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          selectedColor: AppTheme.accentColor(context).withValues(alpha: 0.16),
+          checkmarkColor: AppTheme.accentColor(context),
+          side: BorderSide(
+            color: selected
+                ? AppTheme.accentColor(context).withValues(alpha: 0.4)
+                : AppTheme.dividerColor(context),
+          ),
+          onSelected: (value) {
+            final next = _draft.visibleProperties.toList();
+            if (value) {
+              if (!next.contains(property.key)) next.add(property.key);
+            } else {
+              next.remove(property.key);
+            }
+            setState(() => _draft = _draft.copyWith(visibleProperties: next));
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  String _sortPropertyLabel() {
+    final key = _propertyKeyForSort(_draft.sortBy);
+    if (key == null) return 'A ordenação atual não tem propriedade visível.';
+    final property = widget.availableProperties
+        .cast<FilterProperty?>()
+        .firstWhere((property) => property?.key == key, orElse: () => null);
+    return property == null
+        ? 'A ordenação atual não tem propriedade configurável.'
+        : 'Inclui automaticamente: ${property.label}';
+  }
+
+  String? _propertyKeyForSort(SortField sort) {
+    return switch (sort) {
+      SortField.title => 'title',
+      SortField.created => 'created',
+      SortField.modified => 'modified',
+      SortField.rating => 'rating',
+      SortField.status => _firstAvailableProperty(['status', 'stage', 'state']),
+      SortField.type => _firstAvailableProperty([
+        'type',
+        'kind',
+        'resourceType',
+        'noteType',
+        'goalType',
+      ]),
+      SortField.priority => _firstAvailableProperty([
+        'priority',
+        'contactPriority',
+      ]),
+      SortField.deadline => 'deadline',
+      SortField.streak => 'streak',
+      SortField.lastContact => 'lastContact',
+      SortField.manual => null,
+    };
+  }
+
+  String? _firstAvailableProperty(List<String> keys) {
+    final availableKeys = widget.availableProperties
+        .map((property) => property.key)
+        .toSet();
+    for (final key in keys) {
+      if (availableKeys.contains(key)) return key;
+    }
+    return keys.isEmpty ? null : keys.first;
+  }
+
   void _addRule() {
     if (widget.availableProperties.isEmpty) return;
     final prop = widget.availableProperties.first;
     // Pre-fill value with the first allowed value if available
-    final defaultValue =
-        prop.allowedValues?.isNotEmpty == true ? prop.allowedValues!.first : '';
+    final defaultValue = prop.allowedValues?.isNotEmpty == true
+        ? prop.allowedValues!.first
+        : '';
     setState(
       () => _draft = _draft.copyWith(
         rules: [
@@ -708,7 +826,9 @@ class _FilterSortSheetState extends ConsumerState<FilterSortSheet> {
         _draft.rules.isEmpty &&
         _draft.groupBy == GroupField.none &&
         _draft.sortBy == SortField.modified &&
-        _draft.sortAscending == false;
+        _draft.sortAscending == false &&
+        _draft.visibleProperties.isEmpty &&
+        _draft.includeSortProperty == true;
     widget.onApply(isBlank ? null : _draft);
   }
 

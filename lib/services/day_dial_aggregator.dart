@@ -10,8 +10,10 @@ import '../models/organizer_model.dart';
 import '../models/mood_model.dart';
 import '../models/journal_entry.dart';
 import '../models/event_model.dart';
+import '../models/project_model.dart';
 import '../models/shared_types.dart';
 import '../ui/utils/object_icons.dart';
+import 'rotation_service.dart';
 import 'package:googleapis/calendar/v3.dart' as google_calendar;
 
 /// Aggregates data from multiple sources to produce a DayDialSnapshot
@@ -27,6 +29,7 @@ class DayDialAggregator {
     required List<Organizer> timeBlocks,
     required List<JournalEntry> journalEntries,
     required List<MoodDefinition> moodCatalog,
+    List<Project> projects = const [],
     Map<String, TypeSignature> typeSignatures = const {},
   }) {
     final segments = <DialSegment>[];
@@ -99,17 +102,65 @@ class DayDialAggregator {
         start: start,
         end: start.add(Duration(minutes: duration)),
         title: task.title,
-        colorHex: task.color ?? '#6B5EA8',
+        colorHex: _colorHexForObject(
+          task.color,
+          ObjectTypes.task,
+          typeSignatures,
+        ),
         isEditable: true,
         isResizable: true,
         sourceSlug: task.slug,
       ));
     }
 
+    // Project rotation zones
+    for (final project in projects) {
+      final status = RotationService.computeActiveStatus(project, now: date);
+      if (status == null) continue;
+      final dueTasks = RotationService.dueRotationTasksForStatus(
+        project,
+        status,
+        tasks,
+      ).where((task) => !task.archived && task.stage != TaskStage.finalized);
+      if (dueTasks.isEmpty) continue;
+      final schedule = RotationService.scheduleForStatus(
+        project,
+        status,
+        date,
+      );
+
+      final start = _parseScheduledTime(
+            schedule.time,
+            date,
+          ) ??
+          DateTime(date.year, date.month, date.day, 9);
+      final duration = schedule.durationMinutes;
+      segments.add(DialSegment(
+        id: 'rotationZone:${project.id}:${status.group.id}',
+        kind: DialSegmentKind.rotationZone,
+        start: start,
+        end: start.add(Duration(minutes: duration > 0 ? duration : 60)),
+        title: '${project.title} · ${status.group.name}',
+        colorHex: _colorHexForObject(
+          project.color,
+          ObjectTypes.project,
+          typeSignatures,
+        ),
+        iconData:
+            ObjectIcons.iconDataForTypeWithSignatures(
+              ObjectTypes.project,
+              typeSignatures,
+            ) ??
+            Icons.sync,
+        isEditable: true,
+        isResizable: true,
+        sourceSlug: project.slug,
+      ));
+    }
+
     // Local Events
     for (final event in localEvents) {
       final start = event.startDatetime;
-      if (start == null) continue;
       if (!_isSameDay(start, date)) continue;
 
       final end = event.endDatetime ?? start.add(const Duration(minutes: 30));
@@ -165,7 +216,11 @@ class DayDialAggregator {
           start: start,
           end: end,
           title: block.title,
-          colorHex: block.color ?? '#8E8E93',
+          colorHex: _colorHexForObject(
+            null,
+            ObjectTypes.timeBlock,
+            typeSignatures,
+          ),
           isEditable: false,
           isResizable: false,
           layer: -1,
@@ -187,7 +242,11 @@ class DayDialAggregator {
           start: start,
           end: start.add(const Duration(minutes: 12)),
           title: habit.title,
-          colorHex: habit.color ?? '#FF9500',
+          colorHex: _colorHexForObject(
+            habit.color,
+            ObjectTypes.habit,
+            typeSignatures,
+          ),
           iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.habit, typeSignatures) ?? Icons.refresh,
           isEditable: true,
           isResizable: false,
@@ -234,7 +293,7 @@ class DayDialAggregator {
 
   static void _assignLayers(List<DialSegment> segments) {
     final pointInTime = segments.where((s) => s.kind == DialSegmentKind.habitSlot || s.kind == DialSegmentKind.reminder).toList();
-    final durationSegments = segments.where((s) => 
+      final durationSegments = segments.where((s) => 
         s.kind != DialSegmentKind.timeBlock && 
         s.kind != DialSegmentKind.habitSlot && 
         s.kind != DialSegmentKind.reminder).toList();
@@ -337,5 +396,24 @@ class DayDialAggregator {
     if (hour == null || minute == null) return null;
     if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
     return DateTime(date.year, date.month, date.day, hour, minute);
+  }
+
+  static String _colorHexForObject(
+    String? objectColor,
+    String type,
+    Map<String, TypeSignature> typeSignatures,
+  ) {
+    final parsed = _normalizedHex(objectColor);
+    if (parsed != null) return parsed;
+    final color = ObjectIcons.colorForTypeWithSignatures(type, typeSignatures);
+    return '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+  }
+
+  static String? _normalizedHex(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final clean = value.trim().replaceAll('#', '');
+    if (clean.length == 6) return '#${clean.toUpperCase()}';
+    if (clean.length == 8) return '#${clean.substring(2).toUpperCase()}';
+    return null;
   }
 }

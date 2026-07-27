@@ -5,7 +5,7 @@
 import 'content_object.dart';
 import 'kpi_model.dart';
 import 'scheduler.dart';
-import 'shared_types.dart' hide KPI;
+import 'shared_types.dart';
 
 enum GoalType { oneTime, repeating }
 
@@ -19,6 +19,7 @@ class Goal extends ContentObject {
   DateTime? startDate;
   DateTime? deadline;
   List<KPI> kpis;
+
   /// V5: links replaces old `subtasks` (WikiLinks) — Goal never embeds Task files.
   /// Use the universal `links` field (ContentObject.links) to reference Tasks/Projects.
   List<Scheduler> schedulers;
@@ -60,9 +61,14 @@ class Goal extends ContentObject {
     frontmatter['goal_type'] = goalType.name;
     frontmatter['state'] = state.name;
     if (repeatInterval != null) frontmatter['repeat_interval'] = repeatInterval;
-    if (startDate != null) frontmatter['start_date'] = startDate!.toIso8601String();
+    if (startDate != null)
+      frontmatter['start_date'] = startDate!.toIso8601String();
     if (deadline != null) frontmatter['deadline'] = deadline!.toIso8601String();
-    if (kpis.isNotEmpty) frontmatter['kpis'] = kpis.map((e) => e.toMap()).toList();
+    if (kpis.isNotEmpty)
+      frontmatter['kpis'] = kpis.map((e) => e.toMap()).toList();
+    if (schedulers.isNotEmpty) {
+      frontmatter['schedulers'] = schedulers.map((e) => e.toMap()).toList();
+    }
     if (color != null) frontmatter['color'] = color;
     if (icon != null) frontmatter['icon'] = icon;
     // V5: goal_mode, objective, strategy, phases removed — moved to Project.
@@ -94,6 +100,11 @@ class Goal extends ContentObject {
     goal.kpis = (frontmatter['kpis'] as List? ?? [])
         .whereType<Map>()
         .map((e) => KPI.fromMap(Map<String, dynamic>.from(e)))
+        .toList();
+
+    goal.schedulers = (frontmatter['schedulers'] as List? ?? [])
+        .whereType<Map>()
+        .map((e) => Scheduler.fromMap(Map<String, dynamic>.from(e)))
         .toList();
 
     goal.color = frontmatter['color'] as String?;
@@ -129,26 +140,26 @@ class Goal extends ContentObject {
     String? obsidianPath,
   }) {
     return Goal(
-      id: id,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      goalType: goalType ?? this.goalType,
-      state: state ?? this.state,
-      repeatInterval: repeatInterval ?? this.repeatInterval,
-      startDate: startDate ?? this.startDate,
-      deadline: deadline ?? this.deadline,
-      kpis: kpis ?? this.kpis,
-      schedulers: schedulers ?? this.schedulers,
-      color: color ?? this.color,
-      icon: icon ?? this.icon,
-      organizers: organizers ?? this.organizers,
-      categories: categories ?? this.categories,
-      tags: tags ?? this.tags,
-      links: links ?? this.links,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? DateTime.now(),
-      obsidianPath: obsidianPath ?? this.obsidianPath,
-    )
+        id: id,
+        title: title ?? this.title,
+        description: description ?? this.description,
+        goalType: goalType ?? this.goalType,
+        state: state ?? this.state,
+        repeatInterval: repeatInterval ?? this.repeatInterval,
+        startDate: startDate ?? this.startDate,
+        deadline: deadline ?? this.deadline,
+        kpis: kpis ?? this.kpis,
+        schedulers: schedulers ?? this.schedulers,
+        color: color ?? this.color,
+        icon: icon ?? this.icon,
+        organizers: organizers ?? this.organizers,
+        categories: categories ?? this.categories,
+        tags: tags ?? this.tags,
+        links: links ?? this.links,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? DateTime.now(),
+        obsidianPath: obsidianPath ?? this.obsidianPath,
+      )
       ..archived = archived
       ..pinned = pinned
       ..reminders = List.from(reminders)
@@ -161,7 +172,10 @@ class Goal extends ContentObject {
     if (kpis.isEmpty) return 0.0;
     final total = kpis.fold<double>(0, (sum, k) => sum + k.targetValue);
     if (total == 0) return 0.0;
-    final current = kpis.fold<double>(0, (sum, k) => sum + k.currentValue.clamp(0, k.targetValue));
+    final current = kpis.fold<double>(
+      0,
+      (sum, k) => sum + k.currentValue.clamp(0, k.targetValue),
+    );
     return (current / total).clamp(0.0, 1.0);
   }
 }

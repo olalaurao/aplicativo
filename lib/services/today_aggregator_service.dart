@@ -12,7 +12,11 @@ import '../services/scheduler_service.dart';
 import '../ui/theme.dart';
 import '../ui/utils/object_icons.dart';
 
-enum TodayItemKind { entry, task, event, habitSlot, pomodoro, trackerRecord, reminder, timeBlock }
+import '../models/system_model.dart';
+import '../models/project_model.dart';
+import '../services/rotation_service.dart';
+
+enum TodayItemKind { entry, task, event, habitSlot, pomodoro, trackerRecord, reminder, timeBlock, system, rotationZone }
 enum TodayItemOrigin { created, scheduled }
 
 class TodayItem {
@@ -213,6 +217,59 @@ class TodayAggregatorService {
             title: obj.title,
             iconData: ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.timeBlock, typeSignatures) ?? Icons.access_time,
             color: color,
+            isCompletable: false,
+            isCompleted: false,
+            isPlayable: false,
+            source: obj,
+          ));
+        }
+      } else if (obj is SystemDefinition) {
+        // Include systems that have a scheduledTime on any day
+        // (treat as recurring daily if no scheduler is set)
+        bool showToday = false;
+        if (obj.scheduler != null) {
+          if (SchedulerService.shouldFire(obj.scheduler!, date)) showToday = true;
+        } else {
+          showToday = true; // show every day if no scheduler
+        }
+        if (showToday) {
+          DateTime ts = DateTime(date.year, date.month, date.day);
+          if (obj.scheduledTime != null && obj.scheduledTime!.isNotEmpty) {
+            final parts = obj.scheduledTime!.split(':');
+            if (parts.length == 2) {
+              ts = DateTime(date.year, date.month, date.day,
+                  int.tryParse(parts[0]) ?? 0, int.tryParse(parts[1]) ?? 0);
+            }
+          }
+          items.add(TodayItem(
+            id: obj.id,
+            kind: TodayItemKind.system,
+            origin: TodayItemOrigin.scheduled,
+            timestamp: ts,
+            title: obj.title,
+            iconData: Icons.settings_outlined,
+            color: AppColors.info,
+            isCompletable: false,
+            isCompleted: false,
+            isPlayable: false,
+            source: obj,
+          ));
+        }
+      } else if (obj is Project && obj.hasRotation) {
+        final status = RotationService.computeActiveStatus(obj, now: date);
+        if (status != null) {
+          final schedule = RotationService.scheduleForStatus(obj, status, date);
+          final parts = schedule.time.split(':');
+          final ts = DateTime(date.year, date.month, date.day,
+              int.tryParse(parts.first) ?? 9, parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0);
+          items.add(TodayItem(
+            id: '${obj.id}::rotation',
+            kind: TodayItemKind.rotationZone,
+            origin: TodayItemOrigin.scheduled,
+            timestamp: ts,
+            title: '${obj.title} · ${status.group.name}',
+            iconData: Icons.rotate_right,
+            color: AppColors.accent,
             isCompletable: false,
             isCompleted: false,
             isPlayable: false,

@@ -5,9 +5,11 @@ import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/task_model.dart';
 import '../../models/organizer_model.dart';
+import '../../models/project_model.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/pomodoro_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../services/rotation_service.dart';
 import '../theme.dart';
 import '../utils/object_icons.dart';
 import 'package:googleapis/calendar/v3.dart' as google_calendar;
@@ -19,6 +21,7 @@ import '../screens/universal_detail_view.dart';
 import '../screens/pomodoro_screen.dart';
 import '../forms/create_task_form.dart';
 import '../../models/pomodoro_session.dart';
+import 'rotation_schedule_dialog.dart';
 
 class TimeLineDayView extends ConsumerStatefulWidget {
   final List<Task> tasks;
@@ -36,6 +39,8 @@ class TimeLineDayView extends ConsumerStatefulWidget {
   final int gridGranularity; // 15, 30, or 60 minutes
   final List<PomodoroSession> pomodoroSessions;
   final Organizer? activeTheme; // Active day theme for the selected date
+  final List<Project> rotationProjects;
+  final List<Task> rotationTasks;
 
   const TimeLineDayView({
     super.key,
@@ -54,6 +59,8 @@ class TimeLineDayView extends ConsumerStatefulWidget {
     this.gridGranularity = 30,
     this.pomodoroSessions = const [],
     this.activeTheme,
+    this.rotationProjects = const [],
+    this.rotationTasks = const [],
   });
 
   @override
@@ -170,6 +177,26 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                       endMinutes:
                           startMinutes + (duration < 20 ? 20 : duration),
                       id: event.id ?? event.hashCode.toString(),
+                    ),
+                  );
+                }
+
+                // 4. Rotation Project Blocks
+                for (final project in widget.rotationProjects) {
+                  final status = RotationService.computeActiveStatus(project, now: widget.selectedDate);
+                  if (status == null) continue;
+                  final schedule = RotationService.scheduleForStatus(project, status, widget.selectedDate);
+                  final parts = schedule.time.split(':');
+                  final hour = int.tryParse(parts[0]) ?? 9;
+                  final minute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+                  final startMinutes = hour * 60 + minute;
+                  final duration = schedule.durationMinutes.clamp(20, 24 * 60);
+                  items.add(
+                    TimelineItem(
+                      originalItem: _RotationProjectBlock(project: project, status: status, schedule: schedule),
+                      startMinutes: startMinutes,
+                      endMinutes: startMinutes + duration,
+                      id: 'rotation_${project.id}',
                     ),
                   );
                 }
@@ -451,7 +478,28 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                             ),
                           ),
                         );
+                      } else if (item.originalItem is _RotationProjectBlock) {
+                        final block = item.originalItem as _RotationProjectBlock;
+                        final blockColor = _parseOptionalColor(block.project.color) ?? AppTheme.accentColor(context);
+                        final blockTasks = widget.rotationTasks.where((t) =>
+                          RotationService.rotationTasksForGroup(block.project, block.status.group, widget.rotationTasks).contains(t) &&
+                          !t.archived && t.stage != TaskStage.finalized
+                        ).toList();
+                        return Positioned(
+                          top: topOffset,
+                          left: leftOffset,
+                          width: colWidth - 4,
+                          height: height < 48 ? 48 : height,
+                          child: _buildRotationProjectBlock(
+                            context,
+                            block,
+                            blockColor,
+                            blockTasks,
+                            height,
+                          ),
+                        );
                       } else {
+
                         final event =
                             item.originalItem as google_calendar.Event;
                         final startTime =
@@ -483,39 +531,43 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                                   ),
                                 ),
                               ),
-                              padding: const EdgeInsets.symmetric(
+                              padding: EdgeInsets.symmetric(
                                 horizontal: 12,
-                                vertical: 8,
+                                vertical: height < 30 ? 2 : 8,
                               ),
                               child: Row(
                                 children: [
                                   Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          event.summary ?? '(Untitled)',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.info,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        if (height > 40)
+                                    child: SingleChildScrollView(
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
                                           Text(
-                                            '${DateFormat('HH:mm').format(startTime)} - ${DateFormat('HH:mm').format(endTime)}',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w500,
-                                              color: AppColors.info.withValues(
-                                                alpha: 0.7,
+                                            event.summary ?? '(Untitled)',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.info,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (height > 40)
+                                            Text(
+                                              '${DateFormat('HH:mm').format(startTime)} - ${DateFormat('HH:mm').format(endTime)}',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w500,
+                                                color: AppColors.info.withValues(
+                                                  alpha: 0.7,
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
                                   PopupMenuButton<String>(
@@ -627,7 +679,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
               String title = '';
 
               if (data is Task) {
-                duration = data.estimatedMinutes ?? data.duration;
+                duration = data.duration;
                 title = data.title;
               } else if (data is Habit) {
                 duration = 30; // Habits default to 30 min
@@ -1643,9 +1695,188 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
       ),
     );
   }
+
+  Widget _buildRotationProjectBlock(
+    BuildContext context,
+    _RotationProjectBlock block,
+    Color blockColor,
+    List<Task> blockTasks,
+    double height,
+  ) {
+    final project = block.project;
+    final status = block.status;
+    final schedule = block.schedule;
+    final groupColor = _parseOptionalColor(status.group.colorHex) ?? blockColor;
+    final timeStr = schedule.time;
+    final durationStr = schedule.durationMinutes >= 60
+        ? '${schedule.durationMinutes ~/ 60}h${schedule.durationMinutes % 60 > 0 ? '${schedule.durationMinutes % 60}m' : ''}'
+        : '${schedule.durationMinutes}m';
+    final isCompact = height < 64;
+
+    return GestureDetector(
+      onTap: () {
+        // Expand/collapse is handled internally; tap opens project detail
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UniversalDetailView(object: project),
+          ),
+        );
+      },
+      child: Container(
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+          color: groupColor.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+          border: Border(
+            left: BorderSide(color: groupColor, width: 3),
+          ),
+        ),
+        padding: EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: isCompact ? 4 : 8,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (status.group.emoji != null) ...[
+                  Text(status.group.emoji!, style: const TextStyle(fontSize: 12)),
+                  const SizedBox(width: 4),
+                ],
+                Expanded(
+                  child: Text(
+                    project.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: groupColor,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (_) => RotationScheduleDialog(
+                        project: project,
+                        status: status,
+                        date: widget.selectedDate,
+                        initialTime: timeStr,
+                        initialDuration: schedule.durationMinutes,
+                      ),
+                    );
+                  },
+                  child: Icon(
+                    Icons.schedule_rounded,
+                    size: 14,
+                    color: groupColor.withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
+            ),
+            if (!isCompact) ...[
+              Text(
+                '${status.group.name} • $timeStr ($durationStr)',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: groupColor.withValues(alpha: 0.75),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (blockTasks.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Expanded(
+                  child: ListView.builder(
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: blockTasks.length,
+                    itemBuilder: (context, index) {
+                      final task = blockTasks[index];
+                      return Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              final updated = task.copyWith(
+                                stage: task.stage == TaskStage.finalized
+                                    ? TaskStage.todo
+                                    : TaskStage.finalized,
+                              );
+                              ref.read(vaultProvider.notifier).updateObject(updated);
+                            },
+                            child: Icon(
+                              task.stage == TaskStage.finalized
+                                  ? Icons.check_box_rounded
+                                  : Icons.check_box_outline_blank_rounded,
+                              size: 14,
+                              color: task.stage == TaskStage.finalized
+                                  ? AppColors.habitGreen
+                                  : AppColors.textMuted,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              task.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: task.stage == TaskStage.finalized
+                                    ? AppColors.textMuted
+                                    : AppColors.textPrimary,
+                                decoration: task.stage == TaskStage.finalized
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => UniversalDetailView(object: task)),
+                            ),
+                            child: Icon(
+                              Icons.play_circle_outline_rounded,
+                              size: 14,
+                              color: groupColor.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
+/// Internal data class for rotation project timeline entries
+class _RotationProjectBlock {
+  final Project project;
+  final RotationStatus status;
+  final ({String time, int durationMinutes}) schedule;
+
+  const _RotationProjectBlock({
+    required this.project,
+    required this.status,
+    required this.schedule,
+  });
+}
+
+
 class TimelineItem {
+
   final dynamic originalItem; // Task, Habit, or google_calendar.Event
   final int startMinutes;
   final int endMinutes;

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/task_model.dart';
 import '../../models/habit_model.dart';
 import '../../models/organizer_model.dart';
+import '../../models/project_model.dart';
+import '../../services/rotation_service.dart';
 import '../theme.dart';
 
 class WeekTimeGrid extends ConsumerWidget {
@@ -12,8 +14,10 @@ class WeekTimeGrid extends ConsumerWidget {
   final DateTime startOfWeek;
   final Function(Task, DateTime)? onTaskTap;
   final Function(Habit)? onHabitTap;
+  final Function(Project, DateTime)? onProjectTap;
   final List<Organizer>? dayThemes;
   final List<Organizer>? timeBlocks;
+  final List<Project> projects;
 
   const WeekTimeGrid({
     super.key,
@@ -22,8 +26,10 @@ class WeekTimeGrid extends ConsumerWidget {
     required this.startOfWeek,
     this.onTaskTap,
     this.onHabitTap,
+    this.onProjectTap,
     this.dayThemes,
     this.timeBlocks,
+    this.projects = const [],
   });
 
   @override
@@ -52,10 +58,9 @@ class WeekTimeGrid extends ConsumerWidget {
                   // Find active day theme for this day
                   Organizer? activeTheme;
                   if (dayThemes != null) {
-                    activeTheme = dayThemes!.firstWhere(
+                    activeTheme = dayThemes!.where(
                       (theme) => theme.daysOfWeek.contains(dayName),
-                      orElse: () => null as Organizer,
-                    );
+                    ).firstOrNull;
                   }
                   
                   return Expanded(
@@ -134,6 +139,7 @@ class WeekTimeGrid extends ConsumerWidget {
                               tasks,
                               habits,
                               timeBlocks,
+                              projects,
                             ),
                           );
                         }),
@@ -156,6 +162,7 @@ class WeekTimeGrid extends ConsumerWidget {
     List<Task> tasks,
     List<Habit> habits,
     List<Organizer>? timeBlocks,
+    List<Project> projects,
   ) {
     // Find tasks scheduled for this hour on this day
     final hourTasks = tasks.where((task) {
@@ -165,6 +172,25 @@ class WeekTimeGrid extends ConsumerWidget {
       final taskHour = int.tryParse(parts[0]);
       if (taskHour == null) return false;
       return taskHour == hour && _isSameDay(task.startDate ?? date, date);
+    }).toList();
+
+    final hourRotationProjects = projects.where((project) {
+      final status = RotationService.computeActiveStatus(project, now: date);
+      if (status == null) return false;
+      final dueTasks = RotationService.dueRotationTasksForStatus(
+        project,
+        status,
+        tasks,
+      ).where((task) => !task.archived && task.stage != TaskStage.finalized);
+      if (dueTasks.isEmpty) return false;
+      final time = RotationService.scheduleForStatus(
+        project,
+        status,
+        date,
+      ).time;
+      final parts = time.split(':');
+      if (parts.length < 2) return false;
+      return int.tryParse(parts[0]) == hour;
     }).toList();
 
     // Find habits with reminders at this hour on this day
@@ -201,7 +227,10 @@ class WeekTimeGrid extends ConsumerWidget {
       }
     }
 
-    if (hourTasks.isEmpty && hourHabits.isEmpty && hourTimeBlocks.isEmpty) {
+    if (hourTasks.isEmpty &&
+        hourHabits.isEmpty &&
+        hourTimeBlocks.isEmpty &&
+        hourRotationProjects.isEmpty) {
       return Container(
         decoration: BoxDecoration(
           border: Border(
@@ -224,6 +253,10 @@ class WeekTimeGrid extends ConsumerWidget {
         children: [
           if (hourTimeBlocks.isNotEmpty)
             ...hourTimeBlocks.take(1).map((block) => _buildMiniTimeBlock(context, block)),
+          if (hourRotationProjects.isNotEmpty)
+            ...hourRotationProjects
+                .take(1)
+                .map((project) => _buildMiniRotationBlock(context, project, date)),
           if (hourTasks.isNotEmpty)
             ...hourTasks.take(2).map((task) => _buildMiniTaskBlock(context, task)),
           if (hourHabits.isNotEmpty)
@@ -234,9 +267,7 @@ class WeekTimeGrid extends ConsumerWidget {
   }
 
   Widget _buildMiniTimeBlock(BuildContext context, Organizer block) {
-    final color = block.color != null && block.color!.startsWith('#')
-        ? Color(int.parse(block.color!.replaceAll('#', '0xFF')))
-        : AppColors.info;
+    final color = AppColors.info;
     
     return GestureDetector(
       onTap: () => _showDayThemePopup(context, block),
@@ -264,6 +295,39 @@ class WeekTimeGrid extends ConsumerWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniRotationBlock(
+    BuildContext context,
+    Project project,
+    DateTime date,
+  ) {
+    final status = RotationService.computeActiveStatus(project, now: date);
+    final title = status == null
+        ? project.title
+        : '${project.title} · ${status.group.name}';
+
+    return GestureDetector(
+      onTap: () => onProjectTap?.call(project, date),
+      child: Container(
+        margin: const EdgeInsets.all(2),
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: AppTheme.accentColor(context).withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 9,
+            color: AppTheme.accentColor(context),
+            fontWeight: FontWeight.w600,
+          ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
       ),
     );

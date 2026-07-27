@@ -464,6 +464,9 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
       case DialSegmentKind.dayTheme:
         icon = ObjectIcons.iconDataForTypeWithSignatures(ObjectTypes.dayTheme, typeSignatures);
         break;
+      case DialSegmentKind.rotationZone:
+        icon = Icons.rotate_right;
+        break;
       case DialSegmentKind.sleep:
         icon = Icons.bedtime;
         break;
@@ -479,6 +482,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
       DialSegmentKind.reminder => Icons.notifications,
       DialSegmentKind.dayTheme => Icons.wb_sunny,
       DialSegmentKind.sleep => Icons.bedtime,
+      DialSegmentKind.rotationZone => Icons.rotate_right,
     };
   }
 }

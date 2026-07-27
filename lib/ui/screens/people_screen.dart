@@ -9,6 +9,10 @@ import '../forms/create_person_form.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/object_action_wrapper.dart';
 import 'universal_detail_view.dart';
+import '../../providers/settings_provider.dart';
+import '../../models/saved_filter.dart';
+import '../widgets/filterable_list_header.dart';
+import '../utils/filter_sort_utils.dart';
 
 class PeopleScreen extends ConsumerStatefulWidget {
   const PeopleScreen({super.key});
@@ -21,6 +25,18 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
   bool _isListView = false;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  SavedFilter? _activeFilter;
+  List<SavedFilter> _savedFilters = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(
+        () => _savedFilters = ref.read(settingsProvider).filtersFor('person'),
+      );
+    });
+  }
 
   @override
   void dispose() {
@@ -31,20 +47,26 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
   @override
   Widget build(BuildContext context) {
     final allPeople = ref.watch(peopleProvider);
-    final filtered = allPeople.where((p) {
+    final rawFiltered = allPeople.where((p) {
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery.toLowerCase();
       return p.title.toLowerCase().contains(q) ||
           (p.email?.toLowerCase().contains(q) ?? false) ||
           (p.phone?.toLowerCase().contains(q) ?? false);
-    }).toList()
-      ..sort((a, b) {
+    }).toList();
+    
+    // Sort logic from original code when no custom filter sort is applied
+    if (_activeFilter?.sortBy == null) {
+      rawFiltered.sort((a, b) {
         final aDue = a.isDueForContact;
         final bDue = b.isDueForContact;
         if (aDue && !bDue) return -1;
         if (!aDue && bDue) return 1;
         return 0;
       });
+    }
+
+    final filtered = FilterSortUtils.applyFilterAndSort(rawFiltered, '', _activeFilter).cast<Person>();
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor(context),
@@ -69,33 +91,21 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
               ),
             ],
           ),
-          // Search field
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceVariantColor(context),
-                  borderRadius: BorderRadius.circular(14)),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (v) => setState(() => _searchQuery = v),
-                  decoration: InputDecoration(
-                    hintText: 'Buscar pessoas…',
-                    hintStyle: TextStyle(color: AppTheme.textMutedColor(context)),
-                    prefixIcon: Icon(Icons.search_rounded,
-                        color: AppTheme.textMutedColor(context)),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() => _searchQuery = '');
-                            })
-                        : null,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12)),
-                ),
+              child: FilterableListHeader(
+                targetType: 'person',
+                searchQuery: _searchQuery,
+                activeFilter: _activeFilter,
+                savedFilters: _savedFilters,
+                availableProperties: PersonFilterProperties.all,
+                onSearchChanged: (v) => setState(() => _searchQuery = v),
+                onFilterChanged: (f) => setState(() {
+                  _activeFilter = f;
+                  _savedFilters = ref.read(settingsProvider).filtersFor('person');
+                }),
+                onAddPressed: () => _openCreatePerson(context),
               ),
             ),
           ),

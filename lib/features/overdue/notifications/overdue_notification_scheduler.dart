@@ -16,7 +16,7 @@ class OverdueNotificationScheduler {
       return;
     }
 
-    final notificationId = 'overdue_daily_${DateTime.now().day}';
+    final notificationId = 'overdue_daily_${DateTime.now().day}'.hashCode;
     
     await notificationService.scheduleNotification(
       id: notificationId,
@@ -29,7 +29,7 @@ class OverdueNotificationScheduler {
 
   /// Cancel all overdue notifications
   Future<void> cancelOverdueNotifications() async {
-    await notificationService.cancelNotification('overdue_daily');
+    await notificationService.cancelNotification('overdue_daily'.hashCode);
   }
 
   /// Check if notification should be sent today (prevent spam)
@@ -48,8 +48,7 @@ class OverdueNotificationScheduler {
 
 // Provider for the scheduler
 final overdueNotificationSchedulerProvider = Provider<OverdueNotificationScheduler>((ref) {
-  final notificationService = ref.watch(notificationServiceProvider);
   return OverdueNotificationScheduler(
-    notificationService: notificationService,
+    notificationService: NotificationService(),
   );
 });

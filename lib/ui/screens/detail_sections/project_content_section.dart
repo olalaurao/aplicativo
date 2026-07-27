@@ -47,6 +47,7 @@ List<Widget> buildProjectContentSection(
                 ),
                 const SizedBox(height: 24),
               ],
+              buildProjectZonesSection(context, ref, project),
               buildRotationTasksSection(context, ref, project, tasks),
               if (project.kpis.isNotEmpty) ...[
                 const SizedBox(height: 24),

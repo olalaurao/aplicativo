@@ -11,7 +11,8 @@ import '../../services/resource_metadata_service.dart';
 import '../theme.dart';
 import '../forms/create_resource_form.dart';
 import '../widgets/empty_state.dart';
-import '../widgets/filter_sort_sheet.dart';
+import '../widgets/filterable_list_header.dart';
+import '../utils/filter_sort_utils.dart';
 import 'universal_detail_view.dart';
 
 enum ResourceViewMode { shelfHighlights, list, grid }
@@ -43,21 +44,12 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   List<SavedFilter> _savedFilters = [];
   // Index into _resourceTypeFilters; 0 = "All types" (no type filter)
   int _selectedTypeIndex = 0;
-  
+
   // Bulk selection
   final Set<String> _selectedIds = {};
   bool _isSelectionMode = false;
-  
-  // Configurable grid fields
-  static const _availableFields = [
-    'status',
-    'rating',
-    'category',
-    'author',
-    'year',
-    'priority',
-  ];
-  final Set<String> _visibleGridFields = {'status', 'rating'};
+
+  static const _defaultVisibleResourceFields = {'status', 'rating'};
 
   @override
   void initState() {
@@ -78,79 +70,19 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
 
   List<T> _applyFilterAndSort<T>(List<T> all) {
     final typeFilter = _resourceTypeFilters[_selectedTypeIndex];
-    var result = (_activeFilter?.apply(all) ?? all).where((item) {
+    var typeFiltered = all.where((item) {
       final res = item as Resource;
-      // Type filter
       if (typeFilter.values.isNotEmpty) {
         final rt = res.mediaType.toLowerCase();
         if (!typeFilter.values.any((v) => rt.contains(v) || v.contains(rt))) {
           return false;
         }
       }
-      // Search query
-      if (_searchQuery.isEmpty) return true;
-      final haystack = [
-        res.title,
-        res.author,
-        res.category,
-        res.mediaType,
-        res.synopsis,
-        ...res.tags,
-        ...res.aliases,
-      ].whereType<String>().join(' ').toLowerCase();
-      return haystack.contains(_searchQuery.toLowerCase());
+      return true;
     }).toList();
 
-    final sort = _activeFilter?.sortBy ?? SortField.modified;
-    final asc = _activeFilter?.sortAscending ?? false;
-    result.sort((a, b) {
-      final cmp = switch (sort) {
-        SortField.title => (a as dynamic).title.compareTo((b as dynamic).title),
-        SortField.created =>
-          ((a as dynamic).createdAt ?? DateTime(0)).compareTo(
-            (b as dynamic).createdAt ?? DateTime(0),
-          ),
-        SortField.modified =>
-          ((a as dynamic).updatedAt ?? DateTime(0)).compareTo(
-            (b as dynamic).updatedAt ?? DateTime(0),
-          ),
-        SortField.manual => ((a as dynamic).order ?? 0).compareTo(
-          (b as dynamic).order ?? 0,
-        ),
-        SortField.rating => ((a as dynamic).rating ?? 0).compareTo(
-          (b as dynamic).rating ?? 0,
-        ),
-        SortField.status => ((a as dynamic).status?.name ?? '').compareTo(
-          (b as dynamic).status?.name ?? '',
-        ),
-        SortField.type => ((a as dynamic).mediaType ?? '').compareTo(
-          (b as dynamic).mediaType ?? '',
-        ),
-        _ => 0,
-      };
-      return asc ? cmp : -cmp;
-    });
-    return result;
+    return FilterSortUtils.applyFilterAndSort(typeFiltered, _searchQuery, _activeFilter).cast<T>();
   }
-
-  void _openFilterSheet() => FilterSortSheet.show(
-    context: context,
-    ref: ref,
-    targetType: 'resource',
-    currentFilter: _activeFilter,
-    availableProperties: ResourceFilterProperties.all,
-    onApply: (f) => setState(() {
-      _activeFilter = f;
-      _savedFilters = ref.read(settingsProvider).filtersFor('resource');
-      if (f != null) {
-        if (f.viewMode == ViewMode.grid) {
-          _resourceViewMode = ResourceViewMode.grid;
-        } else {
-          _resourceViewMode = ResourceViewMode.list;
-        }
-      }
-    }),
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -198,29 +130,20 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                   onPressed: () => setState(() => _isSelectionMode = true),
                   tooltip: 'Seleção múltipla',
                 ),
-                if (_resourceViewMode == ResourceViewMode.grid)
-                  IconButton(
-                    icon: const Icon(Icons.view_column_rounded),
-                    onPressed: _showFieldConfigDialog,
-                    tooltip: 'Configurar campos',
-                  ),
-                IconButton(
-                  icon: const Icon(Icons.tune_rounded),
-                  onPressed: _openFilterSheet,
-                ),
+
                 IconButton(
                   icon: Icon(
                     _resourceViewMode == ResourceViewMode.shelfHighlights
                         ? Icons.auto_awesome_mosaic_rounded
                         : _resourceViewMode == ResourceViewMode.list
-                            ? Icons.view_list_rounded
-                            : Icons.grid_view_rounded,
+                        ? Icons.view_list_rounded
+                        : Icons.grid_view_rounded,
                   ),
                   tooltip: _resourceViewMode == ResourceViewMode.shelfHighlights
                       ? 'Visualização Geral'
                       : _resourceViewMode == ResourceViewMode.list
-                          ? 'Visualização em Lista'
-                          : 'Visualização em Grade',
+                      ? 'Visualização em Lista'
+                      : 'Visualização em Grade',
                   onPressed: () => setState(() {
                     _resourceViewMode = switch (_resourceViewMode) {
                       ResourceViewMode.shelfHighlights => ResourceViewMode.list,
@@ -241,7 +164,30 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
               ],
             ],
           ),
-          SliverToBoxAdapter(child: _buildSearchField()),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: FilterableListHeader(
+                targetType: 'resource',
+                searchQuery: _searchQuery,
+                activeFilter: _activeFilter,
+                savedFilters: _savedFilters,
+                availableProperties: ResourceFilterProperties.all,
+                onSearchChanged: (v) => setState(() => _searchQuery = v),
+                onFilterChanged: (f) => setState(() {
+                  _activeFilter = f;
+                  _savedFilters = ref.read(settingsProvider).filtersFor('resource');
+                  if (f != null) {
+                    if (f.viewMode == ViewMode.grid) {
+                      _resourceViewMode = ResourceViewMode.grid;
+                    } else {
+                      _resourceViewMode = ResourceViewMode.list;
+                    }
+                  }
+                }),
+              ),
+            ),
+          ),
           if (_isSelectionMode && _selectedIds.isNotEmpty)
             SliverToBoxAdapter(child: _buildBulkActionBar()),
           // ── Saved-filter chips ──────────────────────────────────────────────
@@ -311,7 +257,8 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                   childAspectRatio: 0.58,
                 ),
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) => _buildResourceGridTile(context, filtered[index]),
+                  (context, index) =>
+                      _buildResourceGridTile(context, filtered[index]),
                   childCount: filtered.length,
                 ),
               ),
@@ -342,38 +289,38 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     VoidCallback onTap, {
     String? emoji,
   }) => GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.only(right: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: selected
-                ? AppTheme.accentColor(context)
-                : AppTheme.surfaceVariantColor(context),
-            borderRadius: BorderRadius.circular(20),
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: selected
+            ? AppTheme.accentColor(context)
+            : AppTheme.surfaceVariantColor(context),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (emoji != null) ...[
+            Text(emoji, style: const TextStyle(fontSize: 12)),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: selected
+                  ? Colors.black
+                  : AppTheme.textSecondaryColor(context),
+            ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (emoji != null) ...[
-                Text(emoji, style: const TextStyle(fontSize: 12)),
-                const SizedBox(width: 4),
-              ],
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: selected
-                      ? Colors.black
-                      : AppTheme.textSecondaryColor(context),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 
   Widget _buildBulkActionBar() {
     return Container(
@@ -381,18 +328,32 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
       decoration: BoxDecoration(
         color: AppTheme.accentColor(context).withValues(alpha: 0.08),
         border: Border(
-          bottom: BorderSide(color: AppTheme.accentColor(context).withValues(alpha: 0.2)),
+          bottom: BorderSide(
+            color: AppTheme.accentColor(context).withValues(alpha: 0.2),
+          ),
         ),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _bulkActionChip('Status', Icons.check_circle_outline, _showBulkStatusPicker),
+            _bulkActionChip(
+              'Status',
+              Icons.check_circle_outline,
+              _showBulkStatusPicker,
+            ),
             const SizedBox(width: 8),
-            _bulkActionChip('Rating', Icons.star_outline, _showBulkRatingPicker),
+            _bulkActionChip(
+              'Rating',
+              Icons.star_outline,
+              _showBulkRatingPicker,
+            ),
             const SizedBox(width: 8),
-            _bulkActionChip('Categoria', Icons.category, _showBulkCategoryPicker),
+            _bulkActionChip(
+              'Categoria',
+              Icons.category,
+              _showBulkCategoryPicker,
+            ),
             const SizedBox(width: 8),
             _bulkActionChip('Prioridade', Icons.flag, _showBulkPriorityPicker),
           ],
@@ -409,7 +370,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
         decoration: BoxDecoration(
           color: AppTheme.accentColor(context).withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.accentColor(context).withValues(alpha: 0.3)),
+          border: Border.all(
+            color: AppTheme.accentColor(context).withValues(alpha: 0.3),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -433,8 +396,10 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   void _showBulkStatusPicker() {
     final allObjects = ref.read(allObjectsProvider).value ?? [];
     final resources = allObjects.whereType<Resource>().toList();
-    final selectedResources = resources.where((r) => _selectedIds.contains(r.id)).toList();
-    
+    final selectedResources = resources
+        .where((r) => _selectedIds.contains(r.id))
+        .toList();
+
     showModalBottomSheet(
       context: context,
       builder: (ctx) => Container(
@@ -443,24 +408,31 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Alterar Status', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text(
+              'Alterar Status',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 16),
-            ...ResourceStatus.values.map((status) => ListTile(
-              title: Text(_resourceStatusLabel(status)),
-              onTap: () async {
-                for (final resource in selectedResources) {
-                  final updated = resource.copyWith(status: status);
-                  await ref.read(vaultProvider.notifier).updateObject(updated);
-                }
-                if (mounted) {
-                  Navigator.pop(ctx);
-                  setState(() {
-                    _isSelectionMode = false;
-                    _selectedIds.clear();
-                  });
-                }
-              },
-            )),
+            ...ResourceStatus.values.map(
+              (status) => ListTile(
+                title: Text(_resourceStatusLabel(status)),
+                onTap: () async {
+                  for (final resource in selectedResources) {
+                    final updated = resource.copyWith(status: status);
+                    await ref
+                        .read(vaultProvider.notifier)
+                        .updateObject(updated);
+                  }
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    setState(() {
+                      _isSelectionMode = false;
+                      _selectedIds.clear();
+                    });
+                  }
+                },
+              ),
+            ),
           ],
         ),
       ),
@@ -476,29 +448,43 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Alterar Rating', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text(
+              'Alterar Rating',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(5, (i) => IconButton(
-                icon: const Icon(Icons.star_rounded, size: 32, color: AppColors.warning),
-                onPressed: () async {
-                  final allObjects = ref.read(allObjectsProvider).value ?? [];
-                  final resources = allObjects.whereType<Resource>().toList();
-                  final selectedResources = resources.where((r) => _selectedIds.contains(r.id)).toList();
-                  for (final resource in selectedResources) {
-                    final updated = resource.copyWith(rating: i + 1);
-                    await ref.read(vaultProvider.notifier).updateObject(updated);
-                  }
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    setState(() {
-                      _isSelectionMode = false;
-                      _selectedIds.clear();
-                    });
-                  }
-                },
-              )),
+              children: List.generate(
+                5,
+                (i) => IconButton(
+                  icon: const Icon(
+                    Icons.star_rounded,
+                    size: 32,
+                    color: AppColors.warning,
+                  ),
+                  onPressed: () async {
+                    final allObjects = ref.read(allObjectsProvider).value ?? [];
+                    final resources = allObjects.whereType<Resource>().toList();
+                    final selectedResources = resources
+                        .where((r) => _selectedIds.contains(r.id))
+                        .toList();
+                    for (final resource in selectedResources) {
+                      final updated = resource.copyWith(rating: i + 1);
+                      await ref
+                          .read(vaultProvider.notifier)
+                          .updateObject(updated);
+                    }
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _isSelectionMode = false;
+                        _selectedIds.clear();
+                      });
+                    }
+                  },
+                ),
+              ),
             ),
           ],
         ),
@@ -509,8 +495,12 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
   void _showBulkCategoryPicker() {
     final allObjects = ref.read(allObjectsProvider).value ?? [];
     final resources = allObjects.whereType<Resource>().toList();
-    final allCategories = resources.map((r) => r.category).whereType<String>().toSet().toList();
-    
+    final allCategories = resources
+        .map((r) => r.category)
+        .whereType<String>()
+        .toSet()
+        .toList();
+
     showModalBottomSheet(
       context: context,
       builder: (ctx) => Container(
@@ -519,32 +509,43 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Alterar Categoria', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text(
+              'Alterar Categoria',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 16),
             if (allCategories.isEmpty)
               const Text('Nenhuma categoria disponível')
             else
-              ...allCategories.map((cat) => ListTile(
-                title: Text(cat),
-                onTap: () async {
-                  final selectedResources = resources.where((r) => _selectedIds.contains(r.id)).toList();
-                  for (final resource in selectedResources) {
-                    final updated = resource.copyWith(category: cat);
-                    await ref.read(vaultProvider.notifier).updateObject(updated);
-                  }
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    setState(() {
-                      _isSelectionMode = false;
-                      _selectedIds.clear();
-                    });
-                  }
-                },
-              )),
+              ...allCategories.map(
+                (cat) => ListTile(
+                  title: Text(cat),
+                  onTap: () async {
+                    final selectedResources = resources
+                        .where((r) => _selectedIds.contains(r.id))
+                        .toList();
+                    for (final resource in selectedResources) {
+                      final updated = resource.copyWith(category: cat);
+                      await ref
+                          .read(vaultProvider.notifier)
+                          .updateObject(updated);
+                    }
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _isSelectionMode = false;
+                        _selectedIds.clear();
+                      });
+                    }
+                  },
+                ),
+              ),
             ListTile(
               title: const Text('Remover categoria'),
               onTap: () async {
-                final selectedResources = resources.where((r) => _selectedIds.contains(r.id)).toList();
+                final selectedResources = resources
+                    .where((r) => _selectedIds.contains(r.id))
+                    .toList();
                 for (final resource in selectedResources) {
                   final updated = resource.copyWith(category: null);
                   await ref.read(vaultProvider.notifier).updateObject(updated);
@@ -573,27 +574,36 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Alterar Prioridade', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text(
+              'Alterar Prioridade',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 16),
-            ...ResourcePriority.values.map((priority) => ListTile(
-              title: Text(priority.name),
-              onTap: () async {
-                final allObjects = ref.read(allObjectsProvider).value ?? [];
-                final resources = allObjects.whereType<Resource>().toList();
-                final selectedResources = resources.where((r) => _selectedIds.contains(r.id)).toList();
-                for (final resource in selectedResources) {
-                  final updated = resource.copyWith(priority: priority);
-                  await ref.read(vaultProvider.notifier).updateObject(updated);
-                }
-                if (mounted) {
-                  Navigator.pop(ctx);
-                  setState(() {
-                    _isSelectionMode = false;
-                    _selectedIds.clear();
-                  });
-                }
-              },
-            )),
+            ...ResourcePriority.values.map(
+              (priority) => ListTile(
+                title: Text(priority.name),
+                onTap: () async {
+                  final allObjects = ref.read(allObjectsProvider).value ?? [];
+                  final resources = allObjects.whereType<Resource>().toList();
+                  final selectedResources = resources
+                      .where((r) => _selectedIds.contains(r.id))
+                      .toList();
+                  for (final resource in selectedResources) {
+                    final updated = resource.copyWith(priority: priority);
+                    await ref
+                        .read(vaultProvider.notifier)
+                        .updateObject(updated);
+                  }
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    setState(() {
+                      _isSelectionMode = false;
+                      _selectedIds.clear();
+                    });
+                  }
+                },
+              ),
+            ),
           ],
         ),
       ),
@@ -607,71 +617,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     ResourceStatus.dropped => 'Abandonado',
   };
 
-  void _showFieldConfigDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Configurar campos da grade'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: _availableFields.map((field) => CheckboxListTile(
-            title: Text(_fieldLabel(field)),
-            value: _visibleGridFields.contains(field),
-            onChanged: (value) {
-              setState(() {
-                if (value == true) {
-                  _visibleGridFields.add(field);
-                } else {
-                  _visibleGridFields.remove(field);
-                }
-              });
-            },
-          )).toList(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Fechar'),
-          ),
-        ],
-      ),
-    );
-  }
 
-  String _fieldLabel(String field) => switch (field) {
-    'status' => 'Status',
-    'rating' => 'Rating',
-    'category' => 'Categoria',
-    'author' => 'Autor',
-    'year' => 'Ano',
-    'priority' => 'Prioridade',
-    _ => field,
-  };
-
-  Widget _buildSearchField() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (value) => setState(() => _searchQuery = value),
-        textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
-          hintText: 'Buscar recurso',
-          prefixIcon: const Icon(Icons.search_rounded),
-          suffixIcon: _searchQuery.isEmpty
-              ? null
-              : IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => setState(() {
-                    _searchController.clear();
-                    _searchQuery = '';
-                  }),
-                ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-        ),
-      ),
-    );
-  }
 
   Widget _buildShelf(List<Resource> resources) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -863,7 +809,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
 
   Widget _buildResourceListTile(BuildContext context, Resource resource) {
     final isSelected = _selectedIds.contains(resource.id);
-    
+
     return GestureDetector(
       onTap: _isSelectionMode
           ? () {
@@ -876,7 +822,10 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
               });
             }
           : () {
-              context.push('/detail/${resource.id}', extra: {'object': resource});
+              context.push(
+                '/detail/${resource.id}',
+                extra: {'object': resource},
+              );
             },
       onLongPress: () {
         setState(() {
@@ -887,7 +836,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.accentColor(context).withValues(alpha: 0.1) : null,
+          color: isSelected
+              ? AppTheme.accentColor(context).withValues(alpha: 0.1)
+              : null,
           borderRadius: BorderRadius.circular(12),
           border: isSelected
               ? Border.all(color: AppTheme.accentColor(context), width: 2)
@@ -925,7 +876,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                     ),
                     child: Icon(
                       isSelected ? Icons.check_circle : Icons.circle_outlined,
-                      color: isSelected ? AppTheme.accentColor(context) : Colors.white,
+                      color: isSelected
+                          ? AppTheme.accentColor(context)
+                          : Colors.white,
                       size: 18,
                     ),
                   ),
@@ -941,28 +894,20 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  _buildStatusChip(resource.status),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      resource.author ?? 'Unknown',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ),
-                ],
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: _buildConfiguredFields(resource),
               ),
-              const SizedBox(height: 2),
-              _buildRatingRow(resource),
+              if (_effectiveVisibleResourceFields().contains('rating')) ...[
+                const SizedBox(height: 2),
+                _buildRatingRow(resource),
+              ],
             ],
           ),
-          trailing: _isSelectionMode ? null : const Icon(Icons.chevron_right_rounded, size: 20),
+          trailing: _isSelectionMode
+              ? null
+              : const Icon(Icons.chevron_right_rounded, size: 20),
         ),
       ),
     );
@@ -970,7 +915,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
 
   Widget _buildResourceGridTile(BuildContext context, Resource resource) {
     final isSelected = _selectedIds.contains(resource.id);
-    
+
     return GestureDetector(
       onTap: _isSelectionMode
           ? () {
@@ -983,7 +928,10 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
               });
             }
           : () {
-              context.push('/detail/${resource.id}', extra: {'object': resource});
+              context.push(
+                '/detail/${resource.id}',
+                extra: {'object': resource},
+              );
             },
       onLongPress: () {
         setState(() {
@@ -993,7 +941,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.accentColor(context).withValues(alpha: 0.1) : null,
+          color: isSelected
+              ? AppTheme.accentColor(context).withValues(alpha: 0.1)
+              : null,
           borderRadius: BorderRadius.circular(12),
           border: isSelected
               ? Border.all(color: AppTheme.accentColor(context), width: 2)
@@ -1027,22 +977,30 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
-                              isSelected ? Icons.check_circle : Icons.circle_outlined,
-                              color: isSelected ? AppTheme.accentColor(context) : Colors.white,
+                              isSelected
+                                  ? Icons.check_circle
+                                  : Icons.circle_outlined,
+                              color: isSelected
+                                  ? AppTheme.accentColor(context)
+                                  : Colors.white,
                               size: 20,
                             ),
                           ),
                         ),
-                      Positioned(
-                        bottom: 4,
-                        left: 4,
-                        child: _buildStatusChip(resource.status),
-                      ),
+                      if (_effectiveVisibleResourceFields().contains('status'))
+                        Positioned(
+                          bottom: 4,
+                          left: 4,
+                          child: _buildStatusChip(resource.status),
+                        ),
                     ],
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -1062,7 +1020,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          if (_visibleGridFields.contains('rating'))
+                          if (_effectiveVisibleResourceFields().contains(
+                            'rating',
+                          ))
                             _buildRatingRow(resource),
                           Text(
                             _resourceEmoji(resource),
@@ -1108,8 +1068,20 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
 
   List<Widget> _buildConfiguredFields(Resource resource) {
     final fields = <Widget>[];
-    
-    if (_visibleGridFields.contains('author') && resource.author != null) {
+
+    final visibleFields = _effectiveVisibleResourceFields();
+
+    if (visibleFields.contains('status')) {
+      fields.add(
+        _inlineTextField('Status', _resourceStatusLabel(resource.status)),
+      );
+    }
+
+    if (visibleFields.contains('resourceType')) {
+      fields.add(_inlineTextField('Tipo', resource.mediaType));
+    }
+
+    if (visibleFields.contains('author') && resource.author != null) {
       fields.add(
         Text(
           resource.author!,
@@ -1122,22 +1094,19 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
         ),
       );
     }
-    
-    if (_visibleGridFields.contains('category') && resource.category != null) {
+
+    if (visibleFields.contains('category') && resource.category != null) {
       fields.add(
         Text(
           resource.category!,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 9,
-            color: AppColors.info,
-          ),
+          style: const TextStyle(fontSize: 9, color: AppColors.info),
         ),
       );
     }
-    
-    if (_visibleGridFields.contains('year') && resource.year != null) {
+
+    if (visibleFields.contains('year') && resource.year != null) {
       fields.add(
         Text(
           resource.year.toString(),
@@ -1150,8 +1119,21 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
         ),
       );
     }
-    
-    if (_visibleGridFields.contains('priority') && resource.priority != ResourcePriority.none) {
+
+    if (visibleFields.contains('created')) {
+      fields.add(
+        _inlineTextField('Criado', _formatShortDate(resource.createdAt)),
+      );
+    }
+
+    if (visibleFields.contains('modified')) {
+      fields.add(
+        _inlineTextField('Modificado', _formatShortDate(resource.updatedAt)),
+      );
+    }
+
+    if (visibleFields.contains('priority') &&
+        resource.priority != ResourcePriority.none) {
       fields.add(
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
@@ -1172,8 +1154,50 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
         ),
       );
     }
-    
+
     return fields;
+  }
+
+  Set<String> _effectiveVisibleResourceFields() {
+    final fields = _activeFilter?.visibleProperties.isNotEmpty == true
+        ? _activeFilter!.visibleProperties.toSet()
+        : Set<String>.from(_defaultVisibleResourceFields);
+    if (_activeFilter?.includeSortProperty != false) {
+      final sortField = _propertyKeyForSort(
+        _activeFilter?.sortBy ?? SortField.modified,
+      );
+      if (sortField != null) fields.add(sortField);
+    }
+    fields.remove('title');
+    return fields;
+  }
+
+  String? _propertyKeyForSort(SortField sort) {
+    return switch (sort) {
+      SortField.title => 'title',
+      SortField.created => 'created',
+      SortField.modified => 'modified',
+      SortField.rating => 'rating',
+      SortField.status => 'status',
+      SortField.type => 'resourceType',
+      SortField.priority => 'priority',
+      _ => null,
+    };
+  }
+
+  Widget _inlineTextField(String label, String value) {
+    if (value.trim().isEmpty) return const SizedBox.shrink();
+    return Text(
+      '$label: $value',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(fontSize: 9, color: AppTheme.textMutedColor(context)),
+    );
+  }
+
+  String _formatShortDate(DateTime? date) {
+    if (date == null) return '';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
   }
 
   Color _priorityColor(ResourcePriority priority) => switch (priority) {
@@ -1310,4 +1334,3 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     );
   }
 }
-

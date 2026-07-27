@@ -65,7 +65,11 @@ class MainActivity : FlutterActivity() {
             pendingWidgetUri = data.toString()
         }
         if (intent != null && intent.hasExtra("payload")) {
-            pendingPayload = intent.getStringExtra("payload")
+            val payload = intent.getStringExtra("payload")
+            if (tryOpenNativeNotification(payload, intent.getIntExtra("notification_id", 0))) {
+                return
+            }
+            pendingPayload = payload
         }
         if (intent?.action == Intent.ACTION_SEND && intent.type?.startsWith("text/") == true) {
             pendingSharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
@@ -233,6 +237,28 @@ class MainActivity : FlutterActivity() {
                         result.error("ERROR", e.message, null)
                     }
                 }
+                "startQuickAddPopup" -> {
+                    try {
+                        val intent = Intent(this@MainActivity, QuickAddPopupActivity::class.java)
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("ERROR", e.message, null)
+                    }
+                }
+                "startNativeNotificationPopup" -> {
+                    try {
+                        val payload = call.argument<String>("payload") ?: ""
+                        val notificationId = call.argument<Int>("notification_id") ?: 0
+                        val popupIntent = nativeNotificationIntent(payload, notificationId)
+                        popupIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(popupIntent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("ERROR", e.message, null)
+                    }
+                }
                 "sendBroadcast" -> {
                     try {
                         val action = call.argument<String>("action")
@@ -275,5 +301,35 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+    }
+
+    private fun tryOpenNativeNotification(payload: String?, notificationId: Int): Boolean {
+        if (payload.isNullOrBlank()) return false
+        val type = extractPayloadField(payload, "ntype")
+        if (type != "popup" && type != "alarm") return false
+        val intent = nativeNotificationIntent(payload, notificationId)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(intent)
+        return true
+    }
+
+    private fun nativeNotificationIntent(payload: String, notificationId: Int): Intent {
+        val type = extractPayloadField(payload, "ntype")
+        val target = if (type == "alarm") {
+            NativeAlarmNotificationActivity::class.java
+        } else {
+            NativePopupNotificationActivity::class.java
+        }
+        return Intent(this@MainActivity, target).apply {
+            putExtra(NativeNotificationActivity.EXTRA_PAYLOAD, payload)
+            putExtra(NativeNotificationActivity.EXTRA_TITLE, extractPayloadField(payload, "title") ?: "Reminder")
+            putExtra(NativeNotificationActivity.EXTRA_BODY, extractPayloadField(payload, "body") ?: "")
+            putExtra(NativeNotificationActivity.EXTRA_NOTIFICATION_ID, notificationId)
+        }
+    }
+
+    private fun extractPayloadField(payload: String, key: String): String? {
+        val match = Regex("(^|[?&])$key=([^&]*)").find(payload)
+        return match?.groupValues?.getOrNull(2)
     }
 }

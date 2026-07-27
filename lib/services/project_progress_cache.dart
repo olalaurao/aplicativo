@@ -10,29 +10,57 @@ class ProjectProgressCache {
   static final Map<String, int> _completedTaskCountCache = {};
   static final Map<String, List<Task>> _linkedTasksCache = {};
 
-  static List<Task> _getLinkedTasks(String projectId, Project project, List<Task> tasks) {
-    if (_linkedTasksCache.containsKey(projectId)) return _linkedTasksCache[projectId]!;
-    final linkedTasks = tasks.where((t) => project.taskLinks.contains(t.slug) || project.taskLinks.contains(t.id)).toList();
+  static List<Task> _getLinkedTasks(
+    String projectId,
+    Project project,
+    List<Task> tasks,
+  ) {
+    if (_linkedTasksCache.containsKey(projectId))
+      return _linkedTasksCache[projectId]!;
+    final linkedTasks = tasks
+        .where(
+          (t) =>
+              project.taskLinks.contains(t.slug) ||
+              project.taskLinks.contains(t.id) ||
+              t.organizers.any(
+                (org) => org.matches(project.id, project.slug, project.title),
+              ),
+        )
+        .toList();
     _linkedTasksCache[projectId] = linkedTasks;
     return linkedTasks;
   }
 
-  static double getProgress(String projectId, Project project, List<Task> tasks) {
+  static double getProgress(
+    String projectId,
+    Project project,
+    List<Task> tasks,
+  ) {
     if (_cache.containsKey(projectId)) return _cache[projectId]!;
     final progress = KPIEngine.calculateProjectProgress(project, tasks);
     _cache[projectId] = progress;
     return progress;
   }
 
-  static int getLinkedTaskCount(String projectId, Project project, List<Task> tasks) {
-    if (_linkedTaskCountCache.containsKey(projectId)) return _linkedTaskCountCache[projectId]!;
+  static int getLinkedTaskCount(
+    String projectId,
+    Project project,
+    List<Task> tasks,
+  ) {
+    if (_linkedTaskCountCache.containsKey(projectId))
+      return _linkedTaskCountCache[projectId]!;
     final linkedTasks = _getLinkedTasks(projectId, project, tasks);
     _linkedTaskCountCache[projectId] = linkedTasks.length;
     return linkedTasks.length;
   }
 
-  static int getCompletedTaskCount(String projectId, Project project, List<Task> tasks) {
-    if (_completedTaskCountCache.containsKey(projectId)) return _completedTaskCountCache[projectId]!;
+  static int getCompletedTaskCount(
+    String projectId,
+    Project project,
+    List<Task> tasks,
+  ) {
+    if (_completedTaskCountCache.containsKey(projectId))
+      return _completedTaskCountCache[projectId]!;
     final linkedTasks = _getLinkedTasks(projectId, project, tasks);
     final doneCount = linkedTasks.where((t) => t.isCompleted).length;
     _completedTaskCountCache[projectId] = doneCount;

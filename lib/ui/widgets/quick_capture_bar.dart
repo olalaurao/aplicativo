@@ -15,17 +15,25 @@ import '../../models/task_model.dart';
 import '../../models/event_model.dart';
 import '../../models/habit_model.dart';
 import '../../models/goal_model.dart';
+import '../../models/reminder_model.dart';
+import '../../models/reminder_config.dart';
+import '../../models/scheduler.dart';
 import '../../models/shared_types.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/nlp_task_parser.dart';
+import '../forms/scheduler_picker.dart';
 import '../theme.dart';
 import '../widgets/nlp_chips.dart';
 import '../widgets/create_menu_sheet.dart';
 import '../widgets/organizer_selector_field.dart';
+import '../widgets/reminder_config_sheet.dart';
 
 // ─── Public show function ────────────────────────────────────────────────────
 
-void showQuickCapture(BuildContext context, {QuickCaptureType defaultType = QuickCaptureType.task}) {
+void showQuickCapture(
+  BuildContext context, {
+  QuickCaptureType defaultType = QuickCaptureType.task,
+}) {
   HapticFeedback.lightImpact();
   showModalBottomSheet(
     context: context,
@@ -37,7 +45,7 @@ void showQuickCapture(BuildContext context, {QuickCaptureType defaultType = Quic
 
 // ─── Type enum ───────────────────────────────────────────────────────────────
 
-enum QuickCaptureType { task, event, habit, goal }
+enum QuickCaptureType { task, event, habit, goal, reminder }
 
 extension _QuickCaptureTypeExt on QuickCaptureType {
   String get label {
@@ -50,6 +58,8 @@ extension _QuickCaptureTypeExt on QuickCaptureType {
         return 'Habit';
       case QuickCaptureType.goal:
         return 'Goal';
+      case QuickCaptureType.reminder:
+        return 'Reminder';
     }
   }
 
@@ -63,6 +73,8 @@ extension _QuickCaptureTypeExt on QuickCaptureType {
         return 'Add a habit…';
       case QuickCaptureType.goal:
         return 'Add a goal…';
+      case QuickCaptureType.reminder:
+        return 'Add a reminder…';
     }
   }
 
@@ -76,11 +88,14 @@ extension _QuickCaptureTypeExt on QuickCaptureType {
         return '/create/habit';
       case QuickCaptureType.goal:
         return '/create/goal';
+      case QuickCaptureType.reminder:
+        return '/create/reminder';
     }
   }
 
   bool get showPriority => this == QuickCaptureType.task;
-  bool get showRecurrence => this == QuickCaptureType.task || this == QuickCaptureType.habit;
+  bool get showRecurrence => true;
+  bool get showReminders => true;
 }
 
 // ─── Widget ──────────────────────────────────────────────────────────────────
@@ -125,6 +140,8 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
   TaskPriority _extraPriority = TaskPriority.none;
   List<OrganizerReference> _extraOrganizers = [];
   String _extraNotes = '';
+  Scheduler? _extraScheduler;
+  List<ReminderConfig> _extraReminders = [];
 
   bool _saving = false;
 
@@ -160,14 +177,32 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
 
   // Effective parsed value accounting for per-field discards
   DateTime? get _effectiveDate => _dateDiscarded ? null : _parsed?.startDate;
-  TimeOfDay? get _effectiveTime => _timeDiscarded ? null : _parsed?.scheduledTime;
-  TaskPriority? get _effectivePriority => _priorityDiscarded ? null : _parsed?.priority;
-  dynamic get _effectiveScheduler => _schedulerDiscarded ? null : _parsed?.scheduler;
+  TimeOfDay? get _effectiveTime =>
+      _timeDiscarded ? null : _parsed?.scheduledTime;
+  TaskPriority? get _effectivePriority =>
+      _priorityDiscarded ? null : _parsed?.priority;
+  dynamic get _effectiveScheduler =>
+      _schedulerDiscarded ? null : _parsed?.scheduler;
+  Scheduler? get _selectedScheduler =>
+      (_effectiveScheduler as Scheduler?) ?? _extraScheduler;
+
+  DateTime? get _selectedDateTime {
+    final date = _effectiveDate ?? _extraDate;
+    if (date == null) return null;
+    final time = _effectiveTime;
+    if (time == null) return DateTime(date.year, date.month, date.day);
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  bool get _selectedHasTime => _effectiveTime != null;
 
   bool get _hasNlpChips =>
       _parsed != null &&
       (_parsed!.hasAnyDetection) &&
-      (!_dateDiscarded || !_timeDiscarded || !_priorityDiscarded || !_schedulerDiscarded) &&
+      (!_dateDiscarded ||
+          !_timeDiscarded ||
+          !_priorityDiscarded ||
+          !_schedulerDiscarded) &&
       (_effectiveDate != null ||
           _effectiveTime != null ||
           _effectivePriority != null ||
@@ -180,6 +215,25 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
       if (_titleController.text.isNotEmpty) {
         _parsed = NlpTaskParser.parse(_titleController.text);
       }
+    });
+  }
+
+  void _resetForm() {
+    _titleController.clear();
+    setState(() {
+      _parsed = null;
+      _dateDiscarded = false;
+      _timeDiscarded = false;
+      _priorityDiscarded = false;
+      _schedulerDiscarded = false;
+      _detailsExpanded = false;
+      _extraDate = null;
+      _extraPriority = TaskPriority.none;
+      _extraOrganizers = [];
+      _extraNotes = '';
+      _extraScheduler = null;
+      _extraReminders = [];
+      _saving = false;
     });
   }
 
@@ -205,40 +259,26 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
               ? '${_effectiveTime!.hour.toString().padLeft(2, '0')}:${_effectiveTime!.minute.toString().padLeft(2, '0')}'
               : null,
           allDay: _effectiveTime == null,
-          scheduler: _effectiveScheduler as dynamic,
+          scheduler: _selectedScheduler,
           notes: _extraNotes.trim().isNotEmpty ? [_extraNotes.trim()] : [],
           duration: 15,
-          reminders: [],
+          reminders: List.from(_extraReminders),
           subtasks: [],
           dependsOn: [],
           links: [],
           organizers: List.from(_extraOrganizers),
         );
-        task.organizers.addAll(_extraOrganizers);
         await ref.read(vaultProvider.notifier).createObject(task);
         if (mounted) {
           if (widget._isSheet) Navigator.of(context).pop();
-          _titleController.clear();
-          setState(() {
-            _parsed = null;
-            _dateDiscarded = false;
-            _timeDiscarded = false;
-            _priorityDiscarded = false;
-            _schedulerDiscarded = false;
-            _detailsExpanded = false;
-            _extraDate = null;
-            _extraPriority = TaskPriority.none;
-            _extraOrganizers = [];
-            _extraNotes = '';
-            _saving = false;
-          });
+          _resetForm();
         }
       } catch (e) {
         setState(() => _saving = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error saving: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error saving: $e')));
         }
       }
     } else if (_selectedType == QuickCaptureType.goal) {
@@ -249,29 +289,20 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
           updatedAt: DateTime.now(),
           title: cleanTitle,
           deadline: _effectiveDate ?? _extraDate,
+          schedulers: _selectedScheduler != null ? [_selectedScheduler!] : [],
         );
+        goal.reminders = List.from(_extraReminders);
         await ref.read(vaultProvider.notifier).createObject(goal);
         if (mounted) {
           if (widget._isSheet) Navigator.of(context).pop();
-          _titleController.clear();
-          setState(() {
-            _parsed = null;
-            _dateDiscarded = false;
-            _timeDiscarded = false;
-            _priorityDiscarded = false;
-            _schedulerDiscarded = false;
-            _detailsExpanded = false;
-            _extraDate = null;
-            _extraPriority = TaskPriority.none;
-            _extraOrganizers = [];
-            _extraNotes = '';
-            _saving = false;
-          });
+          _resetForm();
         }
       } catch (e) {
         setState(() => _saving = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving: $e')));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error saving: $e')));
         }
       }
     } else if (_selectedType == QuickCaptureType.habit) {
@@ -282,30 +313,20 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
           updatedAt: DateTime.now(),
           title: cleanTitle,
           color: '#6366F1',
-          schedulers: _effectiveScheduler != null ? [_effectiveScheduler!] : [],
+          schedulers: _selectedScheduler != null ? [_selectedScheduler!] : [],
         );
+        habit.reminders = List.from(_extraReminders);
         await ref.read(vaultProvider.notifier).createObject(habit);
         if (mounted) {
           if (widget._isSheet) Navigator.of(context).pop();
-          _titleController.clear();
-          setState(() {
-            _parsed = null;
-            _dateDiscarded = false;
-            _timeDiscarded = false;
-            _priorityDiscarded = false;
-            _schedulerDiscarded = false;
-            _detailsExpanded = false;
-            _extraDate = null;
-            _extraPriority = TaskPriority.none;
-            _extraOrganizers = [];
-            _extraNotes = '';
-            _saving = false;
-          });
+          _resetForm();
         }
       } catch (e) {
         setState(() => _saving = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving: $e')));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error saving: $e')));
         }
       }
     } else if (_selectedType == QuickCaptureType.event) {
@@ -320,29 +341,20 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
             timeOfDay: _effectiveTime != null
                 ? '${_effectiveTime!.hour.toString().padLeft(2, '0')}:${_effectiveTime!.minute.toString().padLeft(2, '0')}'
                 : null,
+            scheduler: _selectedScheduler,
+            reminders: List.from(_extraReminders),
           );
           await ref.read(vaultProvider.notifier).createObject(event);
           if (mounted) {
             if (widget._isSheet) Navigator.of(context).pop();
-            _titleController.clear();
-            setState(() {
-              _parsed = null;
-              _dateDiscarded = false;
-              _timeDiscarded = false;
-              _priorityDiscarded = false;
-              _schedulerDiscarded = false;
-              _detailsExpanded = false;
-              _extraDate = null;
-              _extraPriority = TaskPriority.none;
-              _extraOrganizers = [];
-              _extraNotes = '';
-              _saving = false;
-            });
+            _resetForm();
           }
         } catch (e) {
           setState(() => _saving = false);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving: $e')));
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Error saving: $e')));
           }
         }
       } else {
@@ -352,13 +364,41 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
           extra: {'initialTitle': cleanTitle},
         );
       }
+    } else if (_selectedType == QuickCaptureType.reminder) {
+      setState(() => _saving = true);
+      try {
+        final reminder = Reminder(
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          title: cleanTitle,
+          time: _selectedDateTime ?? DateTime.now(),
+          notes: _extraNotes.trim().isNotEmpty ? _extraNotes.trim() : null,
+          scheduler: _selectedScheduler,
+          reminders: _extraReminders.isNotEmpty
+              ? List.from(_extraReminders)
+              : null,
+          organizers: List.from(_extraOrganizers),
+        );
+        await ref.read(vaultProvider.notifier).createObject(reminder);
+        if (mounted) {
+          if (widget._isSheet) Navigator.of(context).pop();
+          _resetForm();
+        }
+      } catch (e) {
+        setState(() => _saving = false);
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error saving: $e')));
+        }
+      }
     }
   }
 
   void _openFullEditor(BuildContext ctx) {
     final title = _titleController.text.trim();
     if (widget._isSheet) Navigator.pop(ctx);
-    ctx.push('/create/task', extra: {'initialTitle': title});
+    ctx.push(_selectedType.createRoute, extra: {'initialTitle': title});
   }
 
   void _openMoreOptions(BuildContext ctx) {
@@ -443,7 +483,10 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
                   onTap: () => _switchType(type),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: selected
                           ? accent.withValues(alpha: 0.15)
@@ -483,7 +526,10 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
                 autofocus: widget._isSheet,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _save(context),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
                 decoration: InputDecoration(
                   hintText: _selectedType.hint,
                   hintStyle: TextStyle(
@@ -499,7 +545,11 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
             // Full editor button (only in sheet mode)
             if (widget._isSheet && _selectedType == QuickCaptureType.task)
               IconButton(
-                icon: Icon(Icons.open_in_full_rounded, size: 20, color: AppColors.textMuted),
+                icon: Icon(
+                  Icons.open_in_full_rounded,
+                  size: 20,
+                  color: AppColors.textMuted,
+                ),
                 tooltip: 'Open full editor',
                 onPressed: () => _openFullEditor(context),
                 padding: EdgeInsets.zero,
@@ -523,7 +573,10 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
                       onPressed: _hasTitle ? () => _save(context) : null,
                       style: FilledButton.styleFrom(
                         backgroundColor: accent,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -551,8 +604,12 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
               cleanTitle: _parsed!.cleanTitle,
               startDate: _effectiveDate,
               scheduledTime: _effectiveTime,
-              priority: (_selectedType.showPriority ? _effectivePriority : null),
-              scheduler: (_selectedType.showRecurrence ? _effectiveScheduler : null),
+              priority: (_selectedType.showPriority
+                  ? _effectivePriority
+                  : null),
+              scheduler: (_selectedType.showRecurrence
+                  ? _effectiveScheduler
+                  : null),
             ),
             onRemoveDate: _effectiveDate != null
                 ? () => setState(() => _dateDiscarded = true)
@@ -560,10 +617,12 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
             onRemoveTime: _effectiveTime != null
                 ? () => setState(() => _timeDiscarded = true)
                 : null,
-            onRemovePriority: (_selectedType.showPriority && _effectivePriority != null)
+            onRemovePriority:
+                (_selectedType.showPriority && _effectivePriority != null)
                 ? () => setState(() => _priorityDiscarded = true)
                 : null,
-            onRemoveScheduler: (_selectedType.showRecurrence && _effectiveScheduler != null)
+            onRemoveScheduler:
+                (_selectedType.showRecurrence && _effectiveScheduler != null)
                 ? () => setState(() => _schedulerDiscarded = true)
                 : null,
           ),
@@ -579,9 +638,7 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    _detailsExpanded
-                        ? Icons.remove_rounded
-                        : Icons.add_rounded,
+                    _detailsExpanded ? Icons.remove_rounded : Icons.add_rounded,
                     size: 16,
                     color: AppColors.textMuted,
                   ),
@@ -603,7 +660,10 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
               TextButton(
                 onPressed: () => _openMoreOptions(context),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   foregroundColor: AppColors.textMuted,
@@ -653,6 +713,59 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
           const SizedBox(height: 8),
         ],
 
+        if (_selectedType.showRecurrence) ...[
+          _DetailRow(
+            icon: Icons.repeat_rounded,
+            label: _selectedScheduler != null ? 'Repeat configured' : 'Repeat',
+            color: _selectedScheduler != null ? accent : AppColors.textMuted,
+            onTap: () async {
+              final scheduler = await Navigator.push<Scheduler>(
+                context,
+                MaterialPageRoute(
+                  fullscreenDialog: true,
+                  builder: (_) =>
+                      SchedulerPicker(initialScheduler: _selectedScheduler),
+                ),
+              );
+              if (scheduler != null) {
+                setState(() {
+                  _extraScheduler = scheduler;
+                  _schedulerDiscarded = true;
+                });
+              }
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
+
+        if (_selectedType.showReminders) ...[
+          _DetailRow(
+            icon: Icons.notifications_active_rounded,
+            label: _extraReminders.isEmpty
+                ? 'Reminder'
+                : '${_extraReminders.length} reminder${_extraReminders.length == 1 ? '' : 's'}',
+            color: _extraReminders.isNotEmpty ? accent : AppColors.textMuted,
+            onTap: () {
+              final parentDateTime = _selectedDateTime;
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => ReminderConfigSheet(
+                  parentDateTime: _selectedHasTime ? parentDateTime : null,
+                  parentDateOnly: parentDateTime,
+                  onSave: (config) {
+                    setState(
+                      () => _extraReminders = [..._extraReminders, config],
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
+
         // Priority (only for Task)
         if (_selectedType.showPriority && _effectivePriority == null) ...[
           Row(
@@ -664,7 +777,9 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
                 style: TextStyle(fontSize: 14, color: AppColors.textMuted),
               ),
               const Spacer(),
-              ...TaskPriority.values.where((p) => p != TaskPriority.none).map((p) {
+              ...TaskPriority.values.where((p) => p != TaskPriority.none).map((
+                p,
+              ) {
                 final selected = _extraPriority == p;
                 Color c;
                 switch (p) {
@@ -689,7 +804,9 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
                     child: Icon(
                       Icons.flag_rounded,
                       size: 22,
-                      color: selected ? c : AppColors.textMuted.withValues(alpha: 0.3),
+                      color: selected
+                          ? c
+                          : AppColors.textMuted.withValues(alpha: 0.3),
                     ),
                   ),
                 );
@@ -715,7 +832,10 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
               fontSize: 13,
               color: AppColors.textMuted.withValues(alpha: 0.6),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(

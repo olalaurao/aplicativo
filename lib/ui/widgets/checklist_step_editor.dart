@@ -55,7 +55,7 @@ class _ChecklistStepEditorState extends State<ChecklistStepEditor> {
             children: [
               ReorderableDragStartListener(
                 index: widget.index,
-                child: const Icon(Icons.drag_handle_rounded, color: AppColors.textMuted, size: 20),
+                child: const Icon(Icons.drag_indicator, color: AppColors.textMuted, size: 20),
               ),
               const SizedBox(width: 12),
               Container(
@@ -63,7 +63,7 @@ class _ChecklistStepEditorState extends State<ChecklistStepEditor> {
                 height: 24,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.textMuted, width: 1.5),
+                  color: AppTheme.textMutedColor(context).withValues(alpha: 0.1),
                 ),
                 alignment: Alignment.center,
                 child: Text(

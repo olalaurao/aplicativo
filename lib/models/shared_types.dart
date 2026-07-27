@@ -7,46 +7,71 @@ import 'package:uuid/uuid.dart';
 // ---------------------------------------------------------------------------
 abstract final class ObjectTypes {
   // Content objects
-  static const String task         = 'task';
-  static const String habit        = 'habit';
-  static const String tracker      = 'tracker';
-  static const String goal         = 'goal';
-  static const String note         = 'note';
-  static const String entry        = 'entry';
-  static const String event        = 'event';
-  static const String reminder     = 'reminder';
-  static const String system       = 'system';
-  static const String socialPost   = 'social_post';
-  static const String moodDef      = 'mood_definition';
-  static const String idea         = 'idea';
-  static const String inbox        = 'inbox';
+  static const String task = 'task';
+  static const String habit = 'habit';
+  static const String tracker = 'tracker';
+  static const String goal = 'goal';
+  static const String note = 'note';
+  static const String entry = 'entry';
+  static const String event = 'event';
+  static const String reminder = 'reminder';
+  static const String system = 'system';
+  static const String socialPost = 'social_post';
+  static const String moodDef = 'mood_definition';
+  static const String idea = 'idea';
+  static const String inbox = 'inbox';
   static const String shoppingList = 'shopping_list';
-  static const String template     = 'template';
-  static const String dailyNote    = 'daily_note';
-  static const String analysis     = 'analysis';
+  static const String template = 'template';
+  static const String dailyNote = 'daily_note';
+  static const String analysis = 'analysis';
   static const String wellbeingIndicator = 'wellbeing_indicator';
 
   // Organizer objects
-  static const String area         = 'area';
-  static const String project      = 'project';
-  static const String activity     = 'activity';
-  static const String label        = 'label';
-  static const String person       = 'person';
-  static const String dayTheme     = 'day_theme';
-  static const String timeBlock    = 'time_block';
-  static const String value        = 'value';
-  static const String routine      = 'routine';
+  static const String area = 'area';
+  static const String project = 'project';
+  static const String activity = 'activity';
+  static const String label = 'label';
+  static const String person = 'person';
+  static const String dayTheme = 'day_theme';
+  static const String timeBlock = 'time_block';
+  static const String value = 'value';
+  static const String routine = 'routine';
 
   // Content objects (continued)
-  static const String pillar       = 'pillar';
-  static const String action       = 'action';
+  static const String pillar = 'pillar';
+  static const String action = 'action';
 
   /// All canonical types in insertion order.
   static const List<String> all = [
-    task, habit, tracker, goal, note, entry, event, reminder, system,
-    socialPost, moodDef, idea, inbox, shoppingList, template, dailyNote,
-    analysis, wellbeingIndicator, area, project, activity, label, person,
-    dayTheme, timeBlock, value, routine, pillar, action,
+    task,
+    habit,
+    tracker,
+    goal,
+    note,
+    entry,
+    event,
+    reminder,
+    system,
+    socialPost,
+    moodDef,
+    idea,
+    inbox,
+    shoppingList,
+    template,
+    dailyNote,
+    analysis,
+    wellbeingIndicator,
+    area,
+    project,
+    activity,
+    label,
+    person,
+    dayTheme,
+    timeBlock,
+    value,
+    routine,
+    pillar,
+    action,
   ];
 
   /// Returns true if [type] is a known canonical type string.
@@ -87,13 +112,13 @@ class TimeRange {
 
 enum MarkerType { tag, property, folder }
 
-
 class TypeSignature {
   final String objectType;
   final MarkerType markerType;
   final String markerValue;
   final String emoji;
   final String? iconName;
+
   /// Optional hex color (e.g. '#F97316') chosen by the user for this object type.
   /// Used by timeline, month grid, dial legend and completables components.
   final String? colorHex;
@@ -201,7 +226,7 @@ class OrganizerReference {
     return OrganizerReference(type: defaultType, slug: slug, title: title);
   }
 
-  String toWikiLink() => '[[$slug]]';
+  String toWikiLink() => type.isEmpty ? '[[$slug]]' : '[[$type/$slug]]';
 
   Map<String, dynamic> toMap() => {
     'type': type,
@@ -241,9 +266,11 @@ class Comment {
 }
 
 class ActionDef {
-  final String type; // add_tracking_record, add_entry, add_text_note, launch_url, etc.
+  final String
+  type; // add_tracking_record, add_entry, add_text_note, launch_url, etc.
   final String trigger; // slot_complete, day_complete, kpi_reached
   final String? targetTracker;
+
   /// Parâmetros extras específicos ao tipo de action.
   /// Ex.: add_text_note: {'title': '...'}, launch_url: {'url': '...'}
   final Map<String, dynamic>? params;
@@ -306,12 +333,13 @@ class Subtask {
   String id;
   String title;
   bool completed;
-  String? slug;     // Link para Task completa se promovida
-  bool isHeader;    // Se true, é um cabeçalho de grupo
+  String? slug; // Link para Task completa se promovida
+  bool isHeader; // Se true, é um cabeçalho de grupo
   bool isCollapsed; // Para cabeçalhos de sessão
-  String? session;  // Nome do grupo
+  String? session; // Nome do grupo
   /// Data de vencimento específica desta subtask (Tasks Plugin: `[due:: YYYY-MM-DD]`)
   DateTime? dueDate;
+
   /// Prioridade específica desta subtask (Tasks Plugin: `[priority:: high]`)
   /// Valores: 'none', 'low', 'medium', 'high' — mesmo enum de TaskPriority.
   String? priority;
@@ -346,8 +374,7 @@ class VaultLinkRef {
 
   bool get isRow => noteSlug != null && blockId != null;
 
-  String toWikiLink() =>
-      isRow ? '[[$noteSlug^$blockId]]' : '[[$objectSlug]]';
+  String toWikiLink() => isRow ? '[[$noteSlug^$blockId]]' : '[[$objectSlug]]';
 
   Map<String, dynamic> toMap() => {
     'link': toWikiLink(),
@@ -496,9 +523,11 @@ class DataSourceReference {
         // Legacy KPI source_type mapping
         if (s.contains('habit')) return DataSourceType.habit;
         if (s.contains('tracker')) return DataSourceType.trackerField;
-        if (s.contains('entry') || s.contains('journal')) return DataSourceType.entry;
+        if (s.contains('entry') || s.contains('journal'))
+          return DataSourceType.entry;
         if (s.contains('time')) return DataSourceType.timeSpent;
-        if (s.contains('subtask') || s.contains('goal')) return DataSourceType.subtasks;
+        if (s.contains('subtask') || s.contains('goal'))
+          return DataSourceType.subtasks;
         if (s.contains('collection')) return DataSourceType.collection;
         if (s.contains('mood')) return DataSourceType.journalMood;
         return DataSourceType.manualQuantity;
@@ -534,7 +563,9 @@ class EventLogEntry {
 
   factory EventLogEntry.fromMap(Map<String, dynamic> map) {
     return EventLogEntry(
-      timestamp: DateTime.tryParse(map['timestamp']?.toString() ?? '') ?? DateTime.now(),
+      timestamp:
+          DateTime.tryParse(map['timestamp']?.toString() ?? '') ??
+          DateTime.now(),
       action: map['action']?.toString() ?? 'unknown',
       description: map['description']?.toString() ?? '',
       oldValue: map['old_value']?.toString(),
