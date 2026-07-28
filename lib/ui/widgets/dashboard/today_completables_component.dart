@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../models/dashboard_block.dart';
 import '../../../models/task_model.dart';
+import '../../../models/dashboard_block.dart';
 import '../../../models/habit_model.dart';
-import '../../../providers/today_provider.dart';
+import '../../../providers/daily_schedule_provider.dart';
+import '../../../services/daily_schedule_service.dart';
 import '../../../providers/vault_provider.dart';
 import '../../../providers/pomodoro_provider.dart';
-import '../../../services/today_aggregator_service.dart';
 import '../../theme.dart';
 import '../../navigation/object_navigation.dart';
 
@@ -20,9 +20,12 @@ class TodayCompletablesComponent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final items = ref.watch(todayItemsProvider(today));
-
-    final completables = items.where((i) => i.isCompletable).toList();
+    final completables = ref.watch(filteredDailyScheduleProvider((
+      date: today,
+      filter: const DailyScheduleFilter(
+        includeCompletableOnly: true,
+      ),
+    ))).allItems;
     
     final maxItems = block.metadata['maxItems'] as int? ?? 8;
     // includeEvents flag is a no-op for now as events are not completable yet per spec
@@ -97,7 +100,11 @@ class TodayCompletablesComponent extends ConsumerWidget {
               children: visibleItems.map((item) {
                 return InkWell(
                   key: ValueKey(item.id),
-                  onTap: () => navigateToObject(context, item.source),
+                  onTap: () {
+                    if (item.source != null) {
+                      navigateToObject(context, item.source!);
+                    }
+                  },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Row(
@@ -113,7 +120,7 @@ class TodayCompletablesComponent extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Expanded(
+                        Flexible(
                           child: Text(
                             item.title,
                             style: Theme.of(context).textTheme.bodyMedium!.copyWith(
@@ -140,13 +147,13 @@ class TodayCompletablesComponent extends ConsumerWidget {
                           value: item.isCompleted,
                           onChanged: (checked) {
                             if (checked == null) return;
-                            if (item.kind == TodayItemKind.task) {
+                            if (item.kind == DailyScheduleKind.task) {
                               HapticFeedback.mediumImpact();
                               final task = item.source as Task;
                               ref.read(vaultProvider.notifier).updateObject(
                                 task.copyWith(stage: checked ? TaskStage.finalized : TaskStage.todo),
                               );
-                            } else if (item.kind == TodayItemKind.habitSlot) {
+                            } else if (item.kind == DailyScheduleKind.habit) {
                               HapticFeedback.lightImpact();
                               final habit = item.source as Habit;
                               final history = List<CompletionRecord>.from(habit.completionHistory);

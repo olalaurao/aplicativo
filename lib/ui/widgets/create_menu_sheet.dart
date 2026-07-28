@@ -599,7 +599,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.check_circle_outline_rounded,
           color: AppColors.info,
-          label: '✅ New task',
+          label: 'New task',
           onTap: () {
             Navigator.pop(context);
             context.push('/create/task', extra: {'initialTitle': widget.initialTitle});
@@ -609,7 +609,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.cached_rounded,
           color: AppColors.habitGreen,
-          label: '🔁 New habit',
+          label: 'New habit',
           onTap: () {
             Navigator.pop(context);
             context.push('/create/habit', extra: {'initialTitle': widget.initialTitle});
@@ -619,7 +619,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.flag_outlined,
           color: AppColors.habitOrange,
-          label: '🎯 New goal',
+          label: 'New goal',
           onTap: () {
             Navigator.pop(context);
             context.push('/create/goal', extra: {'initialTitle': widget.initialTitle});
@@ -629,7 +629,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.event_note_rounded,
           color: AppTheme.accentColor(context),
-          label: '📅 New event',
+          label: 'New event',
           onTap: () {
             Navigator.pop(context);
             context.push('/create/event', extra: {'initialTitle': widget.initialTitle});
@@ -639,7 +639,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.alarm,
           color: AppColors.warning,
-          label: '🔔 New reminder',
+          label: 'New reminder',
           onTap: () {
             Navigator.pop(context);
             context.push('/create/reminder');
@@ -649,7 +649,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.folder_outlined,
           color: AppColors.priorityHigh,
-          label: '📁 New project',
+          label: 'New project',
           onTap: () {
             Navigator.pop(context);
             context.push('/create-project', extra: {'initialTitle': widget.initialTitle});
@@ -659,7 +659,7 @@ class _CreateMenuSheetState extends ConsumerState<CreateMenuSheet> {
         _buildOptionRow(
           icon: Icons.inbox_outlined,
           color: AppColors.info,
-          label: '📥 Add to backlog',
+          label: 'Add to backlog',
           onTap: () {
             Navigator.pop(context);
             context.push('/create/task', extra: {

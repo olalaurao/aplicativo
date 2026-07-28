@@ -140,6 +140,7 @@ class TimelineWindow {
 class TimelineAggregatorService {
   static DayAggregation aggregateForDate(DateTime date, List<ContentObject> allObjects) {
     final dateOnly = DateTime(date.year, date.month, date.day);
+    final visibleObjects = allObjects.where(_isVisibleForDaySurfaces).toList();
     
     final tasks = <Task>[];
     final rotationTasks = <Task>[];
@@ -155,9 +156,9 @@ class TimelineAggregatorService {
     final goals = <Goal>[];
     final peopleToContact = <Person>[];
 
-    final projects = allObjects.whereType<Project>().toList();
-    final dayThemes = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
-    final allTimeBlocks = allObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.timeBlock).toList();
+    final projects = visibleObjects.whereType<Project>().toList();
+    final dayThemes = visibleObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.dayTheme).toList();
+    final allTimeBlocks = visibleObjects.whereType<Organizer>().where((o) => o.organizerType == OrganizerType.timeBlock).toList();
 
     bool isThemeActive(String themeId, DateTime d) {
       const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -175,8 +176,8 @@ class TimelineAggregatorService {
       });
     }
 
-    final allTasks = allObjects.whereType<Task>().toList();
-    final allReminders = allObjects.whereType<Reminder>().toList();
+    final allTasks = visibleObjects.whereType<Task>().toList();
+    final allReminders = visibleObjects.whereType<Reminder>().toList();
 
     bool isItemScheduled(String linkedItemId, DateTime d) {
       final targetSlug = linkedItemId.replaceAll('[[', '').replaceAll(']]', '').trim().toLowerCase();
@@ -217,7 +218,7 @@ class TimelineAggregatorService {
       return hasLinkedReminder;
     }
 
-    for (final obj in allObjects) {
+    for (final obj in visibleObjects) {
       if (obj is Task && obj.archived == false) {
         if (obj.scheduler != null && SchedulerService.shouldFire(obj.scheduler!, dateOnly, isThemeActive: isThemeActive, isBlockActive: isBlockActive, isItemScheduled: isItemScheduled)) {
           tasks.add(obj);
@@ -307,7 +308,7 @@ class TimelineAggregatorService {
       if (status == null) continue;
 
       bool addedProject = false;
-      final tasksInGroup = RotationService.rotationTasksForGroup(project, status.group, allObjects.whereType<Task>().toList());
+      final tasksInGroup = RotationService.rotationTasksForGroup(project, status.group, visibleObjects.whereType<Task>().toList());
       for (final task in tasksInGroup) {
         if (task.archived || task.stage == TaskStage.finalized) continue;
         final include = switch (task.rotationFrequencyType) {
@@ -342,6 +343,17 @@ class TimelineAggregatorService {
       goals: goals,
       peopleToContact: peopleToContact,
     );
+  }
+
+  static bool _isVisibleForDaySurfaces(ContentObject object) {
+    if (object.archived) return false;
+    final normalizedPath = object.obsidianPath.replaceAll('\\', '/');
+    if (normalizedPath == '_deleted' ||
+        normalizedPath.startsWith('_deleted/') ||
+        normalizedPath.contains('/_deleted/')) {
+      return false;
+    }
+    return true;
   }
 
   /// Build timeline items from a list of content objects within a window

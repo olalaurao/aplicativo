@@ -1028,19 +1028,19 @@ class _QuittingHabitCard extends ConsumerWidget {
     final IconData statusIcon;
     if (relapsedToday) {
       statusColor = AppColors.error;
-      statusLabel = 'Recaída hoje 💥';
+      statusLabel = 'Relapsed today';
       statusIcon = Icons.warning_amber_rounded;
     } else if (cleanDays >= 3) {
       statusColor = AppColors.habitGreen;
-      statusLabel = '$cleanDays dias limpos ✨';
+      statusLabel = '$cleanDays days clean';
       statusIcon = Icons.verified_rounded;
     } else if (cleanDays >= 1) {
       statusColor = AppColors.warning;
-      statusLabel = '$cleanDays ${cleanDays == 1 ? "dia" : "dias"} limpo ⚠️';
+      statusLabel = '$cleanDays ${cleanDays == 1 ? "day" : "days"} clean';
       statusIcon = Icons.schedule_rounded;
     } else {
       statusColor = AppColors.error;
-      statusLabel = 'Começando hoje';
+      statusLabel = 'Starting today';
       statusIcon = Icons.flag_rounded;
     }
 

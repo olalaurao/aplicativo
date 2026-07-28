@@ -1,5 +1,8 @@
 // lib/models/dashboard_block.dart
 
+import 'shared_types.dart';
+import '../services/daily_schedule_service.dart';
+
 // F3.8: V5 deduplicated list retired - panel system being redesigned from blank slate
 // Only core mechanics preserved until redesign is complete
 enum BlockType {
@@ -84,4 +87,134 @@ class DashboardBlock {
       metadata: (map['metadata'] as Map?)?.cast<String, dynamic>() ?? {},
     );
   }
+}
+
+// ScheduleSurfaceFilter - reusable filter model for dashboard blocks and widget config
+class ScheduleSurfaceFilter {
+  final Set<DailyScheduleKind> visibleKinds;
+  final bool includeTimed;
+  final bool includeAllDay;
+  final bool includeCompletableOnly;
+  final bool includeCompleted;
+  final List<OrganizerReference>? organizerRefs;
+  final int? maxItems;
+  final int? maxItemsPerDay;
+  final int? maxChipsPerCell;
+
+  ScheduleSurfaceFilter({
+    Set<DailyScheduleKind>? visibleKinds,
+    this.includeTimed = true,
+    this.includeAllDay = true,
+    this.includeCompletableOnly = false,
+    this.includeCompleted = false,
+    this.organizerRefs,
+    this.maxItems,
+    this.maxItemsPerDay,
+    this.maxChipsPerCell,
+  }) : visibleKinds = visibleKinds ?? _defaultVisibleKinds;
+
+  static Set<DailyScheduleKind> get _defaultVisibleKinds => {
+        DailyScheduleKind.task,
+        DailyScheduleKind.habit,
+        DailyScheduleKind.event,
+        DailyScheduleKind.googleCalendar,
+        DailyScheduleKind.reminder,
+        DailyScheduleKind.pomodoro,
+        DailyScheduleKind.trackerRecord,
+        DailyScheduleKind.journalEntry,
+        DailyScheduleKind.timeBlock,
+        DailyScheduleKind.system,
+        DailyScheduleKind.rotationZone,
+        DailyScheduleKind.personContact,
+      };
+
+  Map<String, dynamic> toMap() {
+    return {
+      'visibleKinds': visibleKinds.map((k) => k.name).toList(),
+      'includeTimed': includeTimed,
+      'includeAllDay': includeAllDay,
+      'includeCompletableOnly': includeCompletableOnly,
+      'includeCompleted': includeCompleted,
+      if (organizerRefs != null && organizerRefs!.isNotEmpty)
+        'organizerRefs': organizerRefs!.map((r) => r.toMap()).toList(),
+      if (maxItems != null) 'maxItems': maxItems,
+      if (maxItemsPerDay != null) 'maxItemsPerDay': maxItemsPerDay,
+      if (maxChipsPerCell != null) 'maxChipsPerCell': maxChipsPerCell,
+    };
+  }
+
+  factory ScheduleSurfaceFilter.fromMap(Map<String, dynamic> map) {
+    final rawKinds = map['visibleKinds'] as List?;
+    final visibleKinds = rawKinds != null
+        ? rawKinds
+            .map((k) => DailyScheduleKind.values.firstWhere(
+                  (e) => e.name == k,
+                  orElse: () => DailyScheduleKind.task,
+                ))
+            .toSet()
+        : null;
+
+    final rawOrganizerRefs = map['organizerRefs'] as List?;
+    final organizerRefs = rawOrganizerRefs != null
+        ? rawOrganizerRefs
+            .map((r) => OrganizerReference.fromMap(r as Map<String, dynamic>))
+            .toList()
+        : null;
+
+    return ScheduleSurfaceFilter(
+      visibleKinds: visibleKinds,
+      includeTimed: map['includeTimed'] as bool? ?? true,
+      includeAllDay: map['includeAllDay'] as bool? ?? true,
+      includeCompletableOnly: map['includeCompletableOnly'] as bool? ?? false,
+      includeCompleted: map['includeCompleted'] as bool? ?? false,
+      organizerRefs: organizerRefs,
+      maxItems: map['maxItems'] as int?,
+      maxItemsPerDay: map['maxItemsPerDay'] as int?,
+      maxChipsPerCell: map['maxChipsPerCell'] as int?,
+    );
+  }
+
+  ScheduleSurfaceFilter copyWith({
+    Set<DailyScheduleKind>? visibleKinds,
+    bool? includeTimed,
+    bool? includeAllDay,
+    bool? includeCompletableOnly,
+    bool? includeCompleted,
+    List<OrganizerReference>? organizerRefs,
+    int? maxItems,
+    int? maxItemsPerDay,
+    int? maxChipsPerCell,
+  }) {
+    return ScheduleSurfaceFilter(
+      visibleKinds: visibleKinds ?? this.visibleKinds,
+      includeTimed: includeTimed ?? this.includeTimed,
+      includeAllDay: includeAllDay ?? this.includeAllDay,
+      includeCompletableOnly: includeCompletableOnly ?? this.includeCompletableOnly,
+      includeCompleted: includeCompleted ?? this.includeCompleted,
+      organizerRefs: organizerRefs ?? this.organizerRefs,
+      maxItems: maxItems ?? this.maxItems,
+      maxItemsPerDay: maxItemsPerDay ?? this.maxItemsPerDay,
+      maxChipsPerCell: maxChipsPerCell ?? this.maxChipsPerCell,
+    );
+  }
+
+  static ScheduleSurfaceFilter get defaultPlannerFilter => ScheduleSurfaceFilter();
+
+  static ScheduleSurfaceFilter get defaultTodayTimelineFilter =>
+      ScheduleSurfaceFilter();
+
+  static ScheduleSurfaceFilter get defaultCompletablesFilter =>
+      ScheduleSurfaceFilter(
+        includeCompletableOnly: true,
+        visibleKinds: {
+          DailyScheduleKind.task,
+          DailyScheduleKind.habit,
+        },
+      );
+
+  static ScheduleSurfaceFilter get defaultWeekOverviewFilter =>
+      ScheduleSurfaceFilter(maxItemsPerDay: 10);
+
+  static ScheduleSurfaceFilter get defaultMonthOverviewFilter =>
+      ScheduleSurfaceFilter(maxChipsPerCell: 3);
 }

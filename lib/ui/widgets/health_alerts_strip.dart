@@ -73,11 +73,11 @@ class _TrackerAlertCard extends ConsumerWidget {
     FieldAlertLevel.none     => AppColors.textMuted,
   };
 
-  String get _icon => switch (alert.level) {
-    FieldAlertLevel.critical => '🚨',
-    FieldAlertLevel.warning  => '⚠️',
-    FieldAlertLevel.info     => 'ℹ️',
-    FieldAlertLevel.none     => '•',
+  IconData get _icon => switch (alert.level) {
+    FieldAlertLevel.critical => Icons.error_rounded,
+    FieldAlertLevel.warning  => Icons.warning_amber_rounded,
+    FieldAlertLevel.info     => Icons.info_outline_rounded,
+    FieldAlertLevel.none     => Icons.circle_outlined,
   };
 
   @override
@@ -92,7 +92,7 @@ class _TrackerAlertCard extends ConsumerWidget {
           border: Border.all(color: _color.withValues(alpha: 0.25))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Text(_icon, style: const TextStyle(fontSize: 14)),
+            Icon(_icon, size: 14, color: _color),
             const SizedBox(width: 4),
             Expanded(child: Text(alert.field.title,
               maxLines: 1, overflow: TextOverflow.ellipsis,
@@ -111,7 +111,7 @@ class _TrackerAlertCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _color.withValues(alpha: 0.25))),
       child: Row(children: [
-        Text(_icon, style: const TextStyle(fontSize: 20)),
+        Icon(_icon, size: 20, color: _color),
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('${alert.tracker.title} · ${alert.field.title}',
@@ -153,10 +153,10 @@ class _WellbeingAlertCard extends ConsumerWidget {
     return AppColors.success;
   }
 
-  String get _icon {
-    if (alert.status == SignalStatus.alert) return '🚨';
-    if (alert.status == SignalStatus.watch) return '⚠️';
-    return '✓';
+  IconData get _icon {
+    if (alert.status == SignalStatus.alert) return Icons.error_rounded;
+    if (alert.status == SignalStatus.watch) return Icons.warning_amber_rounded;
+    return Icons.check_circle_rounded;
   }
 
   @override
@@ -171,7 +171,7 @@ class _WellbeingAlertCard extends ConsumerWidget {
           border: Border.all(color: _color.withValues(alpha: 0.25))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Text(_icon, style: const TextStyle(fontSize: 14)),
+            Icon(_icon, size: 14, color: _color),
             const SizedBox(width: 4),
             Expanded(child: Text(alert.sourceTitle ?? 'Signal',
               maxLines: 1, overflow: TextOverflow.ellipsis,
@@ -190,7 +190,7 @@ class _WellbeingAlertCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _color.withValues(alpha: 0.25))),
       child: Row(children: [
-        Text(_icon, style: const TextStyle(fontSize: 20)),
+        Icon(_icon, size: 20, color: _color),
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(alert.sourceTitle ?? 'Wellbeing Signal',

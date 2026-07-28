@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import '../../providers/today_provider.dart';
+import '../../providers/daily_schedule_provider.dart';
 import '../../providers/pomodoro_provider.dart';
 import '../../providers/vault_provider.dart';
 import '../../models/task_model.dart';
 import '../../models/habit_model.dart';
-import '../../services/today_aggregator_service.dart';
+import '../../services/daily_schedule_service.dart';
 import '../theme.dart';
 import '../navigation/object_navigation.dart';
 import 'pomodoro_screen.dart';
@@ -206,7 +206,7 @@ class _WeekTimelineScreenState extends ConsumerState<WeekTimelineScreen> {
 
           final dateIndex = index - 1;
           final date = _loadedDates[dateIndex];
-          final items = ref.watch(todayItemsProvider(date));
+          final items = ref.watch(dailyScheduleProvider(date)).allItems;
 
           // Filter items by search query
           final filteredItems = _isSearching && _searchQuery.isNotEmpty
@@ -342,9 +342,13 @@ class _WeekTimelineScreenState extends ConsumerState<WeekTimelineScreen> {
     );
   }
 
-  Widget _buildItemRow(TodayItem item) {
+  Widget _buildItemRow(DailyScheduleItem item) {
     return InkWell(
-      onTap: () => navigateToObject(context, item.source),
+      onTap: () {
+        if (item.source != null) {
+          navigateToObject(context, item.source!);
+        }
+      },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
         child: Row(
@@ -369,11 +373,11 @@ class _WeekTimelineScreenState extends ConsumerState<WeekTimelineScreen> {
             ),
             const SizedBox(width: 8),
             // Time (only if not midnight/untimed)
-            if (item.timestamp.hour != 0 || item.timestamp.minute != 0)
+            if (item.startMinutes != null && item.startMinutes! > 0)
               SizedBox(
                 width: 44,
                 child: Text(
-                  DateFormat('HH:mm').format(item.timestamp),
+                  _formatMinutes(item.startMinutes!),
                   style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
                 ),
               )
@@ -412,28 +416,36 @@ class _WeekTimelineScreenState extends ConsumerState<WeekTimelineScreen> {
     );
   }
 
-  void _toggleCompletion(TodayItem item) {
+  void _toggleCompletion(DailyScheduleItem item) {
     HapticFeedback.lightImpact();
     
-    if (item.kind == TodayItemKind.task && item.source is Task) {
+    if (item.kind == DailyScheduleKind.task && item.source is Task) {
       final task = item.source as Task;
       final newStage = task.stage == TaskStage.finalized 
           ? TaskStage.todo 
           : TaskStage.finalized;
       ref.read(vaultProvider.notifier).updateObject(task.copyWith(stage: newStage));
-    } else if (item.kind == TodayItemKind.habitSlot && item.source is Habit) {
+    } else if (item.kind == DailyScheduleKind.habit && item.source is Habit) {
       final habit = item.source as Habit;
-      final date = DateTime(item.timestamp.year, item.timestamp.month, item.timestamp.day);
-      ref.read(habitsProvider.notifier).toggleHabit(habit, date);
+      final date = _loadedDates.firstWhere((d) => d.year == item.date.year && d.month == item.date.month && d.day == item.date.day);
+      ref.read(habitsProvider.notifier).toggleHabit(habit, date, slotIndex: item.slotIndex);
     }
   }
 
-  void _startPomodoro(TodayItem item) {
-    ref.read(pomodoroProvider.notifier).setCurrentItem(item.source.id, item.source.title);
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const PomodoroScreen()),
-    );
+  void _startPomodoro(DailyScheduleItem item) {
+    if (item.source != null) {
+      ref.read(pomodoroProvider.notifier).setCurrentItem(item.source!.id, item.source!.title);
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PomodoroScreen()),
+      );
+    }
+  }
+
+  String _formatMinutes(int minutes) {
+    final hour = minutes ~/ 60;
+    final minute = minutes % 60;
+    return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
   }
 
   void _jumpToDate() async {

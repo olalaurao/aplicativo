@@ -4,24 +4,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/task_model.dart';
+import '../../models/content_object.dart';
 import '../../models/organizer_model.dart';
 import '../../models/project_model.dart';
+import '../../models/system_model.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/pomodoro_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/rotation_service.dart';
+import '../../services/daily_schedule_service.dart';
 import '../theme.dart';
 import '../utils/object_icons.dart';
 import 'package:googleapis/calendar/v3.dart' as google_calendar;
 import '../../models/habit_model.dart';
 import 'object_action_wrapper.dart';
-import '../screens/google_event_detail_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../screens/universal_detail_view.dart';
 import '../screens/pomodoro_screen.dart';
-import '../forms/create_task_form.dart';
 import '../../models/pomodoro_session.dart';
 import 'rotation_schedule_dialog.dart';
+import '../forms/scheduler_picker.dart';
+import '../../models/scheduler.dart';
 
 class TimeLineDayView extends ConsumerStatefulWidget {
   final List<Task> tasks;
@@ -70,6 +73,7 @@ class TimeLineDayView extends ConsumerStatefulWidget {
 class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
   // Store local durations during active dragging to avoid continuous DB writes
   final Map<String, int> _localDurations = {};
+  bool _isUntimedSectionExpanded = true;
 
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
@@ -100,8 +104,8 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
         children: [
           // ─── Active Day Theme Banner ───
           if (widget.activeTheme != null) _buildActiveThemeBanner(context),
-          // ─── All-Day Strip ───
-          if (widget.allDayEvents.isNotEmpty) _buildAllDayStrip(context),
+          // ─── Untimed Items Section (toggleable) ───
+          if (widget.allDayEvents.isNotEmpty) _buildUntimedSection(context),
 
           SizedBox(
             height: 24 * hourHeight,
@@ -311,11 +315,8 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
 
                     ..._buildTimeBlockBands(hourHeight, leftColumnWidth),
 
-                    // Drop targets stay behind the scheduled cards so taps open items.
-                    ..._buildDropTargets(hourHeight, leftColumnWidth),
-
                     // ─── Scheduled Blocks (Tasks, Habits, Google Events) ───
-                    ...items.map((item) {
+                    ...items.map<Widget>((item) {
                       final startHour = item.startMinutes ~/ 60;
                       final startMinute = item.startMinutes % 60;
                       final durationMinutes =
@@ -364,38 +365,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                           height: height,
                           child: Stack(
                             children: [
-                              // Planned task block
-                              LongPressDraggable<Task>(
-                                data: task,
-                                feedback: Material(
-                                  color: Colors.transparent,
-                                  child: Container(
-                                    width: colWidth - 4,
-                                    height: height,
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.accentColor(context).withValues(
-                                        alpha: 0.8,
-                                      ),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    padding: const EdgeInsets.all(12),
-                                    child: Text(
-                                      task.title,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ),
-                                childWhenDragging: Opacity(
-                                  opacity: 0.3,
-                                  child: _buildTaskBlock(context, task, height),
-                                ),
-                                child: _buildTaskBlock(context, task, height),
-                              ),
+                              _buildTaskBlock(context, task, height),
                               // Plan-vs-actual overlay
                               if (completedSession != null)
                                 Positioned(
@@ -438,44 +408,11 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                           left: leftOffset,
                           width: colWidth - 4,
                           height: height,
-                          child: LongPressDraggable<Habit>(
-                            data: habit,
-                            feedback: Material(
-                              color: Colors.transparent,
-                              child: Container(
-                                width: colWidth - 4,
-                                height: height,
-                                decoration: BoxDecoration(
-                                  color: _getHabitColor(
-                                    habit,
-                                  ).withValues(alpha: 0.8),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                padding: const EdgeInsets.all(12),
-                                child: Text(
-                                  habit.displayTitle,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            childWhenDragging: Opacity(
-                              opacity: 0.3,
-                              child: _buildHabitBlock(
-                                context,
-                                habit,
-                                slotIndex,
-                                height,
-                              ),
-                            ),
-                            child: _buildHabitBlock(
-                              context,
-                              habit,
-                              slotIndex,
-                              height,
-                            ),
+                          child: _buildHabitBlock(
+                            context,
+                            habit,
+                            slotIndex,
+                            height,
                           ),
                         );
                       } else if (item.originalItem is _RotationProjectBlock) {
@@ -498,10 +435,8 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                             height,
                           ),
                         );
-                      } else {
-
-                        final event =
-                            item.originalItem as google_calendar.Event;
+                      } else if (item.originalItem is google_calendar.Event) {
+                        final event = item.originalItem as google_calendar.Event;
                         final startTime =
                             event.start?.dateTime?.toLocal() ??
                             event.start?.date?.toLocal() ??
@@ -611,6 +546,9 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                             ),
                           ),
                         );
+                      } else {
+                        // Fallback for any other types (e.g., Systems)
+                        return const SizedBox.shrink();
                       }
                     }),
 
@@ -628,102 +566,6 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
         ],
       ),
     );
-  }
-
-  List<Widget> _buildDropTargets(double hourHeight, double leftColumnWidth) {
-    final int slotsPerHour = 60 ~/ widget.gridGranularity;
-    return List.generate(24 * slotsPerHour, (index) {
-      final slotIndex = index % slotsPerHour;
-      final hour = index ~/ slotsPerHour;
-      final minute = slotIndex * widget.gridGranularity;
-      return Positioned(
-        top: index * (hourHeight / slotsPerHour),
-        left: leftColumnWidth,
-        right: 0,
-        height: hourHeight / slotsPerHour,
-        child: GestureDetector(
-          onLongPress: () {
-            // Open CreateTaskForm with pre-filled date and time
-            context.push('/create-task', extra: {
-              'initialDate': widget.selectedDate,
-              'initialTime': TimeOfDay(hour: hour, minute: minute),
-              'initialStage': TaskStage.todo,
-            });
-          },
-          child: DragTarget<Object>(
-            onWillAcceptWithDetails: (details) =>
-                details.data is Task || details.data is Habit,
-            onAcceptWithDetails: (details) {
-              final dropTime = DateTime(
-                widget.selectedDate.year,
-                widget.selectedDate.month,
-                widget.selectedDate.day,
-                hour,
-                minute,
-              );
-
-              if (details.data is Task) {
-                widget.onTaskDrop?.call(details.data as Task, dropTime);
-              } else if (details.data is Habit) {
-                widget.onHabitDrop?.call(details.data as Habit, dropTime);
-              }
-            },
-            builder: (context, candidateData, rejectedData) {
-              if (candidateData.isEmpty) {
-                return const SizedBox.shrink();
-              }
-
-              // Show ghost block with actual duration instead of time pill
-              final data = candidateData.first;
-              int duration = widget.gridGranularity; // Default to current granularity
-              String title = '';
-
-              if (data is Task) {
-                duration = data.duration;
-                title = data.title;
-              } else if (data is Habit) {
-                duration = 30; // Habits default to 30 min
-                title = data.displayTitle;
-              }
-
-              final ghostHeight = (duration / 60 * hourHeight);
-
-              return Container(
-                color: AppTheme.accentColor(context).withValues(alpha: 0.1),
-                child: Center(
-                  child: Container(
-                    height: ghostHeight,
-                    width: double.infinity,
-                    margin: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.accentColor(context).withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: AppTheme.accentColor(context),
-                        width: 2,
-                      ),
-                    ),
-                    padding: const EdgeInsets.all(8),
-                    child: title.isNotEmpty
-                        ? Text(
-                            title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          )
-                        : null,
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      );
-    });
   }
 
   List<Widget> _buildTimeBlockBands(double hourHeight, double leftColumnWidth) {
@@ -797,7 +639,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                       ),
                       GestureDetector(
                         onTap: () {
-                          ref.read(pomodoroProvider.notifier).setCurrentItem(block.id ?? '', block.title);
+                          ref.read(pomodoroProvider.notifier).setCurrentItem(block.id, block.title);
                           ref.read(pomodoroProvider.notifier).start();
                           context.push('/pomodoro');
                         },
@@ -858,9 +700,10 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                         ),
                         child: Row(
                           children: [
-                            Text(
-                              '🍅',
-                              style: TextStyle(fontSize: isTiny ? 12 : 16),
+                            Icon(
+                              Icons.timer_outlined,
+                              size: isTiny ? 12 : 16,
+                              color: baseColor,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -958,11 +801,12 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
       object: task,
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            context.push('/detail/${task.id}', extra: task);
-          },
-          borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              onTap: () {
+                context.push('/detail/${task.id}', extra: task);
+              },
+              onLongPress: () => _showItemActionSheet(context, task),
+              borderRadius: BorderRadius.circular(10),
           child: Container(
             clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
@@ -1104,9 +948,11 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onVerticalDragStart: (_) {
-                      if (mounted) setState(() {
-                        _localDurations[task.id] = task.duration;
-                      });
+                      if (mounted) {
+                        setState(() {
+                          _localDurations[task.id] = task.duration;
+                        });
+                      }
                     },
                     onVerticalDragUpdate: (details) {
                       final newHeight = height + details.delta.dy;
@@ -1114,9 +960,11 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                       final newDuration = (newHeight / hourHeight * 60)
                           .round()
                           .clamp(10, 480);
-                      if (mounted) setState(() {
-                        _localDurations[task.id] = newDuration;
-                      });
+                      if (mounted) {
+                        setState(() {
+                          _localDurations[task.id] = newDuration;
+                        });
+                      }
                     },
                     onVerticalDragEnd: (_) {
                       final finalDuration =
@@ -1236,6 +1084,97 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
     );
   }
 
+  void _showItemActionSheet(BuildContext context, ContentObject object) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppBorderRadius.xxl)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.dividerColor(context),
+                borderRadius: BorderRadius.circular(AppBorderRadius.xs),
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.edit_rounded, color: AppTheme.accentColor(context)),
+              title: const Text('Edit'),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push('/detail/${object.id}', extra: object);
+              },
+            ),
+            if (object is Task) ...[
+              ListTile(
+                leading: Icon(
+                  object.stage == TaskStage.finalized
+                      ? Icons.radio_button_unchecked_rounded
+                      : Icons.check_circle_outline_rounded,
+                  color: AppTheme.accentColor(context),
+                ),
+                title: Text(object.stage == TaskStage.finalized ? 'Mark open' : 'Complete'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  widget.onToggleComplete?.call(object);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.edit_calendar_rounded, color: AppTheme.accentColor(context)),
+                title: const Text('Change date/time'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final result = await showModalBottomSheet<Scheduler>(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    builder: (context) => SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.85,
+                      child: SchedulerPicker(
+                        initialScheduler: object.scheduler ?? Scheduler(
+                          rules: [SchedulerRule(repeatType: RepeatType.numberOfDays, interval: 1)],
+                          startDate: widget.selectedDate,
+                        ),
+                      ),
+                    ),
+                  );
+                  if (result != null) {
+                    ref.read(vaultProvider.notifier).updateObject(object.copyWith(scheduler: result));
+                  }
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.play_arrow_rounded, color: AppTheme.accentColor(context)),
+                title: const Text('Start Pomodoro'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  widget.onPlay?.call(object);
+                },
+              ),
+            ],
+            if (object is Habit)
+              ListTile(
+                leading: Icon(Icons.check_circle_outline_rounded, color: AppTheme.accentColor(context)),
+                title: const Text('Toggle habit'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  widget.onHabitToggle?.call(object, 0);
+                },
+              ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildHabitBlock(
     BuildContext context,
     Habit habit,
@@ -1258,6 +1197,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
           onTap: () {
             context.push('/detail/${habit.id}', extra: habit);
           },
+          onLongPress: () => _showItemActionSheet(context, habit),
           borderRadius: BorderRadius.circular(10),
           child: Container(
             clipBehavior: Clip.hardEdge,
@@ -1431,37 +1371,156 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
     );
   }
 
-  Widget _buildAllDayStrip(BuildContext context) {
-    final allDayItems = widget.allDayEvents.where((event) {
+  Widget _buildUntimedSection(BuildContext context) {
+    final untimedItems = widget.allDayEvents.where((event) {
+      // If it's a DailyScheduleItem, check the source
+      if (event is DailyScheduleItem) {
+        final item = event as DailyScheduleItem;
+        if (item.source is Habit) {
+          final habit = item.source as Habit;
+          final hasScheduledSlots = habit.slots.any(
+            (slot) => slot.hasReminders && slot.primaryReminderTime != null,
+          );
+          return !hasScheduledSlots;
+        }
+        if (item.source is Task) {
+          final task = item.source as Task;
+          return task.scheduledTime == null || task.scheduledTime!.isEmpty;
+        }
+        // For other types, include if they're all-day
+        return item.isAllDay;
+      }
+      // Legacy support for direct ContentObject
       if (event is Habit) {
         final hasScheduledSlots = event.slots.any(
           (slot) => slot.hasReminders && slot.primaryReminderTime != null,
         );
         return !hasScheduledSlots;
       }
+      if (event is Task) {
+        return event.scheduledTime == null || event.scheduledTime!.isEmpty;
+      }
       return true;
     }).toList();
 
-    if (allDayItems.isEmpty) return const SizedBox.shrink();
+    if (untimedItems.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: AppColors.divider, width: 0.5),
-        ),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceVariantColor(context),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: ListView(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        children: allDayItems.map((event) {
-          if (event is Habit) {
-            return _buildHabitStripItem(context, event);
-          } else if (event is Task) {
-            return _buildTaskStripItem(context, event);
-          }
-          return const SizedBox.shrink();
-        }).toList(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _isUntimedSectionExpanded = !_isUntimedSectionExpanded),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today_rounded,
+                    size: 16,
+                    color: AppTheme.textMutedColor(context),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Today\'s Items',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textMutedColor(context),
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    _isUntimedSectionExpanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    size: 20,
+                    color: AppTheme.textMutedColor(context),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_isUntimedSectionExpanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Column(
+                children: untimedItems.map((event) {
+                  // Extract source if it's a DailyScheduleItem
+                  final object = event is DailyScheduleItem ? event.source : event;
+                  if (object == null) return const SizedBox.shrink();
+                  
+                  if (object is Habit) {
+                    return _buildHabitStripItem(context, object);
+                  } else if (object is Task) {
+                    return _buildTaskStripItem(context, object);
+                  } else if (object is SystemDefinition) {
+                    return _buildGenericStripItem(context, object);
+                  } else if (object is ContentObject) {
+                    return _buildGenericStripItem(context, object);
+                  }
+                  return const SizedBox.shrink();
+                }).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGenericStripItem(BuildContext context, ContentObject object) {
+    final settings = ref.watch(settingsProvider);
+    final icon = ObjectIcons.iconDataForTypeWithSignatures(
+          object.type,
+          settings.typeSignatures,
+        ) ??
+        ObjectIcons.defaultIconDataForType(object.type);
+    final color = ObjectIcons.colorForTypeWithSignatures(
+      object.type,
+      settings.typeSignatures,
+    );
+
+    return ObjectActionWrapper(
+      object: object,
+      child: InkWell(
+        onTap: () => context.push('/detail/${object.id}', extra: object),
+        onLongPress: () => _showItemActionSheet(context, object),
+        borderRadius: BorderRadius.circular(AppBorderRadius.sm),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(AppBorderRadius.sm),
+            border: Border.all(color: color.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: AppIconSize.sm, color: color),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  object.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: AppTextSize.sm,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimaryColor(context),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

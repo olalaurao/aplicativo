@@ -11,6 +11,7 @@ import '../../models/dashboard_block.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../providers/widget_sync_provider.dart';
 import '../../services/widget_service.dart';
+import '../../services/daily_schedule_service.dart';
 import '../theme.dart';
 import 'app_chip.dart';
 import 'app_switch_tile.dart';
@@ -432,6 +433,37 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
   }
 
   Widget _buildCalendarConfig(AppSettings settings) {
+    // Migrate old boolean settings to visibleKinds if not already set
+    final rawVisibleKinds = settings.calendarWidgetVisibleKinds;
+    Set<DailyScheduleKind> visibleKinds;
+    
+    if (rawVisibleKinds == null || rawVisibleKinds.isEmpty) {
+      // Migration: use old boolean settings as defaults
+      visibleKinds = {};
+      if (settings.calendarWidgetShowTasks) visibleKinds.add(DailyScheduleKind.task);
+      if (settings.calendarWidgetShowHabits) visibleKinds.add(DailyScheduleKind.habit);
+      if (settings.calendarWidgetShowSessions) {
+        visibleKinds.add(DailyScheduleKind.pomodoro);
+        visibleKinds.add(DailyScheduleKind.googleCalendar);
+      }
+      // Default to all if no old settings
+      if (visibleKinds.isEmpty) {
+        visibleKinds = ScheduleSurfaceFilter._defaultVisibleKinds;
+      }
+    } else {
+      visibleKinds = rawVisibleKinds;
+    }
+
+    const allKinds = [
+      (DailyScheduleKind.task, 'Tasks'),
+      (DailyScheduleKind.habit, 'Habits'),
+      (DailyScheduleKind.event, 'Events'),
+      (DailyScheduleKind.googleCalendar, 'Google Calendar'),
+      (DailyScheduleKind.reminder, 'Reminders'),
+      (DailyScheduleKind.pomodoro, 'Pomodoro'),
+      (DailyScheduleKind.timeBlock, 'Time Blocks'),
+    ];
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -472,36 +504,26 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
           const SizedBox(height: 8),
-          AppSwitchTile(
-            title: 'Tarefas agendadas',
-            value: settings.calendarWidgetShowTasks,
-            onChanged: (val) {
-              ref
-                  .read(settingsProvider.notifier)
-                  .updateWidgetCalendarSettings(showTasks: val);
-            },
-            contentPadding: EdgeInsets.zero,
-          ),
-          AppSwitchTile(
-            title: 'Frequent habits',
-            value: settings.calendarWidgetShowHabits,
-            onChanged: (val) {
-              ref
-                  .read(settingsProvider.notifier)
-                  .updateWidgetCalendarSettings(showHabits: val);
-            },
-            contentPadding: EdgeInsets.zero,
-          ),
-          AppSwitchTile(
-            title: 'Foco do Dia e Pomodoros',
-            value: settings.calendarWidgetShowSessions,
-            onChanged: (val) {
-              ref
-                  .read(settingsProvider.notifier)
-                  .updateWidgetCalendarSettings(showSessions: val);
-            },
-            contentPadding: EdgeInsets.zero,
-          ),
+          ...allKinds.map((pair) {
+            final kind = pair.$1;
+            final label = pair.$2;
+            return AppSwitchTile(
+              title: label,
+              value: visibleKinds.contains(kind),
+              onChanged: (val) {
+                final newKinds = Set<DailyScheduleKind>.from(visibleKinds);
+                if (val == true) {
+                  newKinds.add(kind);
+                } else {
+                  newKinds.remove(kind);
+                }
+                ref
+                    .read(settingsProvider.notifier)
+                    .updateWidgetCalendarSettings(visibleKinds: newKinds);
+              },
+              contentPadding: EdgeInsets.zero,
+            );
+          }),
         ],
       ),
     );

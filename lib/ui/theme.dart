@@ -220,6 +220,38 @@ class AppTheme {
       ? AppColors.darkDivider
       : AppColors.divider;
 
+  // ─── Contrast Helpers ───────────────────────────────────────────────────────
+  /// Returns a text color that ensures readability against the given background color.
+  /// Uses the luminance of the background to determine whether to use light or dark text.
+  static Color contrastColorForBackground(Color backgroundColor) {
+    final luminance = backgroundColor.computeLuminance();
+    // W3C recommends threshold of 0.5 for readability
+    return luminance > 0.5 ? Colors.black : Colors.white;
+  }
+
+  /// Returns a text color that ensures readability against the given background color,
+  /// with a fallback to the theme's text primary color if the background is neutral.
+  static Color contrastColorForBackgroundWithFallback(
+    BuildContext context,
+    Color backgroundColor,
+  ) {
+    final luminance = backgroundColor.computeLuminance();
+    // If background is very light or very dark, use contrast color
+    if (luminance > 0.85) return Colors.black;
+    if (luminance < 0.15) return Colors.white;
+    // Otherwise use theme's text primary color
+    return textPrimaryColor(context);
+  }
+
+  /// Adjusts the alpha of a color to ensure it's readable against the current theme's background.
+  /// Returns a color with adjusted alpha that maintains contrast.
+  static Color readableAlpha(BuildContext context, Color color, {double minAlpha = 0.6}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentAlpha = color.alpha / 255;
+    final adjustedAlpha = currentAlpha < minAlpha ? minAlpha : currentAlpha;
+    return color.withValues(alpha: adjustedAlpha);
+  }
+
   static BoxDecoration sheetDecoration(BuildContext context) {
     return BoxDecoration(
       color: surfaceColor(context),

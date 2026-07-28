@@ -34,6 +34,7 @@ class ObjectIcons {
       ObjectTypes.note => '📝',
       ObjectTypes.event => '📅',
       ObjectTypes.reminder => '🔔',
+      ObjectTypes.pomodoro => '🍅',
       ObjectTypes.system => '⚙️',
       ObjectTypes.socialPost => '🔗',
       ObjectTypes.idea => '💡',
@@ -116,6 +117,7 @@ class ObjectIcons {
       ObjectTypes.note => Icons.description,
       ObjectTypes.event => Icons.calendar_today,
       ObjectTypes.reminder => Icons.notifications,
+      ObjectTypes.pomodoro => Icons.timer,
       ObjectTypes.idea => Icons.lightbulb,
       ObjectTypes.person => Icons.person,
       ObjectTypes.project => Icons.folder,
@@ -195,6 +197,7 @@ class ObjectIcons {
       ObjectTypes.goal     => const Color(0xFFF59E0B), // amber
       ObjectTypes.event    => const Color(0xFF8B5CF6), // purple
       ObjectTypes.reminder => const Color(0xFFF97316), // orange
+      ObjectTypes.pomodoro => const Color(0xFFEF4444), // red
       ObjectTypes.entry    => const Color(0xFF6B7280), // muted gray
       ObjectTypes.note     => const Color(0xFF6B7280),
       ObjectTypes.idea     => const Color(0xFFF59E0B), // amber

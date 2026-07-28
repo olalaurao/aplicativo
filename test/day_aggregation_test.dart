@@ -9,6 +9,7 @@ import 'package:quartzo/models/shared_types.dart';
 import 'package:quartzo/models/system_model.dart';
 import 'package:quartzo/models/task_model.dart';
 import 'package:quartzo/services/day_dial_aggregator.dart';
+import 'package:quartzo/services/daily_schedule_service.dart';
 import 'package:quartzo/services/today_aggregator_service.dart';
 
 OrganizerReference projectRef(Project project) => OrganizerReference(
@@ -86,5 +87,89 @@ void main() {
     );
     expect(segment.start.hour, 10);
     expect(segment.end.difference(segment.start).inMinutes, 45);
+  });
+
+  test('canonical daily schedule splits timed and all-day tasks and habits', () {
+    final date = DateTime(2026, 7, 27);
+    final allDayTask = Task(
+      title: 'All day task',
+      startDate: date,
+    );
+    final timedTask = Task(
+      title: 'Timed task',
+      startDate: date,
+      scheduledTime: '14:30',
+      duration: 45,
+    );
+    final allDayHabit = Habit(
+      title: 'Untimed habit',
+      color: '#22C55E',
+      schedulers: const [],
+      slots: const [],
+    );
+    final timedHabit = Habit(
+      title: 'Timed habit',
+      color: '#22C55E',
+      schedulers: const [],
+      slots: [
+        HabitSlot(time: DateTime(2026, 7, 27, 9, 15)),
+      ],
+    );
+
+    final snapshot = DailyScheduleAggregator.buildForDate(
+      date,
+      allObjects: [allDayTask, timedTask, allDayHabit, timedHabit],
+    );
+
+    expect(snapshot.allDayItems.map((item) => item.title), contains('All day task'));
+    expect(snapshot.allDayItems.map((item) => item.title), contains('Untimed habit'));
+    expect(snapshot.timedItems.map((item) => item.title), contains('Timed task'));
+    expect(snapshot.timedItems.map((item) => item.title), contains('Timed habit'));
+    expect(
+      snapshot.timedItems.firstWhere((item) => item.title == 'Timed task').startMinutes,
+      14 * 60 + 30,
+    );
+    expect(
+      snapshot.timedItems.firstWhere((item) => item.title == 'Timed habit').startMinutes,
+      9 * 60 + 15,
+    );
+  });
+
+  test('canonical daily schedule excludes archived and deleted objects globally', () {
+    final date = DateTime(2026, 7, 27);
+    final archivedTask = Task(
+      title: 'Archived task',
+      startDate: date,
+      archived: true,
+    );
+    final deletedTask = Task(
+      title: 'Deleted task',
+      startDate: date,
+      obsidianPath: '_deleted/deleted-task.md',
+    );
+    final visibleTask = Task(
+      title: 'Visible task',
+      startDate: date,
+    );
+
+    final snapshot = DailyScheduleAggregator.buildForDate(
+      date,
+      allObjects: [archivedTask, deletedTask, visibleTask],
+    );
+
+    expect(snapshot.allItems.map((item) => item.title), ['Visible task']);
+  });
+
+  test('today aggregator delegates to canonical daily schedule rules', () {
+    final date = DateTime(2026, 7, 27);
+    final task = Task(title: 'Canonical task', startDate: date);
+    final archived = Task(title: 'Hidden task', startDate: date, archived: true);
+
+    final items = TodayAggregatorService().buildForDate(
+      date,
+      allObjects: [task, archived],
+    );
+
+    expect(items.map((item) => item.title), ['Canonical task']);
   });
 }

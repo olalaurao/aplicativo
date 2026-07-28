@@ -15,6 +15,7 @@ abstract final class ObjectTypes {
   static const String entry = 'entry';
   static const String event = 'event';
   static const String reminder = 'reminder';
+  static const String pomodoro = 'pomodoro';
   static const String system = 'system';
   static const String socialPost = 'social_post';
   static const String moodDef = 'mood_definition';
@@ -51,6 +52,7 @@ abstract final class ObjectTypes {
     entry,
     event,
     reminder,
+    pomodoro,
     system,
     socialPost,
     moodDef,

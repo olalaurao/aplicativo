@@ -47,6 +47,7 @@ Sourced from a batch of real usage notes (WhatsApp messages, late June 2026). Pu
 ## CHANGELOG — V5.3 → V5.4
 
 - **Daily Surface Aggregation (2026-07 fix):** Planner, dashboard timeline/completables, Week/Month overview, Day Dial and native widgets must derive "what is on this day" from one shared aggregation rule. This includes normal/recurring Tasks, active Project rotation-zone Tasks, Systems, Events, Habits, Reminders, Tracking Records, Journal Entries, Time Blocks and Pomodoros. If one day surface shows an item and another does not, treat it as a regression.
+- **Shared Logic First (2026-07 fix):** when multiple screens, components, providers, or Home Screen Widgets answer the same product question, they must share one service/provider/model contract. New variants must be expressed as filters or configuration on the shared logic, not as local forked aggregation/filtering/parsing code.
 - **Project Rotation Blocks (2026-07 fix):** Projects with `rotationGroups` render as a planned rotation-zone block for the active zone. The block stores default `rotation_scheduled_time`/`rotation_duration_minutes` on the Project, with `rotation_schedule_overrides` for single-day and single-occurrence adjustments. Rotation task due-date math must account for the target zone's position in the cycle; zones in different periods must never show the same next occurrence unless they are explicitly `all zones`.
 - **Organizer Color Deprecation (2026-07 fix):** Organizer color picking is removed from UI. Legacy `Organizer.color` stays readable/writable for old vault files, but Planner/dashboard/widgets must resolve colors as explicit object color → `TypeSignature.colorHex` → theme fallback. Do not use organizer color as the visual source for day surfaces.
 - **Roundtrip Regression Coverage (2026-07 fix):** Rotation metadata/schedule overrides, tracker checkbox records (`true` and `false`), and Task `relaySteps` labels require save→parse tests whenever touched. Checkbox records must never save `null` because the UI failed to render an input control.
@@ -136,6 +137,51 @@ This section exists so nothing gets silently lost. Every item below was found in
 - **Rule 12** — Object Identification is sovereign **only in the sense that a user-configured marker always wins over any other signal.** The app itself ships with **no default folder-per-type behavior.** Every object is saved, by default, in the single flat folder configured for its Object Identification entry (or in `app/` if the user hasn't configured one), and the file name is a slug for human readability only — never parsed to determine type.
 - **Rule 13 (new)** — Every object type declares a list of **required properties** (Part 1.4). The app never blocks a save because of missing required properties — it warns, and always writes what exists to disk, so no data is lost on a crash. The record is flagged as incomplete until required properties are filled.
 - **Rule 14 (new)** — The daily note **body** (the markdown under `## Habits`, `## Trackers`, `## Pomodoros`) is always a *generated rendering* of the frontmatter data. It is regenerated on every save and is never read back as a data source by the app's own parser. (A user editing the body directly in Obsidian is a supported escape hatch but is not guaranteed to be re-imported — see Part 20.)
+
+---
+
+## SHARED LOGIC FIRST — CONSISTENCY RULE
+
+When two or more app surfaces answer the same product question, they must use the same underlying service/provider/model contract. Examples include "what is scheduled today?", "which objects match this search?", "which items are completable?", "which objects belong to this organizer?", and "which items should a Home Screen Widget show?" Screens, dashboard components, in-app reusable components, providers, native Home Screen Widgets, and local caches are projections of shared state, not independent sources of truth.
+
+Do not implement separate filtering, aggregation, parsing, scheduler checks, archive/deleted checks, or type-switch logic inside individual screens when a shared service/provider can own that behavior. If a new surface needs a variant, add explicit filter/configuration parameters to the shared service and keep the returned item identity, inclusion rules, completion state, icon, color, and source metadata consistent. Forked local logic is allowed only when the code documents why the product question is materially different.
+
+Before adding or changing any list, timeline, calendar, dashboard component, or Home Screen Widget:
+
+1. Search for existing services/providers that already aggregate or filter that data.
+2. Reuse or extend the shared service/provider instead of duplicating the logic locally.
+3. Put user-editable variants behind a shared filter/config model.
+4. Add tests proving at least two affected surfaces receive consistent results.
+5. Treat one-off date logic, one-off scheduler checks, one-off archive/deleted filters, and one-off object-type filters as bugs unless there is a documented exception.
+
+### Daily Schedule Surfaces
+
+Planner, Home dashboard schedule components, Week/Month previews, Today's Completables, Day Dial, Android Home Screen Widgets, and iOS Home Screen Widgets must consume the same normalized daily schedule snapshots. Per-surface filters may differ by user settings, but filters must operate on the canonical item model. Archived objects and objects whose path is under `_deleted/` are globally excluded before any per-surface filter runs. If an item appears in one "today" surface but not another with equivalent filters, that is a regression.
+
+The canonical daily schedule item must preserve source identity and enough metadata to debug where it came from. A user must not see mysterious items that cannot be traced back to a source object, external event, or generated schedule block.
+
+#### Canonical Aggregation Pipeline
+
+The canonical daily schedule is built by `DailyScheduleAggregator.buildForDate()` in `lib/services/daily_schedule_service.dart`:
+
+1. **Input**: Content objects from vault, Google Calendar events, type signatures
+2. **Exclusions**: Objects with `archived == true` or path under `_deleted/` are excluded globally
+3. **Aggregation**: Normal/recurring Tasks, active Project rotation-zone Tasks, Systems, Events, Habits, Reminders, Tracking Records, Journal Entries, Time Blocks, and Pomodoros are normalized into `DailyScheduleItem` objects
+4. **Output**: `DailyScheduleSnapshot` containing `allItems`, `allDayItems`, `completableItems`, and `timedItems`
+
+#### Filtering
+
+`DailyScheduleFilter` (in the same file) provides reusable filtering:
+- `visibleKinds`: Set of `DailyScheduleKind` to include (task, habit, event, reminder, etc.)
+- `completableOnly`: Filter to only completable items
+- `allDayOnly`: Filter to only all-day items
+
+#### Provider Usage
+
+- `dailyScheduleProvider`: Provides canonical snapshot for a given date
+- `filteredDailyScheduleProvider`: Applies `DailyScheduleFilter` to the snapshot
+
+All "today" surfaces must consume `dailyScheduleProvider` (or `filteredDailyScheduleProvider` for filtered variants). Never implement separate aggregation logic locally.
 
 ---
 

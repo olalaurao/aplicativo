@@ -9,6 +9,7 @@ import '../../../providers/dashboard_provider.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../providers/vault_provider.dart';
 import '../../../services/component_registry.dart';
+import '../../../services/daily_schedule_service.dart';
 import '../../theme.dart';
 import '../standard_sheet.dart';
 import '../form_section.dart';
@@ -174,25 +175,35 @@ class _DashboardComponentConfigSheetState extends ConsumerState<DashboardCompone
       case BlockType.monthOverview:
         final maxChips = _metadata['maxChipsPerCell'] as int? ?? 2;
         final rawKinds = _metadata['visibleKinds'];
-        // All known item kinds
+        // All canonical DailyScheduleKind values
         const allKinds = [
-          ('entry',     'Journal Entry'),
-          ('task',      'Task'),
-          ('event',     'Event'),
-          ('habitSlot', 'Habit'),
-          ('pomodoro',  'Pomodoro'),
-          ('reminder',  'Reminder'),
-          ('timeBlock', 'Time Block'),
+          (DailyScheduleKind.journalEntry, 'Journal Entry'),
+          (DailyScheduleKind.task, 'Task'),
+          (DailyScheduleKind.event, 'Event'),
+          (DailyScheduleKind.habit, 'Habit'),
+          (DailyScheduleKind.pomodoro, 'Pomodoro'),
+          (DailyScheduleKind.reminder, 'Reminder'),
+          (DailyScheduleKind.timeBlock, 'Time Block'),
+          (DailyScheduleKind.system, 'System'),
+          (DailyScheduleKind.trackerRecord, 'Tracker Record'),
+          (DailyScheduleKind.googleCalendar, 'Google Calendar'),
+          (DailyScheduleKind.rotationZone, 'Rotation Zone'),
+          (DailyScheduleKind.personContact, 'Person Contact'),
         ];
         // Current selection: null/empty list = all selected
-        Set<String> selectedKinds;
+        Set<DailyScheduleKind> selectedKinds;
         if (rawKinds is List && rawKinds.isNotEmpty) {
-          selectedKinds = rawKinds.map((e) => e.toString()).toSet();
+          selectedKinds = rawKinds
+              .map((e) => DailyScheduleKind.values.firstWhere(
+                    (k) => k.name == e.toString(),
+                    orElse: () => DailyScheduleKind.task,
+                  ))
+              .toSet();
         } else {
           selectedKinds = allKinds.map((e) => e.$1).toSet();
         }
 
-        void toggleKind(String kind, bool checked) {
+        void toggleKind(DailyScheduleKind kind, bool checked) {
           if (checked) {
             selectedKinds.add(kind);
           } else {
@@ -203,7 +214,7 @@ class _DashboardComponentConfigSheetState extends ConsumerState<DashboardCompone
           if (selectedKinds.containsAll(allNames)) {
             _updateMeta('visibleKinds', null);
           } else {
-            _updateMeta('visibleKinds', selectedKinds.toList());
+            _updateMeta('visibleKinds', selectedKinds.map((k) => k.name).toList());
           }
         }
 

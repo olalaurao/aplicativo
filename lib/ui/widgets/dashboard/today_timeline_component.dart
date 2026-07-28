@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../models/dashboard_block.dart';
-import '../../../providers/today_provider.dart';
-import '../../../services/today_aggregator_service.dart';
+import '../../../providers/daily_schedule_provider.dart';
+import '../../../services/daily_schedule_service.dart';
 import '../../theme.dart';
 import '../../navigation/object_navigation.dart';
 
@@ -15,14 +15,20 @@ class TodayTimelineComponent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final now = DateTime.now();
-    final items = ref.watch(todayItemsProvider(DateTime(now.year, now.month, now.day)));
+    final items = ref.watch(filteredDailyScheduleProvider((
+      date: DateTime(now.year, now.month, now.day),
+      filter: const DailyScheduleFilter(
+        includeTimed: true,
+        includeAllDay: true,
+      ),
+    ))).allItems;
 
     final maxItems = block.metadata['maxItems'] as int? ?? 12;
     final showUntimedGroup = block.metadata['showUntimedGroup'] as bool? ?? true;
 
     var displayItems = items;
     if (!showUntimedGroup) {
-      displayItems = items.where((i) => !(i.timestamp.hour == 0 && i.timestamp.minute == 0 && i.timestamp.second == 0)).toList();
+      displayItems = items.where((i) => !i.isAllDay).toList();
     }
 
     final hasMore = displayItems.length > maxItems;
@@ -68,7 +74,7 @@ class TodayTimelineComponent extends ConsumerWidget {
               children: visibleItems.asMap().entries.map((entry) {
                 final index = entry.key;
                 final item = entry.value;
-                final isUntimed = item.timestamp.hour == 0 && item.timestamp.minute == 0 && item.timestamp.second == 0;
+                final isUntimed = item.isAllDay;
                 
                 // Agora header logic
                 bool showAgora = false;
@@ -79,7 +85,7 @@ class TodayTimelineComponent extends ConsumerWidget {
                     showAgora = true;
                   } else if (index > 0) {
                     final prev = visibleItems[index - 1];
-                    final prevUntimed = prev.timestamp.hour == 0 && prev.timestamp.minute == 0 && prev.timestamp.second == 0;
+                    final prevUntimed = prev.isAllDay;
                     if ((prev.timestamp.isBefore(now) || prevUntimed) && isNextOrCurrent) {
                       showAgora = true;
                     }
@@ -105,7 +111,11 @@ class TodayTimelineComponent extends ConsumerWidget {
                         ),
                       ),
                     InkWell(
-                      onTap: () => navigateToObject(context, item.source),
+                      onTap: () {
+                        if (item.source != null) {
+                          navigateToObject(context, item.source!);
+                        }
+                      },
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         child: Row(
@@ -141,24 +151,24 @@ class TodayTimelineComponent extends ConsumerWidget {
                                 children: [
                                   Icon(item.iconData, size: 16, color: item.color),
                                   const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      item.title,
-                                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                                        fontWeight: (item.origin == TodayItemOrigin.scheduled && item.timestamp.isAfter(now))
-                                            ? FontWeight.w600
-                                            : FontWeight.normal,
+                                  Flexible(
+                                      child: Text(
+                                        item.title,
+                                        style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                                          fontWeight: (item.timestamp.isAfter(now))
+                                              ? FontWeight.w600
+                                              : FontWeight.normal,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Icon(
-                                    item.origin == TodayItemOrigin.created ? Icons.schedule_rounded : Icons.bolt_rounded,
-                                    size: 12,
-                                    color: AppColors.textMuted.withValues(alpha: 0.7),
-                                  ),
+                                    const SizedBox(width: 6),
+                                    if (item.sourceLabel.isNotEmpty)
+                                      Text(
+                                        item.sourceLabel,
+                                        style: Theme.of(context).textTheme.bodySmall!.copyWith(color: AppColors.textMuted.withValues(alpha: 0.7)),
+                                      ),
                                 ],
                               ),
                             ),

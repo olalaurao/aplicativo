@@ -25,9 +25,36 @@
 - Nunca filtre vínculo estrutural apenas por `OrganizerReference.type` quando dados legados podem ter sido reabertos como `label`. Para Project/Area/Value/etc., use `OrganizerReference.matches(org.id, org.slug, org.title)` ou um helper central equivalente.
 - Se uma tela funciona antes de reiniciar o app mas quebra depois, suspeite primeiro de perda de informação no roundtrip Markdown/frontmatter.
 - Itens do dia devem usar uma agregação única/reutilizável. Planner, dashboard, Day Dial e widgets nativos precisam enxergar os mesmos objetos: Tasks normais/recorrentes, tasks de Project com zona rotativa, Systems, Events, Habits, Reminders, Tracking Records, Journal Entries, Time Blocks e Pomodoros.
+- **Shared Logic First**: quando duas telas, componentes, providers ou widgets nativos respondem à mesma pergunta de produto, eles devem usar o mesmo service/provider/model contract. Não implemente filtros, agregações, parsing, lógica de scheduler, exclusão de arquivados/`_deleted` ou switches de tipo localmente se um service/provider compartilhado puder ser reutilizado ou estendido.
+- Se uma nova superfície precisa de variação, adicione filtros/configuração explícitos no service compartilhado em vez de bifurcar a lógica. Exemplo: Planner, componentes da Home, Week/Month previews, completáveis, Day Dial e Home Screen Widgets podem ter filtros diferentes definidos pelo usuário, mas todos devem filtrar o mesmo snapshot diário normalizado.
+- Antes de criar qualquer lista, timeline, calendário, componente de dashboard ou widget nativo, procure providers/services existentes que já agregam esses dados. Reuse ou estenda a lógica central e adicione testes provando consistência entre pelo menos duas superfícies afetadas.
+- Objetos `archived == true` e objetos com caminho em `_deleted/` nunca devem aparecer em Planner, dashboard, componentes de "hoje", Week/Month, Day Dial ou Home Screen Widgets. Essa exclusão acontece antes de filtros configuráveis por usuário.
 - Projects com `rotationGroups` devem aparecer no dia como um bloco de zona planejável derivado do Project; tasks da zona ativa continuam derivadas via `RotationService`. Mudanças de horário/duração da zona devem persistir no Markdown do Project como padrão futuro, override de ocorrência ou override de dia.
 - Não reintroduza picker de cor para `Organizer`. Campos legados `Organizer.color` podem ser lidos/escritos para compatibilidade, mas superfícies do dia devem usar: cor explícita do objeto, depois `TypeSignature.colorHex`, depois cor do tema.
 - Mudanças em rotação, checkbox de tracker record e `relaySteps` de task exigem testes de roundtrip e de renderização/filtro quando afetarem Planner/dashboard/widgets.
+
+#### Pipeline de Agregação Canônica
+
+O snapshot diário canônico é construído por `DailyScheduleAggregator.buildForDate()` em `lib/services/daily_schedule_service.dart`:
+
+1. **Input**: Objetos do vault, eventos do Google Calendar, type signatures
+2. **Exclusões**: Objetos com `archived == true` ou caminho em `_deleted/` são excluídos globalmente
+3. **Agregação**: Tasks normais/recorrentes, tasks de Project com zona rotativa, Systems, Events, Habits, Reminders, Tracking Records, Journal Entries, Time Blocks e Pomodoros são normalizados em objetos `DailyScheduleItem`
+4. **Output**: `DailyScheduleSnapshot` contendo `allItems`, `allDayItems`, `completableItems` e `timedItems`
+
+#### Filtragem
+
+`DailyScheduleFilter` (no mesmo arquivo) fornece filtragem reutilizável:
+- `visibleKinds`: Set de `DailyScheduleKind` para incluir (task, habit, event, reminder, etc.)
+- `completableOnly`: Filtrar apenas itens completáveis
+- `allDayOnly`: Filtrar apenas itens all-day
+
+#### Uso de Providers
+
+- `dailyScheduleProvider`: Fornece snapshot canônico para uma data específica
+- `filteredDailyScheduleProvider`: Aplica `DailyScheduleFilter` ao snapshot
+
+Todas as superfícies de "hoje" devem consumir `dailyScheduleProvider` (ou `filteredDailyScheduleProvider` para variantes filtradas). Nunca implemente lógica de agregação separada localmente.
 ---
 
 ## 2. STACK TECNOLÓGICA

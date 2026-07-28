@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../models/dashboard_block.dart';
 import '../../../models/organizer_model.dart';
 import '../../../models/shared_types.dart';
-import '../../../providers/today_provider.dart';
+import '../../../providers/daily_schedule_provider.dart';
 import '../../../providers/vault_provider.dart';
 import '../../../providers/settings_provider.dart';
 import '../../theme.dart';
@@ -110,7 +110,7 @@ class _WeekOverviewComponentState extends ConsumerState<WeekOverviewComponent> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: days.map((date) {
                 final isToday = date.year == today.year && date.month == today.month && date.day == today.day;
-                final items = ref.watch(todayItemsProvider(date));
+                final items = ref.watch(dailyScheduleProvider(date)).allItems;
                 final visibleItems = items.take(maxItemsPerDay).toList();
                 final hasMore = items.length > maxItemsPerDay;
                 
@@ -175,7 +175,11 @@ class _WeekOverviewComponentState extends ConsumerState<WeekOverviewComponent> {
                                   padding: const EdgeInsets.only(bottom: 4),
                                   child: InkWell(
                                     key: ValueKey(item.id),
-                                    onTap: () => navigateToObject(context, item.source),
+                                    onTap: () {
+                                      if (item.source != null) {
+                                        navigateToObject(context, item.source!);
+                                      }
+                                    },
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                                       decoration: BoxDecoration(

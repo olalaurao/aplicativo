@@ -31,7 +31,7 @@ import '../models/event_model.dart';
 import '../models/shared_types.dart';
 import '../services/widget_service.dart';
 import '../services/day_dial_aggregator.dart';
-import '../services/timeline_aggregator_service.dart';
+import '../services/daily_schedule_service.dart';
 import 'dashboard_provider.dart';
 import 'pomodoro_provider.dart';
 import 'vault_provider.dart';
@@ -614,114 +614,54 @@ List<Map<String, dynamic>> _dayItems(
   List<calendar.Event> googleEvents,
   AppSettings settings,
 ) {
-  final items = <Map<String, dynamic>>[];
-  final dayAggregation = TimelineAggregatorService.aggregateForDate(date, allObjects);
+  // Use new visibleKinds if set, otherwise migrate from old boolean settings
+  final visibleKinds = settings.calendarWidgetVisibleKinds ?? <DailyScheduleKind>{
+    DailyScheduleKind.reminder,
+    if (settings.calendarWidgetShowTasks) ...{
+      DailyScheduleKind.task,
+      DailyScheduleKind.rotationZone,
+    },
+    if (settings.calendarWidgetShowHabits) DailyScheduleKind.habit,
+    if (settings.calendarWidgetShowSessions) ...{
+      DailyScheduleKind.event,
+      DailyScheduleKind.googleCalendar,
+      DailyScheduleKind.pomodoro,
+      DailyScheduleKind.timeBlock,
+    },
+  };
 
-  if (settings.calendarWidgetShowTasks) {
-    for (final task in dayAggregation.allTasks) {
-      items.add({
-        'type': 'task',
-        'id': task.id,
-        'title': _displayTitle(task),
-        'time': task.scheduledTime ?? (task.allDay ? 'Dia inteiro' : '00:00'),
-        'subtitle': _organizerLabel(task, allObjects),
-        'sort': _sortTime(task.scheduledTime),
-        'completed': task.isCompleted,
-        'linkUri': 'Quartzo:///detail/${task.id}',
-        'toggleUri':
-            'Quartzo://widget-toggle?type=task&id=${Uri.encodeComponent(task.id)}&date=${_dateKey(date)}',
-      });
+  final snapshot = DailyScheduleAggregator.buildForDate(
+    date,
+    allObjects: allObjects,
+    googleEvents: googleEvents,
+    typeSignatures: settings.typeSignatures,
+  ).apply(DailyScheduleFilter(visibleKinds: visibleKinds));
+
+  final items = snapshot.allItems.map((item) {
+    final source = item.source;
+    final type = _widgetTypeForScheduleKind(item.kind);
+    final sourceId = source?.id ?? item.id;
+    final row = <String, dynamic>{
+      'type': type,
+      'id': sourceId,
+      'title': _userFacingText(item.title),
+      'time': item.isAllDay ? 'All day' : _formatMinutes(item.startMinutes!),
+      'subtitle': source == null ? item.subtitle ?? item.sourceLabel : _organizerLabel(source, allObjects),
+      'sort': item.startMinutes ?? 0,
+      'completed': item.isCompleted,
+      'linkUri': source == null ? 'Quartzo:///planner' : 'Quartzo:///detail/${source.id}',
+      'sourceLabel': item.sourceLabel,
+    };
+    if (item.kind == DailyScheduleKind.task && source != null) {
+      row['toggleUri'] =
+          'Quartzo://widget-toggle?type=task&id=${Uri.encodeComponent(source.id)}&date=${_dateKey(date)}';
+    } else if (item.kind == DailyScheduleKind.habit && source != null) {
+      final slot = item.slotIndex == null ? '' : '&slot=${item.slotIndex}';
+      row['toggleUri'] =
+          'Quartzo://widget-toggle?type=habit&id=${Uri.encodeComponent(source.id)}&date=${_dateKey(date)}$slot';
     }
-  }
-
-  for (final reminder in dayAggregation.reminders) {
-    if (reminder.isCompleted) continue;
-    items.add({
-      'type': 'reminder',
-      'id': reminder.id,
-      'title': reminder.title,
-      'time': DateFormat('HH:mm').format(reminder.time),
-      'subtitle': _organizerLabel(reminder, allObjects),
-      'sort': _sortTime(DateFormat('HH:mm').format(reminder.time)),
-      'linkUri': 'Quartzo:///detail/${reminder.id}',
-    });
-  }
-
-  if (settings.calendarWidgetShowHabits) {
-    for (final habit in dayAggregation.habits) {
-      if (habit.status != HabitStatus.active) continue;
-      if (habit.isNegative) continue; // F2.6: Exclude negative habits from widgets
-      final slotTimes = habit.slots
-          .map((slot) => slot.primaryReminderTime ?? _timeOfDate(slot.time))
-          .where((t) => t != null)
-          .toList();
-      if (slotTimes.isEmpty) {
-        final completed = _isHabitCompletedOn(habit, date);
-        items.add({
-          'type': 'habit',
-          'id': habit.id,
-          'title': _displayTitle(habit),
-          'time': '00:00',
-          'subtitle': _organizerLabel(habit, allObjects),
-          'sort': 0,
-          'completed': completed,
-          'linkUri': 'Quartzo:///detail/${habit.id}',
-          'toggleUri':
-              'Quartzo://widget-toggle?type=habit&id=${Uri.encodeComponent(habit.id)}&date=${_dateKey(date)}',
-        });
-      } else {
-        for (var index = 0; index < slotTimes.length; index++) {
-          final slot = slotTimes[index];
-          final time =
-              '${slot.hour.toString().padLeft(2, '0')}:${slot.minute.toString().padLeft(2, '0')}';
-          final completed = _isHabitCompletedOn(habit, date, slotIndex: index);
-          items.add({
-            'type': 'habit',
-            'id': habit.id,
-            'title': _displayTitle(habit),
-            'time': time,
-            'subtitle': _organizerLabel(habit, allObjects),
-            'sort': _sortTime(time),
-            'completed': completed,
-            'linkUri': 'Quartzo:///detail/${habit.id}',
-            'toggleUri':
-                'Quartzo://widget-toggle?type=habit&id=${Uri.encodeComponent(habit.id)}&date=${_dateKey(date)}&slot=$index',
-          });
-        }
-      }
-    }
-  }
-
-  if (settings.calendarWidgetShowSessions) {
-    for (final event in googleEvents) {
-      final start = event.start?.dateTime ?? event.start?.date;
-      if (start == null) continue;
-      final eventDate = DateTime(
-        start.toLocal().year,
-        start.toLocal().month,
-        start.toLocal().day,
-      );
-      if (!_isSameDay(eventDate, date)) continue;
-
-      final end = event.end?.dateTime ?? event.end?.date;
-      final timeStr =
-          (event.start?.dateTime != null && event.end?.dateTime != null)
-          ? '${DateFormat('HH:mm').format(start.toLocal())} - ${DateFormat('HH:mm').format(end!.toLocal())}'
-          : 'Dia inteiro';
-
-      items.add({
-        'type': 'google_calendar',
-        'id': event.id ?? event.summary ?? '',
-        'title': event.summary ?? '(Sem título)',
-        'time': timeStr,
-        'subtitle': 'Google Calendar',
-        'sort': event.start?.dateTime != null
-            ? _sortTime(DateFormat('HH:mm').format(start.toLocal()))
-            : 0,
-        'linkUri': 'Quartzo:///planner',
-      });
-    }
-  }
+    return row;
+  }).toList();
 
   items.sort((a, b) {
     final byTime = (a['sort'] as int).compareTo(b['sort'] as int);
@@ -729,6 +669,30 @@ List<Map<String, dynamic>> _dayItems(
     return (a['title'] as String).compareTo(b['title'] as String);
   });
   return items;
+}
+
+String _widgetTypeForScheduleKind(DailyScheduleKind kind) {
+  return switch (kind) {
+    DailyScheduleKind.task => 'task',
+    DailyScheduleKind.habit => 'habit',
+    DailyScheduleKind.event => 'event',
+    DailyScheduleKind.googleCalendar => 'google_calendar',
+    DailyScheduleKind.reminder => 'reminder',
+    DailyScheduleKind.pomodoro => 'pomodoro',
+    DailyScheduleKind.trackerRecord => 'tracker',
+    DailyScheduleKind.journalEntry => 'entry',
+    DailyScheduleKind.timeBlock => 'time_block',
+    DailyScheduleKind.system => 'system',
+    DailyScheduleKind.rotationZone => 'project',
+    DailyScheduleKind.personContact => 'person',
+    DailyScheduleKind.goal => 'goal',
+  };
+}
+
+String _formatMinutes(int minutes) {
+  final hour = (minutes ~/ 60).clamp(0, 23);
+  final minute = (minutes % 60).clamp(0, 59);
+  return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
 }
 
 Map<String, dynamic> _buildShoppingSnapshot(
@@ -1021,24 +985,6 @@ bool _isHabitCompletedOn(Habit habit, DateTime date, {int? slotIndex}) {
         record.slotCompletions![slotIndex] == true;
   }
   return record.successful;
-}
-
-int _sortTime(String? value) {
-  if (value == null || !RegExp(r'^\d{1,2}:\d{2}').hasMatch(value)) return 9999;
-  final parts = value.split(':');
-  return (int.tryParse(parts[0]) ?? 0) * 60 + (int.tryParse(parts[1]) ?? 0);
-}
-
-dynamic _timeOfDate(DateTime? date) {
-  if (date == null) return null;
-  return _SimpleTime(date.hour, date.minute);
-}
-
-class _SimpleTime {
-  final int hour;
-  final int minute;
-
-  _SimpleTime(this.hour, this.minute);
 }
 
 Future<void> _updateDayDialWidget(

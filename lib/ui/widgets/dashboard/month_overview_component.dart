@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../models/dashboard_block.dart';
 import '../../../models/organizer_model.dart';
-import '../../../providers/today_provider.dart';
+import '../../../providers/daily_schedule_provider.dart';
 import '../../../providers/vault_provider.dart';
 import '../../theme.dart';
 
@@ -130,7 +130,7 @@ class _MonthOverviewComponentState extends ConsumerState<MonthOverviewComponent>
                         final isCurrentMonth = date.month == _currentMonth.month;
                         final isToday = date.year == today.year && date.month == today.month && date.day == today.day;
 
-                        final allItems = ref.watch(todayItemsProvider(date));
+                        final allItems = ref.watch(dailyScheduleProvider(date)).allItems;
                         // Apply kind filter
                         final filteredItems = visibleKinds == null
                             ? allItems

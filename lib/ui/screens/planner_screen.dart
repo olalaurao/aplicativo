@@ -1,9 +1,13 @@
 // lib/ui/screens/planner_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/today_aggregation_provider.dart';
+import '../../providers/daily_schedule_provider.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/overdue_provider.dart';
+import '../../services/daily_schedule_service.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -14,6 +18,7 @@ import '../../models/organizer_model.dart';
 import '../../models/routine_model.dart';
 import '../../models/shared_types.dart';
 import '../widgets/routine_execution_sheet.dart';
+import '../widgets/object_action_sheet.dart';
 import '../theme.dart';
 import '../../models/journal_entry.dart';
 import '../../models/tracker_model.dart';
@@ -23,6 +28,10 @@ import '../../models/task_model.dart';
 import '../../models/pomodoro_session.dart';
 import '../../models/day_dial_model.dart';
 import '../../models/event_model.dart';
+import '../../models/idea_model.dart';
+import '../../models/project_model.dart';
+import '../../models/goal_model.dart';
+import '../../models/inbox_model.dart';
 import '../widgets/timeline_day_view.dart';
 import '../widgets/week_time_grid.dart';
 import '../widgets/day_dial_widget.dart';
@@ -111,14 +120,14 @@ class PlannerScreen extends ConsumerStatefulWidget {
 
 class _PlannerScreenState extends ConsumerState<PlannerScreen>
     with AutomaticKeepAliveClientMixin {
-  int _viewMode = 0; // 0=Day, 1=Week, 2=Month, 3=Dial
-  bool _isTimeline = true;
+  int _viewMode = 0; // 0=Day, 1=Week, 2=Month
   late DateTime _selectedDate;
+  late DateTime _selectedMonth;
   final ScrollController _scrollController = ScrollController();
   bool _showJumpToNowFab = false;
   int _gridGranularity = 30; // 15, 30, or 60 minutes
   bool _showBacklogPanel = false;
-  bool _showActionsPanel = false;
+  bool _isTimeline = true;
 
   @override
   bool get wantKeepAlive => true;
@@ -127,6 +136,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
   void initState() {
     super.initState();
     _selectedDate = widget.initialDate ?? DateTime.now();
+    _selectedMonth = DateTime(_selectedDate.year, _selectedDate.month, 1);
     if (widget.initialDate != null) {
       _viewMode = 0; // Default to day view to show the timeline block
     }
@@ -154,9 +164,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
 
   void _onScroll() {
     if (!mounted) return;
-    
-    // Show FAB when scrolled away from current time
-    if (_isSameDay(_selectedDate, DateTime.now()) && _isTimeline && _viewMode == 0) {
+    if (_isSameDay(_selectedDate, DateTime.now()) && _viewMode == 0) {
       const hourHeight = 80.0;
       const sliverHeaderEstimate = 190.0;
       final now = DateTime.now();
@@ -165,17 +173,13 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
           (now.hour * hourHeight) +
           (now.minute / 60 * hourHeight) -
           (viewport / 3);
-      
       final currentScrollOffset = _scrollController.offset;
       const threshold = 100.0;
-      
       setState(() {
         _showJumpToNowFab = (currentScrollOffset - currentOffset).abs() > threshold;
       });
     } else {
-      setState(() {
-        _showJumpToNowFab = false;
-      });
+      setState(() { _showJumpToNowFab = false; });
     }
   }
 
@@ -184,37 +188,24 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     final tasks = ref.watch(tasksListProvider);
     final organizers = ref.watch(organizersListProvider);
-    final projects = ref.watch(projectsProvider);
     final habits = ref.watch(habitsProvider.select((habits) => habits.where((h) => !h.isQuitting && !h.isNegative).toList()));
-    final people = ref.watch(peopleProvider);
     final dayThemes = organizers.where((o) => o.organizerType == OrganizerType.dayTheme).toList();
-    final timeBlocks = organizers.where((o) => o.organizerType == OrganizerType.timeBlock).toList();
     final googleEvents = ref.watch(googleCalendarEventsProvider(_selectedDate));
+    final overdueCount = ref.watch(overdueCountProvider);
+    final inboxCount = ref.watch(inboxCountProvider);
 
-    final dayName = const [
-      'Mon',
-      'Tue',
-      'Wed',
-      'Thu',
-      'Fri',
-      'Sat',
-      'Sun',
-    ][_selectedDate.weekday - 1];
-
+    final dayName = const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][_selectedDate.weekday - 1];
 
     final dayAggregation = ref.watch(todayAggregationProvider(_selectedDate));
     final dayTasks = dayAggregation.allTasks;
     final activeTimeBlocks = dayAggregation.timeBlocks;
+    final dailySchedule = ref.watch(dailyScheduleProvider(_selectedDate));
 
     final activeTheme = dayThemes.cast<Organizer?>().firstWhere(
       (theme) => theme != null && theme.daysOfWeek.contains(dayName),
       orElse: () => null,
     );
-
     final dayHabits = dayAggregation.habits;
-    final dayEntries = dayAggregation.journalEntries;
-    final dayRecords = dayAggregation.trackerRecords;
-    final dayContactReminders = dayAggregation.peopleToContact;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -225,58 +216,88 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
               controller: _scrollController,
               slivers: [
           SliverAppBar(
-            toolbarHeight: activeTheme != null ? 60.0 : 48.0,
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+            toolbarHeight: 48.0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: Row(
               children: [
-                const Text(
-                  'Planning',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                Icon(
+                  Icons.calendar_today_rounded,
+                  size: 20,
+                  color: AppTheme.textPrimaryColor(context),
                 ),
-                if (activeTheme != null)
-                  Text(
-                    activeTheme.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppTheme.accentColor(context),
-                    ),
-                  ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Planner',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                ),
               ],
             ),
             pinned: true,
             actions: [
-              IconButton(
-                icon: Icon(
-                  _showActionsPanel ? Icons.expand_less : Icons.expand_more,
-                  color: AppTheme.accentColor(context),
+              // Overdue icon – hardcoded red per spec
+              if (overdueCount > 0)
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.warning_amber_rounded, color: AppColors.error),
+                      tooltip: 'Overdue ($overdueCount)',
+                      onPressed: _showOverduePopup,
+                    ),
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(color: AppColors.error, shape: BoxShape.circle),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          overdueCount > 99 ? '99+' : '$overdueCount',
+                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                tooltip: 'Ações',
-                onPressed: () => setState(() => _showActionsPanel = !_showActionsPanel),
+              // Inbox icon with count badge
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.inbox_rounded, color: inboxCount > 0 ? AppTheme.accentColor(context) : AppTheme.textMutedColor(context)),
+                    tooltip: 'Inbox ($inboxCount)',
+                    onPressed: _showInboxPopup,
+                  ),
+                  if (inboxCount > 0)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(color: AppTheme.accentColor(context), shape: BoxShape.circle),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          inboxCount > 99 ? '99+' : '$inboxCount',
+                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(
-                _showActionsPanel 
-                    ? (_viewMode == 0 ? 200 : 100)
-                    : (_viewMode == 0 ? 130 : 50),
-              ),
+              preferredSize: Size.fromHeight(_viewMode == 0 ? 130 : 50),
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildViewToggle(),
-                    if (_showActionsPanel) ...[
-                      const SizedBox(height: 12),
-                      _buildActionsPanel(activeTheme),
-                    ],
                     if (_viewMode == 0) ...[
                       const SizedBox(height: 12),
                       _buildDateStrip(),
@@ -287,153 +308,56 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             ),
           ),
 
-          if (_viewMode == 0) ...[
-            _isTimeline
-                ? SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: TimeLineDayView(
-                        tasks: dayTasks,
-                        selectedDate: _selectedDate,
-                        allDayEvents: dayHabits,
-                        googleEvents: googleEvents.maybeWhen(
-                          data: (events) => events,
-                          orElse: () => [],
-                        ),
-                        timeBlocks: activeTimeBlocks,
-                        activeTheme: activeTheme,
-                        gridGranularity: _gridGranularity,
-                        pomodoroSessions: ref.watch(pomodoroProvider.select((p) => p.history)),
-                        onTaskDrop: (task, time) {
-                          final timeStr = DateFormat('HH:mm').format(time);
-                          final isBacklog =
-                              task.stage == TaskStage.idea ||
-                              task.stage == TaskStage.backlog ||
-                              (task.startDate == null && task.endDate == null);
-
-                          // Sugerir duração com base em estimatedMinutes se disponível
-                          final targetDuration =
-                              task.duration > 0 ? task.duration : 15;
-
-                          final updated = task.copyWith(
-                            scheduledTime: timeStr,
-                            endDate: isBacklog
-                                ? _selectedDate
-                                : task.endDate,
-                            startDate: isBacklog
-                                ? _selectedDate
-                                : task.startDate,
-                            stage: TaskStage.todo,
-                            duration: targetDuration,
-                          );
-                          ref.read(vaultProvider.notifier).updateObject(updated);
-                        },
-                        onHabitDrop: (habit, time) async {
-                          final updatedSlots = List<HabitSlot>.from(
-                            habit.slots,
-                          );
-                          if (updatedSlots.isEmpty) {
-                            updatedSlots.add(
-                              HabitSlot(
-                                reminders: [
-                                  ReminderConfig(
-                                    id: 'primary',
-                                    timeOfDay:
-                                        '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
-                                  ),
-                                ],
-                              ),
-                            );
-                          } else {
-                            final updatedSlot = HabitSlot(
-                              time: updatedSlots[0].time,
-                              completed: updatedSlots[0].completed,
-                              label: updatedSlots[0].label,
-                              reminders: List<ReminderConfig>.from(
-                                updatedSlots[0].reminders,
-                              ),
-                              actions: updatedSlots[0].actions,
-                            );
-                            updatedSlot.enableDefaultReminder();
-                            updatedSlot.setPrimaryReminderTime(
-                              TimeOfDay(
-                                hour: time.hour,
-                                minute: time.minute,
-                              ),
-                            );
-                            updatedSlot.setPrimaryReminderType(
-                              updatedSlots[0].primaryReminderType,
-                            );
-                            updatedSlots[0] = HabitSlot(
-                              time: updatedSlot.time,
-                              completed: updatedSlot.completed,
-                              label: updatedSlot.label,
-                              reminders: updatedSlot.reminders,
-                              actions: updatedSlot.actions,
-                            );
-                          }
-                          final updatedHabit = habit.copyWith(
-                            slots: updatedSlots,
-                          );
-                          await ref
-                              .read(habitsProvider.notifier)
-                              .updateHabit(updatedHabit);
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Hábito "${habit.displayTitle}" agendado para ${DateFormat('HH:mm').format(time)}',
-                              ),
-                            ),
-                          );
-                        },
-                        onDurationChange: (item, newDuration) {
-                          if (item is Task) {
-                            final updated = item.copyWith(duration: newDuration);
-                            ref.read(vaultProvider.notifier).updateObject(updated);
-                          }
-                        },
-                        onToggleComplete: _toggleTaskCompletion,
-                        onPlay: _handlePlay,
-                        onHabitToggle: (habit, slotIndex) async {
-                          await ref
-                              .read(habitsProvider.notifier)
-                              .toggleHabit(
-                                habit,
-                                _selectedDate,
-                                slotIndex: slotIndex,
-                              );
-                        },
-                        colorMode: ref.watch(settingsProvider.select((s) => s.plannerColorMode)),
-                        rotationProjects: dayAggregation.rotationProjects,
-                        rotationTasks: dayAggregation.rotationTasks,
+          if (_viewMode == 0)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Column(
+                  children: [
+                    // Hourly timeline (includes toggleable untimed section)
+                    TimeLineDayView(
+                      tasks: dayTasks,
+                      selectedDate: _selectedDate,
+                      allDayEvents: dailySchedule.allDayItems,
+                      googleEvents: googleEvents.maybeWhen(
+                        data: (events) => events,
+                        orElse: () => [],
                       ),
-                    ),
-                  )
-                : _buildDayAgendaView(
-                    dayTasks,
-                    dayHabits,
-                    dayContactReminders,
-                    dayEntries,
-                    dayRecords,
-                    googleEvents,
-                  ),
-          ] else if (_viewMode == 1)
-            _buildWeekView(tasks, habits)
+                      timeBlocks: activeTimeBlocks,
+                      activeTheme: activeTheme,
+                      gridGranularity: _gridGranularity,
+                      pomodoroSessions: ref.watch(pomodoroProvider.select((p) => p.history)),
+                  onDurationChange: (item, newDuration) {
+                    if (item is Task) {
+                      ref.read(vaultProvider.notifier).updateObject(item.copyWith(duration: newDuration));
+                    }
+                  },
+                  onToggleComplete: _toggleTaskCompletion,
+                  onPlay: _handlePlay,
+                  onHabitToggle: (habit, slotIndex) async {
+                    await ref.read(habitsProvider.notifier).toggleHabit(habit, _selectedDate, slotIndex: slotIndex);
+                  },
+                  colorMode: ref.watch(settingsProvider.select((s) => s.plannerColorMode)),
+                  rotationProjects: dayAggregation.rotationProjects,
+                  rotationTasks: dayAggregation.rotationTasks,
+                  onTaskDrop: null,
+                  onHabitDrop: null,
+                ),
+                  ],
+                ),
+              ),
+            )
+          else if (_viewMode == 1)
+            _buildWeekView()
           else if (_viewMode == 2)
-            _buildMonthView(tasks, habits)
-          else if (_viewMode == 3)
-            _buildDialView(tasks, habits, googleEvents),
-
-          if (_showBacklogPanel)
-            SliverToBoxAdapter(child: _buildBacklogPanel()),
+            _buildMonthView(),
 
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         )),
         ],
       ),
-      floatingActionButton: _showJumpToNowFab && _isTimeline && _viewMode == 0
+      floatingActionButton: _showJumpToNowFab && _viewMode == 0
           ? FloatingActionButton.extended(
               onPressed: () => _scrollToNow(animate: true),
               icon: const Icon(Icons.access_time_rounded),
@@ -494,12 +418,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
               ),
               Expanded(
                 child: backlog.isEmpty && routines.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Padding(
                           padding: EdgeInsets.all(40),
                           child: Text(
                             'Nenhuma tarefa sem data.',
-                            style: TextStyle(color: AppColors.textMuted),
+                            style: TextStyle(color: AppTheme.textMutedColor(context)),
                           ),
                         ),
                       )
@@ -552,10 +476,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             ),
             Expanded(
               child: backlog.isEmpty && routines.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         'Nenhuma tarefa sem data.',
-                        style: TextStyle(color: AppColors.textMuted),
+                        style: TextStyle(color: AppTheme.textMutedColor(context)),
                       ),
                     )
                   : ListView(
@@ -573,7 +497,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
   }
 
   Widget _buildViewToggle() {
-    const labels = ['Day', 'Week', 'Month', 'Dial'];
+    const labels = ['Day', 'Week', 'Month'];
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surfaceVariantColor(context),
@@ -581,7 +505,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
       ),
       padding: const EdgeInsets.all(4),
       child: Row(
-        children: List.generate(4, (i) {
+        children: List.generate(3, (i) {
           final selected = _viewMode == i;
           return Expanded(
             child: GestureDetector(
@@ -591,13 +515,13 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
                   color: selected
-                      ? AppTheme.surfaceColor(context)
+                      ? AppTheme.accentColor(context).withValues(alpha: 0.15)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: selected
                       ? [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
+                            color: AppTheme.accentColor(context).withValues(alpha: 0.1),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -611,7 +535,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                     fontSize: 13,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                     color: selected
-                        ? AppTheme.textPrimaryColor(context)
+                        ? AppTheme.accentColor(context)
                         : AppTheme.textMutedColor(context),
                   ),
                 ),
@@ -621,6 +545,122 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
         }),
       ),
     );
+  }
+
+  Widget _buildAllDaySection(List<DailyScheduleItem> allDayItems) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceVariantColor(context),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_today_rounded, size: 16, color: AppTheme.textMutedColor(context)),
+                const SizedBox(width: 6),
+                Text(
+                  'All day',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textMutedColor(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...allDayItems.map((item) => _buildAllDayItem(item)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAllDayItem(DailyScheduleItem item) {
+    return InkWell(
+      onTap: () {
+        if (item.source != null) {
+          context.push('/detail/${item.source!.id}', extra: item.source);
+        }
+      },
+      onLongPress: () {
+        if (item.source != null) {
+          _showObjectActionSheet(item.source!);
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            Icon(item.iconData, size: 18, color: item.color),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                item.title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppTheme.textPrimaryColor(context),
+                  decoration: item.isCompleted ? TextDecoration.lineThrough : null,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (item.isCompletable)
+              Checkbox(
+                value: item.isCompleted,
+                onChanged: (value) {
+                  _handleItemCompletion(item);
+                },
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showObjectActionSheet(ContentObject object) {
+    ObjectActionSheet.show(
+      context,
+      object: object,
+      onEdit: () {
+        context.push('/detail/${object.id}', extra: object);
+      },
+      onToggleComplete: () {
+        _handleObjectCompletion(object);
+      },
+      onStartPomodoro: () {
+        _handlePlay(object);
+      },
+      onDelete: () {
+        _handleDelete(object);
+      },
+    );
+  }
+
+  void _handleItemCompletion(DailyScheduleItem item) {
+    if (item.source != null) {
+      _handleObjectCompletion(item.source!);
+    }
+  }
+
+  void _handleObjectCompletion(ContentObject object) {
+    if (object is Task) {
+      final updated = object.copyWith(stage: object.isCompleted ? TaskStage.todo : TaskStage.finalized);
+      ref.read(vaultProvider.notifier).updateObject(updated);
+    } else if (object is Habit) {
+      ref.read(habitsProvider.notifier).toggleHabit(object, _selectedDate);
+    }
+  }
+
+  void _handleDelete(ContentObject object) {
+    // TODO: Implement delete with confirmation
   }
 
   Widget _buildActionsPanel(Organizer? activeTheme) {
@@ -698,7 +738,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
     if (!mounted ||
         !_scrollController.hasClients ||
         _viewMode != 0 ||
-        !_isTimeline ||
         !_isSameDay(_selectedDate, DateTime.now())) {
       return;
     }
@@ -745,15 +784,14 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
         IconButton(
           icon: const Icon(Icons.chevron_left_rounded),
           onPressed: () => setState(
-            () =>
-                _selectedDate = _selectedDate.subtract(const Duration(days: 1)),
+            () => _selectedDate = _selectedDate.subtract(const Duration(days: 1)),
           ),
         ),
         Expanded(
           child: GestureDetector(
             onTap: _pickCustomDate,
             child: Text(
-              DateFormat("EEEE, d 'de' MMMM", 'pt_BR').format(_selectedDate),
+              DateFormat('EEEE, MMMM d').format(_selectedDate),
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
             ),
@@ -774,7 +812,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
               );
             },
             child: Text(
-              'Hoje',
+              'Today',
               style: TextStyle(
                 color: AppTheme.accentColor(context),
                 fontSize: 12,
@@ -789,64 +827,79 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
   Widget _buildOverdueButton() {
     final overdueCount = ref.watch(overdueCountProvider.select((count) => count));
     if (overdueCount == 0) return const SizedBox.shrink();
-    
     return IconButton(
-      icon: const Icon(
-        Icons.warning_amber_rounded,
-        color: AppColors.error,
-      ),
-      tooltip: 'Atrasados ($overdueCount)',
+      icon: const Icon(Icons.warning_amber_rounded, color: AppColors.error),
+      tooltip: 'Overdue ($overdueCount)',
       onPressed: () => _showOverduePopup(),
     );
   }
 
-  void _showOverduePopup() {
-    showDialog(
+  void _showInboxPopup() {
+    final inboxQueue = ref.read(unifiedInboxQueueProvider);
+    showModalBottomSheet(
       context: context,
-      builder: (context) => Dialog(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor(context),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
-                  color: AppTheme.surfaceVariantColor(context),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
-                  ),
+                  color: AppTheme.dividerColor(context),
+                  borderRadius: BorderRadius.circular(2),
                 ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.warning_amber_rounded,
-                      color: AppColors.error,
-                    ),
+                    Icon(Icons.inbox_rounded, color: AppTheme.accentColor(context)),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Atrasados',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    Text(
+                      'Inbox (${inboxQueue.length})',
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
                     ),
                     const Spacer(),
                     IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(ctx),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: const OverdueSection(),
+              const Divider(height: 1),
+              if (inboxQueue.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(40),
+                  child: Text(
+                    'Inbox is empty',
+                    style: TextStyle(
+                      color: AppTheme.textMutedColor(context),
+                    ),
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: inboxQueue.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final item = inboxQueue[index];
+                      return _buildInboxQueueItem(ctx, item);
+                    },
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -854,13 +907,408 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
     );
   }
 
-  Widget _buildDayThemeEmojiButton(Organizer theme) {
-    final emoji = theme.icon ?? '📅';
-    return IconButton(
-      icon: Text(
-        emoji,
-        style: const TextStyle(fontSize: 20),
+  Widget _buildInboxQueueItem(BuildContext ctx, InboxQueueItem item) {
+    final pomodoroCount = _getPomodoroCount(item.source);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceVariantColor(context),
+        borderRadius: BorderRadius.circular(12),
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(_iconForInboxKind(item.kind), size: 20, color: AppTheme.accentColor(context)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  item.title,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (pomodoroCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.timer_outlined, size: 12, color: AppColors.error),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$pomodoroCount',
+                        style: const TextStyle(fontSize: 11, color: AppColors.error, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          if (item.subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              item.subtitle!,
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.textMutedColor(context),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _addInboxItemToToday(item);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accentColor(context),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Add today', style: TextStyle(fontSize: 12)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _chooseDateForInboxItem(item);
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Choose date', style: TextStyle(fontSize: 12)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  int _getPomodoroCount(ContentObject source) {
+    if (source is Task) {
+      return source.pomodoroCount ?? 0;
+    }
+    return 0;
+  }
+
+  IconData _iconForInboxKind(InboxQueueKind kind) {
+    switch (kind) {
+      case InboxQueueKind.inbox:
+        return Icons.inbox_rounded;
+      case InboxQueueKind.idea:
+        return Icons.lightbulb_rounded;
+      case InboxQueueKind.task:
+        return Icons.task_alt_rounded;
+      case InboxQueueKind.project:
+        return Icons.folder_rounded;
+      case InboxQueueKind.goal:
+        return Icons.flag_rounded;
+    }
+  }
+
+  void _addInboxItemToToday(InboxQueueItem item) {
+    final today = DateTime.now();
+    if (item.source is InboxItem) {
+      // Convert raw capture to Task scheduled for today
+      final inboxItem = item.source as InboxItem;
+      final task = Task(
+        title: inboxItem.title.isNotEmpty ? inboxItem.title : 'Untitled',
+        startDate: today,
+        endDate: today,
+        stage: TaskStage.todo,
+      );
+      ref.read(vaultProvider.notifier).createObject(task);
+      // Archive the original inbox item
+      ref.read(vaultProvider.notifier).updateObject(inboxItem);
+    } else if (item.source is Task) {
+      final task = item.source as Task;
+      final updated = task.copyWith(
+        startDate: today,
+        endDate: today,
+        stage: TaskStage.todo,
+      );
+      ref.read(vaultProvider.notifier).updateObject(updated);
+    } else if (item.source is IdeaDefinition) {
+      final idea = item.source as IdeaDefinition;
+      final task = Task(
+        title: idea.title,
+        startDate: today,
+        endDate: today,
+        stage: TaskStage.todo,
+      );
+      ref.read(vaultProvider.notifier).createObject(task);
+    } else if (item.source is Project) {
+      final project = item.source as Project;
+      final updated = project.copyWith(startDate: today);
+      ref.read(vaultProvider.notifier).updateObject(updated);
+    } else if (item.source is Goal) {
+      final goal = item.source as Goal;
+      final updated = goal.copyWith(startDate: today);
+      ref.read(vaultProvider.notifier).updateObject(updated);
+    }
+  }
+
+  void _chooseDateForInboxItem(InboxQueueItem item) async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+    );
+    if (date != null) {
+      if (item.source is InboxItem) {
+        final inboxItem = item.source as InboxItem;
+        final task = Task(
+          title: inboxItem.title.isNotEmpty ? inboxItem.title : 'Untitled',
+          startDate: date,
+          endDate: date,
+          stage: TaskStage.todo,
+        );
+        ref.read(vaultProvider.notifier).createObject(task);
+        ref.read(vaultProvider.notifier).updateObject(inboxItem);
+      } else if (item.source is Task) {
+        final task = item.source as Task;
+        final updated = task.copyWith(
+          startDate: date,
+          endDate: date,
+          stage: TaskStage.todo,
+        );
+        ref.read(vaultProvider.notifier).updateObject(updated);
+      } else if (item.source is IdeaDefinition) {
+        final idea = item.source as IdeaDefinition;
+        final task = Task(
+          title: idea.title,
+          startDate: date,
+          endDate: date,
+          stage: TaskStage.todo,
+        );
+        ref.read(vaultProvider.notifier).createObject(task);
+      } else if (item.source is Project) {
+        final project = item.source as Project;
+        final updated = project.copyWith(startDate: date);
+        ref.read(vaultProvider.notifier).updateObject(updated);
+      } else if (item.source is Goal) {
+        final goal = item.source as Goal;
+        final updated = goal.copyWith(startDate: date);
+        ref.read(vaultProvider.notifier).updateObject(updated);
+      }
+    }
+  }
+
+  void _showOverduePopup() {
+    final overdueItems = ref.read(overdueProvider);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.surfaceColor(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        builder: (_, controller) => Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.dividerColor(ctx),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: AppColors.error),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Overdue Tasks (${overdueItems.length})',
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: overdueItems.isEmpty
+                  ? const Center(child: Text('No overdue items.'))
+                  : ListView.builder(
+                      controller: controller,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      itemCount: overdueItems.length,
+                      itemBuilder: (_, i) => _buildOverdueRow(ctx, overdueItems[i]),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverdueRow(BuildContext ctx, OverdueItem item) {
+    final daysText = item.daysLate == 1 ? '1 day overdue' : '${item.daysLate} days overdue';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceVariantColor(ctx),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Colored radio button based on category
+              Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _getCategoryColor(item.object),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push('/detail/${item.object.id}', extra: item.object);
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.object.title,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        daysText,
+                        style: const TextStyle(fontSize: 11, color: AppColors.error, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _moveOverdueToToday(item);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accentColor(ctx),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Move to today', style: TextStyle(fontSize: 12)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(2100),
+                    );
+                    if (date != null) _rescheduleOverdue(item, date);
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('New date', style: TextStyle(fontSize: 12)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getCategoryColor(ContentObject object) {
+    // Return color based on organizer/category
+    if (object.organizers.isNotEmpty) {
+      final firstOrg = object.organizers.first;
+      // You can customize this logic based on your category color mapping
+      return AppTheme.accentColor(context);
+    }
+    return AppColors.error;
+  }
+
+  void _moveOverdueToToday(OverdueItem item) {
+    final today = DateTime.now();
+    final obj = item.object;
+    if (obj is Task) {
+      ref.read(vaultProvider.notifier).updateObject(
+        obj.copyWith(startDate: today, endDate: today),
+      );
+    } else {
+      ref.read(vaultProvider.notifier).updateObject(obj);
+    }
+  }
+
+  void _rescheduleOverdue(OverdueItem item, DateTime date) {
+    final obj = item.object;
+    if (obj is Task) {
+      ref.read(vaultProvider.notifier).updateObject(
+        obj.copyWith(startDate: date, endDate: date),
+      );
+    } else {
+      ref.read(vaultProvider.notifier).updateObject(obj);
+    }
+  }
+
+  Widget _buildDayThemeEmojiButton(Organizer theme) {
+    return IconButton(
+      icon: Icon(Icons.calendar_today_rounded, color: AppTheme.accentColor(context)),
       tooltip: theme.title,
       onPressed: () => _showDayThemePopup(theme),
     );
@@ -878,9 +1326,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             children: [
               Row(
                 children: [
-                  Text(
-                    theme.icon ?? '📅',
-                    style: const TextStyle(fontSize: 32),
+                  Icon(
+                    Icons.calendar_today_rounded,
+                    size: 32,
+                    color: AppTheme.accentColor(context),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -896,7 +1345,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Dias: ${theme.daysOfWeek.join(", ")}',
+                          'Days: ${theme.daysOfWeek.join(", ")}',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppTheme.textMutedColor(context),
@@ -977,7 +1426,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
-          _buildAllDaySection(allDayTasks, allDayHabits),
+          _buildAllDaySection(ref.watch(dailyScheduleProvider(_selectedDate)).allDayItems),
           if (activeBlocks.isNotEmpty) ...[
             ...activeBlocks.map((block) {
               final blockTasks = tasks
@@ -1027,7 +1476,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
           ],
           if (pendingReminders.isNotEmpty) ...[
             const Text(
-              'Lembretes pendentes',
+              'Pending Reminders',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 12),
@@ -1068,9 +1517,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
           decoration: AppTheme.cardDecoration(context),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.auto_stories_rounded,
-                color: AppColors.habitPurple,
+                color: AppTheme.accentColor(context).withValues(alpha: 0.8),
                 size: 20,
               ),
               const SizedBox(width: 12),
@@ -1089,9 +1538,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                         moodLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textMuted,
+                          color: AppTheme.textMutedColor(context),
                         ),
                       ),
                   ],
@@ -1224,9 +1673,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                     ),
                     Text(
                       '${record.fieldValues.length} fields filled',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textMuted,
+                        color: AppTheme.textMutedColor(context),
                       ),
                     ),
                   ],
@@ -1293,94 +1742,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildAllDaySection(List<Task> tasks, List<Habit> habits) {
-    final items = <ContentObject>[...tasks, ...habits]
-      ..sort((a, b) => (a.order ?? 999).compareTo(b.order ?? 999));
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: AppTheme.cardDecorationFlat(context),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          initiallyExpanded: true,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-          title: Row(
-            children: [
-              Icon(
-                Icons.wb_sunny_rounded,
-                size: 18,
-                color: AppTheme.accentColor(context),
-              ),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'Dia Todo',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-                ),
-              ),
-              _buildBlockAddButton(context, null),
-            ],
-          ),
-          children: [
-            if (items.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 16),
-                child: Text(
-                  'Nenhum item para o Dia Todo.',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-                ),
-              )
-            else
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                child: ReorderableListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: items.length,
-                  onReorder: (oldIndex, newIndex) async {
-                    if (newIndex > oldIndex) newIndex--;
-                    final item = items.removeAt(oldIndex);
-                    items.insert(newIndex, item);
-
-                    // Update orders in vault
-                    for (int i = 0; i < items.length; i++) {
-                      final obj = items[i];
-                      if (obj.order != i) {
-                        if (obj is Task) {
-                          final updated = obj.copyWith(order: i);
-                          await ref.read(vaultProvider.notifier).updateObject(updated);
-                        } else if (obj is Habit) {
-                          final updated = obj.copyWith(order: i);
-                          await ref
-                              .read(habitsProvider.notifier)
-                              .updateHabit(updated);
-                        }
-                      }
-                    }
-                  },
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    Widget child;
-                    if (item is Task) {
-                      child = _buildTaskItem(item);
-                    } else {
-                      child = _buildHabitItem(item as Habit);
-                    }
-                    return ReorderableDelayedDragStartListener(
-                      key: ValueKey(item.id),
-                      index: index,
-                      child: child,
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }
@@ -1459,9 +1820,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
               if (ranges.isNotEmpty) ...[
                 Text(
                   ranges,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color: AppColors.textMuted,
+                    color: AppTheme.textMutedColor(context),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1471,11 +1832,11 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
           ),
           children: [
             if (items.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(bottom: 16),
                 child: Text(
                   'Nenhum item neste bloco.',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                  style: TextStyle(color: AppTheme.textMutedColor(context), fontSize: 12),
                 ),
               )
             else
@@ -1566,9 +1927,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                     ),
                     Text(
                       'Frequency: every ${person.contactFrequency?.inDays} days',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textMuted,
+                        color: AppTheme.textMutedColor(context),
                       ),
                     ),
                   ],
@@ -1699,7 +2060,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                       size: 20,
                       color: task.stage == TaskStage.finalized
                           ? AppColors.habitGreen
-                          : (isBlocked ? AppColors.error : AppColors.textMuted),
+                          : (isBlocked ? AppColors.error : AppTheme.textMutedColor(context)),
                     ),
                   ),
                 ),
@@ -1721,8 +2082,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                                     ? TextDecoration.lineThrough
                                     : null,
                                 color: task.stage == TaskStage.finalized
-                                    ? AppColors.textMuted
-                                    : AppColors.textPrimary,
+                                    ? AppTheme.textMutedColor(context)
+                                    : AppTheme.textPrimaryColor(context),
                               ),
                             ),
                             if (task.tripleCheck != null) ...[
@@ -1780,9 +2141,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                         const SizedBox(width: 8),
                         Text(
                           '${task.subtasks.where((s) => s.completed).length}/${task.subtasks.length}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.textMuted,
+                            color: AppTheme.textMutedColor(context),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -1949,7 +2310,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                       ? Icons.check_circle_rounded
                       : Icons.radio_button_unchecked_rounded,
                   size: 20,
-                  color: isDone ? AppColors.habitGreen : AppColors.textMuted,
+                  color: isDone ? AppColors.habitGreen : AppTheme.textMutedColor(context),
                 ),
               ),
             ),
@@ -2072,12 +2433,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
               ),
               const SizedBox(height: 16),
               if (backlog.isEmpty && routines.isEmpty)
-                const Center(
+                Center(
                   child: Padding(
                     padding: EdgeInsets.all(40),
                     child: Text(
                       'Nenhuma tarefa sem data.',
-                      style: TextStyle(color: AppColors.textMuted),
+                      style: TextStyle(color: AppTheme.textMutedColor(context)),
                     ),
                   ),
                 )
@@ -2111,10 +2472,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
         title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w800,
-          color: AppColors.textMuted,
+          color: AppTheme.textMutedColor(context),
         ),
       ),
     );
@@ -2152,43 +2513,308 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
     );
   }
 
-  Widget _buildWeekView(List<Task> tasks, List<Habit> habits) {
-    final organizers = ref.watch(organizersListProvider);
-    final dayThemes = organizers.where((o) => o.organizerType == OrganizerType.dayTheme).toList();
-    final timeBlocks = organizers.where((o) => o.organizerType == OrganizerType.timeBlock).toList();
-    final startOfWeek = DateTime.now().subtract(
-      Duration(days: DateTime.now().weekday - 1),
-    );
+  Widget _buildWeekView() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+    final endOfWeek = startOfWeek.add(const Duration(days: 6));
 
     return SliverPadding(
-      padding: const EdgeInsets.all(20),
-      sliver: SliverToBoxAdapter(
-        child: SizedBox(
-          height: 600,
-          child: WeekTimeGrid(
-            tasks: tasks,
-            habits: habits,
-            startOfWeek: startOfWeek,
-            dayThemes: dayThemes,
-            timeBlocks: timeBlocks,
-            onTaskTap: (task, date) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => UniversalDetailView(object: task),
+      padding: const EdgeInsets.all(16),
+      sliver: SliverList(
+        delegate: SliverChildListDelegate([
+          // Week range header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _formatWeekRange(startOfWeek, endOfWeek),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimaryColor(context),
+                  ),
                 ),
-              );
-            },
-            onHabitTap: (habit) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => UniversalDetailView(object: habit),
+                IconButton(
+                  icon: const Icon(Icons.today_rounded),
+                  onPressed: () {
+                    setState(() {
+                      _selectedDate = today;
+                      _viewMode = 0;
+                    });
+                  },
+                  tooltip: 'Go to today',
                 ),
-              );
-            },
+              ],
+            ),
+          ),
+          // Progress row
+          _buildWeekProgressRow(),
+          const SizedBox(height: 8),
+          // Day sections
+          ...List.generate(7, (index) {
+            final dayDate = startOfWeek.add(Duration(days: index));
+            return _buildWeekDaySection(dayDate, today);
+          }),
+        ]),
+      ),
+    );
+  }
+
+  String _formatWeekRange(DateTime start, DateTime end) {
+    final format = DateFormat('MMM d');
+    return '${format.format(start)} - ${format.format(end)}';
+  }
+
+  Widget _buildWeekProgressRow() {
+    // Calculate completion progress for the week
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+    
+    int completed = 0;
+    int total = 0;
+    
+    for (int i = 0; i < 7; i++) {
+      final dayDate = startOfWeek.add(Duration(days: i));
+      if (dayDate.isAfter(today)) break;
+      
+      final daySchedule = ref.read(dailyScheduleProvider(dayDate));
+      final completableItems = daySchedule.completableItems;
+      total += completableItems.length;
+      completed += completableItems.where((item) => item.isCompleted).length;
+    }
+    
+    final progress = total > 0 ? completed / total : 0.0;
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Weekly Progress',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textSecondaryColor(context),
+                ),
+              ),
+              Text(
+                '$completed/$total',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.accentColor(context),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: AppTheme.surfaceVariantColor(context),
+              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentColor(context)),
+              minHeight: 6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeekDaySection(DateTime dayDate, DateTime today) {
+    final isToday = _isSameDay(dayDate, today);
+    final daySchedule = ref.watch(dailyScheduleProvider(dayDate));
+    final items = daySchedule.allItems;
+    
+    final weekdayLabel = DateFormat('EEE').format(dayDate);
+    final dayLabel = DateFormat('d').format(dayDate);
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: isToday ? AppTheme.accentColor(context).withValues(alpha: 0.08) : AppTheme.surfaceVariantColor(context),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _selectedDate = dayDate;
+            _viewMode = 0;
+          });
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  // Day badge
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isToday ? AppTheme.accentColor(context) : AppTheme.surfaceColor(context),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        dayLabel,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: isToday ? Colors.white : AppTheme.textPrimaryColor(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Weekday label
+                  Text(
+                    weekdayLabel,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isToday ? AppTheme.accentColor(context) : AppTheme.textPrimaryColor(context),
+                    ),
+                  ),
+                  const Spacer(),
+                  // Item count
+                  if (items.isNotEmpty)
+                    Text(
+                      '${items.length} tasks',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textMutedColor(context),
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  // Plus button
+                  IconButton(
+                    icon: Icon(Icons.add_rounded, size: 20),
+                    onPressed: () {
+                      setState(() {
+                        _selectedDate = dayDate;
+                        _viewMode = 0;
+                      });
+                    },
+                    tooltip: 'Add item',
+                  ),
+                ],
+              ),
+              if (items.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                // Compact items with vertical bars
+                ...items.take(3).map((item) => _buildWeekTaskItem(item)),
+                if (items.length > 3)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '+${items.length - 3} more',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textMutedColor(context),
+                      ),
+                    ),
+                  ),
+              ],
+            ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildWeekTaskItem(DailyScheduleItem item) {
+    final timeStr = item.time;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          // Colored vertical bar
+          Container(
+            width: 4,
+            height: 32,
+            decoration: BoxDecoration(
+              color: item.color,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (timeStr != null)
+                  Text(
+                    timeStr,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textMutedColor(context),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (item.subtitle != null)
+            Text(
+              item.subtitle!,
+              style: TextStyle(
+                fontSize: 11,
+                color: item.color,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeekItemChip(DailyScheduleItem item) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: item.color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(item.iconData, size: 14, color: item.color),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              item.title,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.textPrimaryColor(context),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2261,9 +2887,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             if (activeTheme != null)
               GestureDetector(
                 onTap: () => _showDayThemePopup(activeTheme),
-                child: Text(
-                  activeTheme.icon ?? '📅',
-                  style: const TextStyle(fontSize: 32),
+                child: Icon(
+                  Icons.calendar_today_rounded,
+                  size: 32,
+                  color: AppTheme.accentColor(context),
                 ),
               ),
             if (activeTheme != null) const SizedBox(height: 8),
@@ -2333,14 +2960,14 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                           'Schedule',
                           style: Theme.of(context).textTheme.bodySmall!.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textMuted,
+                            color: AppTheme.textMutedColor(context),
                           ),
                         ),
                         IconButton(
                           icon: Icon(
                             showLegendSetting ? Icons.visibility : Icons.visibility_off,
                             size: 18,
-                            color: AppColors.textMuted,
+                            color: AppTheme.textMutedColor(context),
                           ),
                           onPressed: () {
                             ref.read(settingsProvider.notifier).updateDayDialLegend(!showLegendSetting);
@@ -2511,7 +3138,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                       timeStr,
                       style: Theme.of(context).textTheme.bodySmall!.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textMuted,
+                        color: AppTheme.textMutedColor(context),
                       ),
                     ),
                   ),
@@ -2536,7 +3163,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                       segment.title,
                       style: Theme.of(context).textTheme.bodySmall!.copyWith(
                         fontWeight: FontWeight.w500,
-                        color: isCompleted ? AppColors.textMuted : AppColors.textPrimary,
+                        color: isCompleted ? AppTheme.textMutedColor(context) : AppTheme.textPrimaryColor(context),
                         decoration: isCompleted ? TextDecoration.lineThrough : null,
                       ),
                       maxLines: 1,
@@ -2819,8 +3446,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                         ? TextDecoration.lineThrough
                         : null,
                     color: task.isCompleted
-                        ? AppColors.textMuted
-                        : AppColors.textPrimary,
+                        ? AppTheme.textMutedColor(context)
+                        : AppTheme.textPrimaryColor(context),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -2883,8 +3510,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                     fontSize: 12,
                     decoration: completed ? TextDecoration.lineThrough : null,
                     color: completed
-                        ? AppColors.textMuted
-                        : AppColors.textPrimary,
+                        ? AppTheme.textMutedColor(context)
+                        : AppTheme.textPrimaryColor(context),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -2897,115 +3524,265 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
     );
   }
 
-  Widget _buildMonthView(List<Task> tasks, List<Habit> habits) {
-    final now = DateTime.now();
-    final firstDayOfMonth = DateTime(now.year, now.month, 1);
-    final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
+  Widget _buildMonthView() {
+    final firstDayOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+    final lastDayOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
     final daysInMonth = lastDayOfMonth.day;
     final firstWeekday = firstDayOfMonth.weekday; // 1=Mon, 7=Sun
-    
-    final organizers = ref.watch(organizersListProvider);
-    final dayThemes = organizers.where((o) => o.organizerType == OrganizerType.dayTheme).toList();
     const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
 
     return SliverPadding(
-      padding: const EdgeInsets.all(20),
-      sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 7,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          childAspectRatio: 0.7,
-        ),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final day = index - (firstWeekday - 1) + 1;
-            if (day < 1 || day > daysInMonth) return const SizedBox.shrink();
-
-            final date = DateTime(now.year, now.month, day);
-            final hasTask = tasks.any(
-              (t) =>
-                  (t.startDate != null && _isSameDay(t.startDate!, date)) ||
-                  (t.deadline != null && _isSameDay(t.deadline!, date)),
-            );
-            final isToday = _isSameDay(date, DateTime.now());
-            
-            // Find active day theme for this day
-            final dayName = weekDayNames[date.weekday - 1];
-            final activeTheme = dayThemes.cast<Organizer?>().firstWhere(
-              (theme) => theme != null && theme.daysOfWeek.contains(dayName),
-              orElse: () => null,
-            );
-
-            return InkWell(
-              onTap: () => _showDayDetailsSheet(date, tasks, habits),
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isToday
-                      ? AppTheme.accentColor(context).withValues(alpha: 0.1)
-                      : AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(12),
-                  border: isToday
-                      ? Border.all(color: AppTheme.accentColor(context), width: 2)
-                      : null,
+      padding: const EdgeInsets.all(16),
+      sliver: SliverList(
+        delegate: SliverChildListDelegate([
+          // Month navigation header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left_rounded),
+                  onPressed: () {
+                    setState(() {
+                      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1, 1);
+                    });
+                  },
+                  tooltip: 'Previous month',
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (activeTheme != null)
-                      GestureDetector(
-                        onTap: () => _showDayThemePopup(activeTheme),
-                        child: Text(
-                          activeTheme.icon ?? '📅',
-                          style: const TextStyle(fontSize: 14),
+                Text(
+                  DateFormat('MMMM yyyy').format(_selectedMonth),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimaryColor(context),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right_rounded),
+                  onPressed: () {
+                    setState(() {
+                      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
+                    });
+                  },
+                  tooltip: 'Next month',
+                ),
+              ],
+            ),
+          ),
+          // Week day headers
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: weekDayNames.map((day) => Expanded(
+                child: Center(
+                  child: Text(
+                    day.substring(0, 1),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textMutedColor(context),
+                    ),
+                  ),
+                ),
+              )).toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Calendar grid
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 1.0,
+            ),
+            itemCount: 42, // 6 weeks * 7 days
+            itemBuilder: (context, index) {
+              final day = index - (firstWeekday - 1) + 1;
+              final date = DateTime(_selectedMonth.year, _selectedMonth.month, day);
+              final isCurrentMonth = day >= 1 && day <= daysInMonth;
+              final isToday = _isSameDay(date, today);
+
+              if (!isCurrentMonth) {
+                return const SizedBox.shrink();
+              }
+
+              final daySchedule = ref.watch(dailyScheduleProvider(date));
+              final items = daySchedule.allItems;
+              final maxChipsPerCell = 2;
+
+              return InkWell(
+                onTap: () => _showMonthDayPreviewSheet(date),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isToday
+                        ? AppTheme.accentColor(context).withValues(alpha: 0.1)
+                        : AppTheme.surfaceVariantColor(context),
+                    borderRadius: BorderRadius.circular(8),
+                    border: isToday
+                        ? Border.all(color: AppTheme.accentColor(context), width: 1.5)
+                        : null,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          day.toString(),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: isToday ? FontWeight.w700 : FontWeight.w600,
+                            color: isToday
+                                ? AppTheme.accentColor(context)
+                                : AppTheme.textPrimaryColor(context),
+                          ),
                         ),
-                      )
-                    else
-                      const SizedBox(height: 14),
+                        const SizedBox(height: 4),
+                        // Compact item pills
+                        ...items.take(maxChipsPerCell).map((item) => Container(
+                          margin: const EdgeInsets.only(bottom: 2),
+                          height: 3,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: item.color,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        )),
+                        if (items.length > maxChipsPerCell)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              '+${items.length - maxChipsPerCell}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppTheme.textMutedColor(context),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ]),
+      ),
+    );
+  }
+
+  void _showMonthDayPreviewSheet(DateTime date) {
+    final daySchedule = ref.read(dailyScheduleProvider(date));
+    final items = daySchedule.allItems;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.6,
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor(context),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.dividerColor(context),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
                     Text(
-                      day.toString(),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
-                        color: isToday
-                            ? AppTheme.accentColor(context)
-                            : AppColors.textPrimary,
+                      DateFormat('EEEE, MMM d').format(date),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (hasTask) ...[
-                          const SizedBox(width: 2),
-                          _dot(AppColors.secondary),
-                        ],
-                        Consumer(
-                          builder: (context, ref, _) {
-                            final googleEvents = ref
-                                .watch(googleCalendarEventsProvider(date))
-                                .maybeWhen(
-                                  data: (events) => events,
-                                  orElse: () => <google_calendar.Event>[],
-                                );
-                            if (googleEvents.isNotEmpty) {
-                              return Padding(
-                                padding: const EdgeInsets.only(left: 2),
-                                child: _dot(AppColors.info),
-                              );
-                            }
-                            return const SizedBox.shrink();
-                          },
-                        ),
-                      ],
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
               ),
-            );
-          },
-          childCount: 35, // 5 rows
+              const Divider(height: 1),
+              if (items.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(40),
+                  child: Text(
+                    'No items scheduled',
+                    style: TextStyle(
+                      color: AppTheme.textMutedColor(context),
+                    ),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: items.length,
+                    separatorBuilder: (context, index) => Divider(
+                      height: 1,
+                      indent: 20,
+                      endIndent: 20,
+                    ),
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return ListTile(
+                        leading: Icon(item.iconData, color: item.color),
+                        title: Text(item.title),
+                        subtitle: item.subtitle != null ? Text(item.subtitle!) : null,
+                        onTap: () {
+                          Navigator.pop(context);
+                          if (item.source != null) {
+                            context.push('/detail/${item.source!.id}', extra: item.source);
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      setState(() {
+                        _selectedDate = date;
+                        _viewMode = 0;
+                      });
+                    },
+                    icon: const Icon(Icons.visibility_rounded),
+                    label: const Text('View full day'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -3144,12 +3921,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             ),
             const SizedBox(height: 16),
             if (dayTasks.isEmpty && dayHabits.isEmpty)
-              const Center(
+              Center(
                 child: Padding(
                   padding: EdgeInsets.all(40),
                   child: Text(
                     'Nada agendado para este dia',
-                    style: TextStyle(color: AppColors.textMuted),
+                    style: TextStyle(color: AppTheme.textMutedColor(context)),
                   ),
                 ),
               )
@@ -3346,9 +4123,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
               ],
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Reflection (optional)',
-              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+              style: TextStyle(fontSize: 13, color: AppTheme.textMutedColor(context)),
             ),
             const SizedBox(height: 16),
             TextField(

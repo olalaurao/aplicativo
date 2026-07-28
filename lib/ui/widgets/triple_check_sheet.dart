@@ -13,7 +13,7 @@ import '../theme.dart';
 import 'universal_search_picker.dart';
 
 /// Shows the Triple Check bottom sheet for a Task.
-/// Can be opened from the ⋯ menu, or from the ⚠️ badge on a stuck task.
+/// Can be opened from the menu, or from the warning badge on a stuck task.
 Future<void> showTripleCheckSheet(
   BuildContext context,
   WidgetRef ref, // kept for API compatibility but not forwarded
@@ -955,7 +955,7 @@ class TripleCheckBadge extends StatelessWidget {
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('⚠️', style: TextStyle(fontSize: 11)),
+            Icon(Icons.warning_amber_rounded, size: 11, color: AppColors.error),
             SizedBox(width: 3),
             Text(
               'Triple Check',

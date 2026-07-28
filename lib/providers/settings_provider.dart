@@ -5,6 +5,7 @@ import 'dart:convert';
 import '../models/shared_types.dart';
 import '../models/saved_filter.dart';
 import '../models/app_theme_config.dart';
+import '../services/daily_schedule_service.dart';
 
 /// Loaded once in main() before runApp and overridden into the ProviderContainer.
 /// This ensures SettingsNotifier has real prefs from the very first build,
@@ -162,6 +163,7 @@ class AppSettings {
     this.calendarWidgetShowTasks = true,
     this.calendarWidgetShowHabits = true,
     this.calendarWidgetShowSessions = true,
+    this.calendarWidgetVisibleKinds = null,
     this.habitWidgetFilterType = 'all',
     this.habitWidgetOrganizer = '',
     this.ideaStrategy = 'tag',
@@ -208,6 +210,7 @@ class AppSettings {
   final bool calendarWidgetShowTasks;
   final bool calendarWidgetShowHabits;
   final bool calendarWidgetShowSessions;
+  final Set<DailyScheduleKind>? calendarWidgetVisibleKinds;
   final String habitWidgetFilterType;
   final String habitWidgetOrganizer;
 
@@ -261,6 +264,7 @@ class AppSettings {
     bool? calendarWidgetShowTasks,
     bool? calendarWidgetShowHabits,
     bool? calendarWidgetShowSessions,
+    Set<DailyScheduleKind>? calendarWidgetVisibleKinds,
     String? habitWidgetFilterType,
     String? habitWidgetOrganizer,
     String? ideaStrategy,
@@ -342,6 +346,8 @@ class AppSettings {
           calendarWidgetShowHabits ?? this.calendarWidgetShowHabits,
       calendarWidgetShowSessions:
           calendarWidgetShowSessions ?? this.calendarWidgetShowSessions,
+      calendarWidgetVisibleKinds:
+          calendarWidgetVisibleKinds ?? this.calendarWidgetVisibleKinds,
       habitWidgetFilterType:
           habitWidgetFilterType ?? this.habitWidgetFilterType,
       habitWidgetOrganizer: habitWidgetOrganizer ?? this.habitWidgetOrganizer,
@@ -469,6 +475,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
           prefs.getBool('calendarWidgetShowHabits') ?? true,
       calendarWidgetShowSessions:
           prefs.getBool('calendarWidgetShowSessions') ?? true,
+      calendarWidgetVisibleKinds: _parseVisibleKinds(prefs.getString('calendarWidgetVisibleKinds')),
       habitWidgetFilterType: prefs.getString('habitWidgetFilterType') ?? 'all',
       habitWidgetOrganizer: prefs.getString('habitWidgetOrganizer') ?? '',
       ideaStrategy: prefs.getString('ideaStrategy') ?? 'tag',
@@ -1023,6 +1030,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     bool? showTasks,
     bool? showHabits,
     bool? showSessions,
+    Set<DailyScheduleKind>? visibleKinds,
   }) async {
     if (type != null) await _prefs.setString('calendarWidgetType', type);
     if (showTasks != null) {
@@ -1034,11 +1042,15 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     if (showSessions != null) {
       await _prefs.setBool('calendarWidgetShowSessions', showSessions);
     }
+    if (visibleKinds != null) {
+      await _prefs.setString('calendarWidgetVisibleKinds', visibleKinds.map((k) => k.name).join(','));
+    }
     state = state.copyWith(
       calendarWidgetType: type,
       calendarWidgetShowTasks: showTasks,
       calendarWidgetShowHabits: showHabits,
       calendarWidgetShowSessions: showSessions,
+      calendarWidgetVisibleKinds: visibleKinds,
     );
   }
 
@@ -1249,6 +1261,19 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> clearRecentSearches() async {
     await _prefs.remove('recentSearches');
     state = state.copyWith(recentSearches: const []);
+  }
+
+  static Set<DailyScheduleKind>? _parseVisibleKinds(String? value) {
+    if (value == null || value.isEmpty) return null;
+    try {
+      final parts = value.split(',');
+      return parts.map((p) => DailyScheduleKind.values.firstWhere(
+        (k) => k.name == p.trim(),
+        orElse: () => DailyScheduleKind.task,
+      )).toSet();
+    } catch (_) {
+      return null;
+    }
   }
 }
 

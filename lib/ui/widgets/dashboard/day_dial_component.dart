@@ -358,7 +358,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Expanded(
+                  Flexible(
                     child: Text(
                       segment.title,
                       style: Theme.of(context).textTheme.bodySmall!.copyWith(
@@ -382,52 +382,55 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
                       tooltip: 'Start Pomodoro',
                     ),
                   if (isCompletable)
-                    Checkbox(
-                      value: isCompleted,
-                      onChanged: (checked) {
-                        if (checked == null) return;
-                        HapticFeedback.lightImpact();
-                        
-                        if (segment.kind == DialSegmentKind.taskPlanned && segment.sourceSlug != null) {
-                          final task = allObjects.whereType<Task>().firstWhere(
-                            (t) => t.slug == segment.sourceSlug,
-                            orElse: () => allObjects.whereType<Task>().firstWhere(
-                              (t) => t.id == segment.sourceSlug,
-                              orElse: () => Task(id: '', title: '', stage: TaskStage.todo),
-                            ),
-                          );
-                          ref.read(vaultProvider.notifier).updateObject(
-                            task.copyWith(stage: checked ? TaskStage.finalized : TaskStage.todo),
-                          );
-                        } else if (segment.kind == DialSegmentKind.habitSlot && segment.sourceSlug != null) {
-                          final habit = allObjects.whereType<Habit>().firstWhere(
-                            (h) => h.slug == segment.sourceSlug,
-                            orElse: () => allObjects.whereType<Habit>().firstWhere(
-                              (h) => h.id == segment.sourceSlug,
-                              orElse: () => Habit(id: '', title: '', color: '', slots: []),
-                            ),
-                          );
-                          final today = DateTime.now();
-                          final history = List<CompletionRecord>.from(habit.completionHistory);
-                          if (checked) {
-                            history.add(CompletionRecord(
-                              date: today,
-                              completions: 1,
-                              successful: true,
-                              completedAt: DateTime.now(),
-                            ));
-                          } else {
-                            history.removeWhere((c) => 
-                              c.date.year == today.year && c.date.month == today.month && c.date.day == today.day);
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Checkbox(
+                        value: isCompleted,
+                        onChanged: (checked) {
+                          if (checked == null) return;
+                          HapticFeedback.lightImpact();
+                          
+                          if (segment.kind == DialSegmentKind.taskPlanned && segment.sourceSlug != null) {
+                            final task = allObjects.whereType<Task>().firstWhere(
+                              (t) => t.slug == segment.sourceSlug,
+                              orElse: () => allObjects.whereType<Task>().firstWhere(
+                                (t) => t.id == segment.sourceSlug,
+                                orElse: () => Task(id: '', title: '', stage: TaskStage.todo),
+                              ),
+                            );
+                            ref.read(vaultProvider.notifier).updateObject(
+                              task.copyWith(stage: checked ? TaskStage.finalized : TaskStage.todo),
+                            );
+                          } else if (segment.kind == DialSegmentKind.habitSlot && segment.sourceSlug != null) {
+                            final habit = allObjects.whereType<Habit>().firstWhere(
+                              (h) => h.slug == segment.sourceSlug,
+                              orElse: () => allObjects.whereType<Habit>().firstWhere(
+                                (h) => h.id == segment.sourceSlug,
+                                orElse: () => Habit(id: '', title: '', color: '', slots: []),
+                              ),
+                            );
+                            final today = DateTime.now();
+                            final history = List<CompletionRecord>.from(habit.completionHistory);
+                            if (checked) {
+                              history.add(CompletionRecord(
+                                date: today,
+                                completions: 1,
+                                successful: true,
+                                completedAt: DateTime.now(),
+                              ));
+                            } else {
+                              history.removeWhere((c) => 
+                                c.date.year == today.year && c.date.month == today.month && c.date.day == today.day);
+                            }
+                            ref.read(vaultProvider.notifier).updateObject(
+                              habit.copyWith(completionHistory: history),
+                            );
                           }
-                          ref.read(vaultProvider.notifier).updateObject(
-                            habit.copyWith(completionHistory: history),
-                          );
-                        }
-                      },
-                      activeColor: AppColors.success,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        },
+                        activeColor: AppColors.success,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                     ),
                 ],
               ),

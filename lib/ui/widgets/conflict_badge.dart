@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme.dart';
 
 class ConflictBadge extends StatelessWidget {
   final bool visible;
@@ -15,11 +16,12 @@ class ConflictBadge extends StatelessWidget {
     if (!visible) return const SizedBox.shrink();
     return Tooltip(
       message: tooltip ?? 'Conflito de tipo detectado',
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 4.0),
-        child: Text(
-          '⚠️',
-          style: TextStyle(fontSize: 16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+        child: Icon(
+          Icons.warning_amber_rounded,
+          size: 16,
+          color: AppColors.error,
         ),
       ),
     );
