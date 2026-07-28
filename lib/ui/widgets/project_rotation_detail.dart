@@ -10,8 +10,8 @@ import '../../providers/vault_provider.dart';
 import '../../services/rotation_service.dart';
 import '../forms/create_task_form.dart';
 import '../navigation/object_navigation.dart';
-import '../screens/rotation_overview_screen.dart';
 import '../theme.dart';
+import 'object_action_wrapper.dart';
 
 class ProjectRotationDetailScreen extends ConsumerStatefulWidget {
   final String projectId;
@@ -175,6 +175,21 @@ class _ProjectRotationDetailScreenState
       ..sort((a, b) => a.order.compareTo(b.order));
     final activeStatus = RotationService.computeActiveStatus(project);
 
+    final Map<String, ({DateTime startsAt, DateTime endsAt})> zonePeriods = {};
+    if (activeStatus != null) {
+      final currentIdx = groups.indexWhere((g) => g.id == activeStatus.group.id);
+      if (currentIdx >= 0) {
+        zonePeriods[activeStatus.group.id] = (startsAt: activeStatus.periodStart, endsAt: activeStatus.periodEnd);
+        var cursor = activeStatus.periodEnd.add(const Duration(days: 1));
+        for (var i = 1; i < groups.length; i++) {
+          final g = groups[(currentIdx + i) % groups.length];
+          final endsAt = cursor.add(Duration(days: g.periodDays - 1));
+          zonePeriods[g.id] = (startsAt: cursor, endsAt: endsAt);
+          cursor = endsAt.add(const Duration(days: 1));
+        }
+      }
+    }
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _isSelectionMode
@@ -214,7 +229,7 @@ class _ProjectRotationDetailScreenState
               actions: [
                 IconButton(
                   icon: const Icon(Icons.more_vert_rounded),
-                  onPressed: () => _openFullRotation(context, project),
+                  onPressed: () => showObjectActionSheet(context, ref, project),
                 ),
               ],
             ),
@@ -294,6 +309,7 @@ class _ProjectRotationDetailScreenState
               group: group,
               tasks: groupTasks,
               activeStatus: activeStatus,
+              period: zonePeriods[group.id],
               isSelectionMode: _isSelectionMode,
               selectedTaskIds: _selectedTaskIds,
               onToggleSelection: _toggleSelection,
@@ -389,15 +405,6 @@ class _ProjectRotationDetailScreenState
       _frequencyFilter = _frequencyFilter == value ? null : value;
     });
   }
-
-  void _openFullRotation(BuildContext context, Project project) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => RotationOverviewScreen(projectId: project.id),
-      ),
-    );
-  }
 }
 
 class _ProjectZoneSection extends StatefulWidget {
@@ -405,6 +412,7 @@ class _ProjectZoneSection extends StatefulWidget {
   final RotationGroup group;
   final List<Task> tasks;
   final RotationStatus? activeStatus;
+  final ({DateTime startsAt, DateTime endsAt})? period;
   final bool isSelectionMode;
   final Set<String> selectedTaskIds;
   final Function(String) onToggleSelection;
@@ -415,6 +423,7 @@ class _ProjectZoneSection extends StatefulWidget {
     required this.group,
     required this.tasks,
     required this.activeStatus,
+    required this.period,
     required this.isSelectionMode,
     required this.selectedTaskIds,
     required this.onToggleSelection,
@@ -450,14 +459,27 @@ class _ProjectZoneSectionState extends State<_ProjectZoneSection> {
                   _ZoneIcon(group: widget.group),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
-                    child: Text(
-                      widget.group.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: AppTextSize.md,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.group.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: AppTextSize.md,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        if (widget.period != null)
+                          Text(
+                            '${DateFormat('d MMM').format(widget.period!.startsAt)} - ${DateFormat('d MMM').format(widget.period!.endsAt)}',
+                            style: const TextStyle(
+                              fontSize: AppTextSize.xs,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   if (isActive)

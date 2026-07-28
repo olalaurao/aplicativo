@@ -18,6 +18,7 @@ import '../../models/goal_model.dart';
 import '../../models/reminder_model.dart';
 import '../../models/reminder_config.dart';
 import '../../models/scheduler.dart';
+import '../../models/organizer_model.dart';
 import '../../models/shared_types.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/nlp_task_parser.dart';
@@ -45,7 +46,7 @@ void showQuickCapture(
 
 // ─── Type enum ───────────────────────────────────────────────────────────────
 
-enum QuickCaptureType { task, event, habit, goal, reminder }
+enum QuickCaptureType { task, event, habit, goal, reminder, timeBlock }
 
 extension _QuickCaptureTypeExt on QuickCaptureType {
   String get label {
@@ -60,6 +61,8 @@ extension _QuickCaptureTypeExt on QuickCaptureType {
         return 'Goal';
       case QuickCaptureType.reminder:
         return 'Reminder';
+      case QuickCaptureType.timeBlock:
+        return 'Time Block';
     }
   }
 
@@ -75,6 +78,8 @@ extension _QuickCaptureTypeExt on QuickCaptureType {
         return 'Add a goal…';
       case QuickCaptureType.reminder:
         return 'Add a reminder…';
+      case QuickCaptureType.timeBlock:
+        return 'Add a time block…';
     }
   }
 
@@ -90,6 +95,8 @@ extension _QuickCaptureTypeExt on QuickCaptureType {
         return '/create/goal';
       case QuickCaptureType.reminder:
         return '/create/reminder';
+      case QuickCaptureType.timeBlock:
+        return '/create/organizer';
     }
   }
 
@@ -390,6 +397,49 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text('Error saving: $e')));
+        }
+      }
+    } else if (_selectedType == QuickCaptureType.timeBlock) {
+      if (_effectiveDate == null || _effectiveTime == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Date and time are required for a time block.')),
+          );
+        }
+        return;
+      }
+      
+      setState(() => _saving = true);
+      try {
+        final startHour = _effectiveTime!.hour;
+        final startMinute = _effectiveTime!.minute;
+        final endMinutes = (startHour * 60) + startMinute + 60;
+        final endHour = (endMinutes ~/ 60).clamp(0, 23);
+        final endMinute = endMinutes % 60;
+        
+        final timeBlock = Organizer(
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          title: cleanTitle,
+          organizerType: OrganizerType.timeBlock,
+          startDate: _effectiveDate,
+          endDate: _effectiveDate,
+          timeRanges: [
+            TimeRange(startHour: startHour, startMinute: startMinute, endHour: endHour, endMinute: endMinute)
+          ],
+          scheduler: _selectedScheduler,
+          reminders: List.from(_extraReminders),
+          organizers: List.from(_extraOrganizers),
+        );
+        await ref.read(vaultProvider.notifier).createObject(timeBlock);
+        if (mounted) {
+          if (widget._isSheet) Navigator.of(context).pop();
+          _resetForm();
+        }
+      } catch (e) {
+        setState(() => _saving = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving: $e')));
         }
       }
     }

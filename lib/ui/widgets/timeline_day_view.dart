@@ -747,42 +747,70 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
             left: leftColumnWidth,
             right: 0,
             height: height,
-            child: IgnorePointer(
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                decoration: BoxDecoration(
-                  color: bandColor.withValues(alpha: 0.06),
-                  border: Border(
-                    left: BorderSide(
-                      color: bandColor.withValues(alpha: 0.45),
-                      width: 3,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: bandColor.withValues(alpha: 0.06),
+                        border: Border(
+                          left: BorderSide(
+                            color: bandColor.withValues(alpha: 0.45),
+                            width: 3,
+                          ),
+                        ),
+                      ),
+                      child: Stack(
+                        children: [
+                          if (block.energyLevel != null)
+                            Positioned.fill(
+                              child: Container(
+                                color: _energyColor(block.energyLevel!).withValues(alpha: 0.08),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-                child: Stack(
-                  children: [
-                    if (block.energyLevel != null)
-                      Positioned.fill(
-                        child: Container(
-                          color: _energyColor(block.energyLevel!).withValues(alpha: 0.08),
+                Positioned(
+                  top: 4,
+                  left: 10,
+                  right: 16,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: IgnorePointer(
+                          child: Text(
+                            block.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: bandColor.withValues(alpha: 0.8),
+                            ),
+                          ),
                         ),
                       ),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 10, top: 4),
-                      child: Text(
-                        block.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                      GestureDetector(
+                        onTap: () {
+                          ref.read(pomodoroProvider.notifier).setCurrentItem(block.id ?? '', block.title);
+                          ref.read(pomodoroProvider.notifier).start();
+                          context.push('/pomodoro');
+                        },
+                        child: Icon(
+                          Icons.play_circle_outline_rounded,
+                          size: 14,
                           color: bandColor.withValues(alpha: 0.8),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         );
@@ -949,13 +977,14 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                     horizontal: isShort ? 8 : 12,
                     vertical: isTiny ? 0 : (isShort ? 2 : 12),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: (isShort || isTiny)
-                        ? MainAxisAlignment.center
-                        : MainAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+                  child: ClipRect(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: (isShort || isTiny)
+                          ? MainAxisAlignment.center
+                          : MainAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
@@ -1065,6 +1094,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                         ),
                       ],
                     ],
+                    ),
                   ),
                 ),
                 Positioned(
@@ -1239,7 +1269,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
             child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: isShort ? 8 : 12,
-                vertical: isShort ? 2 : 12,
+                vertical: isShort ? 0 : 12,
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -1258,36 +1288,38 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          habit.displayTitle,
-                          style: TextStyle(
-                            fontSize: isShort ? 11 : 13,
-                            fontWeight: FontWeight.w700,
-                            color: baseColor,
-                            decoration: isCompleted
-                                ? TextDecoration.lineThrough
-                                : null,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (!isShort) ...[
-                          const SizedBox(height: 2),
+                    child: ClipRect(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                           Text(
-                            '🔥 ${habit.streak} dias • Slot ${slotIndex + 1}',
+                            habit.displayTitle,
                             style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                              color: baseColor.withValues(alpha: 0.7),
+                              fontSize: isShort ? 11 : 13,
+                              fontWeight: FontWeight.w700,
+                              color: baseColor,
+                              decoration: isCompleted
+                                  ? TextDecoration.lineThrough
+                                  : null,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
+                          if (!isShort) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              '🔥 ${habit.streak} dias • Slot ${slotIndex + 1}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: baseColor.withValues(alpha: 0.7),
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ],
@@ -1837,10 +1869,17 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                             ),
                           ),
                           GestureDetector(
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => UniversalDetailView(object: task)),
-                            ),
+                            onTap: () {
+                              ref.read(pomodoroProvider.notifier).setCurrentItem(task.id, task.title);
+                              if (task.stage == TaskStage.todo) {
+                                final updated = task.copyWith(stage: TaskStage.inProgress);
+                                ref.read(vaultProvider.notifier).updateObject(updated);
+                              }
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const PomodoroScreen()),
+                              );
+                            },
                             child: Icon(
                               Icons.play_circle_outline_rounded,
                               size: 14,

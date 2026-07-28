@@ -175,10 +175,11 @@ class TimelineAggregatorService {
       });
     }
 
+    final allTasks = allObjects.whereType<Task>().toList();
+    final allReminders = allObjects.whereType<Reminder>().toList();
+
     bool isItemScheduled(String linkedItemId, DateTime d) {
       final targetSlug = linkedItemId.replaceAll('[[', '').replaceAll(']]', '').trim().toLowerCase();
-      final allTasks = allObjects.whereType<Task>().toList();
-      final allReminders = allObjects.whereType<Reminder>().toList();
 
       final hasLinkedTask = allTasks.any((t) {
         final isScheduled =
@@ -251,7 +252,18 @@ class TimelineAggregatorService {
         if (rDate == dateOnly || rDate.isBefore(dateOnly)) reminders.add(obj);
       }
       if (obj is Organizer && obj.organizerType == OrganizerType.timeBlock) {
-        timeBlocks.add(obj); 
+        bool scheduledToday = false;
+        if (obj.scheduler != null) {
+          scheduledToday = SchedulerService.shouldFire(obj.scheduler!, dateOnly, isThemeActive: isThemeActive, isBlockActive: isBlockActive, isItemScheduled: isItemScheduled);
+        } else if (obj.startDate != null) {
+          scheduledToday = obj.startDate!.year == dateOnly.year && obj.startDate!.month == dateOnly.month && obj.startDate!.day == dateOnly.day;
+        } else {
+          scheduledToday = isBlockActive(obj.id ?? '', dateOnly);
+          if (!scheduledToday && dayThemes.isEmpty) {
+            scheduledToday = true;
+          }
+        }
+        if (scheduledToday) timeBlocks.add(obj); 
       }
       if (obj is JournalEntry) {
         if (obj.date.year == dateOnly.year && obj.date.month == dateOnly.month && obj.date.day == dateOnly.day) {

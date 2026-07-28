@@ -55,6 +55,8 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
   bool _rotationResetRequested = false;
   Scheduler? _scheduler;
   List<ChecklistStep> _steps = [];
+  String? _rotationScheduledTime;
+  int? _rotationDurationMinutes;
 
   static const _colorSwatches = [
     '#3B82F6',
@@ -97,6 +99,8 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
       _kpis = List.from(project.kpis);
       _scheduler = project.scheduler;
       _steps = List.from(project.steps);
+      _rotationScheduledTime = project.rotationScheduledTime;
+      _rotationDurationMinutes = project.rotationDurationMinutes;
     } else {
       if (widget.initialOrganizers != null) {
         _organizers = List.from(widget.initialOrganizers!);
@@ -619,6 +623,76 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
                               ),
                             ),
                           ],
+                          const SizedBox(height: 16),
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Add to planner'),
+                            subtitle: Text(
+                              _rotationScheduledTime == null
+                                  ? 'Not scheduled'
+                                  : '$_rotationScheduledTime (${_rotationDurationMinutes ?? 60}m)',
+                            ),
+                            trailing: Switch(
+                              value: _rotationScheduledTime != null,
+                              onChanged: (val) async {
+                                if (val) {
+                                  final time = await showTimePicker(
+                                    context: context,
+                                    initialTime: const TimeOfDay(hour: 9, minute: 0),
+                                  );
+                                  if (time != null && mounted) {
+                                    setState(() {
+                                      _rotationScheduledTime = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                                      _rotationDurationMinutes ??= 60;
+                                    });
+                                  }
+                                } else {
+                                  setState(() {
+                                    _rotationScheduledTime = null;
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                          if (_rotationScheduledTime != null)
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    initialValue: _rotationDurationMinutes?.toString() ?? '60',
+                                    keyboardType: TextInputType.number,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Duration (minutes)',
+                                    ),
+                                    onChanged: (val) {
+                                      final parsed = int.tryParse(val);
+                                      if (parsed != null && parsed > 0) {
+                                        _rotationDurationMinutes = parsed;
+                                      }
+                                    },
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.access_time_rounded),
+                                  onPressed: () async {
+                                    final parts = _rotationScheduledTime!.split(':');
+                                    final time = await showTimePicker(
+                                      context: context,
+                                      initialTime: TimeOfDay(
+                                        hour: int.parse(parts[0]),
+                                        minute: int.parse(parts[1]),
+                                      ),
+                                    );
+                                    if (time != null && mounted) {
+                                      setState(() {
+                                        _rotationScheduledTime = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                                      });
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          const SizedBox(height: 16),
                           TextField(
                             controller: _methodLabelController,
                             decoration: const InputDecoration(
@@ -1080,6 +1154,8 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
       methodLabel: _useRotation && _methodLabelController.text.trim().isNotEmpty
           ? _methodLabelController.text.trim()
           : null,
+      rotationScheduledTime: _useRotation ? _rotationScheduledTime : null,
+      rotationDurationMinutes: _useRotation ? _rotationDurationMinutes : null,
       // Reset rotation state if user requested a restart
       rotationCurrentGroupId: _rotationResetRequested ? null : widget.existingProject?.rotationCurrentGroupId,
       rotationCurrentPeriodStart: _rotationResetRequested ? null : widget.existingProject?.rotationCurrentPeriodStart,

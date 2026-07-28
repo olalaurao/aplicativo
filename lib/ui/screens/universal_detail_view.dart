@@ -4968,10 +4968,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            TextButton(
-              onPressed: () => navigateToRotationOverview(context, project.id),
-              child: const Text('View full rotation'),
-            ),
+
           ],
         ),
         const SizedBox(height: 8),
