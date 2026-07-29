@@ -355,6 +355,21 @@ class Habit extends ContentObject {
   bool get isIncomplete => title.trim().isEmpty;
 
   @override
+  DateTime? get baseTime {
+    // For habits, baseTime should be the habit start date or the first slot time
+    // This ensures reminders are calculated relative to when the habit started
+    if (habitStartDate != null) {
+      return habitStartDate;
+    }
+    // Fallback to first slot time if available
+    if (slots.isNotEmpty && slots.first.time != null) {
+      return slots.first.time;
+    }
+    // Final fallback to creation date
+    return createdAt;
+  }
+
+  @override
   List<ReminderConfig> get reminders {
     return slots.asMap().entries.expand((entry) {
       final idx = entry.key;

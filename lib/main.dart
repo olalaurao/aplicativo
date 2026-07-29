@@ -1172,6 +1172,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               final extra = state.extra as Map<String, dynamic>?;
               return CreateHabitForm(
                 initialTitle: extra?['initialTitle'] as String?,
+                existingHabit: extra?['existingHabit'] as Habit?,
               );
             },
           ),

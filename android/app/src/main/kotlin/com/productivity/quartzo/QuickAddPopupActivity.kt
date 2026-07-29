@@ -12,6 +12,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -69,18 +70,18 @@ class QuickAddPopupActivity : Activity() {
             setPadding(0, 20, 0, 16)
         }
 
+        val typeScrollView = HorizontalScrollView(this).apply {
+            addView(typeRow)
+        }
+
         val buttons = linkedMapOf(
-            "task" to typeButton("Task"),
-            "event" to typeButton("Event"),
-            "habit" to typeButton("Habit"),
-            "goal" to typeButton("Goal"),
-            "reminder" to typeButton("Reminder"),
-            "timeblock" to typeButton("TimeBlock"),
-            "project" to typeButton("Project"),
-            "note" to typeButton("Note"),
-            "idea" to typeButton("Idea"),
-            "entry" to typeButton("Journal"),
-        )
+    "task" to typeButton("Task"),
+    "event" to typeButton("Event"),
+    "habit" to typeButton("Habit"),
+    "goal" to typeButton("Goal"),
+    "reminder" to typeButton("Reminder"),
+    "timeblock" to typeButton("TimeBlock"),
+)
         typeButtons = buttons
         buttons.forEach { (type, view) ->
             view.setOnClickListener {
@@ -90,7 +91,7 @@ class QuickAddPopupActivity : Activity() {
             }
             typeRow.addView(view)
         }
-        root.addView(typeRow)
+        root.addView(typeScrollView)
         updateTypeButtons()
 
         editText = EditText(this).apply {
@@ -320,10 +321,6 @@ class QuickAddPopupActivity : Activity() {
             "goal" -> "Add a goal..."
             "reminder" -> "Add a reminder..."
             "timeblock" -> "Add a time block..."
-            "project" -> "Add a project..."
-            "note" -> "Add a note..."
-            "idea" -> "Add an idea..."
-            "entry" -> "Add a journal entry..."
             else -> "Add a task..."
         }
     }

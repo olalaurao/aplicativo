@@ -24,7 +24,6 @@ import '../widgets/form_section_card.dart';
 import '../widgets/discard_guard.dart';
 import '../widgets/app_color_picker.dart';
 import '../../models/color_palette_model.dart';
-import '../../models/color_palette_model.dart';
 class CreateHabitForm extends ConsumerStatefulWidget {
   final String? initialTitle;
   final Habit? existingHabit;

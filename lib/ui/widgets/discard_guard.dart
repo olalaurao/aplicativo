@@ -10,11 +10,11 @@ class DiscardGuard extends StatelessWidget {
     required this.child,
   });
 
-  Future<bool> _onWillPop() async {
+  Future<bool> _onWillPop(BuildContext context) async {
     if (!isDirty) return true;
 
     final confirmed = await showDialog<bool>(
-      context: child.key as BuildContext,
+      context: context,
       builder: (context) => AlertDialog(
         title: const Text('Descartar alterações?'),
         content: const Text('Você tem alterações não salvas. Deseja sair sem salvar?'),
@@ -41,7 +41,7 @@ class DiscardGuard extends StatelessWidget {
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         if (isDirty) {
-          final shouldPop = await _onWillPop();
+          final shouldPop = await _onWillPop(context);
           if (shouldPop && context.mounted) {
             Navigator.pop(context);
           }

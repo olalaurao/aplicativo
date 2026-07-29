@@ -169,7 +169,7 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
                     icon: const Icon(Icons.edit_outlined, size: 20),
                     onPressed: () {
                       Navigator.pop(context);
-                      context.push('/create-habit', extra: {'existingHabit': currentHabit});
+                      context.push('/create/habit', extra: {'existingHabit': currentHabit});
                     },
                   ),
                   const SizedBox(width: 8),

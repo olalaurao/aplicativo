@@ -177,7 +177,7 @@ class _SteeringSheetState extends ConsumerState<SteeringSheet> {
       Navigator.pop(context);
 
       if (outcome == PactOutcome.pivot) {
-        context.push('/create-habit', extra: {'existingHabit': updatedHabit});
+        context.push('/create/habit', extra: {'existingHabit': updatedHabit});
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

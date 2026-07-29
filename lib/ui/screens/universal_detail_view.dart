@@ -5396,6 +5396,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
             id: config.id.hashCode,
             title: object.title,
             config: config,
+            triggerTime: config.triggerTime,
             payload: object.id,
           );
         },

@@ -378,6 +378,8 @@ class NotificationService with WidgetsBindingObserver {
       if (response.id != null) {
         await _instance.cancelNotification(response.id!);
       }
+      // Reschedule habit reminders for the next day
+      await _rescheduleHabitReminderIfApplicable(response);
       return;
     }
     await _enqueueAction(actionId, response.payload, response.id);
@@ -431,6 +433,26 @@ class NotificationService with WidgetsBindingObserver {
     if (payload == null) return 10;
     final match = RegExp(r'snooze=(\d+)').firstMatch(payload);
     return int.tryParse(match?.group(1) ?? '') ?? 10;
+  }
+
+  static Future<void> _rescheduleHabitReminderIfApplicable(
+    NotificationResponse response,
+  ) async {
+    if (_instance._container == null) return;
+    
+    final payload = response.payload ?? '';
+    // Check if this is a habit notification
+    final typeMatch = RegExp(r'type=habit').firstMatch(payload);
+    if (typeMatch == null) return;
+    
+    try {
+      // Simply reschedule all habits - this is the cleanest approach
+      // and ensures all habit reminders are properly scheduled for the future
+      await _instance._container!.read(vaultProvider.notifier).rescheduleAllHabits();
+      debugPrint('Rescheduled all habit reminders after notification dismiss');
+    } catch (e) {
+      debugPrint('Failed to reschedule habit reminders: $e');
+    }
   }
 
   static Future<void> _enqueueAction(
@@ -498,11 +520,15 @@ class NotificationService with WidgetsBindingObserver {
     String? payload,
   }) async {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      debugPrint('NotificationService: skipping schedule on desktop platform');
       return;
     }
-    final time = triggerTime ?? config.triggerTime;
-    if (time == null || time.isBefore(DateTime.now())) return;
+    var time = triggerTime ?? config.triggerTime;
+    if (time == null) return;
+    
+    // If time is in the past, schedule for tomorrow (for recurring reminders like habits)
+    if (time.isBefore(DateTime.now())) {
+      time = time.add(const Duration(days: 1));
+    }
 
     final isAlarm = config.type == NotificationType.alarm;
     final isPopup = config.type == NotificationType.popup;
@@ -670,6 +696,7 @@ class NotificationService with WidgetsBindingObserver {
   void _fireForegroundTimer(int id) {
     final entry = _foregroundEntries.remove(id);
     _foregroundTimers.remove(id);
+    
     if (entry == null) return;
 
     // Only show the screen if the app is in the foreground (navigator available)

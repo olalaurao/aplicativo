@@ -2719,6 +2719,8 @@ class VaultNotifier extends Notifier<void> {
   }
 
   Future<void> _scheduleObjectReminders(ContentObject object) async {
+    debugPrint('[VaultProvider] _scheduleObjectReminders called for ${object.id} (${object.title}), type=${object.type}, reminders.length=${object.reminders.length}');
+    
     // Cancel previous reminders for this object using the current and legacy
     // ID schemes. Older builds used a hash per reminder config, so keep this
     // cleanup until those scheduled alarms naturally disappear from devices.
@@ -2731,19 +2733,40 @@ class VaultNotifier extends Notifier<void> {
       await NotificationService().cancelNotification(legacyReminderId);
     }
 
-    final baseTime = object.baseTime ?? DateTime.now();
+    // For habits, use DateTime.now() as base to calculate trigger time relative to today
+    // For other objects, use their baseTime (e.g., task due date, event date)
+    final baseTime = object is Habit ? DateTime.now() : (object.baseTime ?? DateTime.now());
     final settings = ref.read(settingsProvider);
+
+    // Skip habit reminders if the habitReminders setting is disabled
+    if (object is Habit && !settings.habitReminders) {
+      debugPrint('[VaultProvider] Skipping habit reminder for ${object.id} because habitReminders setting is disabled');
+      return;
+    }
 
     for (var index = 0; index < object.reminders.length; index++) {
       final config = object.reminders[index];
-      final triggerTime = config.calculateTriggerTime(baseTime);
+      var triggerTime = config.calculateTriggerTime(baseTime);
+      
+      debugPrint('[VaultProvider] Scheduling reminder for ${object.id} (${object.title}): type=${config.type}, timeOfDay=${config.timeOfDay}, baseTime=$baseTime, initialTriggerTime=$triggerTime');
+      
+      // For habits with timeOfDay, ensure we schedule for the NEXT occurrence
+      // If the calculated time has already passed today, schedule for tomorrow
+      if (object is Habit && config.timeOfDay != null && triggerTime.isBefore(DateTime.now())) {
+        triggerTime = triggerTime.add(const Duration(days: 1));
+        debugPrint('[VaultProvider] Habit trigger time was in past, rescheduling for tomorrow: $triggerTime');
+      }
+      
       if (triggerTime.isAfter(DateTime.now())) {
+        debugPrint('[VaultProvider] Trigger time is in future, proceeding to schedule');
+        
         final habitSlotIndex = object is Habit
             ? _slotIndexFromReminderConfig(config)
             : null;
         if (object is Habit &&
             habitSlotIndex != null &&
             _isHabitSlotCompletedOn(object, triggerTime, habitSlotIndex)) {
+          debugPrint('[VaultProvider] Skipping reminder because habit slot is already completed');
           continue;
         }
 
@@ -2767,20 +2790,24 @@ class VaultNotifier extends Notifier<void> {
             );
             if (triggerTime.isBefore(limitTime)) {
               // Ignore this notification trigger because of sleep-in mode
+              debugPrint('[VaultProvider] Skipping reminder due to sleep-in mode');
               continue;
             }
           }
         }
 
         final reminderId = baseId + index;
+        debugPrint('[VaultProvider] Calling NotificationService.scheduleReminder with id=$reminderId, triggerTime=$triggerTime');
         await NotificationService().scheduleReminder(
           id: reminderId,
           title: object.title,
           config: config,
+          triggerTime: triggerTime,
           payload: object is Habit && habitSlotIndex != null
               ? 'Quartzo://notification?oid=${Uri.encodeComponent(object.id)}&type=habit&slot=$habitSlotIndex'
               : object.id,
         );
+        debugPrint('[VaultProvider] NotificationService.scheduleReminder completed');
       }
     }
   }
