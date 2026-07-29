@@ -75,6 +75,11 @@ class QuickAddPopupActivity : Activity() {
             "habit" to typeButton("Habit"),
             "goal" to typeButton("Goal"),
             "reminder" to typeButton("Reminder"),
+            "timeblock" to typeButton("TimeBlock"),
+            "project" to typeButton("Project"),
+            "note" to typeButton("Note"),
+            "idea" to typeButton("Idea"),
+            "entry" to typeButton("Journal"),
         )
         typeButtons = buttons
         buttons.forEach { (type, view) ->
@@ -314,6 +319,11 @@ class QuickAddPopupActivity : Activity() {
             "habit" -> "Add a habit..."
             "goal" -> "Add a goal..."
             "reminder" -> "Add a reminder..."
+            "timeblock" -> "Add a time block..."
+            "project" -> "Add a project..."
+            "note" -> "Add a note..."
+            "idea" -> "Add an idea..."
+            "entry" -> "Add a journal entry..."
             else -> "Add a task..."
         }
     }

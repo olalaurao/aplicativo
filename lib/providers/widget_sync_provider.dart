@@ -231,7 +231,7 @@ Future<void> _updateAllWidgets(
       googleEvents,
       prefs?.getInt('monthWidgetOffset') ?? 0,
       prefs?.getInt('monthWidgetMaxChips') ?? 3,
-      prefs?.getStringList('monthWidgetVisibleKinds') ?? ['task', 'habit', 'reminder', 'google_calendar'],
+      prefs?.getStringList('monthWidgetVisibleKinds') ?? ['task', 'habit', 'reminder', 'google_calendar', 'time_block'],
     );
     final shopping = _buildShoppingSnapshot(allObjects);
     final pomodoro = _buildPomodoroSnapshot(pomodoroHistory);
@@ -518,6 +518,8 @@ Map<String, dynamic> _buildMonthSnapshot(
     // Filter by visibleKinds
     dayItems = dayItems.where((item) {
       final type = item['type'] as String? ?? '';
+      // Exclude rotation zone items - they should only appear as time blocks
+      if (type == 'project') return false;
       return visibleKinds.contains(type);
     }).toList();
 
@@ -637,7 +639,10 @@ List<Map<String, dynamic>> _dayItems(
     typeSignatures: settings.typeSignatures,
   ).apply(DailyScheduleFilter(visibleKinds: visibleKinds));
 
-  final items = snapshot.allItems.map((item) {
+  final items = snapshot.allItems.where((item) {
+    // Exclude rotation zone items - they should only appear as time blocks
+    return item.kind != DailyScheduleKind.rotationZone;
+  }).map((item) {
     final source = item.source;
     final type = _widgetTypeForScheduleKind(item.kind);
     final sourceId = source?.id ?? item.id;

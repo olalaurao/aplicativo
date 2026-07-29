@@ -153,6 +153,7 @@ class DailyScheduleAggregator {
     final items = <DailyScheduleItem>[];
 
     for (final task in aggregation.allTasks) {
+      if (task.isRotationTask) continue; // Rotation tasks appear only as part of rotation zone
       if (task.isCompleted) continue;
       final start = _parseTime(task.scheduledTime);
       items.add(

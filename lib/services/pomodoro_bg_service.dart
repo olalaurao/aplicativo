@@ -89,18 +89,18 @@ class PomodoroTaskHandler extends TaskHandler {
       final timeStr =
           '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
       FlutterForegroundTask.updateService(
-        notificationTitle: _isStopwatchMode ? 'Cronômetro em andamento' : 'Pomodoro em andamento',
-        notificationText: _isStopwatchMode ? 'Tempo decorrido: $timeStr' : 'Tempo restante: $timeStr',
+        notificationTitle: _isStopwatchMode ? 'Stopwatch running' : 'Pomodoro running',
+        notificationText: _isStopwatchMode ? 'Elapsed time: $timeStr' : 'Time remaining: $timeStr',
         notificationButtons: PomodoroBackgroundService._notificationButtons,
       );
       return;
     }
 
     FlutterForegroundTask.updateService(
-      notificationTitle: done ? 'Pomodoro concluído!' : (_isStopwatchMode ? 'Cronômetro pausado' : 'Pomodoro pausado'),
+      notificationTitle: done ? 'Pomodoro complete!' : (_isStopwatchMode ? 'Stopwatch paused' : 'Pomodoro paused'),
       notificationText: done
-          ? 'Hora de trocar de fase.'
-          : 'Retome quando estiver pronto.',
+          ? 'Time to switch phases.'
+          : 'Resume when ready.',
       notificationButtons: done
           ? const []
           : PomodoroBackgroundService._notificationButtons,
@@ -110,9 +110,9 @@ class PomodoroTaskHandler extends TaskHandler {
 
 class PomodoroBackgroundService {
   static const _notificationButtons = [
-    NotificationButton(id: 'pauseButton', text: 'Pausar/Retomar'),
-    NotificationButton(id: 'skipButton', text: 'Pular fase'),
-    NotificationButton(id: 'stopButton', text: 'Parar'),
+    NotificationButton(id: 'pauseButton', text: 'Pause/Resume'),
+    NotificationButton(id: 'skipButton', text: 'Skip phase'),
+    NotificationButton(id: 'stopButton', text: 'Stop'),
   ];
 
   static void init() {
@@ -176,7 +176,7 @@ class PomodoroBackgroundService {
     });
     FlutterForegroundTask.updateService(
       notificationTitle: 'Pomodoro Paused',
-      notificationText: 'Retome quando estiver pronto',
+      notificationText: 'Resume when ready',
       notificationButtons: _notificationButtons,
     );
   }

@@ -43,7 +43,7 @@ class OverdueSection extends ConsumerWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'Atrasados (${overdueItems.length})',
+                'Overdue (${overdueItems.length})',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -70,7 +70,7 @@ class OverdueSection extends ConsumerWidget {
                   context.go('/replanning');
                 },
                 child: Text(
-                  'Ver todos ($remainingCount mais)',
+                  'View all ($remainingCount more)',
                   style: TextStyle(
                     color: AppColors.error,
                     fontWeight: FontWeight.w600,

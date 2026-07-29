@@ -10,6 +10,8 @@ import '../../models/note_model.dart';
 import '../../models/organizer_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/template_model.dart';
+import '../../models/scheduler.dart';
+import '../../models/reminder_config.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/color_palette_provider.dart';
 import '../widgets/wiki_link_controller.dart';
@@ -22,7 +24,20 @@ class CreateGoalForm extends ConsumerStatefulWidget {
   final String? initialTitle;
   final Goal? existingGoal;
   final List<OrganizerReference>? initialOrganizers;
-  const CreateGoalForm({super.key, this.initialTitle, this.existingGoal, this.initialOrganizers});
+  final DateTime? initialDeadline;
+  final Scheduler? initialScheduler;
+  final List<ReminderConfig>? initialReminders;
+  final String? initialNotes;
+  const CreateGoalForm({
+    super.key,
+    this.initialTitle,
+    this.existingGoal,
+    this.initialOrganizers,
+    this.initialDeadline,
+    this.initialScheduler,
+    this.initialReminders,
+    this.initialNotes,
+  });
 
   @override
   ConsumerState<CreateGoalForm> createState() => _CreateGoalFormState();
@@ -52,6 +67,8 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
   GoalStatus _state = GoalStatus.active;
   List<KPI> _kpis = [];
   List<OrganizerReference> _organizers = [];
+  Scheduler? _scheduler;
+  List<ReminderConfig> _reminders = [];
 
   @override
   void initState() {
@@ -62,7 +79,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
     );
     _descController = WikiLinkTextController(
       context: context,
-      text: widget.existingGoal?.description ?? '',
+      text: widget.existingGoal?.description ?? widget.initialNotes ?? '',
     );
 
     if (widget.existingGoal != null) {
@@ -74,9 +91,22 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
       _state = goal.state;
       _kpis = List.from(goal.kpis);
       _organizers = List.from(goal.organizers);
+      if (goal.schedulers.isNotEmpty) {
+        _scheduler = goal.schedulers.first;
+      }
+      _reminders = List.from(goal.reminders);
     } else {
       if (widget.initialOrganizers != null) {
         _organizers = List.from(widget.initialOrganizers!);
+      }
+      if (widget.initialDeadline != null) {
+        _deadline = widget.initialDeadline;
+      }
+      if (widget.initialScheduler != null) {
+        _scheduler = widget.initialScheduler;
+      }
+      if (widget.initialReminders != null) {
+        _reminders = List.from(widget.initialReminders!);
       }
     }
   }

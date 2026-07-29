@@ -37,7 +37,7 @@ class OverdueSection extends ConsumerWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                'Atrasados (${items.length})',
+                'Overdue (${items.length})',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -62,8 +62,8 @@ class _OverdueCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final daysText = item.daysLate == 1
-        ? '1 dia atrasado'
-        : '${item.daysLate} dias atrasado';
+        ? '1 day overdue'
+        : '${item.daysLate} days overdue';
     final (icon, color) = switch (item.itemType) {
       'task' => (
           Icons.check_box_outline_blank_rounded,

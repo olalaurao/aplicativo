@@ -1527,21 +1527,27 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
 
   Widget _buildTaskStripItem(BuildContext context, Task task) {
     final isBlocked = task.isBlocked(ref.watch(allObjectsProvider).value ?? []);
+    final settings = ref.watch(settingsProvider);
+    final color = ObjectIcons.colorForTypeWithSignatures(
+      task.type,
+      settings.typeSignatures,
+    );
     return ObjectActionWrapper(
       object: task,
       child: InkWell(
         onTap: () {
           context.push('/detail/${task.id}', extra: task);
         },
+        onLongPress: () => _showItemActionSheet(context, task),
         borderRadius: BorderRadius.circular(AppBorderRadius.sm),
         child: Container(
           margin: const EdgeInsets.only(bottom: AppSpacing.sm),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
           decoration: BoxDecoration(
-            color: AppColors.secondary.withValues(alpha: 0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(AppBorderRadius.sm),
             border: Border.all(
-              color: AppColors.secondary.withValues(alpha: 0.3),
+              color: color.withValues(alpha: 0.3),
             ),
           ),
           child: Row(
@@ -1572,29 +1578,29 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                         onChanged: (_) => widget.onToggleComplete?.call(task),
                         visualDensity: VisualDensity.compact,
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        activeColor: AppColors.secondary,
+                        activeColor: color,
                       ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   task.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.secondary,
+                    color: color,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (task.stage == TaskStage.finalized)
-                const Padding(
-                  padding: EdgeInsets.only(left: 6),
+                Padding(
+                  padding: const EdgeInsets.only(left: 6),
                   child: Icon(
                     Icons.check_circle_rounded,
                     size: 14,
-                    color: AppColors.secondary,
+                    color: color,
                   ),
                 ),
             ],
@@ -1729,7 +1735,7 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
     } catch (_) {
       // Invalid color format
     }
-    return AppColors.secondary;
+    return AppColors.textMuted;
   }
 
   bool _isToday(DateTime date) {

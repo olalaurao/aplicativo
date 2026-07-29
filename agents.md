@@ -55,6 +55,19 @@ O snapshot diário canônico é construído por `DailyScheduleAggregator.buildFo
 - `filteredDailyScheduleProvider`: Aplica `DailyScheduleFilter` ao snapshot
 
 Todas as superfícies de "hoje" devem consumir `dailyScheduleProvider` (ou `filteredDailyScheduleProvider` para variantes filtradas). Nunca implemente lógica de agregação separada localmente.
+
+#### Superfícies de Overdue
+
+O sistema de overdue possui três componentes principais:
+
+1. **Embedded Overdue List** (`lib/ui/widgets/overdue_section.dart`): Widget usado em telas como Ideas, Projects, Goals e Organize para mostrar itens atrasados. Usa `OverdueItem` com propriedades `daysLate` e `itemType`.
+
+2. **Overdue Summary Card** (`lib/features/overdue/widgets/overdue_section.dart`): Card resumido usado no Home dashboard e menu More, mostrando top 5 itens atrasados com link "View all more".
+
+3. **Replanning Screen** (`lib/features/overdue/replanning/replanning_screen.dart`): Tela completa de replanning em lote acessível via More → Replanning e Home dashboard. Permite seleção múltipla e ações em lote (defer 1 day/week, mark as done, discard).
+
+**Importante**: Todo texto de UI em overdue surfaces deve estar em inglês. Não use strings em português.
+
 ---
 
 ## 2. STACK TECNOLÓGICA

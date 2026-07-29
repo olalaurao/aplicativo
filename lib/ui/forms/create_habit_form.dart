@@ -30,12 +30,18 @@ class CreateHabitForm extends ConsumerStatefulWidget {
   final Habit? existingHabit;
   final String? initialTimeBlock;
   final List<OrganizerReference>? initialOrganizers;
+  final Scheduler? initialScheduler;
+  final List<ReminderConfig>? initialReminders;
+  final String? initialNotes;
   const CreateHabitForm({
     super.key,
     this.initialTitle,
     this.existingHabit,
     this.initialTimeBlock,
     this.initialOrganizers,
+    this.initialScheduler,
+    this.initialReminders,
+    this.initialNotes,
   });
 
   @override
@@ -87,7 +93,7 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
     );
     _descController = WikiLinkTextController(
       context: context,
-      text: widget.existingHabit?.description ?? '',
+      text: widget.existingHabit?.description ?? widget.initialNotes ?? '',
     );
     _statementController = WikiLinkTextController(
       context: context,
@@ -153,6 +159,13 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
       _timeBlock = widget.initialTimeBlock;
       if (widget.initialOrganizers != null) {
         _organizers = List.from(widget.initialOrganizers!);
+      }
+      if (widget.initialScheduler != null) {
+        _schedulers = [widget.initialScheduler!];
+      }
+      if (widget.initialReminders != null) {
+        // Habits use reminders differently - they're stored on the habit object
+        // We'll need to handle this when saving
       }
     }
   }

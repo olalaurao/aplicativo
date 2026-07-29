@@ -122,6 +122,7 @@ class Task extends ContentObject {
   String? linkedGoogleEventUrl;
   int? pomodoroCount;
   String? timeBlock;
+  String? linkedItemId; // For pomodoro scheduling - stores real linked object id
   List<String> dependsOn = const [];
   TripleCheck? tripleCheck;
   String? linkedSystem;
@@ -198,6 +199,7 @@ class Task extends ContentObject {
     this.linkedGoogleEventUrl,
     this.pomodoroCount,
     this.timeBlock,
+    this.linkedItemId,
     this.dependsOn = const [],
     this.tripleCheck,
     this.linkedSystem,
@@ -350,6 +352,9 @@ class Task extends ContentObject {
     }
     if (timeBlock != null) {
       frontmatter['time_block'] = timeBlock;
+    }
+    if (linkedItemId != null) {
+      frontmatter['linked_item_id'] = linkedItemId;
     }
     if (dependsOn.isNotEmpty) {
       frontmatter['depends_on'] = dependsOn;
@@ -553,6 +558,7 @@ class Task extends ContentObject {
     task.timeBlock = frontmatter['time_block'] is List
         ? (frontmatter['time_block'] as List).join(', ')
         : frontmatter['time_block']?.toString();
+    task.linkedItemId = frontmatter['linked_item_id']?.toString();
     if (frontmatter['depends_on'] != null &&
         frontmatter['depends_on'] is List) {
       task.dependsOn = (frontmatter['depends_on'] as List)

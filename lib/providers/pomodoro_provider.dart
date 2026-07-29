@@ -10,9 +10,12 @@ import '../models/goal_model.dart';
 import '../models/project_model.dart';
 import '../models/kpi_model.dart';
 import '../models/shared_types.dart';
+import '../models/organizer_model.dart';
 import '../models/relay_step.dart';
 import '../services/notification_service.dart';
 import 'vault_provider.dart';
+import 'day_theme_provider.dart';
+import 'settings_provider.dart';
 import '../services/pomodoro_bg_service.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import '../services/markdown_parser.dart';
@@ -135,27 +138,45 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
         );
       }
     }
-    await _loadHistory();
+    
+    // One-time migration from pomodoro_history.md to vault objects
+    await _migrateHistoryFromBlob();
   }
 
-  Future<void> _loadHistory() async {
+  Future<void> _migrateHistoryFromBlob() async {
+    final settings = ref.read(settingsProvider);
+    final settingsNotifier = ref.read(settingsProvider.notifier);
+    final migrationApplied = settings.pomodoroHistoryV2Applied ?? false;
+    if (migrationApplied) return;
+
     final obsidianService = ref.read(obsidianServiceProvider);
-    final content = await obsidianService.readFile(
-      'sessions/pomodoro_history.md',
-    );
-    if (content == null) return;
+    final content = await obsidianService.readFile('sessions/pomodoro_history.md');
+    if (content == null) {
+      // Mark as applied even if file doesn't exist (nothing to migrate)
+      await settingsNotifier.setPomodoroHistoryV2Applied(true);
+      return;
+    }
+
     final fm = MarkdownParser.parseFrontmatter(content);
     final rawSessions = fm['sessions'] as List? ?? const [];
-    final history = rawSessions.whereType<Map>().map((raw) {
+    final allObjects = await ref.read(allObjectsProvider.future);
+    final existingSessionIds = allObjects.whereType<PomodoroSession>().map((s) => s.id).toSet();
+
+    int migratedCount = 0;
+    for (final raw in rawSessions.whereType<Map>()) {
       final map = Map<String, dynamic>.from(raw);
+      final sessionId = map['id']?.toString();
+      if (sessionId == null || existingSessionIds.contains(sessionId)) continue;
+
       final date = DateTime.tryParse(map['date']?.toString() ?? map['start_time']?.toString() ?? '') ?? DateTime.now();
       final blocksCompleted = (map['blocks_completed'] as num?)?.toInt() ?? (map['completed'] == true ? 1 : 0);
       final minutesWorked = (map['minutes_worked'] as num?)?.toInt() ?? ((map['duration_seconds'] as num?)?.toInt() ?? 0) ~/ 60;
       final minutesBreak = (map['minutes_break'] as num?)?.toInt() ?? 0;
       final stateStr = map['state']?.toString() ?? 'completed';
       final stateVal = PomodoroSessionState.values.firstWhere((s) => s.name == stateStr, orElse: () => PomodoroSessionState.completed);
-      return PomodoroSession(
-        id: map['id']?.toString(),
+
+      final session = PomodoroSession(
+        id: sessionId,
         taskTitle: map['task_title']?.toString() ?? map['title']?.toString() ?? 'Focus Session',
         date: date,
         linkedItemSlug: map['linked_item_slug'],
@@ -164,9 +185,18 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
         minutesBreak: minutesBreak,
         state: stateVal,
       );
-    }).toList()..sort((a, b) => b.date.compareTo(a.date));
-    state = state.copyWith(history: history);
-    _updateWeeklyWidget();
+
+      await ref.read(vaultProvider.notifier).createObject(session);
+      migratedCount++;
+    }
+
+    // Delete the blob file after successful migration
+    if (migratedCount > 0) {
+      await obsidianService.deleteFile('sessions/pomodoro_history.md');
+    }
+
+    // Mark migration as complete
+    await settingsNotifier.setPomodoroHistoryV2Applied(true);
   }
 
   Future<void> _persistState() async {
@@ -184,34 +214,6 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     };
     final content = generateMarkdown(fm, '# Pomodoro Current State');
     await obsidianService.writeFile('sessions/current.md', content);
-  }
-
-  Future<void> _persistHistory() async {
-    final obsidianService = ref.read(obsidianServiceProvider);
-    final frontmatter = {
-      'type': 'pomodoro_history',
-      'updated_at': DateTime.now().toIso8601String(),
-      'sessions': state.history
-          .take(200)
-          .map(
-            (session) => {
-              'id': session.id,
-              'task_title': session.title,
-              'date': session.date.toIso8601String(),
-              'linked_item_slug': session.linkedItemSlug,
-              'blocks_completed': session.blocksCompleted,
-              'minutes_worked': session.minutesWorked,
-              'minutes_break': session.minutesBreak,
-              'state': session.state.name,
-            },
-          )
-          .toList(),
-    };
-    final markdown = generateMarkdown(
-      frontmatter,
-      '# Pomodoro History\n\nPersisted pomodoro sessions for analytics and timeline.',
-    );
-    await obsidianService.writeFile('sessions/pomodoro_history.md', markdown);
   }
 
   void _initBackgroundListener() {
@@ -375,12 +377,12 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       PomodoroBackgroundService.start(state.remainingSeconds);
     }
 
+    // Local timer only for widget refresh cadence and reminders
+    // Actual countdown is handled by background service (single source of truth)
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (state.currentType == PomodoroType.stopwatch) {
-        // Stopwatch mode: count up
-        state = state.copyWith(elapsedSeconds: state.elapsedSeconds + 1);
-        
-        // 5-minute reminder vibration
+        // Stopwatch mode: 5-minute reminder vibration only
+        // elapsedSeconds is updated by background service callback
         if (state.elapsedSeconds % 300 == 0 && state.elapsedSeconds > 0) {
           _vibrateReminder();
           _sendReminderNotification();
@@ -399,33 +401,20 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
           _persistState();
         }
       } else {
-        // Countdown mode
-        if (state.remainingSeconds > 0) {
-          state = state.copyWith(remainingSeconds: state.remainingSeconds - 1);
-
-          // Update widget every 10 seconds or when starting
-          if (state.remainingSeconds % 10 == 0 ||
-              state.remainingSeconds == state.totalSeconds - 1) {
-            final minutes = state.remainingSeconds ~/ 60;
-            final seconds = state.remainingSeconds % 60;
-            final timeStr =
-                '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-            WidgetService.updatePomodoro(
-              state.currentItemTitle ?? 'Session de Focus',
-              timeStr,
-            );
-            _updateWeeklyWidget();
-            _persistState();
-          }
-        } else {
-          stop();
-          _completeSession();
-          _notifyPhaseEnd();
-          
-          // RA-P1-4: Auto-advance relay step if in relay mode
-          if (state.isRelayMode) {
-            _advanceRelayStep();
-          }
+        // Countdown mode: remainingSeconds is updated by background service callback
+        // Update widget every 10 seconds or when starting
+        if (state.remainingSeconds % 10 == 0 ||
+            state.remainingSeconds == state.totalSeconds - 1) {
+          final minutes = state.remainingSeconds ~/ 60;
+          final seconds = state.remainingSeconds % 60;
+          final timeStr =
+              '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+          WidgetService.updatePomodoro(
+            state.currentItemTitle ?? 'Focus Session',
+            timeStr,
+          );
+          _updateWeeklyWidget();
+          _persistState();
         }
       }
     });
@@ -439,12 +428,12 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
 
     switch (state.currentType) {
       case PomodoroType.work:
-        title = 'Trabalho Completed';
+        title = 'Work Completed';
         body = 'Time to rest a little.';
         break;
       case PomodoroType.shortBreak:
       case PomodoroType.longBreak:
-        title = 'Pausa Completed';
+        title = 'Break Completed';
         body = 'Ready to focus again?';
         break;
       case PomodoroType.custom:
@@ -452,7 +441,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
         body = 'Your custom timer is done.';
         break;
       case PomodoroType.stopwatch:
-        title = 'Cronômetro Stopped';
+        title = 'Stopwatch Stopped';
         body = 'Stopwatch session completed.';
         break;
     }
@@ -481,8 +470,8 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     final minutes = state.elapsedSeconds ~/ 60;
     NotificationService().showImmediateNotification(
       id: 101,
-      title: 'Foco contínuo',
-      body: 'Você está focado em "${state.currentItemTitle ?? "esta tarefa"}" há $minutes minutos',
+      title: 'Continuous focus',
+      body: 'You have been focused on "${state.currentItemTitle ?? "this task"}" for $minutes minutes',
     );
   }
 
@@ -555,19 +544,39 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
         ? state.elapsedSeconds
         : state.totalSeconds - state.remainingSeconds;
     final elapsedMinutes = elapsedSeconds ~/ 60;
+    final sessionStart = now.subtract(Duration(seconds: elapsedSeconds));
+
+    // Resolve active TimeBlock at session start time
+    String? activeTimeBlockId;
+    final timeBlocks = ref.read(timeBlocksProvider);
+    for (final block in timeBlocks) {
+      if (block.organizerType != OrganizerType.timeBlock) continue;
+      for (final range in block.timeRanges) {
+        final start = DateTime(sessionStart.year, sessionStart.month, sessionStart.day, range.startHour, range.startMinute);
+        var end = DateTime(sessionStart.year, sessionStart.month, sessionStart.day, range.endHour, range.endMinute);
+        if (end.isBefore(start) || end.isAtSameMomentAs(start)) {
+          end = end.add(const Duration(days: 1)); // midnight spanning
+        }
+        if (sessionStart.isAfter(start) && sessionStart.isBefore(end)) {
+          activeTimeBlockId = block.id;
+          break;
+        }
+      }
+      if (activeTimeBlockId != null) break;
+    }
 
     final session = PomodoroSession(
       id: now.millisecondsSinceEpoch.toString(),
-      taskTitle: state.currentItemTitle ?? 'Focus em projeto',
-      date: now.subtract(Duration(seconds: elapsedSeconds)),
+      taskTitle: state.currentItemTitle ?? 'Focus Session',
+      date: sessionStart,
       linkedItemSlug: state.currentItemId,
+      timeBlockId: activeTimeBlockId,
       blocksCompleted: state.currentType == PomodoroType.work && state.remainingSeconds == 0 ? 1 : 0,
       minutesWorked: (state.currentType == PomodoroType.work || state.currentType == PomodoroType.stopwatch) ? elapsedMinutes : 0,
       minutesBreak: state.currentType != PomodoroType.work && state.currentType != PomodoroType.stopwatch ? elapsedMinutes : 0,
       state: state.remainingSeconds == 0 || state.currentType == PomodoroType.stopwatch ? PomodoroSessionState.completed : PomodoroSessionState.cancelled,
     );
     state = state.copyWith(history: [session, ...state.history]);
-    await _persistHistory();
     _updateWeeklyWidget();
 
     // Save to Vault (Standalone + Daily Note projection)
@@ -637,19 +646,45 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
   }) async {
     // Add pomodoros to vault
 
+    // Build relay steps: N work steps of 25min, interleaved with breaks
+    // Short breaks (5min) between work steps, long break (15min) after every 4 work steps
+    final relaySteps = <RelayStep>[];
+    for (int i = 0; i < count; i++) {
+      // Work step
+      relaySteps.add(RelayStep(
+        label: 'Work ${i + 1}',
+        durationMinutes: 25,
+        isBreak: false,
+      ));
+      
+      // Add break after work step (except after last work step)
+      if (i < count - 1) {
+        final isLongBreak = (i + 1) % 4 == 0;
+        relaySteps.add(RelayStep(
+          label: isLongBreak ? 'Long Break' : 'Short Break',
+          durationMinutes: isLongBreak ? 15 : 5,
+          isBreak: true,
+        ));
+      }
+    }
+
     // Create a unified Pomodoro Block session for the planner
     // 25m work + 5m break (except last break)
     final totalDuration = (count * 25) + ((count - 1) * 5);
 
     final pomodoroBlock = Task(
       id: 'pomo_${DateTime.now().millisecondsSinceEpoch}',
-      title: 'Bloco Pomodoro: ${taskTitle ?? "Focus"}',
+      title: 'Pomodoro Block: ${taskTitle ?? "Focus"}',
       endDate: startTime,
       duration: totalDuration,
       stage: TaskStage.todo,
       scheduledTime: DateFormat('HH:mm').format(startTime),
       color: AppColors.error.toARGB32().toRadixString(16),
       pomodoroCount: count,
+      // Store real linked object id directly for proper attribution
+      linkedItemId: taskId,
+      // Store relay steps for execution
+      relaySteps: relaySteps,
       organizers: taskId != null
           ? [
               OrganizerReference(
@@ -687,7 +722,6 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     );
     
     state = state.copyWith(history: [session, ...state.history]);
-    await _persistHistory();
     await ref.read(vaultProvider.notifier).createObject(session);
     await _saveToDailyNote(session);
     await _updateLinkedObjectMetrics(session);
@@ -740,9 +774,9 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
             )
             .join('\n');
     WidgetService.updatePomodoroWeekly(
-      '${totalHours.toStringAsFixed(0)}h esta semana',
+      '${totalHours.toStringAsFixed(0)}h this week',
       dayHours,
-      details.isEmpty ? 'Sem sessões registradas' : details,
+      details.isEmpty ? 'No sessions logged yet' : details,
       null,
     );
   }

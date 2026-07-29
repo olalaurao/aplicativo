@@ -68,6 +68,7 @@ class AppSettings {
   final bool nlpTaskParsingEnabled;
   final bool showOverdueSection;
   final bool syncStateResetV1Applied;
+  final bool pomodoroHistoryV2Applied;
   final String dailyNoteIdentifier;
   final String dailyNoteDateFormat;
   final String dailyNoteFolder;
@@ -148,6 +149,7 @@ class AppSettings {
     this.nlpTaskParsingEnabled = true,
     this.showOverdueSection = true,
     this.syncStateResetV1Applied = false,
+    this.pomodoroHistoryV2Applied = false,
     this.dailyNoteIdentifier = 'filename_format',
     this.dailyNoteDateFormat = 'yyyy-MM-dd',
     this.dailyNoteFolder = 'daily',
@@ -249,6 +251,7 @@ class AppSettings {
     bool? nlpTaskParsingEnabled,
     bool? showOverdueSection,
     bool? syncStateResetV1Applied,
+    bool? pomodoroHistoryV2Applied,
     String? dailyNoteIdentifier,
     String? dailyNoteDateFormat,
     String? dailyNoteFolder,
@@ -323,6 +326,7 @@ class AppSettings {
           nlpTaskParsingEnabled ?? this.nlpTaskParsingEnabled,
       showOverdueSection: showOverdueSection ?? this.showOverdueSection,
       syncStateResetV1Applied: syncStateResetV1Applied ?? this.syncStateResetV1Applied,
+      pomodoroHistoryV2Applied: pomodoroHistoryV2Applied ?? this.pomodoroHistoryV2Applied,
       dailyNoteIdentifier: dailyNoteIdentifier ?? this.dailyNoteIdentifier,
       dailyNoteDateFormat: dailyNoteDateFormat ?? this.dailyNoteDateFormat,
       dailyNoteFolder: dailyNoteFolder ?? this.dailyNoteFolder,
@@ -452,6 +456,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       nlpTaskParsingEnabled: prefs.getBool('nlpTaskParsingEnabled') ?? true,
       showOverdueSection: prefs.getBool('showOverdueSection') ?? true,
       syncStateResetV1Applied: prefs.getBool('syncStateResetV1Applied') ?? false,
+      pomodoroHistoryV2Applied: prefs.getBool('pomodoroHistoryV2Applied') ?? false,
       dailyNoteIdentifier:
           prefs.getString('dailyNoteIdentifier') ?? 'filename_format',
       dailyNoteDateFormat:
@@ -1201,6 +1206,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> updateLastSuccessfulSyncTime(DateTime time) async {
     await _prefs.setString('lastSuccessfulSyncTime', time.toIso8601String());
     state = state.copyWith(lastSuccessfulSyncTime: time);
+  }
+
+  // ── Pomodoro history migration ──
+  Future<void> setPomodoroHistoryV2Applied(bool applied) async {
+    await _prefs.setBool('pomodoroHistoryV2Applied', applied);
+    state = state.copyWith(pomodoroHistoryV2Applied: applied);
   }
 
   Future<void> setIdeaStrategy({

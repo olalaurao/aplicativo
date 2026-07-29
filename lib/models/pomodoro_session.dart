@@ -11,6 +11,7 @@ class PomodoroSession extends ContentObject {
   /// Used for retroactive logging (F2.18) where the session is entered after the fact.
   /// Defaults to [date] when not set.
   DateTime? occurredAt;
+  String? timeBlockId; // Links session to active TimeBlock at start time
   int workDuration;
   int shortBreakDuration;
   int longBreakDuration;
@@ -27,6 +28,7 @@ class PomodoroSession extends ContentObject {
     required this.date,
     this.occurredAt,
     this.linkedItemSlug,
+    this.timeBlockId,
     this.workDuration = 25,
     this.shortBreakDuration = 5,
     this.longBreakDuration = 20,
@@ -54,6 +56,9 @@ class PomodoroSession extends ContentObject {
     if (linkedItemSlug != null) {
       frontmatter['linked_item_slug'] = linkedItemSlug;
     }
+    if (timeBlockId != null) {
+      frontmatter['time_block_id'] = timeBlockId;
+    }
     frontmatter['work_duration'] = workDuration;
     frontmatter['short_break_duration'] = shortBreakDuration;
     frontmatter['long_break_duration'] = longBreakDuration;
@@ -78,6 +83,7 @@ class PomodoroSession extends ContentObject {
       date: DateTime.tryParse(frontmatter['date']?.toString() ?? '') ?? DateTime.now(),
       occurredAt: DateTime.tryParse(frontmatter['occurred_at']?.toString() ?? ''),
       linkedItemSlug: frontmatter['linked_item_slug']?.toString(),
+      timeBlockId: frontmatter['time_block_id']?.toString(),
       workDuration: (frontmatter['work_duration'] as num? ?? 25).toInt(),
       shortBreakDuration: (frontmatter['short_break_duration'] as num? ?? 5).toInt(),
       longBreakDuration: (frontmatter['long_break_duration'] as num? ?? 20).toInt(),

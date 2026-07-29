@@ -82,6 +82,7 @@ import 'ui/screens/organizer_detail_screen.dart';
 import 'ui/screens/overdue_detail_screen.dart';
 import 'ui/screens/tasks_screen.dart';
 import 'ui/screens/values_screen.dart';
+import 'models/organizer_model.dart';
 import 'ui/screens/routines_screen.dart';
 import 'ui/screens/systems_screen.dart';
 import 'ui/screens/areas_screen.dart';
@@ -1042,21 +1043,33 @@ void _openQuickAddEditor(Uri uri) {
     'habit' => '/create/habit',
     'goal' => '/create/goal',
     'reminder' => '/create/reminder',
+    'timeblock' => '/create/organizer',
+    'project' => '/create/organizer',
+    'note' => '/create/note',
+    'idea' => '/create/idea',
+    'entry' => '/create/entry',
     _ => '/create/task',
   };
 
   WidgetsBinding.instance.addPostFrameCallback((_) {
     final context = _rootNavigatorKey.currentContext;
     if (context == null) return;
-    context.push(
-      route,
-      extra: {
-        if (title != null && title.isNotEmpty) 'initialTitle': title,
-        if (dueDate != null) 'initialDate': dueDate,
-        if (priority != TaskPriority.none) 'initialPriority': priority,
-        if (notes != null && notes.trim().isNotEmpty) 'initialNotes': notes,
-      },
-    );
+    
+    final extra = <String, dynamic>{
+      if (title != null && title.isNotEmpty) 'initialTitle': title,
+      if (dueDate != null) 'initialDate': dueDate,
+      if (priority != TaskPriority.none) 'initialPriority': priority,
+      if (notes != null && notes.trim().isNotEmpty) 'initialNotes': notes,
+    };
+    
+    // Add organizer type for timeblock and project
+    if (objectType == 'timeblock') {
+      extra['initialType'] = OrganizerType.timeBlock;
+    } else if (objectType == 'project') {
+      extra['initialType'] = OrganizerType.project;
+    }
+    
+    context.push(route, extra: extra);
   });
 }
 
@@ -1336,20 +1349,33 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/detail/:id',
             builder: (context, state) {
-              final extra = state.extra as Map<String, dynamic>?;
-              // If object is passed directly, skip the resolver lookup
-              final directObject = extra?['object'] as ContentObject?;
+              // Handle both cases: direct ContentObject or Map<String, dynamic>
+              ContentObject? directObject;
+              String? searchQuery;
+              String? searchSnippet;
+              
+              if (state.extra is ContentObject) {
+                // Object passed directly
+                directObject = state.extra as ContentObject;
+              } else if (state.extra is Map<String, dynamic>) {
+                // Object passed in a map
+                final extra = state.extra as Map<String, dynamic>;
+                directObject = extra['object'] as ContentObject?;
+                searchQuery = extra['searchQuery'] as String?;
+                searchSnippet = extra['searchSnippet'] as String?;
+              }
+              
               if (directObject != null) {
                 return UniversalDetailView(
                   object: directObject,
-                  searchQuery: extra?['searchQuery'] as String?,
-                  searchSnippet: extra?['searchSnippet'] as String?,
+                  searchQuery: searchQuery,
+                  searchSnippet: searchSnippet,
                 );
               }
               return _ObjectDetailResolver(
                 id: state.pathParameters['id']!,
-                searchQuery: extra?['searchQuery'] as String?,
-                searchSnippet: extra?['searchSnippet'] as String?,
+                searchQuery: searchQuery,
+                searchSnippet: searchSnippet,
               );
             },
           ),

@@ -19,6 +19,7 @@ import '../forms/create_habit_form.dart';
 import '../forms/create_task_form.dart';
 import '../theme.dart';
 import '../widgets/create_menu_sheet.dart';
+import '../widgets/capture_bubble_fab.dart';
 import '../widgets/steering_sheet.dart';
 import '../widgets/dashboard/today_timeline_component.dart';
 import '../widgets/dashboard/today_completables_component.dart';
@@ -30,11 +31,6 @@ import '../widgets/dashboard/goals_projects_overview_component.dart';
 import '../widgets/dashboard/dashboard_component_config_sheet.dart';
 import '../widgets/dashboard/pinned_object_component.dart';
 import '../widgets/dashboard/tracker_analysis_component.dart';
-import '../forms/create_habit_form.dart';
-import '../forms/create_task_form.dart';
-import '../theme.dart';
-import '../widgets/create_menu_sheet.dart';
-import '../widgets/steering_sheet.dart';
 import '../../features/overdue/widgets/overdue_section.dart';
 
 final _quickAddSubmittingProvider = StateProvider<bool>((ref) => false);
@@ -263,11 +259,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             tooltip: _editMode ? 'Done editing' : 'Edit dashboard',
             onPressed: () => setState(() => _editMode = !_editMode),
           ),
-          IconButton(
-            onPressed: () => showCreateMenu(context),
-            icon: const Icon(Icons.add_rounded),
-            tooltip: 'Create',
-          ),
         ],
       ),
       body: SafeArea(
@@ -398,6 +389,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             error: (err, stack) => Center(child: Text('Error: $err')),
           ),
         ),
+      ),
+      floatingActionButton: CaptureBubbleFab(
+        tooltip: 'Quick add',
+        onPressed: () => showCreateMenu(context),
       ),
     );
   }

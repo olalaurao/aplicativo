@@ -448,7 +448,19 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
   void _openFullEditor(BuildContext ctx) {
     final title = _titleController.text.trim();
     if (widget._isSheet) Navigator.pop(ctx);
-    ctx.push(_selectedType.createRoute, extra: {'initialTitle': title});
+    
+    final extra = <String, dynamic>{
+      'initialTitle': title,
+      if (_effectiveDate != null) 'initialDate': _effectiveDate,
+      if (_effectiveTime != null) 'initialTime': _effectiveTime,
+      if (_effectivePriority != null) 'initialPriority': _effectivePriority,
+      if (_selectedScheduler != null) 'initialScheduler': _selectedScheduler,
+      if (_extraReminders.isNotEmpty) 'initialReminders': List.from(_extraReminders),
+      if (_extraOrganizers.isNotEmpty) 'initialOrganizers': List.from(_extraOrganizers),
+      if (_extraNotes.trim().isNotEmpty) 'initialNotes': _extraNotes.trim(),
+    };
+    
+    ctx.push(_selectedType.createRoute, extra: extra);
   }
 
   void _openMoreOptions(BuildContext ctx) {
@@ -593,7 +605,7 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
             ),
             const SizedBox(width: 8),
             // Full editor button (only in sheet mode)
-            if (widget._isSheet && _selectedType == QuickCaptureType.task)
+            if (widget._isSheet)
               IconButton(
                 icon: Icon(
                   Icons.open_in_full_rounded,

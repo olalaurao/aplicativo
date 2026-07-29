@@ -7,6 +7,9 @@ import '../../models/event_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/task_model.dart';
 import '../../models/template_model.dart';
+import '../../models/scheduler.dart';
+import '../../models/reminder_config.dart';
+import '../../models/organizer_model.dart';
 import '../../providers/google_calendar_provider.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/google_auth_service.dart' as auth;
@@ -16,8 +19,24 @@ import '../widgets/date_picker_field.dart';
 class CreateEventForm extends ConsumerStatefulWidget {
   final Task? existingEvent;
   final String? initialTitle;
+  final DateTime? initialDate;
+  final TimeOfDay? initialTime;
+  final Scheduler? initialScheduler;
+  final List<ReminderConfig>? initialReminders;
+  final List<OrganizerReference>? initialOrganizers;
+  final String? initialNotes;
 
-  const CreateEventForm({super.key, this.existingEvent, this.initialTitle});
+  const CreateEventForm({
+    super.key,
+    this.existingEvent,
+    this.initialTitle,
+    this.initialDate,
+    this.initialTime,
+    this.initialScheduler,
+    this.initialReminders,
+    this.initialOrganizers,
+    this.initialNotes,
+  });
 
   @override
   ConsumerState<CreateEventForm> createState() => _CreateEventFormState();
@@ -35,6 +54,9 @@ class _CreateEventFormState extends ConsumerState<CreateEventForm> {
   );
   final Set<String> _selectedPersonIds = {};
   bool _saving = false;
+  Scheduler? _scheduler;
+  List<ReminderConfig> _reminders = [];
+  List<OrganizerReference> _organizers = [];
 
   @override
   void initState() {
@@ -45,9 +67,13 @@ class _CreateEventFormState extends ConsumerState<CreateEventForm> {
     );
     _locationController = TextEditingController();
     _descriptionController = TextEditingController(
-      text: event?.notes.join('\n') ?? '',
+      text: event?.notes.join('\n') ?? widget.initialNotes ?? '',
     );
-    if (event?.startDate != null) _date = event!.startDate!;
+    if (event?.startDate != null) {
+      _date = event!.startDate!;
+    } else if (widget.initialDate != null) {
+      _date = widget.initialDate!;
+    }
     if (event?.scheduledTime != null) {
       final parts = event!.scheduledTime!.split(':');
       _startTime = TimeOfDay(
@@ -62,11 +88,34 @@ class _CreateEventFormState extends ConsumerState<CreateEventForm> {
         _startTime.minute,
       ).add(Duration(minutes: event.duration));
       _endTime = TimeOfDay(hour: end.hour, minute: end.minute);
+    } else if (widget.initialTime != null) {
+      _startTime = widget.initialTime!;
+      final end = DateTime(
+        _date.year,
+        _date.month,
+        _date.day,
+        _startTime.hour,
+        _startTime.minute,
+      ).add(const Duration(minutes: 60));
+      _endTime = TimeOfDay(hour: end.hour, minute: end.minute);
     }
     if (event != null) {
       _selectedPersonIds.addAll(
         event.participants.map((participant) => participant.slug),
       );
+      _scheduler = event.scheduler;
+      _reminders = List.from(event.reminders);
+      _organizers = List.from(event.organizers);
+    } else {
+      if (widget.initialScheduler != null) {
+        _scheduler = widget.initialScheduler;
+      }
+      if (widget.initialReminders != null) {
+        _reminders = List.from(widget.initialReminders!);
+      }
+      if (widget.initialOrganizers != null) {
+        _organizers = List.from(widget.initialOrganizers!);
+      }
     }
   }
 

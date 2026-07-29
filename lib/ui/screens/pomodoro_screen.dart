@@ -132,7 +132,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                           child: Column(
                             children: [
                               Text(
-                                state.currentItemTitle ?? 'Selecionar objeto',
+                                state.currentItemTitle ?? 'Select object',
                                 style: const TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.w800,
@@ -144,7 +144,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                               ),
                               const SizedBox(height: 4),
                               const Text(
-                                'Toque para mudar',
+                                'Tap to change',
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: AppColors.textMuted,
@@ -253,7 +253,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                               _actionButton(
                                 onPressed: state.isRunning ? notifier.pause : notifier.start,
                                 icon: state.isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                label: state.isRunning ? 'Pausar' : 'Iniciar',
+                                label: state.isRunning ? 'Pause' : 'Start',
                                 color: AppColors.info,
                                 isPrimary: true,
                               ),
@@ -273,7 +273,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                                 icon: state.isRunning
                                     ? Icons.pause_rounded
                                     : Icons.play_arrow_rounded,
-                                label: state.isRunning ? 'Pausar' : 'Focar',
+                                label: state.isRunning ? 'Pause' : 'Focus',
                                 color: AppColors.error,
                                 isPrimary: true,
                               ),
@@ -281,7 +281,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                                 _actionButton(
                                   onPressed: () => _showStopDialog(context, ref),
                                   icon: Icons.stop_rounded,
-                                  label: 'Parar',
+                                  label: 'Stop',
                                   color: AppColors.textMuted,
                                   isPrimary: false,
                                 )
@@ -289,7 +289,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                                 _actionButton(
                                   onPressed: () => _handleSkip(context, ref),
                                   icon: Icons.skip_next_rounded,
-                                  label: 'Pular',
+                                  label: 'Skip',
                                   color: AppColors.textMuted,
                                   isPrimary: false,
                                 ),
@@ -395,7 +395,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Programar Pomodoro',
+            'Schedule Pomodoro',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -495,7 +495,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      _linkedObjectTitle ?? 'Vincular a um objeto (opcional)',
+                      _linkedObjectTitle ?? 'Link to an object (optional)',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -539,7 +539,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                 ),
               ),
               child: const Text(
-                'Agendar Pomodoro',
+                'Schedule Pomodoro',
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
@@ -651,7 +651,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Agendado: $_sessionCount pomodoros para ${DateFormat('dd/MM HH:mm').format(startTime)}',
+          'Scheduled: $_sessionCount pomodoros for ${DateFormat('dd/MM HH:mm').format(startTime)}',
         ),
       ),
     );
@@ -679,8 +679,8 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
         runSpacing: 8,
         children: [
           _summaryChip('🍅', '$count', 'pomodoros'),
-          _summaryChip('☕', '$shortBreaks', 'pausas curtas'),
-          _summaryChip('🛋', '$longBreaks', 'pausa longa'),
+          _summaryChip('☕', '$shortBreaks', 'short breaks'),
+          _summaryChip('🛋', '$longBreaks', 'long break'),
           _summaryChip('⏱', durationStr, 'total'),
         ],
       ),
@@ -746,7 +746,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Pomodoros Agendados',
+            'Scheduled Pomodoros',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -804,14 +804,30 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                         iconSize: 28,
                         padding: EdgeInsets.zero,
                         onPressed: () {
-                          ref.read(pomodoroProvider.notifier).setCurrentItem(
-                            s.id,
-                            s.title,
-                          );
-                          ref.read(pomodoroProvider.notifier).start();
+                          // Resolve real linked object id from linkedItemId field or organizers
+                          final realLinkedId = s.linkedItemId ?? 
+                              (s.organizers.isNotEmpty ? s.organizers.first.slug : null);
+                          final realLinkedTitle = realLinkedId != null && s.organizers.isNotEmpty
+                              ? s.organizers.first.title
+                              : s.title;
+                          
+                          // Use relay mode if relay steps are available
+                          if (s.relaySteps != null && s.relaySteps!.isNotEmpty) {
+                            ref.read(pomodoroProvider.notifier).startRelayMode(
+                              s.relaySteps!,
+                              realLinkedId ?? s.id,
+                              realLinkedTitle,
+                            );
+                          } else {
+                            ref.read(pomodoroProvider.notifier).setCurrentItem(
+                              realLinkedId ?? s.id,
+                              realLinkedTitle,
+                            );
+                            ref.read(pomodoroProvider.notifier).start();
+                          }
                           context.go('/pomodoro');
                         },
-                        tooltip: 'Iniciar agora',
+                        tooltip: 'Start now',
                       ),
                     ],
                   ),
@@ -845,7 +861,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
 
           if (history.isEmpty)
             const Text(
-              'Focus em projeto',
+              'Focus Session',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,

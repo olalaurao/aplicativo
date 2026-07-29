@@ -39,6 +39,8 @@ class CreateTaskForm extends ConsumerStatefulWidget {
   final String? initialNotes;
   final String? initialRotationGroupId;
   final RotationFrequencyType? initialRotationFrequencyType;
+  final Scheduler? initialScheduler;
+  final List<ReminderConfig>? initialReminders;
   const CreateTaskForm({
     super.key,
     this.initialTitle,
@@ -52,6 +54,8 @@ class CreateTaskForm extends ConsumerStatefulWidget {
     this.initialNotes,
     this.initialRotationGroupId,
     this.initialRotationFrequencyType,
+    this.initialScheduler,
+    this.initialReminders,
   });
 
   @override
@@ -186,6 +190,12 @@ class _CreateTaskFormState extends ConsumerState<CreateTaskForm> {
         _rotationFrequencyType =
             widget.initialRotationFrequencyType ??
             RotationFrequencyType.oncePerPeriod;
+      }
+      if (widget.initialScheduler != null) {
+        _scheduler = widget.initialScheduler;
+      }
+      if (widget.initialReminders != null) {
+        _customReminders = List.from(widget.initialReminders!);
       }
     }
   }

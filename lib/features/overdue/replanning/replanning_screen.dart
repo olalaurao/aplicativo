@@ -22,7 +22,7 @@ class _ReplanningScreenState extends ConsumerState<ReplanningScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Replanejar Atrasados'),
+        title: const Text('Replan Overdue Items'),
         backgroundColor: AppColors.error.withValues(alpha: 0.1),
         elevation: 0,
         actions: [
@@ -30,7 +30,7 @@ class _ReplanningScreenState extends ConsumerState<ReplanningScreen> {
             TextButton.icon(
               onPressed: () => _showBatchActions(context, ref),
               icon: const Icon(Icons.check_circle),
-              label: const Text('Aplicar a todos'),
+              label: const Text('Apply to all'),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.error,
               ),
@@ -55,7 +55,7 @@ class _ReplanningScreenState extends ConsumerState<ReplanningScreen> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Tudo em dia!',
+            'All caught up!',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -63,7 +63,7 @@ class _ReplanningScreenState extends ConsumerState<ReplanningScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Não há itens atrasados.',
+            'No overdue items.',
             style: TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
@@ -117,7 +117,7 @@ class _ReplanningScreenState extends ConsumerState<ReplanningScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Aplicar a ${selectedItems.length} itens',
+              'Apply to ${selectedItems.length} items',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -126,7 +126,7 @@ class _ReplanningScreenState extends ConsumerState<ReplanningScreen> {
             const SizedBox(height: 16),
             _BatchActionButton(
               icon: Icons.add_circle_outline,
-              label: 'Adiar 1 dia',
+              label: 'Defer 1 day',
               color: AppColors.info,
               onTap: () {
                 ReplanningActions.executeBatchAction(
@@ -142,7 +142,7 @@ class _ReplanningScreenState extends ConsumerState<ReplanningScreen> {
             const SizedBox(height: 8),
             _BatchActionButton(
               icon: Icons.calendar_today,
-              label: 'Adiar 1 semana',
+              label: 'Defer 1 week',
               color: AppColors.info,
               onTap: () {
                 ReplanningActions.executeBatchAction(
@@ -158,7 +158,7 @@ class _ReplanningScreenState extends ConsumerState<ReplanningScreen> {
             const SizedBox(height: 8),
             _BatchActionButton(
               icon: Icons.check_circle,
-              label: 'Marcar como concluído',
+              label: 'Mark as done',
               color: AppColors.success,
               onTap: () {
                 ReplanningActions.executeBatchAction(
@@ -174,7 +174,7 @@ class _ReplanningScreenState extends ConsumerState<ReplanningScreen> {
             const SizedBox(height: 8),
             _BatchActionButton(
               icon: Icons.delete_outline,
-              label: 'Descartar',
+              label: 'Discard',
               color: AppColors.error,
               onTap: () {
                 ReplanningActions.executeBatchAction(
@@ -273,7 +273,7 @@ class _OverdueItemCard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
-                                '${item.daysLate} dias atrasado',
+                                '${item.daysLate} days overdue',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: color,
@@ -303,7 +303,7 @@ class _OverdueItemCard extends StatelessWidget {
                 Expanded(
                   child: _ActionButton(
                     icon: Icons.add_circle_outline,
-                    label: '+1 dia',
+                    label: '+1 day',
                     onTap: () => onAction(ReplanningAction.deferOneDay),
                   ),
                 ),
@@ -311,7 +311,7 @@ class _OverdueItemCard extends StatelessWidget {
                 Expanded(
                   child: _ActionButton(
                     icon: Icons.calendar_today,
-                    label: '+1 sem',
+                    label: '+1 wk',
                     onTap: () => onAction(ReplanningAction.deferOneWeek),
                   ),
                 ),
@@ -319,7 +319,7 @@ class _OverdueItemCard extends StatelessWidget {
                 Expanded(
                   child: _ActionButton(
                     icon: Icons.check_circle,
-                    label: 'Concluir',
+                    label: 'Complete',
                     onTap: () => onAction(ReplanningAction.complete),
                   ),
                 ),
@@ -327,7 +327,7 @@ class _OverdueItemCard extends StatelessWidget {
                 Expanded(
                   child: _ActionButton(
                     icon: Icons.delete_outline,
-                    label: 'Descartar',
+                    label: 'Discard',
                     onTap: () => onAction(ReplanningAction.discard),
                   ),
                 ),

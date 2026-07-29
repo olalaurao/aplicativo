@@ -84,6 +84,7 @@ class DayDialAggregator {
     for (final task in tasks) {
       if (task.scheduledTime == null) continue;
       if (task.stage == TaskStage.finalized) continue;
+      if (task.isRotationTask) continue; // Exclude rotation tasks - they appear as part of rotation zones
 
       final start = _parseScheduledTime(task.scheduledTime!, date);
       if (start == null) continue;

@@ -14,7 +14,25 @@ import 'create_routine_form.dart';
 class CreateOrganizerForm extends ConsumerStatefulWidget {
   final OrganizerType? initialType;
   final Organizer? organizer;
-  const CreateOrganizerForm({super.key, this.initialType, this.organizer});
+  final String? initialTitle;
+  final DateTime? initialDate;
+  final TimeOfDay? initialTime;
+  final Scheduler? initialScheduler;
+  final List<ReminderConfig>? initialReminders;
+  final List<OrganizerReference>? initialOrganizers;
+  final String? initialNotes;
+  const CreateOrganizerForm({
+    super.key,
+    this.initialType,
+    this.organizer,
+    this.initialTitle,
+    this.initialDate,
+    this.initialTime,
+    this.initialScheduler,
+    this.initialReminders,
+    this.initialOrganizers,
+    this.initialNotes,
+  });
 
   @override
   ConsumerState<CreateOrganizerForm> createState() =>
@@ -51,6 +69,39 @@ class _CreateOrganizerFormState extends ConsumerState<CreateOrganizerForm> {
       _energyLevel = organizer.energyLevel;
       _scheduler = organizer.scheduler;
       _reminders = List.from(organizer.reminders);
+    } else {
+      if (widget.initialTitle != null) {
+        _titleController.text = widget.initialTitle!;
+      }
+      if (widget.initialNotes != null) {
+        _statementController.text = widget.initialNotes!;
+      }
+      if (widget.initialOrganizers != null) {
+        _organizers = List.from(widget.initialOrganizers!);
+      }
+      if (widget.initialDate != null && widget.initialTime != null) {
+        // For timeBlock: create a time range from date and time
+        final startHour = widget.initialTime!.hour;
+        final startMinute = widget.initialTime!.minute;
+        final endMinutes = (startHour * 60) + startMinute + 60;
+        final endHour = (endMinutes ~/ 60).clamp(0, 23);
+        final endMinute = endMinutes % 60;
+        _timeRanges = [
+          TimeRange(
+            startHour: startHour,
+            startMinute: startMinute,
+            endHour: endHour,
+            endMinute: endMinute,
+          )
+        ];
+        _daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; // Default to all days
+      }
+      if (widget.initialScheduler != null) {
+        _scheduler = widget.initialScheduler;
+      }
+      if (widget.initialReminders != null) {
+        _reminders = List.from(widget.initialReminders!);
+      }
     }
   }
 

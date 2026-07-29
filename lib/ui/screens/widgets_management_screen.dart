@@ -178,7 +178,7 @@ class MonthWidgetConfigSheet extends ConsumerStatefulWidget {
 
 class _MonthWidgetConfigSheetState extends ConsumerState<MonthWidgetConfigSheet> {
   int _maxChips = 3;
-  List<String> _visibleKinds = ['task', 'habit', 'reminder', 'google_calendar'];
+  List<String> _visibleKinds = ['task', 'habit', 'reminder', 'google_calendar', 'time_block'];
 
   @override
   void initState() {
@@ -191,7 +191,7 @@ class _MonthWidgetConfigSheetState extends ConsumerState<MonthWidgetConfigSheet>
     setState(() {
       _maxChips = prefs.getInt('monthWidgetMaxChips') ?? 3;
       _visibleKinds = prefs.getStringList('monthWidgetVisibleKinds') ?? 
-          ['task', 'habit', 'reminder', 'google_calendar'];
+          ['task', 'habit', 'reminder', 'google_calendar', 'time_block'];
     });
   }
 
@@ -293,10 +293,11 @@ class _MonthWidgetConfigSheetState extends ConsumerState<MonthWidgetConfigSheet>
             spacing: 8,
             runSpacing: 8,
             children: [
-              _buildFilterChip('Tarefas', 'task', AppColors.warning),
-              _buildFilterChip('Hábitos', 'habit', AppColors.habitGreen),
-              _buildFilterChip('Lembretes', 'reminder', AppColors.error),
-              _buildFilterChip('Eventos', 'google_calendar', AppColors.habitBlue),
+              _buildFilterChip('Tasks', 'task', AppColors.warning),
+              _buildFilterChip('Habits', 'habit', AppColors.habitGreen),
+              _buildFilterChip('Reminders', 'reminder', AppColors.error),
+              _buildFilterChip('Events', 'google_calendar', AppColors.habitBlue),
+              _buildFilterChip('Time Blocks', 'time_block', AppColors.info),
             ],
           ),
           

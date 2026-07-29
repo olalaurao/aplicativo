@@ -18,8 +18,22 @@ import '../widgets/organizer_picker_modal.dart';
 class CreateReminderForm extends ConsumerStatefulWidget {
   final String? initialTitle;
   final DateTime? initialDate;
+  final TimeOfDay? initialTime;
+  final Scheduler? initialScheduler;
+  final List<ReminderConfig>? initialReminders;
+  final List<OrganizerReference>? initialOrganizers;
+  final String? initialNotes;
 
-  const CreateReminderForm({super.key, this.initialTitle, this.initialDate});
+  const CreateReminderForm({
+    super.key,
+    this.initialTitle,
+    this.initialDate,
+    this.initialTime,
+    this.initialScheduler,
+    this.initialReminders,
+    this.initialOrganizers,
+    this.initialNotes,
+  });
 
   @override
   ConsumerState<CreateReminderForm> createState() => _CreateReminderFormState();
@@ -34,7 +48,9 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
   String? _timeBlock;
   bool _completable = true;
   final List<String> _checkboxes = [];
-  final List<OrganizerReference> _organizers = [];
+  List<OrganizerReference> _organizers = [];
+  List<ReminderConfig> _reminders = [];
+  String? _notes;
 
   NotificationType _type = NotificationType.push;
   bool _ringOnSilent = false;
@@ -49,6 +65,21 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
     );
     if (widget.initialDate != null) {
       _date = widget.initialDate!;
+    }
+    if (widget.initialTime != null) {
+      _time = widget.initialTime;
+    }
+    if (widget.initialScheduler != null) {
+      _scheduler = widget.initialScheduler;
+    }
+    if (widget.initialReminders != null) {
+      _reminders = List.from(widget.initialReminders!);
+    }
+    if (widget.initialOrganizers != null) {
+      _organizers = List.from(widget.initialOrganizers!);
+    }
+    if (widget.initialNotes != null) {
+      _notes = widget.initialNotes;
     }
   }
 
@@ -463,19 +494,21 @@ class _CreateReminderFormState extends ConsumerState<CreateReminderForm> {
       time: time,
       isCompleted: false,
       isCompletable: _completable,
-      notes: _checkboxes.isNotEmpty ? _checkboxes.join('\n') : null,
+      notes: _notes ?? (_checkboxes.isNotEmpty ? _checkboxes.join('\n') : null),
       scheduler: _scheduler,
       timeBlock: _timeBlock,
       organizers: _organizers,
-      reminders: [
-        ReminderConfig(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          triggerTime: time,
-          type: _type,
-          ringOnSilent: _ringOnSilent,
-          snoozeMinutes: _snoozeMinutes,
-        ),
-      ],
+      reminders: _reminders.isNotEmpty
+          ? _reminders
+          : [
+              ReminderConfig(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                triggerTime: time,
+                type: _type,
+                ringOnSilent: _ringOnSilent,
+                snoozeMinutes: _snoozeMinutes,
+              ),
+            ],
     );
 
     ref.read(remindersProvider.notifier).addReminder(reminder);
