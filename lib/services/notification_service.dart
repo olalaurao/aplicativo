@@ -14,10 +14,12 @@ import '../ui/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/vault_provider.dart';
 import '../providers/notification_overlay_provider.dart';
+import '../providers/settings_provider.dart';
 import '../ui/screens/alarm_screen.dart';
 import '../ui/screens/popup_notification_screen.dart';
 import 'package:flutter/services.dart';
 import 'permission_service.dart';
+import 'vibration_pattern_helper.dart';
 
 class NotificationService with WidgetsBindingObserver {
   static final NotificationService _instance = NotificationService._internal();
@@ -266,43 +268,76 @@ class NotificationService with WidgetsBindingObserver {
         >();
     if (android == null) return;
 
+    // Get user settings if available, otherwise use defaults
+    final settings = _container?.read(settingsProvider);
+    final alarmPattern = settings?.alarmVibrationPattern ?? 'normal';
+    final popupPattern = settings?.popupVibrationPattern ?? 'normal';
+    final reminderPattern = settings?.reminderVibrationPattern ?? 'normal';
+    final alarmSound = settings?.alarmSoundEnabled ?? true;
+    final popupSound = settings?.popupSoundEnabled ?? true;
+    final reminderSound = settings?.reminderSoundEnabled ?? true;
+
     // Alarms Channel
+    Int64List? alarmVibrationPattern;
+    try {
+      alarmVibrationPattern = VibrationPatternHelper.getPattern(alarmPattern);
+    } catch (e) {
+      debugPrint('NotificationService: failed to get alarm vibration pattern: $e');
+      alarmVibrationPattern = VibrationPatternHelper.getPattern('normal');
+    }
+
     final alarmChannel = AndroidNotificationChannel(
       'alarm_channel_v5',
       'Alarms',
       description: 'High priority intrusive alarms',
       importance: Importance.max,
-      playSound: true,
+      playSound: alarmSound,
       enableVibration: true,
       enableLights: true,
-      vibrationPattern: Int64List.fromList(<int>[0, 500, 200, 500]),
+      vibrationPattern: alarmVibrationPattern,
       audioAttributesUsage: AudioAttributesUsage.alarm,
     );
 
     // Popups Channel
+    Int64List? popupVibrationPattern;
+    try {
+      popupVibrationPattern = VibrationPatternHelper.getPattern(popupPattern);
+    } catch (e) {
+      debugPrint('NotificationService: failed to get popup vibration pattern: $e');
+      popupVibrationPattern = VibrationPatternHelper.getPattern('normal');
+    }
+
     final popupChannel = AndroidNotificationChannel(
       'popup_channel_v5',
       'Popups',
       description: 'Important visual popups',
       importance: Importance.max,
-      playSound: true,
+      playSound: popupSound,
       enableVibration: true,
-      vibrationPattern: Int64List.fromList(<int>[0, 300, 200, 300]),
+      vibrationPattern: popupVibrationPattern,
       audioAttributesUsage: AudioAttributesUsage.alarm,
     );
 
     // Reminders Channel
+    Int64List? reminderVibrationPattern;
+    try {
+      reminderVibrationPattern = VibrationPatternHelper.getPattern(reminderPattern);
+    } catch (e) {
+      debugPrint('NotificationService: failed to get reminder vibration pattern: $e');
+      reminderVibrationPattern = VibrationPatternHelper.getPattern('normal');
+    }
+
     final reminderChannel = AndroidNotificationChannel(
       'reminder_channel_v2',
       'Reminders',
       description: 'General task reminders',
       importance: Importance.max,
-      playSound: true,
+      playSound: reminderSound,
       enableVibration: true,
-      vibrationPattern: Int64List.fromList(<int>[0, 250, 150, 250]),
+      vibrationPattern: reminderVibrationPattern,
+      audioAttributesUsage: AudioAttributesUsage.notification,
     );
 
-    // Immediate Channel
     final immediateChannel = AndroidNotificationChannel(
       'immediate_channel_v2',
       'Immediate Notifications',
@@ -546,6 +581,48 @@ class NotificationService with WidgetsBindingObserver {
       }
     }
 
+    // Get user settings for vibration patterns and sound
+    final settings = _container?.read(settingsProvider);
+    final alarmPattern = settings?.alarmVibrationPattern ?? 'normal';
+    final popupPattern = settings?.popupVibrationPattern ?? 'normal';
+    final reminderPattern = settings?.reminderVibrationPattern ?? 'normal';
+    final alarmSound = settings?.alarmSoundEnabled ?? true;
+    final popupSound = settings?.popupSoundEnabled ?? true;
+    final reminderSound = settings?.reminderSoundEnabled ?? true;
+
+    // Get vibration pattern with error handling
+    Int64List vibrationPattern;
+    try {
+      vibrationPattern = isAlarm
+          ? VibrationPatternHelper.getPattern(alarmPattern)
+          : (isPopup
+                ? VibrationPatternHelper.getPattern(popupPattern)
+                : VibrationPatternHelper.getPattern(reminderPattern));
+    } catch (e) {
+      debugPrint('NotificationService: failed to get vibration pattern: $e');
+      vibrationPattern = VibrationPatternHelper.getPattern('normal');
+    }
+
+    // Build notification actions based on user button visibility settings
+    final buttonConfig = settings?.notificationAppearanceConfig ?? {};
+    final showDone = buttonConfig['btn_done'] != 'false';
+    final showSnooze = buttonConfig['btn_snooze'] != 'false';
+    final showDismiss = buttonConfig['btn_dismiss'] != 'false';
+
+    final List<AndroidNotificationAction> actions = [];
+    if (showDone) {
+      actions.add(const AndroidNotificationAction('done', 'Concluído'));
+    }
+    if (showSnooze) {
+      actions.add(const AndroidNotificationAction('snooze', 'Adiar'));
+    }
+    if (showDismiss) {
+      actions.add(const AndroidNotificationAction('dismiss', 'Dispensar'));
+    }
+
+    // Enforce Android's 3-action limit by prioritizing Done, Snooze, Dismiss
+    final filteredActions = actions.take(3).toList();
+
     final androidDetails = AndroidNotificationDetails(
       isAlarm
           ? 'alarm_channel_v5'
@@ -560,14 +637,10 @@ class NotificationService with WidgetsBindingObserver {
       category: (isAlarm || isPopup)
           ? AndroidNotificationCategory.alarm
           : AndroidNotificationCategory.reminder,
-      // Force sound and vibration for all notifications to ensure they work reliably
-      playSound: true,
+      // Use user settings for sound and vibration
+      playSound: isAlarm ? alarmSound : (isPopup ? popupSound : reminderSound),
       enableVibration: true,
-      vibrationPattern: isAlarm
-          ? Int64List.fromList(<int>[0, 500, 200, 500])
-          : (isPopup
-                ? Int64List.fromList(<int>[0, 300, 200, 300])
-                : Int64List.fromList(<int>[0, 250, 150, 250])),
+      vibrationPattern: vibrationPattern,
       audioAttributesUsage: isAlarm || isPopup
           ? AudioAttributesUsage.alarm
           : AudioAttributesUsage.notification,
@@ -578,11 +651,7 @@ class NotificationService with WidgetsBindingObserver {
       timeoutAfter: null,
       additionalFlags: isAlarm ? Int32List.fromList(<int>[4]) : null,
       channelShowBadge: true,
-      actions: [
-        const AndroidNotificationAction('done', 'Concluído'),
-        const AndroidNotificationAction('snooze', 'Adiar'),
-        const AndroidNotificationAction('dismiss', 'Dispensar'),
-      ],
+      actions: filteredActions,
     );
 
     // iOS notification respects playSound flag - force true for all types

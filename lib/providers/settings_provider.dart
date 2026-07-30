@@ -111,6 +111,14 @@ class AppSettings {
   // ── Notification appearance config ──
   final Map<String, String> notificationAppearanceConfig; // Stores notification colors and button visibility
 
+  // ── Vibration and sound settings ──
+  final String alarmVibrationPattern;
+  final String popupVibrationPattern;
+  final String reminderVibrationPattern;
+  final bool alarmSoundEnabled;
+  final bool popupSoundEnabled;
+  final bool reminderSoundEnabled;
+
   // ── Floating quick-capture bubble (Android only) ──
   final bool floatingCaptureBubbleEnabled;
 
@@ -182,6 +190,12 @@ class AppSettings {
     this.showDayDialLegend = true,
     this.lastSuccessfulSyncTime,
     this.notificationAppearanceConfig = const {},
+    this.alarmVibrationPattern = 'normal',
+    this.popupVibrationPattern = 'normal',
+    this.reminderVibrationPattern = 'normal',
+    this.alarmSoundEnabled = true,
+    this.popupSoundEnabled = true,
+    this.reminderSoundEnabled = true,
     this.floatingCaptureBubbleEnabled = false,
   });
 
@@ -284,6 +298,12 @@ class AppSettings {
     bool? showDayDialLegend,
     DateTime? lastSuccessfulSyncTime,
     Map<String, String>? notificationAppearanceConfig,
+    String? alarmVibrationPattern,
+    String? popupVibrationPattern,
+    String? reminderVibrationPattern,
+    bool? alarmSoundEnabled,
+    bool? popupSoundEnabled,
+    bool? reminderSoundEnabled,
     bool? floatingCaptureBubbleEnabled,
   }) {
     return AppSettings(
@@ -369,6 +389,12 @@ class AppSettings {
       showDayDialLegend: showDayDialLegend ?? this.showDayDialLegend,
       lastSuccessfulSyncTime: lastSuccessfulSyncTime ?? this.lastSuccessfulSyncTime,
       notificationAppearanceConfig: notificationAppearanceConfig ?? this.notificationAppearanceConfig,
+      alarmVibrationPattern: alarmVibrationPattern ?? this.alarmVibrationPattern,
+      popupVibrationPattern: popupVibrationPattern ?? this.popupVibrationPattern,
+      reminderVibrationPattern: reminderVibrationPattern ?? this.reminderVibrationPattern,
+      alarmSoundEnabled: alarmSoundEnabled ?? this.alarmSoundEnabled,
+      popupSoundEnabled: popupSoundEnabled ?? this.popupSoundEnabled,
+      reminderSoundEnabled: reminderSoundEnabled ?? this.reminderSoundEnabled,
       floatingCaptureBubbleEnabled: floatingCaptureBubbleEnabled ?? this.floatingCaptureBubbleEnabled,
     );
   }
@@ -533,6 +559,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
           return const <String, String>{};
         }
       }(),
+      alarmVibrationPattern: prefs.getString('alarmVibrationPattern') ?? 'normal',
+      popupVibrationPattern: prefs.getString('popupVibrationPattern') ?? 'normal',
+      reminderVibrationPattern: prefs.getString('reminderVibrationPattern') ?? 'normal',
+      alarmSoundEnabled: prefs.getBool('alarmSoundEnabled') ?? true,
+      popupSoundEnabled: prefs.getBool('popupSoundEnabled') ?? true,
+      reminderSoundEnabled: prefs.getBool('reminderSoundEnabled') ?? true,
       floatingCaptureBubbleEnabled:
           prefs.getBool('floatingCaptureBubbleEnabled') ?? false,
     );
@@ -906,6 +938,46 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     config[key] = value;
     await _prefs.setString('notificationAppearanceConfig', json.encode(config));
     state = state.copyWith(notificationAppearanceConfig: config);
+  }
+
+  Future<void> updateVibrationPattern({
+    required String type,
+    required String pattern,
+  }) async {
+    switch (type) {
+      case 'alarm':
+        await _prefs.setString('alarmVibrationPattern', pattern);
+        state = state.copyWith(alarmVibrationPattern: pattern);
+        break;
+      case 'popup':
+        await _prefs.setString('popupVibrationPattern', pattern);
+        state = state.copyWith(popupVibrationPattern: pattern);
+        break;
+      case 'reminder':
+        await _prefs.setString('reminderVibrationPattern', pattern);
+        state = state.copyWith(reminderVibrationPattern: pattern);
+        break;
+    }
+  }
+
+  Future<void> updateSoundEnabled({
+    required String type,
+    required bool enabled,
+  }) async {
+    switch (type) {
+      case 'alarm':
+        state = state.copyWith(alarmSoundEnabled: enabled);
+        await _prefs.setBool('alarmSoundEnabled', enabled);
+        break;
+      case 'popup':
+        state = state.copyWith(popupSoundEnabled: enabled);
+        await _prefs.setBool('popupSoundEnabled', enabled);
+        break;
+      case 'reminder':
+        state = state.copyWith(reminderSoundEnabled: enabled);
+        await _prefs.setBool('reminderSoundEnabled', enabled);
+        break;
+    }
   }
 
   Future<void> updateDriveSyncFolder(String folder) async {

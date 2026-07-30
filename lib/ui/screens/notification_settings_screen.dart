@@ -5,6 +5,8 @@ import '../theme.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/color_palette_provider.dart';
 import '../../models/color_palette_model.dart';
+import '../widgets/vibration_pattern_selector.dart';
+import '../widgets/notification_sound_toggle.dart';
 
 /// Settings screen for customizing notification appearance (popup colors, alarm colors, buttons).
 class NotificationSettingsScreen extends ConsumerStatefulWidget {
@@ -93,8 +95,21 @@ class _NotificationSettingsScreenState
     if (mounted) setState(() {});
   }
 
+  Future<void> _saveVibrationPattern(String type, String pattern) async {
+    final notifier = ref.read(settingsProvider.notifier);
+    await notifier.updateVibrationPattern(type: type, pattern: pattern);
+    if (mounted) setState(() {});
+  }
+
+  void _saveSoundEnabled(String type, bool enabled) {
+    final notifier = ref.read(settingsProvider.notifier);
+    notifier.updateSoundEnabled(type: type, enabled: enabled);
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider);
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -155,6 +170,73 @@ class _NotificationSettingsScreenState
                   'popup_snooze': 'Snooze 10 min',
                   'popup_dismiss': 'Dismiss / OK',
                 }),
+
+                const SizedBox(height: 28),
+
+                // ── Vibration Patterns ──
+                _sectionHeader('Vibration Patterns'),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      VibrationPatternSelector(
+                        value: settings.alarmVibrationPattern,
+                        onChanged: (pattern) {
+                          if (pattern != null) _saveVibrationPattern('alarm', pattern);
+                        },
+                        label: 'Alarm Vibration',
+                      ),
+                      const SizedBox(height: 12),
+                      VibrationPatternSelector(
+                        value: settings.popupVibrationPattern,
+                        onChanged: (pattern) {
+                          if (pattern != null) _saveVibrationPattern('popup', pattern);
+                        },
+                        label: 'Popup Vibration',
+                      ),
+                      const SizedBox(height: 12),
+                      VibrationPatternSelector(
+                        value: settings.reminderVibrationPattern,
+                        onChanged: (pattern) {
+                          if (pattern != null) _saveVibrationPattern('reminder', pattern);
+                        },
+                        label: 'Reminder Vibration',
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 28),
+
+                // ── Sound ──
+                _sectionHeader('Sound'),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: AppTheme.cardDecoration(context),
+                  child: Column(
+                    children: [
+                      NotificationSoundToggle(
+                        value: settings.alarmSoundEnabled,
+                        onChanged: (enabled) => _saveSoundEnabled('alarm', enabled),
+                        label: 'Alarm Sound',
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      NotificationSoundToggle(
+                        value: settings.popupSoundEnabled,
+                        onChanged: (enabled) => _saveSoundEnabled('popup', enabled),
+                        label: 'Popup Sound',
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      NotificationSoundToggle(
+                        value: settings.reminderSoundEnabled,
+                        onChanged: (enabled) => _saveSoundEnabled('reminder', enabled),
+                        label: 'Reminder Sound',
+                      ),
+                    ],
+                  ),
+                ),
 
                 const SizedBox(height: 28),
 
@@ -386,9 +468,9 @@ class _NotificationSettingsScreenState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reset Colors & Buttons?'),
+        title: const Text('Reset Notification Settings?'),
         content: const Text(
-            'This will restore all notification colors and button visibility to their default values.'),
+            'This will restore all notification colors, button visibility, vibration patterns, and sound settings to their default values.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -412,6 +494,15 @@ class _NotificationSettingsScreenState
     for (final entry in _defaultButtons.entries) {
       await notifier.updateNotificationAppearanceConfig('btn_${entry.key}', entry.value.toString());
     }
+    // Reset vibration patterns to defaults
+    await notifier.updateVibrationPattern(type: 'alarm', pattern: 'normal');
+    await notifier.updateVibrationPattern(type: 'popup', pattern: 'normal');
+    await notifier.updateVibrationPattern(type: 'reminder', pattern: 'normal');
+    // Reset sound settings to defaults
+    await notifier.updateSoundEnabled(type: 'alarm', enabled: true);
+    await notifier.updateSoundEnabled(type: 'popup', enabled: true);
+    await notifier.updateSoundEnabled(type: 'reminder', enabled: true);
+    
     setState(() {
       _typeColors = Map.from(_defaultColors);
       _buttonVisibility = Map.from(_defaultButtons);

@@ -92,6 +92,7 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
       _location = entry.location;
       _templateId = entry.templateId;
       _organizers = List.of(entry.organizers);
+      _photoPaths.addAll(entry.photos);
     } else {
       final now = DateTime.now();
       final initialDate = widget.initialDate;
@@ -847,6 +848,7 @@ class _CreateEntryFormState extends ConsumerState<CreateEntryForm> {
       location: _location,
       templateId: _templateId,
       organizers: _organizers,
+      photos: _photoPaths,
     );
     try {
       if (widget.existingEntry != null) {

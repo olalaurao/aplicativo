@@ -1979,6 +1979,8 @@ Sync architecture (Google Drive, offline queue, conflict resolution via `_confli
 
 **Escalation (new in V5.1):** each Reminder Configuration gains an optional `escalation` setting: when the same reminder is dismissed/ignored (not acted on, not snoozed intentionally) for **N consecutive occurrences** (user-configurable, default 3), the app automatically increases its intensity for the next occurrence — stepping through, in order: `push` → `popup` → `alarm`, plus a stronger vibration pattern and, optionally, a distinct color/sound the user picks when enabling escalation. This exists specifically to counter notification-blindness on recurring reminders the user has started tuning out. Escalation resets to the base intensity as soon as the user acts on (completes/opens) one occurrence.
 
+**Vibration and Sound Customization (new in V5.4):** users can customize vibration patterns and sound settings per notification type (Alarm, Popup, Reminder) via Settings → Notification Appearance. Vibration patterns are preset options (Gentle, Normal, Strong, Pulsing, Urgent) with defined millisecond patterns. Sound settings are binary (on/off) using platform default notification sounds. Settings persist via SharedPreferences and are applied by NotificationService when creating notification channels and scheduling reminders. Default patterns: Alarm uses 'strong', Popup uses 'normal', Reminder uses 'normal'. All sounds default to enabled.
+
 Everything else (trigger types, per-type button behavior, reliability via the system alarm manager) is unchanged from V4.
 
 ---
