@@ -197,7 +197,7 @@ class DailyScheduleAggregator {
     }
 
     for (final event in aggregation.events) {
-      final start = _minutesOf(event.date);
+      final start = _parseTime(event.timeOfDay);
       items.add(
         DailyScheduleItem(
           id: 'event:${event.id}',
@@ -208,10 +208,10 @@ class DailyScheduleAggregator {
           color: _color(event.pomodoro == null ? ObjectTypes.event : ObjectTypes.pomodoro, typeSignatures),
           date: dateOnly,
           startMinutes: start,
-          endMinutes: start + event.duration.clamp(10, 24 * 60).toInt(),
+          endMinutes: start == null ? null : start + event.duration.clamp(10, 24 * 60).toInt(),
           isPlayable: event.pomodoro != null,
           sourceLabel: _sourceLabel(event),
-          subtitle: _timeSubtitle(start, event.duration),
+          subtitle: start == null ? null : _timeSubtitle(start, event.duration),
         ),
       );
     }

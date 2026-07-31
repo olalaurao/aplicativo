@@ -46,9 +46,11 @@ class TodayTimelineComponent extends ConsumerWidget {
               children: [
                 const Icon(Icons.access_time_rounded, color: AppColors.textMuted, size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  block.title.isNotEmpty ? block.title : 'Timeline do dia',
-                  style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
+                Expanded(
+                  child: Text(
+                    block.title.isNotEmpty ? block.title : 'Timeline do dia',
+                    style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ],
             ),

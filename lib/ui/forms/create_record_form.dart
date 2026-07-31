@@ -171,17 +171,19 @@ class _CreateRecordFormState extends ConsumerState<CreateRecordForm> {
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                 child: Row(
                   children: [
-                    DatePickerField(
-                      label: 'Date',
-                      selectedDate: _date,
-                      initialDate: DateTime.now(),
-                      firstDate: DateTime.now().subtract(
-                        const Duration(days: 365),
+                    Expanded(
+                      child: DatePickerField(
+                        label: 'Date',
+                        selectedDate: _date,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime.now().subtract(
+                          const Duration(days: 365),
+                        ),
+                        lastDate: DateTime.now(),
+                        onDateChanged: (d) {
+                          if (d != null) setState(() => _date = d);
+                        },
                       ),
-                      lastDate: DateTime.now(),
-                      onDateChanged: (d) {
-                        if (d != null) setState(() => _date = d);
-                      },
                     ),
                   ],
                 ),
@@ -430,14 +432,17 @@ class _CreateRecordFormState extends ConsumerState<CreateRecordForm> {
         final selectedValue = rawValue is String && options.contains(rawValue)
             ? rawValue
             : null;
-        return DropdownButton<String>(
-          value: selectedValue,
-          hint: const Text('Select...'),
-          items: options
-              .map((o) => DropdownMenuItem(value: o, child: Text(o)))
-              .toList(),
-          onChanged: (v) => setState(() => _values[field.id] = v),
-          underline: const SizedBox(),
+        return Expanded(
+          child: DropdownButton<String>(
+            isExpanded: true,
+            value: selectedValue,
+            hint: const Text('Select...'),
+            items: options
+                .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+                .toList(),
+            onChanged: (v) => setState(() => _values[field.id] = v),
+            underline: const SizedBox(),
+          ),
         );
       case InputFieldType.checklist:
         final checklistOptions = field.optionsSourceCollectionSlug != null

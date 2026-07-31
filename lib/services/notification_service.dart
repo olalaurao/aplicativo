@@ -175,7 +175,7 @@ class NotificationService with WidgetsBindingObserver {
     );
 
     // Create notification channels for Android
-    await _createNotificationChannels();
+    await createNotificationChannels();
 
     final android = _notifications
         .resolvePlatformSpecificImplementation<
@@ -261,7 +261,7 @@ class NotificationService with WidgetsBindingObserver {
     return _extractField(payload, 'ntype') ?? 'push';
   }
 
-  Future<void> _createNotificationChannels() async {
+  Future<void> createNotificationChannels() async {
     final android = _notifications
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
@@ -270,28 +270,44 @@ class NotificationService with WidgetsBindingObserver {
 
     // Get user settings if available, otherwise use defaults
     final settings = _container?.read(settingsProvider);
-    final alarmPattern = settings?.alarmVibrationPattern ?? 'normal';
+    final version = settings?.notificationChannelVersion ?? 1;
+
+    final alarmPattern = settings?.alarmVibrationPattern ?? 'strong';
     final popupPattern = settings?.popupVibrationPattern ?? 'normal';
-    final reminderPattern = settings?.reminderVibrationPattern ?? 'normal';
+    final reminderPattern = settings?.reminderVibrationPattern ?? 'gentle';
     final alarmSound = settings?.alarmSoundEnabled ?? true;
     final popupSound = settings?.popupSoundEnabled ?? true;
     final reminderSound = settings?.reminderSoundEnabled ?? true;
 
-    // Alarms Channel
+    final alarmSoundName = settings?.alarmSoundName ?? 'default';
+    final popupSoundName = settings?.popupSoundName ?? 'default';
+    final pushSoundName = settings?.pushSoundName ?? 'default';
+
+    final popupRingOnSilent = settings?.popupRingOnSilent ?? true;
+    final pushRingOnSilent = settings?.pushRingOnSilent ?? false;
+
+    // Helper for custom sounds
+    AndroidNotificationSound? getSound(String soundName) {
+      if (soundName == 'default' || soundName.isEmpty) return null;
+      return RawResourceAndroidNotificationSound(soundName);
+    }
+
+    // Alarms Channel (Always bypass silent)
     Int64List? alarmVibrationPattern;
     try {
       alarmVibrationPattern = VibrationPatternHelper.getPattern(alarmPattern);
     } catch (e) {
       debugPrint('NotificationService: failed to get alarm vibration pattern: $e');
-      alarmVibrationPattern = VibrationPatternHelper.getPattern('normal');
+      alarmVibrationPattern = VibrationPatternHelper.getPattern('strong');
     }
 
     final alarmChannel = AndroidNotificationChannel(
-      'alarm_channel_v5',
+      'alarm_channel_v$version',
       'Alarms',
       description: 'High priority intrusive alarms',
       importance: Importance.max,
       playSound: alarmSound,
+      sound: alarmSound ? getSound(alarmSoundName) : null,
       enableVibration: true,
       enableLights: true,
       vibrationPattern: alarmVibrationPattern,
@@ -308,14 +324,15 @@ class NotificationService with WidgetsBindingObserver {
     }
 
     final popupChannel = AndroidNotificationChannel(
-      'popup_channel_v5',
+      'popup_channel_v$version',
       'Popups',
       description: 'Important visual popups',
       importance: Importance.max,
       playSound: popupSound,
+      sound: popupSound ? getSound(popupSoundName) : null,
       enableVibration: true,
       vibrationPattern: popupVibrationPattern,
-      audioAttributesUsage: AudioAttributesUsage.alarm,
+      audioAttributesUsage: popupRingOnSilent ? AudioAttributesUsage.alarm : AudioAttributesUsage.notification,
     );
 
     // Reminders Channel
@@ -324,22 +341,23 @@ class NotificationService with WidgetsBindingObserver {
       reminderVibrationPattern = VibrationPatternHelper.getPattern(reminderPattern);
     } catch (e) {
       debugPrint('NotificationService: failed to get reminder vibration pattern: $e');
-      reminderVibrationPattern = VibrationPatternHelper.getPattern('normal');
+      reminderVibrationPattern = VibrationPatternHelper.getPattern('gentle');
     }
 
     final reminderChannel = AndroidNotificationChannel(
-      'reminder_channel_v2',
+      'reminder_channel_v$version',
       'Reminders',
       description: 'General task reminders',
       importance: Importance.max,
       playSound: reminderSound,
+      sound: reminderSound ? getSound(pushSoundName) : null,
       enableVibration: true,
       vibrationPattern: reminderVibrationPattern,
-      audioAttributesUsage: AudioAttributesUsage.notification,
+      audioAttributesUsage: pushRingOnSilent ? AudioAttributesUsage.alarm : AudioAttributesUsage.notification,
     );
 
     final immediateChannel = AndroidNotificationChannel(
-      'immediate_channel_v2',
+      'immediate_channel_v$version',
       'Immediate Notifications',
       description: 'Ongoing or immediate notifications',
       importance: Importance.high,
@@ -348,8 +366,8 @@ class NotificationService with WidgetsBindingObserver {
       vibrationPattern: Int64List.fromList(<int>[0, 200, 100, 200]),
     );
 
-    const quickCaptureChannel = AndroidNotificationChannel(
-      'quick_capture_channel_v2',
+    final quickCaptureChannel = AndroidNotificationChannel(
+      'quick_capture_channel_v$version',
       'Quick Capture',
       description: 'Add a journal entry or task from the lock screen',
       importance: Importance.high,
@@ -394,20 +412,29 @@ class NotificationService with WidgetsBindingObserver {
     }
 
     if (actionId == 'snooze') {
+      final payload = response.payload ?? '';
+      final titleStr = Uri.decodeComponent(_extractField(payload, 'title') ?? 'Snoozed Reminder');
+      final notifType = _extractNotifType(payload);
+      var type = NotificationType.push;
+      if (notifType == 'alarm') type = NotificationType.alarm;
+      else if (notifType == 'popup') type = NotificationType.popup;
+
+      final snoozeMinutes = _snoozeMinutesFromPayload(payload);
+      
       final notificationService = NotificationService();
       await notificationService.scheduleReminder(
         id: response.id ?? 999998,
-        title: response.payload ?? 'Snoozed Reminder',
+        title: titleStr,
         config: ReminderConfig(
           id: '${response.id}_snooze',
-          triggerTime: DateTime.now().add(
-            Duration(minutes: _snoozeMinutesFromPayload(response.payload)),
-          ),
-          type: NotificationType.push,
-          notificationBody: 'Snoozed: ${response.payload ?? "Reminder"}',
+          triggerTime: DateTime.now().add(Duration(minutes: snoozeMinutes)),
+          type: type,
+          notificationBody: 'Adiado por ${snoozeMinutes}min',
+          snoozeMinutes: snoozeMinutes,
         ),
-        payload: response.payload,
+        payload: payload,
       );
+      return;
     }
     if (actionId == 'dismiss') {
       if (response.id != null) {
@@ -589,6 +616,8 @@ class NotificationService with WidgetsBindingObserver {
     final alarmSound = settings?.alarmSoundEnabled ?? true;
     final popupSound = settings?.popupSoundEnabled ?? true;
     final reminderSound = settings?.reminderSoundEnabled ?? true;
+    final popupRingOnSilent = settings?.popupRingOnSilent ?? true;
+    final pushRingOnSilent = settings?.pushRingOnSilent ?? false;
 
     // Get vibration pattern with error handling
     Int64List vibrationPattern;
@@ -623,10 +652,12 @@ class NotificationService with WidgetsBindingObserver {
     // Enforce Android's 3-action limit by prioritizing Done, Snooze, Dismiss
     final filteredActions = actions.take(3).toList();
 
+    final version = settings?.notificationChannelVersion ?? 1;
+
     final androidDetails = AndroidNotificationDetails(
       isAlarm
-          ? 'alarm_channel_v5'
-          : (isPopup ? 'popup_channel_v5' : 'reminder_channel_v2'),
+          ? 'alarm_channel_v$version'
+          : (isPopup ? 'popup_channel_v$version' : 'reminder_channel_v$version'),
       isAlarm ? 'Alarms' : (isPopup ? 'Popups' : 'Reminders'),
       channelDescription: isAlarm
           ? 'High priority intrusive alarms'
@@ -641,9 +672,13 @@ class NotificationService with WidgetsBindingObserver {
       playSound: isAlarm ? alarmSound : (isPopup ? popupSound : reminderSound),
       enableVibration: true,
       vibrationPattern: vibrationPattern,
-      audioAttributesUsage: isAlarm || isPopup
+      audioAttributesUsage: isAlarm
           ? AudioAttributesUsage.alarm
-          : AudioAttributesUsage.notification,
+          : (isPopup && popupRingOnSilent
+              ? AudioAttributesUsage.alarm
+              : (!isAlarm && !isPopup && pushRingOnSilent
+                  ? AudioAttributesUsage.alarm
+                  : AudioAttributesUsage.notification)),
       color: config.popupColor ?? AppColors.primary,
       visibility: NotificationVisibility.public,
       ongoing: isAlarm || isPopup,
@@ -829,8 +864,11 @@ class NotificationService with WidgetsBindingObserver {
       );
       return;
     }
+    final settings = _container?.read(settingsProvider);
+    final version = settings?.notificationChannelVersion ?? 1;
+
     final androidDetails = AndroidNotificationDetails(
-      'immediate_channel_v2',
+      'immediate_channel_v$version',
       'Immediate Notifications',
       importance: Importance.high,
       priority: Priority.high,
@@ -878,8 +916,11 @@ class NotificationService with WidgetsBindingObserver {
       );
       return;
     }
-    const androidDetails = AndroidNotificationDetails(
-      'quick_capture_channel_v2',
+    final settings = _container?.read(settingsProvider);
+    final version = settings?.notificationChannelVersion ?? 1;
+
+    final androidDetails = AndroidNotificationDetails(
+      'quick_capture_channel_v$version',
       'Quick Capture',
       channelDescription: 'Add a journal entry or task from the lock screen',
       importance: Importance.high,
@@ -912,7 +953,7 @@ class NotificationService with WidgetsBindingObserver {
         ),
       ],
     );
-    const details = NotificationDetails(android: androidDetails);
+    final details = NotificationDetails(android: androidDetails);
     await _notifications.show(
       999,
       'Touch to add',
@@ -954,8 +995,11 @@ class NotificationService with WidgetsBindingObserver {
       id: id,
     );
 
+    final settings = _container?.read(settingsProvider);
+    final version = settings?.notificationChannelVersion ?? 1;
+
     final androidDetails = AndroidNotificationDetails(
-      'reminder_channel_v2',
+      'reminder_channel_v$version',
       'Reminders',
       channelDescription: 'General task reminders',
       importance: Importance.max,

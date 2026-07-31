@@ -69,11 +69,12 @@ class _WeekOverviewComponentState extends ConsumerState<WeekOverviewComponent> {
                 children: [
                   Icon(Icons.view_week_rounded, color: AppColors.textMuted, size: 20),
                   const SizedBox(width: 8),
-                  Text(
-                    widget.block.title.isNotEmpty ? widget.block.title : 'This Week',
-                    style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16),
+                  Expanded(
+                    child: Text(
+                      widget.block.title.isNotEmpty ? widget.block.title : 'This Week',
+                      style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16),
+                    ),
                   ),
-                  const Spacer(),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [

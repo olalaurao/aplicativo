@@ -69,11 +69,13 @@ void main() {
       final archivedHabit = Habit(
         id: 'archived-habit-1',
         title: 'Archived Habit',
+        color: '#000000',
         archived: true,
       );
       final normalHabit = Habit(
         id: 'normal-habit-1',
         title: 'Normal Habit',
+        color: '#000000',
       );
 
       final snapshot = DailyScheduleAggregator.buildForDate(
@@ -153,6 +155,7 @@ void main() {
       final habit = Habit(
         id: 'habit-1',
         title: 'Habit',
+        color: '#000000',
       );
       final event = Event(
         id: 'event-1',
@@ -199,7 +202,7 @@ void main() {
         typeSignatures: {},
       );
 
-      final filter = DailyScheduleFilter(completableOnly: true);
+      final filter = DailyScheduleFilter(includeCompletableOnly: true);
       final filtered = snapshot.apply(filter);
 
       expect(filtered.completableItems.length, 1);
@@ -230,7 +233,7 @@ void main() {
         typeSignatures: {},
       );
 
-      final filter = DailyScheduleFilter(allDayOnly: true);
+      final filter = DailyScheduleFilter(includeTimed: false);
       final filtered = snapshot.apply(filter);
 
       expect(filtered.allDayItems.length, 1);
@@ -255,6 +258,7 @@ void main() {
       final habit = Habit(
         id: 'habit-1',
         title: 'Habit',
+        color: '#000000',
       );
 
       final snapshot = DailyScheduleAggregator.buildForDate(
@@ -266,7 +270,7 @@ void main() {
 
       final filter = DailyScheduleFilter(
         visibleKinds: {DailyScheduleKind.task},
-        allDayOnly: true,
+        includeTimed: false,
       );
       final filtered = snapshot.apply(filter);
 
@@ -301,6 +305,7 @@ void main() {
       final habit = Habit(
         id: 'habit-1',
         title: 'Habit',
+        color: '#000000',
       );
 
       final snapshot = DailyScheduleAggregator.buildForDate(
@@ -361,7 +366,6 @@ void main() {
         id: 'all-day-event-1',
         title: 'All Day Event',
         date: date,
-        isAllDay: true,
       );
 
       final snapshot = DailyScheduleAggregator.buildForDate(

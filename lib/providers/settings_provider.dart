@@ -119,6 +119,22 @@ class AppSettings {
   final bool popupSoundEnabled;
   final bool reminderSoundEnabled;
 
+  // ── Sound selection (bundled sounds) ──
+  final String alarmSoundName;    // 'default' | 'classic' | 'gentle' | 'urgent'
+  final String popupSoundName;    // 'default' | 'chime' | 'soft'
+  final String pushSoundName;     // 'default' | 'chime' | 'soft'
+
+  // ── Ring on silent ──
+  final bool popupRingOnSilent;   // always true for alarm; default true for popup
+  final bool pushRingOnSilent;    // default false for push
+
+  // ── Alarm behavior ──
+  final int alarmRepeatCount;     // how many times vibration pattern repeats while screen open (default: 5)
+  final int popupAutoDismissSeconds; // seconds before auto-dismiss of popup (default: 10)
+
+  // ── Notification channel version (increment to recreate channels) ──
+  final int notificationChannelVersion;
+
   // ── Floating quick-capture bubble (Android only) ──
   final bool floatingCaptureBubbleEnabled;
 
@@ -190,12 +206,20 @@ class AppSettings {
     this.showDayDialLegend = true,
     this.lastSuccessfulSyncTime,
     this.notificationAppearanceConfig = const {},
-    this.alarmVibrationPattern = 'normal',
+    this.alarmVibrationPattern = 'strong',
     this.popupVibrationPattern = 'normal',
-    this.reminderVibrationPattern = 'normal',
+    this.reminderVibrationPattern = 'gentle',
     this.alarmSoundEnabled = true,
     this.popupSoundEnabled = true,
     this.reminderSoundEnabled = true,
+    this.alarmSoundName = 'default',
+    this.popupSoundName = 'default',
+    this.pushSoundName = 'default',
+    this.popupRingOnSilent = true,
+    this.pushRingOnSilent = false,
+    this.alarmRepeatCount = 5,
+    this.popupAutoDismissSeconds = 10,
+    this.notificationChannelVersion = 1,
     this.floatingCaptureBubbleEnabled = false,
   });
 
@@ -304,6 +328,14 @@ class AppSettings {
     bool? alarmSoundEnabled,
     bool? popupSoundEnabled,
     bool? reminderSoundEnabled,
+    String? alarmSoundName,
+    String? popupSoundName,
+    String? pushSoundName,
+    bool? popupRingOnSilent,
+    bool? pushRingOnSilent,
+    int? alarmRepeatCount,
+    int? popupAutoDismissSeconds,
+    int? notificationChannelVersion,
     bool? floatingCaptureBubbleEnabled,
   }) {
     return AppSettings(
@@ -395,6 +427,14 @@ class AppSettings {
       alarmSoundEnabled: alarmSoundEnabled ?? this.alarmSoundEnabled,
       popupSoundEnabled: popupSoundEnabled ?? this.popupSoundEnabled,
       reminderSoundEnabled: reminderSoundEnabled ?? this.reminderSoundEnabled,
+      alarmSoundName: alarmSoundName ?? this.alarmSoundName,
+      popupSoundName: popupSoundName ?? this.popupSoundName,
+      pushSoundName: pushSoundName ?? this.pushSoundName,
+      popupRingOnSilent: popupRingOnSilent ?? this.popupRingOnSilent,
+      pushRingOnSilent: pushRingOnSilent ?? this.pushRingOnSilent,
+      alarmRepeatCount: alarmRepeatCount ?? this.alarmRepeatCount,
+      popupAutoDismissSeconds: popupAutoDismissSeconds ?? this.popupAutoDismissSeconds,
+      notificationChannelVersion: notificationChannelVersion ?? this.notificationChannelVersion,
       floatingCaptureBubbleEnabled: floatingCaptureBubbleEnabled ?? this.floatingCaptureBubbleEnabled,
     );
   }
@@ -559,12 +599,20 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
           return const <String, String>{};
         }
       }(),
-      alarmVibrationPattern: prefs.getString('alarmVibrationPattern') ?? 'normal',
+      alarmVibrationPattern: prefs.getString('alarmVibrationPattern') ?? 'strong',
       popupVibrationPattern: prefs.getString('popupVibrationPattern') ?? 'normal',
-      reminderVibrationPattern: prefs.getString('reminderVibrationPattern') ?? 'normal',
+      reminderVibrationPattern: prefs.getString('reminderVibrationPattern') ?? 'gentle',
       alarmSoundEnabled: prefs.getBool('alarmSoundEnabled') ?? true,
       popupSoundEnabled: prefs.getBool('popupSoundEnabled') ?? true,
       reminderSoundEnabled: prefs.getBool('reminderSoundEnabled') ?? true,
+      alarmSoundName: prefs.getString('alarmSoundName') ?? 'default',
+      popupSoundName: prefs.getString('popupSoundName') ?? 'default',
+      pushSoundName: prefs.getString('pushSoundName') ?? 'default',
+      popupRingOnSilent: prefs.getBool('popupRingOnSilent') ?? true,
+      pushRingOnSilent: prefs.getBool('pushRingOnSilent') ?? false,
+      alarmRepeatCount: prefs.getInt('alarmRepeatCount') ?? 5,
+      popupAutoDismissSeconds: prefs.getInt('popupAutoDismissSeconds') ?? 10,
+      notificationChannelVersion: prefs.getInt('notificationChannelVersion') ?? 1,
       floatingCaptureBubbleEnabled:
           prefs.getBool('floatingCaptureBubbleEnabled') ?? false,
     );
@@ -978,6 +1026,59 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
         await _prefs.setBool('reminderSoundEnabled', enabled);
         break;
     }
+  }
+
+  Future<void> updateSoundName({
+    required String type,
+    required String soundName,
+  }) async {
+    switch (type) {
+      case 'alarm':
+        await _prefs.setString('alarmSoundName', soundName);
+        state = state.copyWith(alarmSoundName: soundName);
+        break;
+      case 'popup':
+        await _prefs.setString('popupSoundName', soundName);
+        state = state.copyWith(popupSoundName: soundName);
+        break;
+      case 'push':
+        await _prefs.setString('pushSoundName', soundName);
+        state = state.copyWith(pushSoundName: soundName);
+        break;
+    }
+  }
+
+  Future<void> updateRingOnSilent({
+    required String type,
+    required bool ringOnSilent,
+  }) async {
+    switch (type) {
+      case 'popup':
+        await _prefs.setBool('popupRingOnSilent', ringOnSilent);
+        state = state.copyWith(popupRingOnSilent: ringOnSilent);
+        break;
+      case 'push':
+        await _prefs.setBool('pushRingOnSilent', ringOnSilent);
+        state = state.copyWith(pushRingOnSilent: ringOnSilent);
+        break;
+      // alarm always rings on silent — not user-configurable
+    }
+  }
+
+  Future<void> updateAlarmRepeatCount(int count) async {
+    await _prefs.setInt('alarmRepeatCount', count);
+    state = state.copyWith(alarmRepeatCount: count);
+  }
+
+  Future<void> updatePopupAutoDismissSeconds(int seconds) async {
+    await _prefs.setInt('popupAutoDismissSeconds', seconds);
+    state = state.copyWith(popupAutoDismissSeconds: seconds);
+  }
+
+  Future<void> incrementNotificationChannelVersion() async {
+    final next = state.notificationChannelVersion + 1;
+    await _prefs.setInt('notificationChannelVersion', next);
+    state = state.copyWith(notificationChannelVersion: next);
   }
 
   Future<void> updateDriveSyncFolder(String folder) async {

@@ -2677,6 +2677,47 @@ class VaultNotifier extends Notifier<void> {
     // Run purge asynchronously to avoid blocking main thread
     Future.microtask(() => _purgeOldDeletedFiles());
   }
+  int? _slotIndexFromNotificationPayload(String payload) {
+    if (payload.isEmpty) return null;
+    final uri = Uri.tryParse(payload);
+    if (uri != null) {
+      final slot = uri.queryParameters['slot'];
+      if (slot != null && slot.isNotEmpty) return int.tryParse(slot);
+    }
+    return null;
+  }
+
+  Future<void> markObjectDone(String objectIdOrPayload) async {
+    final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+    
+    final realObjectId = _objectIdFromNotificationPayload(objectIdOrPayload) ?? objectIdOrPayload;
+    final slotIndex = _slotIndexFromNotificationPayload(objectIdOrPayload);
+    
+    // First try exact ID match
+    var obj = allObjects.where((o) => o.id == realObjectId).firstOrNull;
+    
+    // If not found, it might be a synthetic reminder ID `${parentId}_${configId}`
+    if (obj == null && realObjectId.contains('_')) {
+       final parentId = realObjectId.substring(0, realObjectId.lastIndexOf('_'));
+       obj = allObjects.where((o) => o.id == parentId).firstOrNull;
+    }
+
+    if (obj is Task) {
+      final updated = obj.copyWith(
+        stage: TaskStage.finalized,
+        reflection: obj.reflection ?? 'Concluído via notificação.',
+      );
+      await updateObject(updated);
+      await _completeContactTaskIfNeeded(updated);
+    } else if (obj is Habit) {
+      await ref.read(habitsProvider.notifier).toggleHabit(obj, DateTime.now(), slotIndex: slotIndex);
+    } else if (obj is Reminder) {
+      obj.isCompleted = true;
+      await ref.read(remindersProvider.notifier).updateReminder(obj);
+    } else {
+      debugPrint('VaultNotifier: markObjectDone could not handle objectId $objectIdOrPayload');
+    }
+  }
 
   String _signatureKeyFor(ContentObject object) {
     if (object is TrackerDefinition) return 'tracker_definition';
@@ -2718,19 +2759,21 @@ class VaultNotifier extends Notifier<void> {
     };
   }
 
-  Future<void> _scheduleObjectReminders(ContentObject object) async {
+  Future<void> _scheduleObjectReminders(ContentObject object, {bool skipCancel = false}) async {
     debugPrint('[VaultProvider] _scheduleObjectReminders called for ${object.id} (${object.title}), type=${object.type}, reminders.length=${object.reminders.length}');
     
     // Cancel previous reminders for this object using the current and legacy
     // ID schemes. Older builds used a hash per reminder config, so keep this
     // cleanup until those scheduled alarms naturally disappear from devices.
     final baseId = _stableNotificationBaseId(object.id);
-    for (int i = 0; i < 50; i++) {
-      await NotificationService().cancelNotification(baseId + i);
-    }
-    for (final config in object.reminders) {
-      final legacyReminderId = (object.id + config.id).hashCode.abs() % 1000000;
-      await NotificationService().cancelNotification(legacyReminderId);
+    if (!skipCancel) {
+      for (int i = 0; i < 50; i++) {
+        await NotificationService().cancelNotification(baseId + i);
+      }
+      for (final config in object.reminders) {
+        final legacyReminderId = (object.id + config.id).hashCode.abs() % 1000000;
+        await NotificationService().cancelNotification(legacyReminderId);
+      }
     }
 
     // For habits, use DateTime.now() as base to calculate trigger time relative to today
@@ -2912,7 +2955,7 @@ class VaultNotifier extends Notifier<void> {
     await NotificationService().cancelAllScheduled();
     final allObjects = await ref.read(allObjectsProvider.future);
     for (final object in allObjects) {
-      await _scheduleObjectReminders(object);
+      await _scheduleObjectReminders(object, skipCancel: true);
     }
     await NotificationService().showQuickCaptureNotification();
   }
@@ -4026,9 +4069,8 @@ class VaultNotifier extends Notifier<void> {
 
       final objectId = _objectIdFromNotificationPayload(payload);
       if (objectId == null || objectId.isEmpty) continue;
-
       if (actionId == 'done') {
-        await _markNotificationTargetDone(objectId);
+        await markObjectDone(payload);
       } else if (actionId == 'dismiss') {
         await _recordNotificationDismissal(objectId);
       } else if (actionId == 'snooze') {
@@ -4245,39 +4287,7 @@ class VaultNotifier extends Notifier<void> {
     return clean.isNotEmpty ? clean : null;
   }
 
-  /// Marks the notification target as done — Task → finalized,
-  /// Reminder → isCompleted, Habit → toggle for today.
-  Future<void> _markNotificationTargetDone(String objectId) async {
-    final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
-    final target = allObjects.where((o) => o.id == objectId).firstOrNull;
-    if (target == null) {
-      debugPrint('NotificationAction done: object $objectId not found');
-      return;
-    }
 
-    try {
-      if (target is Task) {
-        // Use copyWith — never mutate Task fields directly
-        final updated = target.copyWith(
-          stage: TaskStage.finalized,
-          reflection: target.reflection ?? 'Concluído via notificação.',
-        );
-        await ref.read(vaultProvider.notifier).updateObject(updated);
-        await _completeContactTaskIfNeeded(updated);
-      } else if (target is Reminder) {
-        // Reminder is a mutable model — set field then persist
-        target.isCompleted = true;
-        await ref.read(remindersProvider.notifier).updateReminder(target);
-      } else if (target is Habit) {
-        await ref
-            .read(habitsProvider.notifier)
-            .toggleHabit(target, DateTime.now());
-      }
-      debugPrint('NotificationAction done: marked $objectId as done');
-    } catch (e) {
-      debugPrint('NotificationAction done: error for $objectId: $e');
-    }
-  }
 
   /// Dismisses the notification without completing the object.
   /// Simply touches updatedAt so the object is not re-alerted.
@@ -4295,8 +4305,17 @@ class VaultNotifier extends Notifier<void> {
 
     // Find the object to re-use its title
     final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
-    final target = allObjects.where((o) => o.id == objectId).firstOrNull;
+    final realObjectId = _objectIdFromNotificationPayload(payload) ?? objectId;
+    final target = allObjects.where((o) => o.id == realObjectId).firstOrNull;
     final title = target?.title ?? 'Lembrete';
+
+    var type = NotificationType.push;
+    final match = RegExp(r'ntype=([^&]+)').firstMatch(payload);
+    if (match != null) {
+      final typeStr = match.group(1);
+      if (typeStr == 'alarm') type = NotificationType.alarm;
+      else if (typeStr == 'popup') type = NotificationType.popup;
+    }
 
     final notifId = DateTime.now().millisecondsSinceEpoch % 100000;
     await NotificationService().scheduleReminder(
@@ -4305,11 +4324,11 @@ class VaultNotifier extends Notifier<void> {
       config: ReminderConfig(
         id: '${objectId}_snooze_$notifId',
         triggerTime: fireAt,
-        type: NotificationType.push,
+        type: type,
         notificationBody: 'Adiado por ${snoozeMinutes}min',
         snoozeMinutes: snoozeMinutes,
       ),
-      payload: objectId,
+      payload: payload,
     );
     debugPrint(
       'NotificationAction snooze: $objectId snoozed for ${snoozeMinutes}min',

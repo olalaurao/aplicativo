@@ -114,11 +114,15 @@ class _ReminderList extends ConsumerWidget {
                         : AppTheme.accentColor(context),
                   ),
                   onPressed: () {
-                    reminder.isCompleted = !reminder.isCompleted;
-                    reminder.updatedAt = DateTime.now();
-                    ref
-                        .read(remindersProvider.notifier)
-                        .updateReminder(reminder);
+                    if (reminder.isCompleted) {
+                      // Restoration of completed reminders - for standalone reminders only
+                      reminder.isCompleted = false;
+                      reminder.updatedAt = DateTime.now();
+                      ref.read(remindersProvider.notifier).updateReminder(reminder);
+                    } else {
+                      // Completion works for both standalone and synthetic reminders via markObjectDone
+                      ref.read(vaultProvider.notifier).markObjectDone(reminder.id);
+                    }
                   },
                 ),
                 const SizedBox(width: 8),

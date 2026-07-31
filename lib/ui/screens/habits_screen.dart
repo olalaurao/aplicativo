@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../providers/vault_provider.dart';
+import '../../providers/daily_schedule_provider.dart';
+import '../../services/daily_schedule_service.dart';
 import '../../models/habit_model.dart';
 import '../theme.dart';
 import '../widgets/empty_state.dart';
@@ -212,13 +214,24 @@ class _TodayView extends ConsumerWidget {
     final dailyData = ref.watch(dailyNoteDataProvider(dateStr));
     final habitsMap = dailyData['habits'] as Map? ?? {};
 
+    final scheduleItems = ref.watch(filteredDailyScheduleProvider((
+      date: now,
+      filter: const DailyScheduleFilter(
+        visibleKinds: {DailyScheduleKind.habit},
+        includeCompleted: true,
+        includeCompletableOnly: false,
+      ),
+    ))).allItems;
+    
+    final scheduledHabitIds = scheduleItems.map((item) => (item.source as Habit).id).toSet();
+
     // Split quitting vs regular habits
     final regularHabits = habits.where((h) => !h.isQuitting).toList();
     final flexibleHabits = regularHabits
         .where((h) => h.isFlexibleFrequency)
         .toList();
     final dailyHabits = regularHabits
-        .where((h) => !h.isFlexibleFrequency)
+        .where((h) => !h.isFlexibleFrequency && scheduledHabitIds.contains(h.id))
         .toList();
     final quittingHabits = habits.where((h) => h.isQuitting).toList();
 

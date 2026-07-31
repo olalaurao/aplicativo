@@ -103,9 +103,11 @@ class GoalsProjectsOverviewComponent extends ConsumerWidget {
               children: [
                 Icon(Icons.flag_rounded, color: AppColors.textMuted, size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  block.title.isNotEmpty ? block.title : 'Goals & Projects',
-                  style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16),
+                Expanded(
+                  child: Text(
+                    block.title.isNotEmpty ? block.title : 'Goals & Projects',
+                    style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16),
+                  ),
                 ),
               ],
             ),

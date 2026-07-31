@@ -10,6 +10,8 @@ import '../../models/reminder_model.dart';
 import '../../models/habit_model.dart';
 import '../../models/task_model.dart';
 import '../../providers/vault_provider.dart';
+import '../../providers/settings_provider.dart';
+import '../../services/vibration_service.dart';
 
 /// Data passed to the popup screen via notification fullScreenIntent.
 class PopupScreenData {
@@ -53,7 +55,7 @@ class _PopupNotificationScreenState
   double _progress = 1.0;
   late final Timer _progressTimer;
 
-  static const _autoDismissMs = 10000;
+  int _autoDismissMs = 10000;
 
   @override
   void initState() {
@@ -73,18 +75,31 @@ class _PopupNotificationScreenState
     );
     _slideController.forward();
 
-    HapticFeedback.mediumImpact();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final settings = ref.read(settingsProvider);
+      
+      VibrationService.start(
+        settings.popupVibrationPattern,
+      );
 
-    _autoTimer = Timer(
-      const Duration(milliseconds: _autoDismissMs),
-      _dismiss,
-    );
+      _autoDismissMs = settings.popupAutoDismissSeconds * 1000;
+      if (_autoDismissMs > 0) {
+        _autoTimer = Timer(
+          Duration(milliseconds: _autoDismissMs),
+          _dismiss,
+        );
 
-    _progressTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (mounted) {
+        _progressTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+          if (mounted) {
+            setState(() {
+              _progress -= 100 / _autoDismissMs;
+              if (_progress < 0) _progress = 0;
+            });
+          }
+        });
+      } else {
         setState(() {
-          _progress -= 100 / _autoDismissMs;
-          if (_progress < 0) _progress = 0;
+          _progress = 0; // No auto-dismiss
         });
       }
     });
@@ -92,8 +107,11 @@ class _PopupNotificationScreenState
 
   @override
   void dispose() {
+    VibrationService.stop();
     _autoTimer?.cancel();
-    _progressTimer.cancel();
+    if (this._autoDismissMs > 0) {
+      _progressTimer.cancel();
+    }
     _slideController.dispose();
     super.dispose();
   }
@@ -126,8 +144,9 @@ class _PopupNotificationScreenState
   }
 
   void _dismiss() {
+    VibrationService.stop();
     _autoTimer?.cancel();
-    _progressTimer.cancel();
+    if (_autoDismissMs > 0) _progressTimer.cancel();
     if (widget.data.notificationId != null) {
       NotificationService().cancelNotification(widget.data.notificationId!);
     }
@@ -135,9 +154,10 @@ class _PopupNotificationScreenState
   }
 
   void _snooze(int minutes) {
+    VibrationService.stop();
     HapticFeedback.mediumImpact();
     _autoTimer?.cancel();
-    _progressTimer.cancel();
+    if (_autoDismissMs > 0) _progressTimer.cancel();
 
     NotificationService().scheduleReminder(
       id: DateTime.now().millisecondsSinceEpoch % 100000,
@@ -156,28 +176,14 @@ class _PopupNotificationScreenState
   }
 
   Future<void> _markDone() async {
+    VibrationService.stop();
     HapticFeedback.mediumImpact();
     _autoTimer?.cancel();
-    _progressTimer.cancel();
+    if (_autoDismissMs > 0) _progressTimer.cancel();
 
     if (widget.data.objectId != null) {
       try {
-        final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
-        final obj = allObjects.where(
-          (o) => o.id == widget.data.objectId,
-        ).firstOrNull;
-
-        if (obj is Task) {
-          final updated = obj.copyWith(stage: TaskStage.finalized);
-          await ref.read(vaultProvider.notifier).updateObject(updated);
-        } else if (obj is Reminder) {
-          obj.isCompleted = true;
-          await ref.read(remindersProvider.notifier).updateReminder(obj);
-        } else if (obj is Habit) {
-          await ref.read(habitsProvider.notifier).toggleHabit(obj, DateTime.now());
-        } else if (obj == null) {
-          debugPrint('PopupScreen: object ${widget.data.objectId} not found');
-        }
+        await ref.read(vaultProvider.notifier).markObjectDone(widget.data.objectId!);
       } catch (e) {
         debugPrint('PopupScreen: Failed to mark done: $e');
       }
@@ -343,7 +349,7 @@ class _PopupNotificationScreenState
                                 child: Row(
                                   children: [
                                     _actionButton(
-                                      'Adiar 10min',
+                                      'Snooze 10m',
                                       Icons.snooze_rounded,
                                       onTap: () => _snooze(10),
                                     ),
@@ -352,7 +358,7 @@ class _PopupNotificationScreenState
                                         widget.data.type == PopupScreenType.reminder ||
                                         widget.data.type == PopupScreenType.habit) ...[
                                       _actionButton(
-                                        'Concluído',
+                                        'Done',
                                         Icons.check_rounded,
                                         onTap: _markDone,
                                         filled: true,
@@ -360,7 +366,7 @@ class _PopupNotificationScreenState
                                       const SizedBox(width: 8),
                                     ],
                                     _actionButton(
-                                      'OK',
+                                      'Dismiss',
                                       Icons.close_rounded,
                                       onTap: _dismiss,
                                     ),

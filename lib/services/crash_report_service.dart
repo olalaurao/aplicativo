@@ -27,6 +27,9 @@ class CrashReportService {
     _vaultPath = vaultPath;
     _appVersion = appVersion ?? 'unknown';
 
+    // Auto-cleanup reports older than 3 days
+    unawaited(cleanupOldReports());
+
     logEvent('app_start version=$_appVersion');
 
     // Capture Flutter framework errors (widget build errors, etc.)
@@ -310,6 +313,44 @@ $details
       }
     } catch (e) {
       debugPrint('[CrashReport] Error clearing reports: $e');
+    }
+  }
+
+  Future<void> cleanupOldReports() async {
+    try {
+      final docDir = await getApplicationDocumentsDirectory();
+      final internalDir = Directory('${docDir.path}/diagnostics/crash_reports');
+      final cutoff = DateTime.now().subtract(const Duration(days: 3));
+
+      // Clean internal storage
+      if (await internalDir.exists()) {
+        final files = internalDir.listSync().whereType<File>();
+        for (final file in files) {
+          try {
+            if (file.lastModifiedSync().isBefore(cutoff)) {
+              await file.delete();
+            }
+          } catch (_) {}
+        }
+      }
+
+      // Clean vault storage
+      if (_vaultPath != null && _vaultPath!.isNotEmpty) {
+        final vaultDir = Directory('$_vaultPath/_diagnostics/crash_reports');
+        if (await vaultDir.exists()) {
+          final files = vaultDir.listSync().whereType<File>();
+          for (final file in files) {
+            try {
+              if (file.lastModifiedSync().isBefore(cutoff)) {
+                await file.delete();
+              }
+            } catch (_) {}
+          }
+        }
+      }
+      debugPrint('[CrashReport] Cleanup of old reports completed.');
+    } catch (e) {
+      debugPrint('[CrashReport] Error during cleanup: $e');
     }
   }
 

@@ -27,9 +27,11 @@ class TrackerAnalysisComponent extends ConsumerWidget {
           children: [
             const Icon(Icons.bar_chart_rounded, color: AppColors.textMuted),
             const SizedBox(width: 12),
-            const Text(
-              'No tracker selected — configure this block',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+            const Expanded(
+              child: Text(
+                'No tracker selected — configure this block',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+              ),
             ),
           ],
         ),

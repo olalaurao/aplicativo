@@ -9,6 +9,8 @@ import '../../models/reminder_config.dart';
 import '../../models/reminder_model.dart';
 import '../../models/habit_model.dart';
 import '../../models/task_model.dart';
+import '../../services/vibration_service.dart';
+import '../../providers/settings_provider.dart';
 
 /// The type of alarm, each with its own color/icon.
 enum AlarmType { alarm, task, event, reminder }
@@ -63,12 +65,18 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen>
       if (mounted) setState(() => _elapsedSeconds++);
     });
 
-    // Vibrate on open
-    HapticFeedback.heavyImpact();
+    // Start continuous vibration for the alarm
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final settings = ref.read(settingsProvider);
+      VibrationService.start(
+        settings.alarmVibrationPattern,
+      );
+    });
   }
 
   @override
   void dispose() {
+    VibrationService.stop();
     _pulseController.dispose();
     _elapsedTimer.cancel();
     super.dispose();
@@ -143,22 +151,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen>
 
     if (widget.data.objectId != null) {
       try {
-        final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
-        final obj = allObjects.where(
-          (o) => o.id == widget.data.objectId,
-        ).firstOrNull;
-
-        if (obj is Task) {
-          final updated = obj.copyWith(stage: TaskStage.finalized);
-          await ref.read(vaultProvider.notifier).updateObject(updated);
-        } else if (obj is Reminder) {
-          obj.isCompleted = true;
-          await ref.read(remindersProvider.notifier).updateReminder(obj);
-        } else if (obj is Habit) {
-          await ref.read(habitsProvider.notifier).toggleHabit(obj, DateTime.now());
-        } else if (obj == null) {
-          debugPrint('AlarmScreen: object ${widget.data.objectId} not found');
-        }
+        await ref.read(vaultProvider.notifier).markObjectDone(widget.data.objectId!);
       } catch (e) {
         debugPrint('AlarmScreen: Failed to mark done: $e');
       }
@@ -199,20 +192,20 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen>
 
     // Day of week + date
     const weekdays = [
-      'segunda',
-      'terça',
-      'quarta',
-      'quinta',
-      'sexta',
-      'sábado',
-      'domingo'
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
     ];
     const months = [
-      'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-      'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
     ];
     final dateStr =
-        '${weekdays[now.weekday - 1]}, ${now.day} de ${months[now.month - 1]}';
+        '${weekdays[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
 
     return PopScope(
       canPop: false,
@@ -319,7 +312,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen>
                             size: 14, color: Colors.white.withValues(alpha: 0.9)),
                         const SizedBox(width: 6),
                         Text(
-                          'Repetindo ${_repeatCount}x',
+                          'Repeating ${_repeatCount}x',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -340,7 +333,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen>
                         size: 16, color: Colors.white.withValues(alpha: 0.7)),
                     const SizedBox(width: 6),
                     Text(
-                      'Tocando há $_elapsedFormatted',
+                      'Ringing for $_elapsedFormatted',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.white.withValues(alpha: 0.7),
@@ -363,7 +356,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen>
                         onPressed: _markDone,
                         icon: const Icon(Icons.check_rounded, size: 20),
                         label: const Text(
-                          'Marcar como Concluído',
+                          'Mark as Done',
                           style: TextStyle(
                               fontSize: 16, fontWeight: FontWeight.w700),
                         ),
@@ -407,7 +400,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen>
                       icon: Icon(Icons.close_rounded,
                           size: 18, color: Colors.white.withValues(alpha: 0.9)),
                       label: Text(
-                        'Dispensar',
+                        'Dismiss',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,

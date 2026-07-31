@@ -50,8 +50,8 @@ List<Widget> buildTrackerContentSection(
                   (field) {
                     final values = trackerRecords
                         .map((r) => r.fieldValues[field.id])
-                        .whereType<num>()
-                        .map((n) => n.toDouble())
+                        .where((v) => v is num || v is bool)
+                        .map((v) => v is num ? v.toDouble() : ((v as bool) ? 1.0 : 0.0))
                         .toList();
 
                     final latestValue = trackerRecords.isNotEmpty

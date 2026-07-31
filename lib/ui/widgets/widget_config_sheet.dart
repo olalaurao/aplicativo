@@ -448,7 +448,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
       }
       // Default to all if no old settings
       if (visibleKinds.isEmpty) {
-        visibleKinds = ScheduleSurfaceFilter._defaultVisibleKinds;
+        visibleKinds = DailyScheduleKind.values.toSet();
       }
     } else {
       visibleKinds = rawVisibleKinds;

@@ -237,9 +237,25 @@ class TimelineAggregatorService {
         }
       }
       if (obj is Habit) {
+        DateTime? lastCompletion;
+        for (final r in obj.completionHistory) {
+          if (r.successful) {
+            if (lastCompletion == null || r.date.isAfter(lastCompletion)) {
+              lastCompletion = r.date;
+            }
+          }
+        }
+        
         final scheduledToday = obj.schedulers.isEmpty
             ? true
-            : obj.schedulers.any((s) => SchedulerService.shouldFire(s, dateOnly, isThemeActive: isThemeActive, isBlockActive: isBlockActive, isItemScheduled: isItemScheduled));
+            : obj.schedulers.any((s) => SchedulerService.shouldFire(
+                  s, 
+                  dateOnly, 
+                  isThemeActive: isThemeActive, 
+                  isBlockActive: isBlockActive, 
+                  isItemScheduled: isItemScheduled,
+                  lastCompletionDate: lastCompletion,
+                ));
         if (scheduledToday && obj.status == HabitStatus.active && !obj.isNegative) habits.add(obj);
       }
       if (obj is Event) {

@@ -1,4 +1,4 @@
-﻿package com.productivity.quartzo
+package com.productivity.quartzo
 
 import android.app.AlarmManager
 import android.content.Context
@@ -291,6 +291,46 @@ class MainActivity : FlutterActivity() {
                         if (reportDir.exists()) {
                             reportDir.deleteRecursively()
                         }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("ERROR", e.message, null)
+                    }
+                }
+                else -> {
+                    result.notImplemented()
+                }
+            }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.productivity.Quartzo/vibration").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "vibrate" -> {
+                    try {
+                        val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                        val pattern = call.argument<String>("pattern") ?: "normal"
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            val timings = when (pattern) {
+                                "gentle" -> longArrayOf(0, 100, 1000)
+                                "normal" -> longArrayOf(0, 200, 800)
+                                "strong" -> longArrayOf(0, 400, 600)
+                                "pulsing" -> longArrayOf(0, 100, 50, 100, 500)
+                                "urgent" -> longArrayOf(0, 200, 200, 200, 400)
+                                else -> longArrayOf(0, 200, 800)
+                            }
+                            vibrator.vibrate(android.os.VibrationEffect.createWaveform(timings, -1))
+                        } else {
+                            @Suppress("DEPRECATION")
+                            vibrator.vibrate(500)
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("ERROR", e.message, null)
+                    }
+                }
+                "cancelVibration" -> {
+                    try {
+                        val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                        vibrator.cancel()
                         result.success(true)
                     } catch (e: Exception) {
                         result.error("ERROR", e.message, null)
