@@ -777,7 +777,7 @@ Future<void> _initApp(ProviderContainer container) async {
     // to reduce startup overhead
     try {
       final prefs = await SharedPreferences.getInstance();
-      const purgeKey = 'notification_cache_purged_late_duplicates_20260525';
+      const purgeKey = 'notification_cache_purged_late_duplicates_20260731_payload';
       if (prefs.getBool(purgeKey) != true) {
         await notificationService.clearNotificationCache();
         await prefs.setBool(purgeKey, true);
