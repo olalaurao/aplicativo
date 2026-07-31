@@ -1176,10 +1176,7 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
         }
       } catch (e) {
         debugPrint('[Conflicts] Cleanup of conflict artifacts failed: $e');
-        // For _diagnostics files, this is expected - they may have been deleted already
-        if (!isDiagnosticsConflict) {
-          rethrow;
-        }
+        // Do not rethrow - resolution was successful (metadata deleted), cleanup is secondary
       }
 
       if (mounted) {
@@ -1236,9 +1233,15 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
       }
 
       final sourcePath = keepLocal ? conflict.localPath : conflict.remotePath;
-      final chosenContent = await obsidian.readFile(sourcePath);
+      String? chosenContent = await obsidian.readFile(sourcePath);
       if (chosenContent == null) {
-        throw Exception('Versão escolhida não foi encontrada');
+        // Fallback to the current main file if conflict artifacts are missing
+        debugPrint('Warning: Conflict artifact missing at $sourcePath, falling back to ${conflict.relativePath}');
+        chosenContent = await obsidian.readFile(conflict.relativePath);
+        if (chosenContent == null) {
+          // If even the main file is missing, use empty content or throw a more helpful error
+          throw Exception('Arquivos de conflito ausentes e arquivo principal também não foi encontrado. Tente excluir o conflito.');
+        }
       }
 
       driveSync.init(client);
@@ -1280,6 +1283,7 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
         await driveSync.permanentlyDeleteFileByPath(conflict.remotePath);
       } catch (e) {
         debugPrint('[Conflicts] Cleanup of conflict artifacts failed: $e');
+        // Do not rethrow - resolution was successful, cleanup is secondary
       }
 
       if (mounted) {

@@ -37,7 +37,6 @@ class SyncManager {
   bool _isAppStarting = true; // Guard to prevent sync during startup
 
   SyncManager(this._ref) {
-    // PERMANENTLY disable sync to prevent crashes
     _isAppStarting = true;
     // Cancel any existing timers from previous hot restarts
     _syncTimer?.cancel();
@@ -47,12 +46,12 @@ class SyncManager {
   void start() {
     debugPrint('[SyncManager] start() called');
     _syncTimer?.cancel();
-    // DISABLED: Periodic sync causing crashes
-    // _syncTimer = Timer.periodic(const Duration(minutes: 15), (_) {
-    //   if (_ref.read(settingsProvider).autoSync) {
-    //     performSync(debounce: true);
-    //   }
-    // });
+    // Periodic sync
+    _syncTimer = Timer.periodic(const Duration(minutes: 15), (_) {
+      if (_ref.read(settingsProvider).autoSync) {
+        performSync(debounce: true);
+      }
+    });
 
     // Initial sync and cleanup - defer to avoid startup load
     debugPrint('[SyncManager] Scheduling startup tasks in 5 seconds');
@@ -72,13 +71,13 @@ class SyncManager {
   Future<void> _runStartupTasks() async {
     debugPrint('[SyncManager] Running startup tasks');
     
-    // DISABLED: Startup guard no longer needed without vault watcher
-    // await Future.delayed(const Duration(seconds: 30));
-    // _isAppStarting = false;
-    // debugPrint('[SyncManager] Startup guard expired - vault watcher and sync now active');
+    await Future.delayed(const Duration(seconds: 30));
+    _isAppStarting = false;
+    debugPrint('[SyncManager] Startup guard expired - sync now active');
     
-    // DISABLED: Initial sync to prevent crashes
-    // await performSync();
+    if (_ref.read(settingsProvider).autoSync) {
+      await performSync();
+    }
   }
 
   void _setupVaultWatcher() {
@@ -152,9 +151,10 @@ class SyncManager {
   }
 
   Future<void> performSync({bool debounce = false}) async {
-    // DISABLED: Sync causing freeze/crash
-    debugPrint('[SyncManager] Sync disabled to prevent freeze/crash');
-    return;
+    if (!_ref.read(settingsProvider).autoSync) {
+      debugPrint('[SyncManager] Sync disabled by autoSync toggle');
+      return;
+    }
     
     // Cancel any pending debounced sync
     _syncDebounceTimer?.cancel();
@@ -316,8 +316,9 @@ class SyncManager {
       final localChanged = baseHash != null && localHash != baseHash;
       final remoteChanged =
           baseHash != null && remoteHash != null && remoteHash != baseHash;
+      final remoteLostHash = baseHash != null && remoteHash == null;
 
-      if (localChanged && remoteChanged && remoteFile?.id != null) {
+      if (localChanged && (remoteChanged || remoteLostHash) && remoteFile?.id != null) {
         final remoteContent = await driveSync.downloadFile(remoteFile!.id!);
         if (remoteContent != null) {
           await _storeConflict(
@@ -466,8 +467,9 @@ class SyncManager {
       final localChanged = baseHash != null && localHash != baseHash;
       final remoteChanged =
           baseHash != null && remoteHash != null && remoteHash != baseHash;
+      final remoteLostHash = baseHash != null && remoteHash == null;
 
-      if (localChanged && remoteChanged && remoteFile.id != null) {
+      if (localChanged && (remoteChanged || remoteLostHash) && remoteFile.id != null) {
         final remoteContent = await driveSync.downloadFile(remoteFile.id!);
         if (remoteContent != null) {
           await _storeConflict(
@@ -533,22 +535,6 @@ class SyncManager {
         if (remoteFile.id == null) continue;
         final remoteContent = await driveSync.downloadFile(remoteFile.id!);
         if (remoteContent != null) {
-          // Optimistic concurrency check: re-read sync state before writing
-          final currentSyncState = await queue.getFileSyncState(relPath);
-          if (currentSyncState != null && currentSyncState['remoteHash'] != null) {
-            // Another device already synced this file, treat as conflict
-            await _storeConflict(
-              driveSync: driveSync,
-              obsidian: obsidian,
-              relativePath: relPath,
-              localContent: content,
-              remoteContent: remoteContent,
-              remoteModifiedAt: remoteFile.modifiedTime,
-            );
-            processedCount++;
-            _ref.read(syncProgressProvider.notifier).update(processedCount);
-            continue;
-          }
           await _ensurePreSyncBackup(driveSync);
           await obsidian.writeFile(relPath, remoteContent);
           final newHash = driveSync.calculateHash(remoteContent);
@@ -566,25 +552,6 @@ class SyncManager {
         _ref.read(syncProgressProvider.notifier).update(processedCount);
       } else if (remoteHash == null &&
           await _isLocalFileNewer(localFile, remoteFile)) {
-        // Optimistic concurrency check: re-read sync state before writing
-        final currentSyncState = await queue.getFileSyncState(relPath);
-        if (currentSyncState != null && currentSyncState['remoteHash'] != null) {
-          // Another device already synced this file, treat as conflict
-          final remoteContent = await driveSync.downloadFile(remoteFile.id!);
-          if (remoteContent != null) {
-            await _storeConflict(
-              driveSync: driveSync,
-              obsidian: obsidian,
-              relativePath: relPath,
-              localContent: content,
-              remoteContent: remoteContent,
-              remoteModifiedAt: remoteFile.modifiedTime,
-            );
-          }
-          processedCount++;
-          _ref.read(syncProgressProvider.notifier).update(processedCount);
-          continue;
-        }
         await _ensurePreSyncBackup(driveSync);
         final uploaded = await driveSync.syncFile(relPath, content, localHash);
         if (uploaded) {

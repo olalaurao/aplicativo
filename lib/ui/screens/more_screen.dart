@@ -14,6 +14,8 @@ import 'pillars_screen.dart';
 import '../../providers/google_calendar_provider.dart';
 import '../widgets/navigation_shortcut_picker.dart';
 import '../../providers/vault_provider.dart';
+import '../../services/sync_manager.dart';
+import '../../providers/settings_provider.dart';
 
 class MoreScreen extends ConsumerStatefulWidget {
   const MoreScreen({super.key});
@@ -99,6 +101,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 _buildSyncRow(context),
+                _buildAppSyncToggle(context),
                 const SizedBox(height: 24),
                 _buildSectionHeader(
                   'Navigation & Content',
@@ -616,7 +619,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Google Calendar & Sync',
+                      'Google Account',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -703,6 +706,76 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppSyncToggle(BuildContext context) {
+    final authAccount = ref.watch(googleAuthServiceProvider);
+    final isSignedIn = authAccount != null;
+    final settings = ref.watch(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
+    
+    // Only show sync toggle if user is signed in to Google
+    if (!isSignedIn) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        decoration: AppTheme.cardDecoration(context),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: (settings.autoSync ? AppTheme.accentColor(context) : AppColors.textMuted).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                settings.autoSync ? Icons.sync_rounded : Icons.sync_disabled_rounded,
+                size: 20,
+                color: settings.autoSync ? AppTheme.accentColor(context) : AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'App Sync (Google Drive)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    settings.autoSync ? 'Active - syncing changes' : 'Disabled (Obsidian Sync mode)',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch.adaptive(
+              value: settings.autoSync,
+              onChanged: (value) async {
+                await notifier.updateAutoSync(value);
+                if (value) {
+                  // Trigger immediate sync when enabled
+                  ref.read(syncManagerProvider).performSync(debounce: true);
+                }
+              },
+              activeThumbColor: AppTheme.accentColor(context),
+            ),
+          ],
         ),
       ),
     );
