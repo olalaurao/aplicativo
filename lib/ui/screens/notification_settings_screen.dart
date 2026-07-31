@@ -7,6 +7,9 @@ import '../../providers/color_palette_provider.dart';
 import '../../models/color_palette_model.dart';
 import '../widgets/vibration_pattern_selector.dart';
 import '../widgets/notification_sound_toggle.dart';
+import '../widgets/notification_sound_selector.dart';
+import '../../services/notification_service.dart';
+import '../../models/reminder_config.dart';
 
 /// Settings screen for customizing notification appearance (popup colors, alarm colors, buttons).
 class NotificationSettingsScreen extends ConsumerStatefulWidget {
@@ -98,13 +101,58 @@ class _NotificationSettingsScreenState
   Future<void> _saveVibrationPattern(String type, String pattern) async {
     final notifier = ref.read(settingsProvider.notifier);
     await notifier.updateVibrationPattern(type: type, pattern: pattern);
+    await notifier.incrementNotificationChannelVersion();
+    await NotificationService().createNotificationChannels();
     if (mounted) setState(() {});
   }
 
-  void _saveSoundEnabled(String type, bool enabled) {
+  Future<void> _saveSoundEnabled(String type, bool enabled) async {
     final notifier = ref.read(settingsProvider.notifier);
-    notifier.updateSoundEnabled(type: type, enabled: enabled);
+    await notifier.updateSoundEnabled(type: type, enabled: enabled);
+    await notifier.incrementNotificationChannelVersion();
+    await NotificationService().createNotificationChannels();
     setState(() {});
+  }
+
+  Future<void> _saveSoundName(String type, String? name) async {
+    if (name == null) return;
+    final notifier = ref.read(settingsProvider.notifier);
+    await notifier.updateSoundName(type: type, soundName: name);
+    await notifier.incrementNotificationChannelVersion();
+    await NotificationService().createNotificationChannels();
+    setState(() {});
+  }
+
+  void _testNotification(String type) {
+    final service = NotificationService();
+    final now = DateTime.now();
+    switch (type) {
+      case 'alarm':
+        service.showAlarmScreen(
+          title: 'Test Alarm',
+          body: 'This is how your alarms will appear.',
+          notificationId: 9991,
+        );
+        break;
+      case 'popup':
+        service.showInAppPopup(
+          title: 'Test Popup',
+          body: 'This is how your popups will appear.',
+        );
+        break;
+      case 'push':
+        service.scheduleReminder(
+          id: 9992,
+          title: 'Test Push Notification',
+          config: ReminderConfig(
+            id: 'test_push',
+            triggerTime: now.add(const Duration(seconds: 2)),
+            type: NotificationType.push,
+            notificationBody: 'This is how your push notifications will appear.',
+          ),
+        );
+        break;
+    }
   }
 
   @override
@@ -210,29 +258,109 @@ class _NotificationSettingsScreenState
 
                 const SizedBox(height: 28),
 
-                // ── Sound ──
-                _sectionHeader('Sound'),
+                // ── Sound & Behavior ──
+                _sectionHeader('Sound & Behavior'),
                 const SizedBox(height: 12),
                 Container(
                   decoration: AppTheme.cardDecoration(context),
                   child: Column(
                     children: [
+                      // Alarm
+                      ListTile(
+                        title: const Text('Alarm (Full Screen)', style: TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: const Text('Always rings on silent'),
+                        trailing: ElevatedButton(
+                          onPressed: () => _testNotification('alarm'),
+                          child: const Text('Test'),
+                        ),
+                      ),
                       NotificationSoundToggle(
                         value: settings.alarmSoundEnabled,
                         onChanged: (enabled) => _saveSoundEnabled('alarm', enabled),
-                        label: 'Alarm Sound',
+                        label: 'Play Sound',
                       ),
-                      const Divider(height: 1, indent: 16),
+                      if (settings.alarmSoundEnabled)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: NotificationSoundSelector(
+                            value: settings.alarmSoundName,
+                            onChanged: (name) => _saveSoundName('alarm', name),
+                            label: 'Alarm Sound',
+                          ),
+                        ),
+                      
+                      const Divider(height: 1),
+                      
+                      // Popup
+                      ListTile(
+                        title: const Text('Popup Banner', style: TextStyle(fontWeight: FontWeight.bold)),
+                        trailing: ElevatedButton(
+                          onPressed: () => _testNotification('popup'),
+                          child: const Text('Test'),
+                        ),
+                      ),
                       NotificationSoundToggle(
                         value: settings.popupSoundEnabled,
                         onChanged: (enabled) => _saveSoundEnabled('popup', enabled),
-                        label: 'Popup Sound',
+                        label: 'Play Sound',
                       ),
-                      const Divider(height: 1, indent: 16),
+                      if (settings.popupSoundEnabled)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: NotificationSoundSelector(
+                            value: settings.popupSoundName,
+                            onChanged: (name) => _saveSoundName('popup', name),
+                            label: 'Popup Sound',
+                          ),
+                        ),
+                      SwitchListTile.adaptive(
+                        title: const Text('Ring on Silent', style: TextStyle(fontSize: 14)),
+                        value: settings.popupRingOnSilent,
+                        onChanged: (val) async {
+                          final notifier = ref.read(settingsProvider.notifier);
+                          await notifier.updateRingOnSilent(type: 'popup', ringOnSilent: val);
+                          await notifier.incrementNotificationChannelVersion();
+                          await NotificationService().createNotificationChannels();
+                          setState((){});
+                        },
+                        activeColor: AppTheme.accentColor(context),
+                      ),
+                      
+                      const Divider(height: 1),
+
+                      // Push (Reminder)
+                      ListTile(
+                        title: const Text('Push Notification', style: TextStyle(fontWeight: FontWeight.bold)),
+                        trailing: ElevatedButton(
+                          onPressed: () => _testNotification('push'),
+                          child: const Text('Test'),
+                        ),
+                      ),
                       NotificationSoundToggle(
                         value: settings.reminderSoundEnabled,
-                        onChanged: (enabled) => _saveSoundEnabled('reminder', enabled),
-                        label: 'Reminder Sound',
+                        onChanged: (enabled) => _saveSoundEnabled('push', enabled),
+                        label: 'Play Sound',
+                      ),
+                      if (settings.reminderSoundEnabled)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: NotificationSoundSelector(
+                            value: settings.pushSoundName,
+                            onChanged: (name) => _saveSoundName('push', name),
+                            label: 'Push Sound',
+                          ),
+                        ),
+                      SwitchListTile.adaptive(
+                        title: const Text('Ring on Silent', style: TextStyle(fontSize: 14)),
+                        value: settings.pushRingOnSilent,
+                        onChanged: (val) async {
+                          final notifier = ref.read(settingsProvider.notifier);
+                          await notifier.updateRingOnSilent(type: 'push', ringOnSilent: val);
+                          await notifier.incrementNotificationChannelVersion();
+                          await NotificationService().createNotificationChannels();
+                          setState((){});
+                        },
+                        activeColor: AppTheme.accentColor(context),
                       ),
                     ],
                   ),

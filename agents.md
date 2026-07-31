@@ -1537,25 +1537,25 @@ Toda mutação (create/update/delete) enfileira uma `SyncAction`. A fila é proc
 
 ## 13. NOTIFICAÇÕES
 
-### 13.1 Três Tipos
+### 13.1 Três Tipos e Comportamentos
 
-| Tipo | Comportamento | Configuração |
+| Tipo | Comportamento | Configuração (Settings) |
 |---|---|---|
-| **Push** | Notification shade padrão | Som, vibração, LED color |
-| **Popup** | Full-screen sobre lock screen | Background color, botões |
-| **Alarm** | Toca como alarme (ignora silencioso) | Ringtone, snooze duration |
+| **Push** | Notification shade padrão | Som e Vibração selecionáveis, Ring on Silent opcional |
+| **Popup** | Full-screen via flutter intent sobre lock screen | Som e Vibração selecionáveis, Ring on Silent opcional, botões dinâmicos |
+| **Alarm** | Full-screen contínuo (ignora silencioso sempre) | Som em Loop, Vibração Contínua, Snooze dinâmico |
 
-### 13.2 Action Buttons em Todas as Notificações
+### 13.2 Regras de Arquitetura Críticas (NÃO QUEBRAR)
+- **Canais Imutáveis do Android**: O Android bloqueia alterações de som e vibração em canais de notificação existentes. Para burlar isso e permitir a customização do usuário, usamos versionamento (`notificationChannelVersion`). **Toda vez** que alterar um setting de som, vibração ou `Ring on Silent` (ex: `notification_settings_screen.dart`), chame OBRIGATORIAMENTE `incrementNotificationChannelVersion()` seguido de `NotificationService().createNotificationChannels()`.
+- **Enriched Payload e Roteamento Nativo**: Nunca dispare notificações manualmente. Use sempre `NotificationService.scheduleReminder()`. Ele anexa um `?ntype=alarm/popup/push` ao ID do objeto (`_buildEnrichedPayload`). O Android (Kotlin) usa Regex para extrair esse `ntype` e forçar a abertura da Activity em tela cheia correta (Alarm ou Popup) antes mesmo de o Flutter carregar por completo. Alterar esse payload quebra o full-screen intent.
+- **Ring on Silent**: É implementado injetando `AudioAttributesUsage.alarm` na criação do AndroidNotificationChannel para Popups e Pushs caso o usuário ative a chave.
+- **Vibração Contínua**: O `VibrationService.dart` roda em loop dentro do Flutter para Popups e Alarms, traduzindo o nome do padrão ("urgent", "gentle") em tempos de waveform no Kotlin, rodando ininterruptamente enquanto a tela estiver visível.
 
-- **"Concluído"** — marca o objeto como completo SEM abrir o app
-- **"Adiar"** — adia pela duração de snooze configurada (padrão: 10min)
-- **"Dispensar"** — fecha sem marcar como completo
+### 13.3 Action Buttons em Todas as Notificações
 
-### 13.3 Regras de Implementação
-
-- Usar `AlarmManager.setExactAndAllowWhileIdle()` no Android
-- Registrar alarmes no MOMENTO da criação, não ao abrir o app
-- Cada objeto pode ter múltiplos reminders independentes
+- **"Concluído"** — Marca o objeto como completo (via `VaultNotifier.markObjectDone()`) parseando a URL do payload.
+- **"Adiar"** — Reagenda usando a quantidade de minutos definida pela configuração no payload.
+- **"Dispensar"** — Apenas cancela a tela/notificação.
 
 ---
 

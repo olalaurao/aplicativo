@@ -1979,11 +1979,17 @@ Sync architecture (Google Drive, offline queue, conflict resolution via `_confli
 
 **Escalation (new in V5.1):** each Reminder Configuration gains an optional `escalation` setting: when the same reminder is dismissed/ignored (not acted on, not snoozed intentionally) for **N consecutive occurrences** (user-configurable, default 3), the app automatically increases its intensity for the next occurrence — stepping through, in order: `push` → `popup` → `alarm`, plus a stronger vibration pattern and, optionally, a distinct color/sound the user picks when enabling escalation. This exists specifically to counter notification-blindness on recurring reminders the user has started tuning out. Escalation resets to the base intensity as soon as the user acts on (completes/opens) one occurrence.
 
-**Vibration and Sound Customization (new in V5.4):** users can customize vibration patterns and sound settings per notification type (Alarm, Popup, Reminder) via Settings → Notification Appearance. Vibration patterns are preset options (Gentle, Normal, Strong, Pulsing, Urgent) with defined millisecond patterns. Sound settings are binary (on/off) using platform default notification sounds. Settings persist via SharedPreferences and are applied by NotificationService when creating notification channels and scheduling reminders. Default patterns: Alarm uses 'strong', Popup uses 'normal', Reminder uses 'normal'. All sounds default to enabled.
+**Vibration and Sound Customization (new in V5.4):** users can customize vibration patterns, sound settings, and "Ring on Silent" per notification type (Alarm, Popup, Reminder) via Settings → Notification Appearance. 
+* **Critical Rule - Channel Immutability:** Because Android notification channels are immutable, any modification to sound, vibration, or ring-on-silent **MUST** trigger `incrementNotificationChannelVersion()` and `NotificationService().createNotificationChannels()`. This regenerates the channels (e.g. `alarm_channel_v2`) so the system adopts the new settings instantly.
+* **Ring on Silent Mechanism:** Achieved by injecting `AudioAttributesUsage.alarm` into the `AndroidNotificationChannel`.
+
+**Reusable Reminder Component & Native Routing:** 
+* **Critical Rule - Enriched Payload:** Never trigger notifications manually. ALWAYS use `NotificationService.scheduleReminder()`. This method takes the generic object payload (like `20240101-1234`) and builds an **Enriched Payload** by appending URL parameters (`?ntype=alarm&title=...`). 
+* **Kotlin Routing:** When the system wakes up, `MainActivity.kt` uses Regex to extract `ntype` from the payload to determine whether to open `NativeAlarmNotificationActivity` or `NativePopupNotificationActivity` in full-screen before Flutter even loads. Modifying payload structures outside `_buildEnrichedPayload` will break this pipeline.
+* **Continuous Native Vibration:** For Popups and Alarms, `VibrationService.start()` is called within Flutter. This translates the user's string setting ("urgent", "gentle") into exact millisecond waveforms in Kotlin, looping while the screen is visible.
 
 Everything else (trigger types, per-type button behavior, reliability via the system alarm manager) is unchanged from V4.
 
----
 
 ## PART 14 — ARCHIVE
 
