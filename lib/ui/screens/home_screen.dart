@@ -442,9 +442,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 )
               : Icon(icon, color: color),
           tooltip: progressTooltip,
-          onPressed: status == SyncStatus.conflict || status == SyncStatus.error
-              ? () => context.push('/sync-conflicts')
-              : null,
+          onPressed: () {
+            if (status == SyncStatus.conflict || status == SyncStatus.error) {
+              context.push('/sync-conflicts');
+            } else if (status != SyncStatus.syncing) {
+              ref.read(syncManagerProvider).performSync(debounce: true);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Sincronização manual iniciada')),
+              );
+            }
+          },
         );
       },
     );

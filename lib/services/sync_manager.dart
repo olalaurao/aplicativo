@@ -60,9 +60,9 @@ class SyncManager {
       _runStartupTasks();
     });
 
-    // DISABLED: Vault watcher causing ANR/crash even with error handling
-    // debugPrint('[SyncManager] Setting up vault watcher with error handling');
-    // _setupVaultWatcher();
+    // Re-enabled: Vault watcher is necessary to catch Obsidian Sync changes
+    debugPrint('[SyncManager] Setting up vault watcher with error handling');
+    _setupVaultWatcher();
 
     // Periodic Backup
     _setupBackupTimer();
@@ -274,6 +274,9 @@ class SyncManager {
       await driveSync.setupVaultFolder(settings.driveSyncFolder);
     }
 
+    debugPrint('[SyncManager] Fetching remote files for queue processing.');
+    final remoteFiles = await driveSync.fetchRemoteFiles();
+
     // 1. Push local queued edits first. Drive is the shared source of truth,
     // but offline mobile edits should reach it before we pull remote changes.
     debugPrint('[SyncManager] Processing local sync queue.');
@@ -294,7 +297,6 @@ class SyncManager {
         final path = relativePath ?? _guessPathForAction(action);
         if (path == null) return;
 
-        final remoteFiles = await driveSync.fetchRemoteFiles();
         final remoteFile = remoteFiles.where((f) => f.name == path).firstOrNull;
         if (remoteFile != null && remoteFile.id != null) {
           await driveSync.deleteFile(path, remoteFile.id!);
@@ -309,7 +311,7 @@ class SyncManager {
       final localHash = driveSync.calculateHash(content);
       final state = await queue.getFileSyncState(relativePath);
       final baseHash = state?['baseHash'] as String?;
-      final remoteFile = (await driveSync.fetchRemoteFiles())
+      final remoteFile = remoteFiles
           .where((file) => file.name == relativePath)
           .firstOrNull;
       final remoteHash = remoteFile?.appProperties?['Quartzo_hash'];
@@ -321,14 +323,29 @@ class SyncManager {
       if (localChanged && (remoteChanged || remoteLostHash) && remoteFile?.id != null) {
         final remoteContent = await driveSync.downloadFile(remoteFile!.id!);
         if (remoteContent != null) {
-          await _storeConflict(
-            driveSync: driveSync,
-            obsidian: obsidian,
-            relativePath: relativePath,
-            localContent: content,
-            remoteContent: remoteContent,
-            remoteModifiedAt: remoteFile.modifiedTime,
-          );
+          final newRemoteHash = driveSync.calculateHash(remoteContent);
+          if (newRemoteHash == localHash) {
+            // Contents are identical! Just update state and skip conflict
+            await queue.upsertFileSyncState(
+              relativePath: relativePath,
+              localHash: localHash,
+              remoteHash: localHash,
+              baseHash: localHash,
+              remoteFileId: remoteFile.id,
+              localModifiedAt: await obsidian.getFileModificationTime(relativePath),
+              remoteModifiedAt: remoteFile.modifiedTime,
+            );
+            debugPrint('[SyncManager] $relativePath had missing/changed hash but content is identical. Resolved automatically.');
+          } else {
+            await _storeConflict(
+              driveSync: driveSync,
+              obsidian: obsidian,
+              relativePath: relativePath,
+              localContent: content,
+              remoteContent: remoteContent,
+              remoteModifiedAt: remoteFile.modifiedTime,
+            );
+          }
         }
         return;
       }
@@ -472,14 +489,29 @@ class SyncManager {
       if (localChanged && (remoteChanged || remoteLostHash) && remoteFile.id != null) {
         final remoteContent = await driveSync.downloadFile(remoteFile.id!);
         if (remoteContent != null) {
-          await _storeConflict(
-            driveSync: driveSync,
-            obsidian: obsidian,
-            relativePath: relPath,
-            localContent: content,
-            remoteContent: remoteContent,
-            remoteModifiedAt: remoteFile.modifiedTime,
-          );
+          final newRemoteHash = driveSync.calculateHash(remoteContent);
+          if (newRemoteHash == localHash) {
+            // Contents are identical! Just update state and skip conflict
+            await queue.upsertFileSyncState(
+              relativePath: relPath,
+              localHash: localHash,
+              remoteHash: localHash,
+              baseHash: localHash,
+              remoteFileId: remoteFile.id,
+              localModifiedAt: await localFile.lastModified(),
+              remoteModifiedAt: remoteFile.modifiedTime,
+            );
+            debugPrint('[SyncManager] $relPath had missing/changed hash but content is identical. Resolved automatically.');
+          } else {
+            await _storeConflict(
+              driveSync: driveSync,
+              obsidian: obsidian,
+              relativePath: relPath,
+              localContent: content,
+              remoteContent: remoteContent,
+              remoteModifiedAt: remoteFile.modifiedTime,
+            );
+          }
         }
         processedCount++;
         _ref.read(syncProgressProvider.notifier).update(processedCount);
@@ -489,6 +521,14 @@ class SyncManager {
       if (remoteChanged && remoteFile.id != null) {
         final remoteContent = await driveSync.downloadFile(remoteFile.id!);
         if (remoteContent != null) {
+          // Optimistic concurrency check: ensure file wasn't modified locally while downloading
+          final currentState = await queue.getFileSyncState(relPath);
+          final currentLocalHash = currentState?['localHash'] as String?;
+          if (currentLocalHash != null && currentLocalHash != localHash) {
+            debugPrint('[SyncManager] File $relPath changed locally during pull. Aborting overwrite to avoid data loss.');
+            continue; 
+          }
+          
           await _ensurePreSyncBackup(driveSync);
           await obsidian.writeFile(relPath, remoteContent);
           final newHash = driveSync.calculateHash(remoteContent);
@@ -535,6 +575,14 @@ class SyncManager {
         if (remoteFile.id == null) continue;
         final remoteContent = await driveSync.downloadFile(remoteFile.id!);
         if (remoteContent != null) {
+          // Optimistic concurrency check: ensure file wasn't modified locally while downloading
+          final currentState = await queue.getFileSyncState(relPath);
+          final currentLocalHash = currentState?['localHash'] as String?;
+          if (currentLocalHash != null && currentLocalHash != localHash) {
+            debugPrint('[SyncManager] File $relPath changed locally during pull. Aborting overwrite to avoid data loss.');
+            continue; 
+          }
+
           await _ensurePreSyncBackup(driveSync);
           await obsidian.writeFile(relPath, remoteContent);
           final newHash = driveSync.calculateHash(remoteContent);

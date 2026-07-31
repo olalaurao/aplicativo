@@ -459,7 +459,7 @@ class ObsidianService {
   }
 
   Stream<List<WatchEvent>>? watchVaultDebounced({
-    Duration debounce = const Duration(milliseconds: 800),
+    Duration debounce = const Duration(milliseconds: 3000), // Increased to 3s to prevent reload storms from Obsidian Sync
   }) {
     if (vaultDir == null) return null;
     final rawStream = Platform.isIOS

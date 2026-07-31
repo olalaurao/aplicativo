@@ -294,6 +294,14 @@ class SyncQueueService {
 
   Future<List<Map<String, dynamic>>> getConflicts() async {
     if (_db == null) throw Exception('Database not initialized');
+    
+    // Automatically delete _diagnostics conflicts from DB so they never appear in UI
+    await _db!.delete(
+      'sync_conflicts',
+      where: 'relativePath LIKE ? OR relativePath LIKE ?',
+      whereArgs: ['%_diagnostics/%', '_diagnostics/%'],
+    );
+    
     return _db!.query('sync_conflicts', orderBy: 'detectedAt DESC');
   }
 
