@@ -7,10 +7,12 @@ import 'package:intl/intl.dart';
 import '../../models/project_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/task_model.dart';
+import '../../models/reminder_config.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/rotation_service.dart';
 import '../forms/create_task_form.dart';
 import '../theme.dart';
+import '../widgets/rotation_reminder_config_sheet.dart';
 
 // Top-level function for compute() - must be static or top-level
 ({Project updated, bool advanced, RotationGroup? nextGroup, bool viaTimeout})
@@ -95,6 +97,26 @@ class RotationZoneDetailScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            icon: Icon(Icons.add_alert_rounded),
+            tooltip: 'Add Reminder',
+            onPressed: () => showRotationReminderConfigSheet(
+              context,
+              project: project,
+              initialGroupId: group.id,
+              onSave: (config) async {
+                final updated = project.copyProjectWith(
+                  rotationReminders: [
+                    ...project.rotationReminders,
+                    config,
+                  ],
+                );
+                await ref
+                    .read(projectsProvider.notifier)
+                    .updateProject(updated);
+              },
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.more_horiz_rounded),
             onPressed: () {},
           ),
@@ -157,6 +179,11 @@ class RotationZoneDetailScreen extends ConsumerWidget {
             everyN,
             status,
             RotationFrequencyType.everyNRotations,
+          ),
+          // ─── Reminders Section ───
+          _RemindersSection(
+            project: project,
+            groupId: group.id,
           ),
         ],
       ),
@@ -641,3 +668,134 @@ class _ZoneProgressBars extends StatelessWidget {
     );
   }
 }
+
+// ─── Reminders Section ────────────────────────────────────────────────────────
+
+class _RemindersSection extends ConsumerWidget {
+  final Project project;
+  final String groupId;
+
+  const _RemindersSection({
+    required this.project,
+    required this.groupId,
+  });
+
+  String _triggerLabel(RotationReminderConfig r) {
+    switch (r.triggerMode) {
+      case RotationReminderTriggerMode.atStartTime:
+        return 'At start time';
+      case RotationReminderTriggerMode.minutesBefore:
+        return '${r.minutesBefore ?? 10} min before';
+      case RotationReminderTriggerMode.atTimeOfDay:
+        return 'At ${r.timeOfDay ?? '09:00'}';
+    }
+  }
+
+  IconData _notifIcon(NotificationType t) {
+    switch (t) {
+      case NotificationType.push:
+        return Icons.notifications_outlined;
+      case NotificationType.popup:
+        return Icons.open_in_new_rounded;
+      case NotificationType.alarm:
+        return Icons.alarm_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Show reminders that are global (groupId==null) or for this specific group
+    final relevant = project.rotationReminders
+        .where((r) => r.groupId == null || r.groupId == groupId)
+        .toList();
+
+    if (relevant.isEmpty) return const SizedBox(height: AppSpacing.lg);
+
+    final accent = AppTheme.accentColor(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: AppSpacing.xl),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            children: [
+              Icon(
+                Icons.notifications_rounded,
+                size: 14,
+                color: AppColors.textMuted,
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                'REMINDERS',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textMuted,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        ...relevant.map((reminder) {
+          final isGlobal = reminder.groupId == null;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: AppTheme.cardDecorationFlat(context),
+            child: Row(
+              children: [
+                Icon(
+                  _notifIcon(reminder.notificationType),
+                  size: 18,
+                  color: accent,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _triggerLabel(reminder),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (isGlobal)
+                        const Text(
+                          'All groups',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                  color: AppColors.textMuted,
+                  onPressed: () async {
+                    final updated = project.copyProjectWith(
+                      rotationReminders: project.rotationReminders
+                          .where((r) => r.id != reminder.id)
+                          .toList(),
+                    );
+                    await ref
+                        .read(projectsProvider.notifier)
+                        .updateProject(updated);
+                  },
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+

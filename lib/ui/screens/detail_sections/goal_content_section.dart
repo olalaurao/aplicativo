@@ -72,7 +72,9 @@ List<Widget> buildGoalContentSection(
       moods: moods,
       allObjects: allObjects,
     );
-    completed += (val / kpi.targetValue).clamp(0.0, 1.0);
+    if (val != null) {
+      completed += (val / kpi.targetValue).clamp(0.0, 1.0);
+    }
   }
   final progress = total > 0 ? (completed / total) : 0.0;
   final kpisDone = goal.kpis.where((k) => k.completed).length;

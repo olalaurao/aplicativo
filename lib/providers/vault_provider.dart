@@ -1179,9 +1179,26 @@ class ProjectsNotifier extends Notifier<List<Project>> {
         if (p.id == project.id) updatedProject else p,
     ];
     await ref.read(vaultProvider.notifier).updateObject(updatedProject);
+    // Reschedule rotation reminders when the project is saved.
+    if (updatedProject.hasRotation &&
+        updatedProject.rotationReminders.isNotEmpty) {
+      await NotificationService().scheduleRotationRemindersForProject(
+        updatedProject,
+      );
+    }
   }
 
   Future<void> deleteProject(Project project) async {
+    // Safe deletion: move child projects to root before deleting parent
+    final childProjects = state
+        .where((p) => p.parentId == project.id)
+        .toList();
+    
+    for (final child in childProjects) {
+      final updated = child.copyWith(parentId: null);
+      await ref.read(vaultProvider.notifier).updateObject(updated);
+    }
+    
     state = state.where((p) => p.id != project.id).toList();
     await ref.read(vaultProvider.notifier).deleteObject(project);
   }

@@ -7,13 +7,16 @@ import 'package:intl/intl.dart';
 import '../../providers/vault_provider.dart';
 import '../../providers/daily_schedule_provider.dart';
 import '../../services/daily_schedule_service.dart';
+import '../../services/notification_service.dart';
 import '../../models/habit_model.dart';
+import '../../models/reminder_config.dart';
 import '../theme.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/habit_detail_sheet.dart';
 import '../forms/create_habit_form.dart';
 import '../widgets/health_alerts_strip.dart';
 import '../widgets/habit_check_handler.dart';
+import '../widgets/snooze_picker_sheet.dart';
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
@@ -460,7 +463,149 @@ class _TodayView extends ConsumerWidget {
           ],
         ),
       ),
-      child: child,
+      child: GestureDetector(
+        onLongPress: () => _showHabitContextMenu(context, ref, habit, date, currentVal),
+        child: child,
+      ),
+    );
+  }
+
+  /// Long-press context menu: Complete / Snooze / View Details
+  void _showHabitContextMenu(
+    BuildContext context,
+    WidgetRef ref,
+    Habit habit,
+    DateTime date,
+    dynamic currentVal,
+  ) {
+    HapticFeedback.mediumImpact();
+    final habitColor = _habitColor(habit);
+    final isDone = _isCompleted(currentVal, habit);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(ctx).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Habit name header
+            Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: habitColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    habit.displayTitle,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            // ─── Actions ───
+            if (!isDone)
+              _HabitContextAction(
+                icon: Icons.check_circle_outline_rounded,
+                label: 'Mark as done',
+                color: habitColor,
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await ref.read(habitsProvider.notifier).toggleHabit(habit, date);
+                  HapticFeedback.lightImpact();
+                },
+              ),
+            if (!isDone) const SizedBox(height: 4),
+            _HabitContextAction(
+              icon: Icons.snooze_rounded,
+              label: 'Snooze',
+              color: AppColors.warning,
+              onTap: () {
+                Navigator.pop(ctx);
+                _openSnooze(context, habit);
+              },
+            ),
+            const SizedBox(height: 4),
+            _HabitContextAction(
+              icon: Icons.open_in_new_rounded,
+              label: 'View details',
+              color: AppColors.textMuted,
+              onTap: () {
+                Navigator.pop(ctx);
+                showHabitDetailSheet(context, habit, date);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Open the SnoozePickerSheet and schedule a notification on confirm.
+  void _openSnooze(BuildContext context, Habit habit) {
+    showSnoozePickerSheet(
+      context,
+      title: habit.displayTitle,
+      onSnooze: (duration) async {
+        final triggerTime = DateTime.now().add(duration);
+        final notifId =
+            'habit_snooze_${habit.id}'.hashCode.abs() % 999990000 + 1;
+        await NotificationService().scheduleReminder(
+          id: notifId,
+          title: habit.displayTitle,
+          config: ReminderConfig(
+            id: 'snooze_${habit.id}_${DateTime.now().millisecondsSinceEpoch}',
+            triggerTime: triggerTime,
+            type: NotificationType.push,
+            notificationBody: 'Time to do your habit!',
+            snoozeMinutes: 10,
+          ),
+          triggerTime: triggerTime,
+          payload:
+              'Quartzo://notification?oid=${Uri.encodeComponent(habit.id)}&type=habit',
+        );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Snoozed "${habit.displayTitle}" — reminder set',
+              ),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
     );
   }
 
@@ -516,6 +661,57 @@ class _TodayView extends ConsumerWidget {
     return streak;
   }
 }
+
+// ─── Habit Context Action Row ─────────────────────────────────────────────────
+
+class _HabitContextAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _HabitContextAction({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textPrimaryColor(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Habit Section Label ──────────────────────────────────────────────────────
 
 class _HabitSectionLabel extends StatelessWidget {
   final String label;

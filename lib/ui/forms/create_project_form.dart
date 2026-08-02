@@ -23,6 +23,7 @@ import '../widgets/app_switch_tile.dart';
 import '../widgets/date_picker_field.dart';
 import '../widgets/checklist_step_editor.dart';
 import '../../services/collection_row_service.dart';
+import '../../services/project_hierarchy_service.dart';
 import '../theme.dart';
 import 'scheduler_picker.dart';
 import '../../models/color_palette_model.dart';
@@ -57,6 +58,8 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
   List<ChecklistStep> _steps = [];
   String? _rotationScheduledTime;
   int? _rotationDurationMinutes;
+  String? _parentId;
+  String _hierarchyCombinationMode = 'simple';
 
   static const _colorSwatches = [
     '#3B82F6',
@@ -101,6 +104,8 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
       _steps = List.from(project.steps);
       _rotationScheduledTime = project.rotationScheduledTime;
       _rotationDurationMinutes = project.rotationDurationMinutes;
+      _parentId = project.parentId;
+      _hierarchyCombinationMode = project.hierarchyCombinationMode ?? 'simple';
     } else {
       if (widget.initialOrganizers != null) {
         _organizers = List.from(widget.initialOrganizers!);
@@ -537,6 +542,169 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
                       onChanged: (val) => setState(() => _organizers = val),
                     ),
                   ),
+
+                  const SizedBox(height: 12),
+
+                  // Parent Project
+                  Container(
+                    decoration: AppTheme.cardDecoration(context),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Parent Project',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Consumer(
+                          builder: (context, ref, child) {
+                            final allProjects = ref.watch(projectsProvider);
+                            final currentProjectId = widget.existingProject?.id;
+                            
+                            // Filter available parents (exclude self and validate depth for display)
+                            final availableParents = allProjects
+                                .where((p) {
+                                  // Cannot be parent of itself
+                                  if (currentProjectId != null && p.id == currentProjectId) {
+                                    return false;
+                                  }
+                                  
+                                  // Check depth limit for display
+                                  final validDepth = ProjectHierarchyService.validateDepth(
+                                    p.id,
+                                    allProjects,
+                                  );
+                                  if (!validDepth) return false;
+                                  
+                                  return true;
+                                })
+                                .toList();
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceVariant,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String?>(
+                                  value: _parentId,
+                                  isExpanded: true,
+                                  hint: const Text('No Parent (Root Project)'),
+                                  items: [
+                                    const DropdownMenuItem<String?>(
+                                      value: null,
+                                      child: Text('No Parent (Root Project)'),
+                                    ),
+                                    ...availableParents.map(
+                                      (Project p) => DropdownMenuItem<String?>(
+                                        value: p.id,
+                                        child: Text(p.title),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: (val) {
+                                    // Validate before changing
+                                    if (val != null && currentProjectId != null) {
+                                      final wouldCreateCycle = ProjectHierarchyService.detectCycle(
+                                        currentProjectId,
+                                        val,
+                                        allProjects,
+                                      );
+                                      if (wouldCreateCycle) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Cannot create cycle in project hierarchy'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      
+                                      final validDepth = ProjectHierarchyService.validateDepth(
+                                        val,
+                                        allProjects,
+                                      );
+                                      if (!validDepth) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Cannot exceed maximum hierarchy depth of 3 levels'),
+                                            backgroundColor: Colors.orange,
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                    }
+                                    setState(() => _parentId = val);
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Hierarchy Combination Mode
+                  if (_parentId != null) ...[
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Hierarchical Progress Mode',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          SegmentedButton<String>(
+                            segments: const [
+                              ButtonSegment(
+                                value: 'simple',
+                                label: Text('Simple Average'),
+                              ),
+                              ButtonSegment(
+                                value: 'weighted',
+                                label: Text('Weighted by Tasks'),
+                              ),
+                              ButtonSegment(
+                                value: 'children_only',
+                                label: Text('Children Only'),
+                              ),
+                            ],
+                            selected: {_hierarchyCombinationMode},
+                            onSelectionChanged: (Set<String> newSelection) {
+                              setState(() {
+                                _hierarchyCombinationMode = newSelection.first;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Controls how parent project progress combines with child projects',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
 
                   const SizedBox(height: 12),
 
@@ -1146,6 +1314,8 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
       kpis: _kpis,
       scheduler: _scheduler,
       steps: _steps,
+      hierarchyCombinationMode: _parentId != null ? _hierarchyCombinationMode : null,
+      parentId: _parentId,
     );
 
     project = project.copyProjectWith(
@@ -1160,6 +1330,8 @@ class _CreateProjectFormState extends ConsumerState<CreateProjectForm> {
       rotationCurrentGroupId: _rotationResetRequested ? null : widget.existingProject?.rotationCurrentGroupId,
       rotationCurrentPeriodStart: _rotationResetRequested ? null : widget.existingProject?.rotationCurrentPeriodStart,
       rotationCycleNumber: _rotationResetRequested ? 1 : widget.existingProject?.rotationCycleNumber,
+      hierarchyCombinationMode: _parentId != null ? _hierarchyCombinationMode : null,
+      parentId: _parentId,
     );
 
     if (widget.existingProject != null) {
@@ -1228,6 +1400,14 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
           _CalculationModeOption(label: 'Contagem de entradas', value: null),
           _CalculationModeOption(label: 'Contagem de palavras', value: 'word_count'),
         ];
+      case kpi_model.KPISourceType.childProjects:
+        return const [
+          _CalculationModeOption(label: 'Média de progresso', value: 'average'),
+          _CalculationModeOption(label: 'Soma de progresso', value: 'sum'),
+          _CalculationModeOption(label: 'Contagem de subprojetos', value: 'count'),
+          _CalculationModeOption(label: 'Maior progresso', value: 'max'),
+          _CalculationModeOption(label: 'Menor progresso', value: 'min'),
+        ];
       default:
         return const [];
     }
@@ -1260,6 +1440,15 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
     return [
       const _ScopeOption(label: 'Todos', value: null),
       ...organizers.map((o) => _ScopeOption(label: o.displayTitle, value: o.slug)),
+    ];
+  }
+
+  List<_ScopeOption> _getProjectOptions() {
+    final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
+    final projects = allObjects.where((o) => o.type == 'project').toList();
+    
+    return [
+      ...projects.map((p) => _ScopeOption(label: p.displayTitle, value: p.id)),
     ];
   }
 
@@ -1542,6 +1731,25 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
             const SizedBox(height: 12),
           ],
 
+          // Scope picker for childProjects
+          if (_sourceType == kpi_model.KPISourceType.childProjects) ...[
+            DropdownButtonFormField<String>(
+              value: _sourceId,
+              decoration: const InputDecoration(
+                labelText: 'Selecionar Projeto Pai',
+                border: OutlineInputBorder(),
+              ),
+              items: _getProjectOptions().map((option) {
+                return DropdownMenuItem<String>(
+                  value: option.value,
+                  child: Text(option.label),
+                );
+              }).toList(),
+              onChanged: (v) => setState(() => _sourceId = v),
+            ),
+            const SizedBox(height: 12),
+          ],
+
           // Others source type - second dropdown for specific modes
           if (_sourceType == kpi_model.KPISourceType.others) ...[
             DropdownButtonFormField<String>(
@@ -1638,7 +1846,8 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
           if (_sourceType == kpi_model.KPISourceType.habit ||
               _sourceType == kpi_model.KPISourceType.trackerField ||
               _sourceType == kpi_model.KPISourceType.subtasks ||
-              _sourceType == kpi_model.KPISourceType.entry) ...[
+              _sourceType == kpi_model.KPISourceType.entry ||
+              _sourceType == kpi_model.KPISourceType.childProjects) ...[
             DropdownButtonFormField<String>(
               value: _calculationMode,
               decoration: const InputDecoration(

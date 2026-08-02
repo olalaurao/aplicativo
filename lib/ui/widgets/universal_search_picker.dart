@@ -24,6 +24,8 @@ class UniversalSearchPickerSheet extends ConsumerStatefulWidget {
   final VoidCallback? onClear;
   final bool showClear;
   final String initialFilter; // 'all', 'task', etc.
+  final bool allowMultiSelect;
+  final ValueChanged<List<ContentObject>>? onMultiSelected;
 
   const UniversalSearchPickerSheet({
     super.key,
@@ -32,6 +34,8 @@ class UniversalSearchPickerSheet extends ConsumerStatefulWidget {
     this.onClear,
     this.showClear = true,
     this.initialFilter = 'all',
+    this.allowMultiSelect = false,
+    this.onMultiSelected,
   });
 
   @override
@@ -46,6 +50,7 @@ class _UniversalSearchPickerSheetState
   late String _selectedFilter;
   SocialPlatform? _socialPlatformFilter;
   String? _socialCreatorFilter;
+  final Set<String> _selectedIds = {}; // Track selected object IDs for multi-select
 
   @override
   void initState() {
@@ -80,13 +85,37 @@ class _UniversalSearchPickerSheetState
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                widget.title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
+              Expanded(
+                child: Text(
+                  widget.title,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (widget.allowMultiSelect && _selectedIds.isNotEmpty)
+                TextButton(
+                  onPressed: _selectedIds.length >= 2 
+                    ? () {
+                        final allObjects = ref.read(allObjectsProvider).value ?? [];
+                        final selectedObjects = allObjects.where((obj) => _selectedIds.contains(obj.id)).toList();
+                        widget.onMultiSelected?.call(selectedObjects);
+                        Navigator.pop(context);
+                      }
+                    : null,
+                  child: Text(
+                    'M (${_selectedIds.length})',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _selectedIds.length >= 2 
+                        ? AppTheme.accentColor(context)
+                        : AppColors.textMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               IconButton(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.close_rounded),
@@ -198,9 +227,24 @@ class _UniversalSearchPickerSheetState
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     final obj = filtered[index];
+                    final isSelected = _selectedIds.contains(obj.id);
+                    
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: _getIconForType(obj),
+                      leading: widget.allowMultiSelect
+                        ? Checkbox(
+                            value: isSelected,
+                            onChanged: (bool? value) {
+                              setState(() {
+                                if (value == true) {
+                                  _selectedIds.add(obj.id);
+                                } else {
+                                  _selectedIds.remove(obj.id);
+                                }
+                              });
+                            },
+                          )
+                        : _getIconForType(obj),
                       title: Text(
                         obj.title,
                         style: const TextStyle(
@@ -217,7 +261,17 @@ class _UniversalSearchPickerSheetState
                         ),
                       ),
                       onTap: () {
-                        widget.onSelected(obj);
+                        if (widget.allowMultiSelect) {
+                          setState(() {
+                            if (_selectedIds.contains(obj.id)) {
+                              _selectedIds.remove(obj.id);
+                            } else {
+                              _selectedIds.add(obj.id);
+                            }
+                          });
+                        } else {
+                          widget.onSelected(obj);
+                        }
                       },
                     );
                   },
@@ -234,8 +288,36 @@ class _UniversalSearchPickerSheetState
             ),
           const SizedBox(height: 16),
 
-          // Bottom Action: Criar Novo Objeto
-          if (_searchController.text.trim().isNotEmpty)
+          // Bottom Action: Criar Novo Objeto OR Multi-select Continue
+          if (widget.allowMultiSelect && _selectedIds.isNotEmpty)
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  final allObjects = allObjectsAsync.valueOrNull ?? [];
+                  final selectedObjects = allObjects
+                      .where((obj) => _selectedIds.contains(obj.id))
+                      .toList();
+                  if (widget.onMultiSelected != null) {
+                    widget.onMultiSelected!(selectedObjects);
+                  }
+                },
+                icon: const Icon(Icons.check_rounded, size: 20),
+                label: Text(
+                  '${_selectedIds.length}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accentColor(context),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            )
+          else if (_searchController.text.trim().isNotEmpty)
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -378,22 +460,24 @@ class _UniversalSearchPickerSheetState
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.search_off_rounded, size: 48, color: AppColors.textMuted),
-          SizedBox(height: 12),
-          Text(
-            'Nenhum objeto encontrado',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          SizedBox(height: 4),
-          Text(
-            'Experimente mudar o filtro ou criar um novo.',
-            style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-          ),
-        ],
+    return Center(
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.search_off_rounded, size: 40, color: AppColors.textMuted),
+            const SizedBox(height: 8),
+            const Text(
+              'Nenhum objeto encontrado',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Experimente mudar o filtro ou criar um novo.',
+              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+          ],
+        ),
       ),
     );
   }

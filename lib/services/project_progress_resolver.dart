@@ -2,6 +2,7 @@ import '../models/content_object.dart';
 import '../models/project_model.dart';
 import '../models/task_model.dart';
 import '../models/kpi_model.dart';
+import 'project_hierarchy_service.dart';
 
 class ProjectProgressResolver {
   /// Returns a value between 0.0 and 1.0 representing the progress of the project,
@@ -65,5 +66,22 @@ class ProjectProgressResolver {
 
     // 4. Else (no KPI, no phases, no task links)
     return null;
+  }
+
+  /// Returns hierarchical progress including child projects
+  /// combinationMode: 'simple' (average), 'weighted' (by task count), 'children_only'
+  static double? resolveWithChildren(
+    Project project,
+    List<ContentObject> allObjects,
+    List<Project> allProjects, {
+    String? combinationMode = 'simple',
+  }) {
+    final tasks = allObjects.whereType<Task>().toList();
+    return ProjectHierarchyService.calculateHierarchicalProgress(
+      project,
+      allProjects,
+      tasks,
+      combinationMode: combinationMode,
+    );
   }
 }

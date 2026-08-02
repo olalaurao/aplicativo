@@ -13,9 +13,12 @@ import 'day_theme_screen.dart';
 import 'pillars_screen.dart';
 import '../../providers/google_calendar_provider.dart';
 import '../widgets/navigation_shortcut_picker.dart';
+import '../widgets/universal_search_picker.dart';
 import '../../providers/vault_provider.dart';
 import '../../services/sync_manager.dart';
 import '../../providers/settings_provider.dart';
+import 'merge_flow_orchestrator.dart';
+import '../../models/content_object.dart';
 
 class MoreScreen extends ConsumerStatefulWidget {
   const MoreScreen({super.key});
@@ -301,6 +304,38 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                     );
                   },
                 ),
+
+                const SizedBox(height: 8),
+                _buildMenuRow(
+                  context,
+                  'Merge Objects',
+                  Icons.merge_type_rounded,
+                  AppColors.info,
+                  () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => UniversalSearchPickerSheet(
+                        title: 'Select Objects to Merge',
+                        onSelected: (obj) {
+                          // Single selection not allowed for merge
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please select 2+ objects to merge'),
+                            ),
+                          );
+                        },
+                        allowMultiSelect: true,
+                        onMultiSelected: (selectedObjects) {
+                          Navigator.pop(context);
+                          // Navigate to merge flow
+                          _startMergeFlow(context, selectedObjects as List<ContentObject>);
+                        },
+                      ),
+                    );
+                  },
+                ),
                 ],
               ]),
             ),
@@ -363,6 +398,11 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     if (result != null) {
       ref.read(navigationProvider.notifier).addShortcut(result);
     }
+  }
+
+  void _startMergeFlow(BuildContext context, List selectedObjects) {
+    // Use the merge flow orchestrator to handle the complete merge process
+    MergeFlowOrchestrator.startMergeFlow(context, ref, selectedObjects as List<ContentObject>);
   }
 
   void _showRenameShortcut(BuildContext context, NavigationItem item) {

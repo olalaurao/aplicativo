@@ -2,14 +2,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import '../../../models/project_model.dart';
 import '../../../models/task_model.dart';
 import '../../../models/checklist_step.dart';
+import '../../../models/reminder_config.dart';
 import '../../../providers/vault_provider.dart';
 import '../../../services/kpi_engine.dart';
 import '../../../services/project_progress_cache.dart';
+import '../../../services/project_hierarchy_service.dart';
 import '../../widgets/property_grid.dart';
 import '../../widgets/actionable_checklist_tile.dart';
+import '../../widgets/rotation_reminder_config_sheet.dart';
 import '../../theme.dart';
 import '../../../services/rotation_service.dart';
 
@@ -325,5 +329,363 @@ Widget _buildZoneCard(BuildContext context, RotationGroup group, String title, {
         ),
       ],
     ),
+  );
+}
+
+/// Build the subprojects section for Project detail view
+/// Exported for use in project_content_section.dart
+Widget buildSubprojectsSection(
+  BuildContext context,
+  WidgetRef ref,
+  Project project,
+) {
+  final allProjects = ref.watch(projectsProvider);
+  final allObjects = ref.watch(allObjectsProvider).value ?? [];
+  final tasks = allObjects.whereType<Task>().toList();
+  
+  final children = ProjectHierarchyService.getChildProjects(
+    project.id,
+    allProjects,
+  );
+
+  if (children.isEmpty) {
+    return const SizedBox.shrink();
+  }
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Padding(
+        padding: EdgeInsets.fromLTRB(20, 32, 20, 8),
+        child: Text(
+          'Subprojects',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          children: [
+            ...children.map((child) {
+              final childProgress = ProjectProgressCache.getProgress(
+                child.id,
+                child,
+                tasks,
+              );
+              final childColor = child.color != null
+                  ? _parseColor(child.color!)
+                  : AppTheme.accentColor(context);
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  onTap: () => context.push('/projects/${child.id}'),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    decoration: AppTheme.cardDecorationFlat(context),
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: childColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.folder_outlined,
+                            size: 16,
+                            color: childColor,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                child.title,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: LinearProgressIndicator(
+                                        value: childProgress,
+                                        minHeight: 4,
+                                        backgroundColor: AppColors.surfaceVariant,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          childColor,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${(childProgress * 100).toInt()}%',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textMuted,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.textMuted,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () => context.push('/projects/new', extra: {'parentId': project.id}),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: AppColors.textMuted.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add_rounded,
+                      size: 18,
+                      color: AppColors.textMuted,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Add Subproject',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+Color _parseColor(String hexColor) {
+  try {
+    return Color(int.parse(hexColor.replaceFirst('#', '0xFF')));
+  } catch (_) {
+    return AppColors.textMuted;
+  }
+}
+
+// ─── Rotation Reminders Section ───────────────────────────────────────────────
+
+/// Build the rotation reminders section for a Project with rotation groups.
+/// Shows all current rotation reminders with their scope and trigger, plus
+/// an "Add reminder" button.
+Widget buildProjectRotationRemindersSection(
+  BuildContext context,
+  WidgetRef ref,
+  Project project,
+) {
+  if (!project.hasRotation) return const SizedBox.shrink();
+
+  final reminders = project.rotationReminders;
+  final accent = AppTheme.accentColor(context);
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Padding(
+        padding: EdgeInsets.fromLTRB(20, 32, 20, 8),
+        child: Text(
+          'Rotation Reminders',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          children: [
+            if (reminders.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: AppTheme.cardDecorationFlat(context),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.notifications_none_rounded,
+                      color: AppColors.textMuted,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'No reminders set for rotation blocks.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ...reminders.map((reminder) {
+              final groupName = reminder.groupId == null
+                  ? 'All groups'
+                  : project.rotationGroups
+                          .cast<RotationGroup?>()
+                          .firstWhere(
+                            (g) => g?.id == reminder.groupId,
+                            orElse: () => null,
+                          )
+                          ?.name ??
+                      'Unknown group';
+
+              final triggerText = switch (reminder.triggerMode) {
+                RotationReminderTriggerMode.atStartTime => 'At start time',
+                RotationReminderTriggerMode.minutesBefore =>
+                  '${reminder.minutesBefore ?? 10} min before',
+                RotationReminderTriggerMode.atTimeOfDay =>
+                  'At ${reminder.timeOfDay ?? '09:00'}',
+              };
+
+              final notifIcon = switch (reminder.notificationType) {
+                NotificationType.push => Icons.notifications_outlined,
+                NotificationType.popup => Icons.open_in_new_rounded,
+                NotificationType.alarm => Icons.alarm_rounded,
+              };
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: AppTheme.cardDecorationFlat(context),
+                  child: Row(
+                    children: [
+                      Icon(notifIcon, size: 18, color: accent),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              triggerText,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              groupName,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                        ),
+                        color: AppColors.textMuted,
+                        onPressed: () async {
+                          final updated = project.copyProjectWith(
+                            rotationReminders: project.rotationReminders
+                                .where((r) => r.id != reminder.id)
+                                .toList(),
+                          );
+                          await ref
+                              .read(projectsProvider.notifier)
+                              .updateProject(updated);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(height: 8),
+            // Add Reminder button
+            InkWell(
+              onTap: () => showRotationReminderConfigSheet(
+                context,
+                project: project,
+                onSave: (config) async {
+                  final updated = project.copyProjectWith(
+                    rotationReminders: [
+                      ...project.rotationReminders,
+                      config,
+                    ],
+                  );
+                  await ref
+                      .read(projectsProvider.notifier)
+                      .updateProject(updated);
+                },
+              ),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: AppColors.textMuted.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add_rounded,
+                      size: 18,
+                      color: AppColors.textMuted,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Add Rotation Reminder',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
   );
 }

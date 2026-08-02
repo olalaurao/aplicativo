@@ -315,5 +315,7 @@ MetricType _metricTypeFromUnified(DataSourceReference source) {
     case DataSourceType.collection:
     case DataSourceType.entry:
       return MetricType.trackerScore;
+    case DataSourceType.childProjects:
+      return MetricType.kpi; // Map to kpi as fallback
   }
 }

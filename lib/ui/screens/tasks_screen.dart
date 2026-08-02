@@ -7,6 +7,8 @@ import '../theme.dart';
 import '../forms/create_task_form.dart';
 import 'universal_detail_view.dart';
 import '../widgets/object_action_wrapper.dart';
+import 'merge_flow_orchestrator.dart';
+import '../../models/content_object.dart';
 
 class TasksScreen extends ConsumerStatefulWidget {
   const TasksScreen({super.key});
@@ -17,6 +19,8 @@ class TasksScreen extends ConsumerStatefulWidget {
 
 class _TasksScreenState extends ConsumerState<TasksScreen> {
   String _searchQuery = '';
+  bool _isMultiSelectMode = false;
+  final Set<String> _selectedTaskIds = {};
 
   @override
   Widget build(BuildContext context) {
@@ -27,35 +31,71 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tasks'),
+        title: _isMultiSelectMode 
+            ? Text('${_selectedTaskIds.length} selected')
+            : const Text('Tasks'),
         centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: Colors.transparent,
         actions: [
-          IconButton(
-            icon: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppTheme.accentColor(context).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.add_rounded,
-                size: 20,
-                color: AppTheme.accentColor(context),
-              ),
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const CreateTaskForm(),
+          if (_isMultiSelectMode) ...[
+            if (_selectedTaskIds.length >= 2)
+              TextButton(
+                onPressed: () {
+                  // Start merge flow with selected tasks
+                  _startMergeFlow(context, tasks.where((t) => _selectedTaskIds.contains(t.id)).toList());
+                },
+                child: Text(
+                  'Merge',
+                  style: TextStyle(
+                    color: AppTheme.accentColor(context),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              );
-            },
-          ),
+              ),
+            IconButton(
+              icon: const Icon(Icons.close_rounded),
+              onPressed: () {
+                setState(() {
+                  _isMultiSelectMode = false;
+                  _selectedTaskIds.clear();
+                });
+              },
+            ),
+          ] else ...[
+            IconButton(
+              icon: const Icon(Icons.checklist_rounded),
+              onPressed: () {
+                setState(() {
+                  _isMultiSelectMode = true;
+                });
+              },
+            ),
+            IconButton(
+              icon: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppTheme.accentColor(context).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.add_rounded,
+                  size: 20,
+                  color: AppTheme.accentColor(context),
+                ),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CreateTaskForm(),
+                  ),
+                );
+              },
+            ),
+          ],
         ],
       ),
       body: Column(
@@ -85,18 +125,73 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                     },
                   ),
           ),
+          if (_isMultiSelectMode && _selectedTaskIds.isNotEmpty)
+            _buildMultiSelectActionBar(context),
         ],
       ),
     );
   }
 
   Widget _buildTaskTile(BuildContext context, Task task) {
-    return ObjectActionWrapper(
-      object: task,
+    final isSelected = _selectedTaskIds.contains(task.id);
+    
+    return InkWell(
+      onTap: () {
+        if (_isMultiSelectMode) {
+          setState(() {
+            if (_selectedTaskIds.contains(task.id)) {
+              _selectedTaskIds.remove(task.id);
+            } else {
+              _selectedTaskIds.add(task.id);
+            }
+          });
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => UniversalDetailView(object: task),
+            ),
+          );
+        }
+      },
+      onLongPress: () {
+        if (!_isMultiSelectMode) {
+          setState(() {
+            _isMultiSelectMode = true;
+            _selectedTaskIds.add(task.id);
+          });
+        }
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
-        decoration: AppTheme.cardDecoration(context),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? AppTheme.accentColor(context).withValues(alpha: 0.1)
+              : null,
+          borderRadius: BorderRadius.circular(12),
+          border: isSelected
+              ? Border.all(
+                  color: AppTheme.accentColor(context),
+                  width: 2,
+                )
+              : null,
+        ),
         child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: _isMultiSelectMode
+              ? Checkbox(
+                  value: isSelected,
+                  onChanged: (bool? value) {
+                    setState(() {
+                      if (value == true) {
+                        _selectedTaskIds.add(task.id);
+                      } else {
+                        _selectedTaskIds.remove(task.id);
+                      }
+                    });
+                  },
+                )
+              : null,
           title: Text(
             task.title,
             style: const TextStyle(fontWeight: FontWeight.w600),
@@ -110,20 +205,76 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   ),
                 )
               : null,
-          trailing: Icon(
-            Icons.chevron_right_rounded,
-            size: 20,
-            color: AppTheme.textMutedColor(context),
-          ),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => UniversalDetailView(object: task),
-            ),
-          ),
+          trailing: !_isMultiSelectMode
+              ? Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: AppTheme.textMutedColor(context),
+                )
+              : null,
         ),
       ),
     );
+  }
+
+  Widget _buildMultiSelectActionBar(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        border: Border(
+          top: BorderSide(
+            color: AppTheme.dividerColor(context),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '${_selectedTaskIds.length} task${_selectedTaskIds.length == 1 ? '' : 's'} selected',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          if (_selectedTaskIds.length >= 2)
+            ElevatedButton.icon(
+              onPressed: () {
+                _startMergeFlow(context, 
+                  ref.read(tasksListProvider).where((t) => _selectedTaskIds.contains(t.id)).toList());
+              },
+              icon: const Icon(Icons.merge_type_rounded, size: 18),
+              label: const Text('Merge'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.accentColor(context),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _isMultiSelectMode = false;
+                _selectedTaskIds.clear();
+              });
+            },
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _startMergeFlow(BuildContext context, List selectedTasks) {
+    setState(() {
+      _isMultiSelectMode = false;
+      _selectedTaskIds.clear();
+    });
+    
+    // Use the merge flow orchestrator to handle the complete merge process
+    MergeFlowOrchestrator.startMergeFlow(context, ref, selectedTasks as List<ContentObject>);
   }
 
   Widget _buildEmptyState() {

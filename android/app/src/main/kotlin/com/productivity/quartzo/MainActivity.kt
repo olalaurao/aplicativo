@@ -1,6 +1,7 @@
 package com.productivity.quartzo
 
 import android.app.AlarmManager
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -10,6 +11,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.view.WindowManager
 import android.app.KeyguardManager
+import androidx.core.app.NotificationManagerCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -154,10 +156,17 @@ class MainActivity : FlutterActivity() {
                 }
                 "requestFullScreenIntent" -> {
                     try {
-                        if (Build.VERSION.SDK_INT >= 34) { // Android 14 (UPSIDE_DOWN_CAKE)
-                            val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)
-                            intent.data = Uri.parse("package:$packageName")
-                            startActivity(intent)
+                        if (Build.VERSION.SDK_INT >= 34) { // Android 14+
+                            try {
+                                val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)
+                                intent.data = Uri.parse("package:$packageName")
+                                startActivity(intent)
+                            } catch (e: ActivityNotFoundException) {
+                                // Fallback: open general notification settings
+                                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                intent.putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                                startActivity(intent)
+                            }
                             result.success(true)
                         } else {
                             result.success(true)
@@ -169,9 +178,9 @@ class MainActivity : FlutterActivity() {
                 "checkFullScreenIntent" -> {
                     try {
                         if (Build.VERSION.SDK_INT >= 34) {
-                            val appOpsManager = getSystemService(APP_OPS_SERVICE) as android.app.AppOpsManager
-                            val mode = appOpsManager.unsafeCheckOpNoThrow("android:use_fullscreen_intent", android.os.Process.myUid(), packageName)
-                            result.success(mode == android.app.AppOpsManager.MODE_ALLOWED)
+                            // Use the recommended API: NotificationManagerCompat.canUseFullScreenIntent()
+                            val granted = NotificationManagerCompat.from(this).canUseFullScreenIntent()
+                            result.success(granted)
                         } else {
                             result.success(true)
                         }

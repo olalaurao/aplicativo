@@ -13,6 +13,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/organizer_model.dart';
 import '../../models/shared_types.dart';
+import '../widgets/month_calendar_grid.dart';
 import '../theme.dart';
 import '../../models/task_model.dart';
 import '../../models/idea_model.dart';
@@ -1730,14 +1731,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
   }
 
   Widget _buildMonthView() {
-    final firstDayOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-    final lastDayOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
-    final daysInMonth = lastDayOfMonth.day;
-    final firstWeekday = firstDayOfMonth.weekday; // 1=Mon, 7=Sun
-    const weekDayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
     return SliverPadding(
       padding: const EdgeInsets.all(16),
       sliver: SliverList(
@@ -1777,38 +1770,18 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
               ],
             ),
           ),
-          // Week day headers
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: weekDayNames.map((day) => Expanded(
-                child: Center(
-                  child: Text(
-                    day.substring(0, 1),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textMutedColor(context),
-                    ),
-                  ),
-                ),
-              )).toList(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Calendar grid - use Table for better overflow control
-          Table(
-            columnWidths: const {
-              0: FlexColumnWidth(1),
-              1: FlexColumnWidth(1),
-              2: FlexColumnWidth(1),
-              3: FlexColumnWidth(1),
-              4: FlexColumnWidth(1),
-              5: FlexColumnWidth(1),
-              6: FlexColumnWidth(1),
+          // Month calendar grid
+          MonthCalendarGrid(
+            selectedMonth: _selectedMonth,
+            selectedDate: _selectedDate,
+            onDayTap: (date) {
+              setState(() {
+                _selectedDate = date;
+              });
             },
-            defaultVerticalAlignment: TableCellVerticalAlignment.top,
-            children: _buildMonthTableRows(firstWeekday, daysInMonth, today, weekDayNames),
+            maxChipsPerCell: 2,
+            showDayOfWeek: true,
+            isTodayHighlight: true,
           ),
           const SizedBox(height: 16),
           // Inline day preview for selected date
@@ -1816,120 +1789,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
         ]),
       ),
     );
-  }
-
-  List<TableRow> _buildMonthTableRows(int firstWeekday, int daysInMonth, DateTime today, List<String> weekDayNames) {
-    final rows = <TableRow>[];
-    int dayCounter = 1;
-    
-    // Build 6 rows (6 weeks)
-    for (int week = 0; week < 6; week++) {
-      final cells = <Widget>[];
-      
-      for (int dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
-        if (week == 0 && dayOfWeek < firstWeekday - 1) {
-          cells.add(const SizedBox.shrink());
-        } else if (dayCounter > daysInMonth) {
-          cells.add(const SizedBox.shrink());
-        } else {
-          final day = dayCounter;
-          final date = DateTime(_selectedMonth.year, _selectedMonth.month, day);
-          final isToday = _isSameDay(date, today);
-          
-          final daySchedule = ref.watch(dailyScheduleProvider(date));
-          final items = daySchedule.allItems;
-          const maxChipsPerCell = 2;
-
-          cells.add(
-            TableCell(
-              verticalAlignment: TableCellVerticalAlignment.top,
-              child: InkWell(
-                onTap: () {
-                  setState(() {
-                    _selectedDate = date;
-                  });
-                },
-                child: Container(
-                  height: 80,
-                  margin: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: isToday
-                        ? AppTheme.accentColor(context).withValues(alpha: 0.1)
-                        : AppTheme.surfaceVariantColor(context),
-                    borderRadius: BorderRadius.circular(8),
-                    border: isToday
-                        ? Border.all(color: AppTheme.accentColor(context), width: 1.5)
-                        : null,
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              weekDayNames[date.weekday - 1].substring(0, 3),
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: isToday
-                                    ? AppTheme.accentColor(context)
-                                    : AppTheme.textMutedColor(context),
-                              ),
-                            ),
-                            Text(
-                              day.toString(),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isToday ? FontWeight.w700 : FontWeight.w600,
-                                color: isToday
-                                    ? AppTheme.accentColor(context)
-                                    : AppTheme.textPrimaryColor(context),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        // Compact item pills
-                        ...items.take(maxChipsPerCell).map((item) => Container(
-                          margin: const EdgeInsets.only(bottom: 2),
-                          height: 3,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: item.color,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        )),
-                        if (items.length > maxChipsPerCell)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(
-                              '+${items.length - maxChipsPerCell}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: AppTheme.textMutedColor(context),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-          dayCounter++;
-        }
-      }
-      
-      rows.add(TableRow(children: cells));
-    }
-    
-    return rows;
   }
 
   Widget _buildMonthDayPreview() {

@@ -1,7 +1,9 @@
 // lib/services/project_progress_cache.dart
 import '../models/project_model.dart';
 import '../models/task_model.dart';
+import '../models/content_object.dart';
 import 'kpi_engine.dart';
+import 'project_hierarchy_service.dart';
 
 /// Helper class to cache computed project progress to avoid duplicate calculations
 class ProjectProgressCache {
@@ -9,6 +11,10 @@ class ProjectProgressCache {
   static final Map<String, int> _linkedTaskCountCache = {};
   static final Map<String, int> _completedTaskCountCache = {};
   static final Map<String, List<Task>> _linkedTasksCache = {};
+  
+  // Hierarchical progress cache
+  static final Map<String, double> _hierarchicalCache = {};
+  static final Map<String, String> _hierarchicalModeCache = {}; // Store combination mode
 
   static List<Task> _getLinkedTasks(
     String projectId,
@@ -67,11 +73,44 @@ class ProjectProgressCache {
     return doneCount;
   }
 
+  /// Get hierarchical progress including children
+  static double getHierarchicalProgress(
+    String projectId,
+    Project project,
+    List<ContentObject> allObjects,
+    List<Project> allProjects, {
+    String? combinationMode = 'simple',
+  }) {
+    final cacheKey = '$projectId-$combinationMode';
+    
+    if (_hierarchicalCache.containsKey(cacheKey) && 
+        _hierarchicalModeCache[projectId] == combinationMode) {
+      return _hierarchicalCache[cacheKey]!;
+    }
+
+    final tasks = allObjects.whereType<Task>().toList();
+    final progress = ProjectHierarchyService.calculateHierarchicalProgress(
+      project,
+      allProjects,
+      tasks,
+      combinationMode: combinationMode,
+    );
+
+    if (progress != null) {
+      _hierarchicalCache[cacheKey] = progress;
+      _hierarchicalModeCache[projectId] = combinationMode ?? 'simple';
+    }
+
+    return progress ?? 0.0;
+  }
+
   static void clearCache() {
     _cache.clear();
     _linkedTaskCountCache.clear();
     _completedTaskCountCache.clear();
     _linkedTasksCache.clear();
+    _hierarchicalCache.clear();
+    _hierarchicalModeCache.clear();
   }
 
   static void invalidateForProject(String projectId) {
@@ -79,6 +118,15 @@ class ProjectProgressCache {
     _linkedTaskCountCache.remove(projectId);
     _completedTaskCountCache.remove(projectId);
     _linkedTasksCache.remove(projectId);
+    
+    // Invalidate hierarchical cache entries for this project
+    _hierarchicalCache.removeWhere((key, value) => key.startsWith('$projectId-'));
+    _hierarchicalModeCache.remove(projectId);
+  }
+
+  static void invalidateForHierarchical(String projectId) {
+    _hierarchicalCache.removeWhere((key, value) => key.startsWith('$projectId-'));
+    _hierarchicalModeCache.remove(projectId);
   }
 
   static void invalidateForTask(Task task) {
@@ -89,5 +137,18 @@ class ProjectProgressCache {
     _cache.clear();
     _linkedTaskCountCache.clear();
     _completedTaskCountCache.clear();
+    _hierarchicalCache.clear();
+    _hierarchicalModeCache.clear();
+  }
+
+  /// Invalidate hierarchical cache for a project and all its descendants
+  static void invalidateForHierarchy(String projectId, List<Project> allProjects) {
+    invalidateForHierarchical(projectId);
+    
+    // Also invalidate all descendants
+    final descendantIds = ProjectHierarchyService.getDescendantIds(projectId, allProjects);
+    for (final descId in descendantIds) {
+      invalidateForHierarchical(descId);
+    }
   }
 }

@@ -10,6 +10,7 @@ import '../widgets/notification_sound_toggle.dart';
 import '../widgets/notification_sound_selector.dart';
 import '../../services/notification_service.dart';
 import '../../models/reminder_config.dart';
+import '../../providers/vault_provider.dart';
 
 /// Settings screen for customizing notification appearance (popup colors, alarm colors, buttons).
 class NotificationSettingsScreen extends ConsumerStatefulWidget {
@@ -103,6 +104,8 @@ class _NotificationSettingsScreenState
     await notifier.updateVibrationPattern(type: type, pattern: pattern);
     await notifier.incrementNotificationChannelVersion();
     await NotificationService().createNotificationChannels();
+    // Reschedule all reminders so they use the new channel
+    _rescheduleAllAfterChannelChange();
     if (mounted) setState(() {});
   }
 
@@ -111,6 +114,8 @@ class _NotificationSettingsScreenState
     await notifier.updateSoundEnabled(type: type, enabled: enabled);
     await notifier.incrementNotificationChannelVersion();
     await NotificationService().createNotificationChannels();
+    // Reschedule all reminders so they use the new channel
+    _rescheduleAllAfterChannelChange();
     setState(() {});
   }
 
@@ -120,7 +125,24 @@ class _NotificationSettingsScreenState
     await notifier.updateSoundName(type: type, soundName: name);
     await notifier.incrementNotificationChannelVersion();
     await NotificationService().createNotificationChannels();
+    // Reschedule all reminders so they use the new channel
+    _rescheduleAllAfterChannelChange();
     setState(() {});
+  }
+
+  /// Reschedules all object reminders after a channel version bump.
+  /// Runs in the background — does not block the UI.
+  void _rescheduleAllAfterChannelChange() {
+    Future.microtask(() async {
+      try {
+        await ref
+            .read(vaultProvider.notifier)
+            .rescheduleAllObjectReminders();
+        debugPrint('NotificationSettingsScreen: rescheduled all reminders after channel change');
+      } catch (e) {
+        debugPrint('NotificationSettingsScreen: reschedule after channel change failed: $e');
+      }
+    });
   }
 
   void _testNotification(String type) {
@@ -321,9 +343,10 @@ class _NotificationSettingsScreenState
                           await notifier.updateRingOnSilent(type: 'popup', ringOnSilent: val);
                           await notifier.incrementNotificationChannelVersion();
                           await NotificationService().createNotificationChannels();
+                          _rescheduleAllAfterChannelChange();
                           setState((){});
                         },
-                        activeColor: AppTheme.accentColor(context),
+                        activeThumbColor: AppTheme.accentColor(context),
                       ),
                       
                       const Divider(height: 1),
@@ -358,9 +381,10 @@ class _NotificationSettingsScreenState
                           await notifier.updateRingOnSilent(type: 'push', ringOnSilent: val);
                           await notifier.incrementNotificationChannelVersion();
                           await NotificationService().createNotificationChannels();
+                          _rescheduleAllAfterChannelChange();
                           setState((){});
                         },
-                        activeColor: AppTheme.accentColor(context),
+                        activeThumbColor: AppTheme.accentColor(context),
                       ),
                     ],
                   ),

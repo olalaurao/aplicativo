@@ -19,10 +19,12 @@ import 'package:quartzo/models/relay_step.dart';
 import 'package:quartzo/models/tracker_model.dart';
 import 'package:quartzo/models/kpi_model.dart' as kpi_model;
 import 'package:quartzo/models/dashboard_block.dart';
+import 'package:quartzo/models/content_object.dart';
 import 'package:quartzo/providers/settings_provider.dart';
-import 'package:quartzo/providers/widget_sync_provider.dart';
+import 'package:quartzo/providers/widget_sync_provider.dart' show buildCalendarSnapshotForTest, buildFilterSnapshotForTest;
 import 'package:quartzo/services/markdown_parser.dart';
 import 'package:quartzo/services/kpi_engine.dart';
+import 'package:quartzo/services/project_hierarchy_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -773,6 +775,145 @@ Texto original.
       expect(filter['organizer'], 'Trabalho');
       expect(rows, hasLength(1));
       expect((rows.single as Map<String, dynamic>)['title'], 'Beber água');
+    });
+
+    test('project preserves parentId in roundtrip', () {
+      final project = Project(
+        id: 'project-1',
+        title: 'Parent Project',
+        parentId: 'project-parent',
+        description: 'Test project with parent',
+        hierarchyCombinationMode: 'weighted',
+      );
+
+      final markdown = project.toMarkdown();
+      final parsed = Project.fromMarkdown(
+        MarkdownParser.parseFrontmatter(markdown),
+        MarkdownParser.extractBody(markdown),
+      );
+
+      expect(parsed.id, project.id);
+      expect(parsed.title, project.title);
+      expect(parsed.parentId, project.parentId);
+      expect(parsed.description, project.description);
+      expect(parsed.hierarchyCombinationMode, project.hierarchyCombinationMode);
+    });
+
+    test('kpi with childProjects source type preserves fields in roundtrip', () {
+      final kpi = kpi_model.KPI(
+        id: 'kpi-1',
+        title: 'Subproject Progress',
+        sourceType: kpi_model.KPISourceType.childProjects,
+        sourceId: 'project-parent',
+        targetValue: 100,
+        currentValue: 75,
+      );
+
+      final markdown = kpi.toMap();
+      final parsed = kpi_model.KPI.fromMap(markdown);
+
+      expect(parsed.id, kpi.id);
+      expect(parsed.title, kpi.title);
+      expect(parsed.sourceType, kpi_model.KPISourceType.childProjects);
+      expect(parsed.sourceId, kpi.sourceId);
+      expect(parsed.targetValue, kpi.targetValue);
+      expect(parsed.currentValue, kpi.currentValue);
+    });
+
+    test('project hierarchy service calculates correct descendant progress', () {
+      final parentProject = Project(
+        id: 'project-parent',
+        title: 'Parent',
+        taskLinks: ['task-1'],
+      );
+      
+      final childProject1 = Project(
+        id: 'project-child-1',
+        title: 'Child 1',
+        parentId: 'project-parent',
+        taskLinks: ['task-2', 'task-3'],
+      );
+      
+      final childProject2 = Project(
+        id: 'project-child-2',
+        title: 'Child 2',
+        parentId: 'project-parent',
+        taskLinks: ['task-4'],
+      );
+
+      final tasks = [
+        Task(id: 'task-1', title: 'Task 1', stage: TaskStage.finalized),
+        Task(id: 'task-2', title: 'Task 2', stage: TaskStage.finalized),
+        Task(id: 'task-3', title: 'Task 3', stage: TaskStage.inProgress),
+        Task(id: 'task-4', title: 'Task 4', stage: TaskStage.finalized),
+      ];
+
+      final allProjects = [parentProject, childProject1, childProject2];
+      final allObjects = [...allProjects, ...tasks] as List<ContentObject>;
+
+      // Test getting children
+      final children = ProjectHierarchyService.getChildProjects(
+        'project-parent',
+        allProjects,
+      );
+      expect(children, hasLength(2));
+      expect(children.map((p) => p.id).toSet(), containsAll(['project-child-1', 'project-child-2']));
+
+      // Test hierarchical progress calculation
+      final hierarchicalProgress = ProjectHierarchyService.calculateHierarchicalProgress(
+        parentProject,
+        allProjects,
+        tasks,
+        combinationMode: 'simple',
+      );
+
+      // Parent has 1/1 = 100%, Child1 has 1/2 = 50%, Child2 has 1/1 = 100%
+      // Simple average: (1.0 + 0.5 + 1.0) / 3 = 0.833
+      expect(hierarchicalProgress, closeTo(0.833, 0.01));
+    });
+
+    test('cycle detection prevents infinite loops', () {
+      final projectA = Project(id: 'project-a', title: 'Project A');
+      final projectB = Project(id: 'project-b', title: 'Project B');
+      final allProjects = [projectA, projectB];
+
+      // A cannot be parent of itself
+      expect(
+        ProjectHierarchyService.detectCycle('project-a', 'project-a', allProjects),
+        isTrue,
+      );
+
+      // A → B is fine
+      expect(
+        ProjectHierarchyService.detectCycle('project-b', 'project-a', allProjects),
+        isFalse,
+      );
+
+      // B → A would create cycle A → B → A (simulated by setting parentId)
+      expect(
+        ProjectHierarchyService.detectCycle('project-a', 'project-b', allProjects),
+        isFalse,
+      );
+    });
+
+    test('legacy projects without parentId still work', () {
+      final legacyProject = Project(
+        id: 'project-legacy',
+        title: 'Legacy Project',
+        // No parentId field
+        // No hierarchyCombinationMode field
+      );
+
+      final markdown = legacyProject.toMarkdown();
+      final parsed = Project.fromMarkdown(
+        MarkdownParser.parseFrontmatter(markdown),
+        MarkdownParser.extractBody(markdown),
+      );
+
+      expect(parsed.id, legacyProject.id);
+      expect(parsed.title, legacyProject.title);
+      expect(parsed.parentId, isNull); // Should be null for legacy projects
+      expect(parsed.hierarchyCombinationMode, isNull); // Should be null for legacy projects
     });
   });
 }

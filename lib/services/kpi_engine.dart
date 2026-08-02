@@ -8,6 +8,10 @@ import '../models/tracker_model.dart';
 import '../models/journal_entry.dart';
 import '../models/mood_model.dart';
 import '../models/note_model.dart';
+import '../models/shared_types.dart';
+import '../models/content_object.dart';
+import 'project_hierarchy_service.dart';
+import 'project_progress_resolver.dart';
 
 class KPIEngine {
   static double calculateProjectProgress(Project project, List<Task> allTasks) {
@@ -38,7 +42,7 @@ class KPIEngine {
   static double min(List<double> values) =>
       values.isEmpty ? 0 : values.reduce((a, b) => a < b ? a : b);
 
-  static double calculateKPIValue({
+  static double? calculateKPIValue({
     required KPI kpi,
     required List<Habit> habits,
     required List<TrackingRecord> trackerRecords,
@@ -391,10 +395,76 @@ class KPIEngine {
         }
         return 0;
 
+      // ─── CHILD PROJECTS ───
+      case KPISourceType.childProjects:
+        final projects = allObjects.whereType<Project>().toList();
+        if (kpi.sourceId == null) return 0;
+
+        final parentProject = projects.cast<Project?>().firstWhere(
+          (p) => p?.id == kpi.sourceId || p?.slug == kpi.sourceId,
+          orElse: () => null,
+        );
+
+        if (parentProject == null) {
+          // Parent project not found
+          return 0;
+        }
+
+        final childProjects = ProjectHierarchyService.getChildProjects(
+          parentProject.id,
+          projects,
+        );
+
+        if (childProjects.isEmpty) return 0;
+
+        // Filter by date range if specified
+        final filteredChildren = kpi.startDate == null && kpi.endDate == null
+            ? childProjects
+            : childProjects.where((p) {
+                // Filter by project start/end dates
+                if (kpi.startDate != null && p.startDate != null && p.startDate!.isBefore(kpi.startDate!)) {
+                  return false;
+                }
+                if (kpi.endDate != null && p.endDate != null && p.endDate!.isAfter(kpi.endDate!)) {
+                  return false;
+                }
+                return true;
+              }).toList();
+
+        if (filteredChildren.isEmpty) return 0;
+
+        // Calculate progress for each child
+        final childProgresses = <double>[];
+        for (final child in filteredChildren) {
+          final progress = ProjectProgressResolver.resolve(child, allObjects.cast<ContentObject>());
+          childProgresses.add(progress ?? 0.0);
+        }
+
+        if (childProgresses.isEmpty) return 0;
+
+        // Aggregate based on aggregation type
+        final aggregation = kpi.dataSource.aggregation ?? DataSourceAggregation.average;
+        switch (aggregation) {
+          case DataSourceAggregation.average:
+            return average(childProgresses);
+          case DataSourceAggregation.sum:
+            return sum(childProgresses);
+          case DataSourceAggregation.count:
+            return childProgresses.length.toDouble();
+          case DataSourceAggregation.max:
+            return max(childProgresses);
+          case DataSourceAggregation.min:
+            return min(childProgresses);
+          case DataSourceAggregation.streak:
+            // Not applicable for child projects, use average
+            return average(childProgresses);
+        }
+
       // ─── TIME SPENT (planner_task_duration e category_duration) ───
       // Nota: o case principal já trata timeSpent acima; este bloco é
       // necessário apenas como extensão do switch para satisfazer o Dart.
     }
+    return 0;
   }
 
   static List<double> _getTrackerValues(KPI kpi, List<TrackingRecord> records) {
@@ -422,7 +492,7 @@ class KPIEngine {
         entries: entries,
         moods: moods,
         allObjects: allObjects,
-      );
+      ) ?? 0;
       if (kpi.currentValue >= kpi.targetValue) {
         kpi.completed = true;
       }

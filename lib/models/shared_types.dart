@@ -419,6 +419,7 @@ enum DataSourceType {
   entry,
   timeSpent,
   manualQuantity,
+  childProjects,
 }
 
 enum DataSourceAggregation { sum, average, count, max, min, streak }
@@ -500,6 +501,8 @@ class DataSourceReference {
         return 'time_spent';
       case DataSourceType.manualQuantity:
         return 'manual_quantity';
+      case DataSourceType.childProjects:
+        return 'child_projects';
     }
   }
 
@@ -521,6 +524,8 @@ class DataSourceReference {
         return DataSourceType.timeSpent;
       case 'manual_quantity':
         return DataSourceType.manualQuantity;
+      case 'child_projects':
+        return DataSourceType.childProjects;
       default:
         // Legacy KPI source_type mapping
         if (s.contains('habit')) return DataSourceType.habit;
@@ -532,6 +537,7 @@ class DataSourceReference {
           return DataSourceType.subtasks;
         if (s.contains('collection')) return DataSourceType.collection;
         if (s.contains('mood')) return DataSourceType.journalMood;
+        if (s.contains('child')) return DataSourceType.childProjects;
         return DataSourceType.manualQuantity;
     }
   }

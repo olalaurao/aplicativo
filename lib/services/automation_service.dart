@@ -445,7 +445,7 @@ class AutomationService {
             entries: entries,
             moods: moods,
             allObjects: allObjects,
-          );
+          ) ?? 0;
           if (kpi.currentValue != newValue) {
             kpi.currentValue = newValue;
             goalChanged = true;
@@ -488,7 +488,7 @@ class AutomationService {
             entries: entries,
             moods: moods,
             allObjects: allObjects,
-          );
+          ) ?? 0;
           if (kpi.currentValue != newValue) {
             kpi.currentValue = newValue;
             projectChanged = true;

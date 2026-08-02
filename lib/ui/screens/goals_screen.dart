@@ -555,7 +555,9 @@ class _GoalCard extends ConsumerWidget {
         moods: moods,
         allObjects: allObjects,
       );
-      completed += (currentValue / kpi.targetValue).clamp(0.0, 1.0);
+      if (currentValue != null) {
+        completed += (currentValue / kpi.targetValue).clamp(0.0, 1.0);
+      }
     }
 
     return total > 0 ? (completed / total) : 0;

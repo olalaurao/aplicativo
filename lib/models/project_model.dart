@@ -72,6 +72,109 @@ class RotationScheduleOverride {
       );
 }
 
+/// Trigger modes for a rotation reminder.
+enum RotationReminderTriggerMode {
+  /// Fire at the rotation block's scheduled start time.
+  atStartTime,
+  /// Fire N minutes before the rotation block's scheduled start time.
+  minutesBefore,
+  /// Fire at a fixed time of day (HH:mm) on rotation days.
+  atTimeOfDay,
+}
+
+/// Reminder configuration attached to a rotation project.
+/// Can apply to all groups (groupId == null) or a specific group.
+class RotationReminderConfig {
+  final String id;
+  /// Null = applies to all rotation groups.
+  final String? groupId;
+  final RotationReminderTriggerMode triggerMode;
+  /// Used when [triggerMode] == [RotationReminderTriggerMode.minutesBefore].
+  final int? minutesBefore;
+  /// Used when [triggerMode] == [RotationReminderTriggerMode.atTimeOfDay]. Format: "HH:mm".
+  final String? timeOfDay;
+  final NotificationType notificationType;
+
+  const RotationReminderConfig({
+    required this.id,
+    this.groupId,
+    this.triggerMode = RotationReminderTriggerMode.atStartTime,
+    this.minutesBefore,
+    this.timeOfDay,
+    this.notificationType = NotificationType.push,
+  });
+
+  /// Compute the concrete trigger DateTime for a given rotation day.
+  /// [blockStart] is the scheduled start of the rotation block (DateTime).
+  DateTime? computeTriggerTime(DateTime blockStart) {
+    switch (triggerMode) {
+      case RotationReminderTriggerMode.atStartTime:
+        return blockStart;
+      case RotationReminderTriggerMode.minutesBefore:
+        final mins = minutesBefore ?? 10;
+        return blockStart.subtract(Duration(minutes: mins));
+      case RotationReminderTriggerMode.atTimeOfDay:
+        final parts = (timeOfDay ?? '09:00').split(':');
+        final hour = int.tryParse(parts[0]) ?? 9;
+        final minute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+        return DateTime(
+          blockStart.year,
+          blockStart.month,
+          blockStart.day,
+          hour,
+          minute,
+        );
+    }
+  }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    if (groupId != null) 'group_id': groupId,
+    'trigger_mode': triggerMode.name,
+    if (minutesBefore != null) 'minutes_before': minutesBefore,
+    if (timeOfDay != null) 'time_of_day': timeOfDay,
+    'notification_type': notificationType.name,
+  };
+
+  factory RotationReminderConfig.fromMap(Map<String, dynamic> map) =>
+      RotationReminderConfig(
+        id: map['id']?.toString() ??
+            DateTime.now().millisecondsSinceEpoch.toString(),
+        groupId: map['group_id']?.toString(),
+        triggerMode: RotationReminderTriggerMode.values.firstWhere(
+          (e) => e.name == map['trigger_mode'],
+          orElse: () => RotationReminderTriggerMode.atStartTime,
+        ),
+        minutesBefore: map['minutes_before'] is num
+            ? (map['minutes_before'] as num).toInt()
+            : int.tryParse(map['minutes_before']?.toString() ?? ''),
+        timeOfDay: map['time_of_day']?.toString(),
+        notificationType: NotificationType.values.firstWhere(
+          (e) => e.name == map['notification_type'],
+          orElse: () => NotificationType.push,
+        ),
+      );
+
+  RotationReminderConfig copyWith({
+    String? id,
+    String? groupId,
+    bool clearGroupId = false,
+    RotationReminderTriggerMode? triggerMode,
+    int? minutesBefore,
+    bool clearMinutesBefore = false,
+    String? timeOfDay,
+    bool clearTimeOfDay = false,
+    NotificationType? notificationType,
+  }) => RotationReminderConfig(
+    id: id ?? this.id,
+    groupId: clearGroupId ? null : (groupId ?? this.groupId),
+    triggerMode: triggerMode ?? this.triggerMode,
+    minutesBefore: clearMinutesBefore ? null : (minutesBefore ?? this.minutesBefore),
+    timeOfDay: clearTimeOfDay ? null : (timeOfDay ?? this.timeOfDay),
+    notificationType: notificationType ?? this.notificationType,
+  );
+}
+
 /// A phase groups Tasks by stage within a Project.
 /// Each phase has a name and a list of WikiLinks to child Tasks.
 class ProjectPhase {
@@ -149,6 +252,10 @@ class Project extends Organizer {
   /// V5: set on old file when a scheduled restart creates a new Project
   String? supersededBy;   // WikiLink e.g. "[[new-project-slug]]"
   String? methodLabel;
+  /// Hierarchical progress combination mode: 'simple', 'weighted', 'children_only'
+  String? hierarchyCombinationMode;
+  /// Reminders attached to this project's rotation blocks.
+  List<RotationReminderConfig> rotationReminders;
 
   bool get hasRotation =>
       rotationGroups.isNotEmpty && rotationStartDate != null;
@@ -199,6 +306,8 @@ class Project extends Organizer {
     List<ProjectPhase>? phases,
     List<ChecklistStep>? steps,
     this.supersededBy,
+    this.hierarchyCombinationMode,
+    List<RotationReminderConfig>? rotationReminders,
     super.parentId,
     super.startDate,
     super.endDate,
@@ -217,6 +326,7 @@ class Project extends Organizer {
        rotationScheduleOverrides = rotationScheduleOverrides ?? [],
        phases = phases ?? [],
        steps = steps ?? [],
+       rotationReminders = rotationReminders ?? [],
        super(
          organizerType: OrganizerType.project,
          state: state.name,
@@ -297,12 +407,18 @@ class Project extends Organizer {
       frontmatter['steps'] = steps.map((s) => s.toMap()).toList();
     }
     if (supersededBy != null) frontmatter['superseded_by'] = supersededBy;
+    if (hierarchyCombinationMode != null) frontmatter['hierarchy_combination_mode'] = hierarchyCombinationMode;
+    if (rotationReminders.isNotEmpty) {
+      frontmatter['rotation_reminders'] =
+          rotationReminders.map((r) => r.toMap()).toList();
+    }
 
     // Add organizer-specific fields
     if (startDate != null) {
       frontmatter['start_date'] = startDate!.toIso8601String();
     }
     if (endDate != null) frontmatter['end_date'] = endDate!.toIso8601String();
+    if (parentId != null) frontmatter['parent_id'] = parentId;
     if (color != null) frontmatter['color'] = color;
     if (icon != null) frontmatter['icon'] = icon;
 
@@ -356,6 +472,7 @@ class Project extends Organizer {
     if (frontmatter['end_date'] != null) {
       project.endDate = DateTime.tryParse(frontmatter['end_date']);
     }
+    project.parentId = frontmatter['parent_id'] as String?;
     project.color = frontmatter['color'] is List
         ? (frontmatter['color'] as List).join(', ')
         : frontmatter['color']?.toString();
@@ -409,6 +526,7 @@ class Project extends Organizer {
               .toList();
     }
     project.methodLabel = frontmatter['method_label']?.toString();
+    project.hierarchyCombinationMode = frontmatter['hierarchy_combination_mode']?.toString();
 
     // V5: Plan-mode fields
     project.objective = frontmatter['objective'] is List
@@ -430,6 +548,14 @@ class Project extends Organizer {
           .toList();
     }
     project.supersededBy = frontmatter['superseded_by']?.toString();
+    if (frontmatter['rotation_reminders'] is List) {
+      project.rotationReminders = (frontmatter['rotation_reminders'] as List)
+          .whereType<Map>()
+          .map(
+            (m) => RotationReminderConfig.fromMap(Map<String, dynamic>.from(m)),
+          )
+          .toList();
+    }
 
     return project;
   }
@@ -538,6 +664,8 @@ class Project extends Organizer {
     List<ProjectPhase>? phases,
     List<ChecklistStep>? steps,
     String? supersededBy,
+    String? hierarchyCombinationMode,
+    List<RotationReminderConfig>? rotationReminders,
     String? parentId,
     DateTime? startDate,
     DateTime? endDate,
@@ -580,10 +708,12 @@ class Project extends Organizer {
           rotationScheduleOverrides ?? this.rotationScheduleOverrides,
       methodLabel: methodLabel ?? this.methodLabel,
       objective: objective ?? this.objective,
+      hierarchyCombinationMode: hierarchyCombinationMode ?? this.hierarchyCombinationMode,
       strategy: strategy ?? this.strategy,
       phases: phases ?? this.phases,
       steps: steps ?? this.steps,
       supersededBy: supersededBy ?? this.supersededBy,
+      rotationReminders: rotationReminders ?? this.rotationReminders,
       parentId: parentId ?? this.parentId,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,

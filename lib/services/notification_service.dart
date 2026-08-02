@@ -10,6 +10,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import '../models/reminder_config.dart';
+import '../models/project_model.dart';
 import '../ui/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/vault_provider.dart';
@@ -19,6 +20,7 @@ import '../ui/screens/alarm_screen.dart';
 import '../ui/screens/popup_notification_screen.dart';
 import 'package:flutter/services.dart';
 import 'permission_service.dart';
+import 'rotation_service.dart';
 import 'vibration_pattern_helper.dart';
 
 class NotificationService with WidgetsBindingObserver {
@@ -151,8 +153,8 @@ class NotificationService with WidgetsBindingObserver {
       return;
     }
     tz.initializeTimeZones();
-    final timeZoneName = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timeZoneName.identifier));
+    final timezoneInfo = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timezoneInfo.identifier));
 
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/launcher_icon');
@@ -416,8 +418,8 @@ class NotificationService with WidgetsBindingObserver {
       final titleStr = Uri.decodeComponent(_extractField(payload, 'title') ?? 'Snoozed Reminder');
       final notifType = _extractNotifType(payload);
       var type = NotificationType.push;
-      if (notifType == 'alarm') type = NotificationType.alarm;
-      else if (notifType == 'popup') type = NotificationType.popup;
+      if (notifType == 'alarm') { type = NotificationType.alarm; }
+      else if (notifType == 'popup') { type = NotificationType.popup; }
 
       final snoozeMinutes = _snoozeMinutesFromPayload(payload);
       
@@ -574,6 +576,80 @@ class NotificationService with WidgetsBindingObserver {
     await prefs.setStringList('notification_actions', filtered);
   }
 
+  /// Pre-schedules all rotation reminders for [project] for the next [daysAhead] days.
+  ///
+  /// Called after saving a Project that has rotation groups and rotationReminders.
+  /// Uses [RotationService.computeActiveStatus] per day to check if a rotation is
+  /// active, then computes each reminder's trigger time via [RotationReminderConfig.computeTriggerTime].
+  Future<void> scheduleRotationRemindersForProject(
+    Project project, {
+    int daysAhead = 7,
+  }) async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return;
+    if (!project.hasRotation || project.rotationReminders.isEmpty) return;
+
+    final today = DateTime.now();
+    for (int d = 0; d < daysAhead; d++) {
+      final day = DateTime(today.year, today.month, today.day + d);
+      final status = RotationService.computeActiveStatus(project, now: day);
+      if (status == null) continue;
+
+      final schedule = RotationService.scheduleForStatus(project, status, day);
+      final startMinutes = _parseTimeString(schedule.time) ?? (9 * 60);
+      final blockStart = DateTime(
+        day.year,
+        day.month,
+        day.day,
+        startMinutes ~/ 60,
+        startMinutes % 60,
+      );
+
+      for (final reminder in project.rotationReminders) {
+        // Skip if reminder is for a different group
+        if (reminder.groupId != null && reminder.groupId != status.group.id) {
+          continue;
+        }
+
+        final triggerTime = reminder.computeTriggerTime(blockStart);
+        if (triggerTime == null) continue;
+        if (triggerTime.isBefore(DateTime.now())) continue;
+
+        // Stable ID: hash of project+reminderConfig+day
+        final idSeed =
+            'rotation_${project.id}_${reminder.id}_${day.toIso8601String().split('T').first}';
+        final notifId = idSeed.hashCode.abs() % 999990000 + 1;
+
+        final groupLabel = reminder.groupId == null
+            ? ''
+            : ' · ${status.group.name}';
+        await scheduleReminder(
+          id: notifId,
+          title: '${project.title}$groupLabel',
+          config: ReminderConfig(
+            id: idSeed,
+            triggerTime: triggerTime,
+            type: reminder.notificationType,
+            notificationBody: 'Your rotation block is starting.',
+            snoozeMinutes: 10,
+          ),
+          triggerTime: triggerTime,
+          payload:
+              'Quartzo://notification?oid=${Uri.encodeComponent(project.id)}&type=project',
+        );
+      }
+    }
+  }
+
+  static int? _parseTimeString(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final parts = value.split(':');
+    if (parts.length < 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    return (hour.clamp(0, 23) * 60) + minute.clamp(0, 59);
+  }
+
   Future<void> scheduleReminder({
     required int id,
     required String title,
@@ -681,10 +757,12 @@ class NotificationService with WidgetsBindingObserver {
                   : AudioAttributesUsage.notification)),
       color: config.popupColor ?? AppColors.primary,
       visibility: NotificationVisibility.public,
-      ongoing: isAlarm || isPopup,
-      autoCancel: !(isAlarm || isPopup),
-      timeoutAfter: null,
+      // Note: ongoing:true blocks fullScreenIntent on Android 12+ — keep false
+      ongoing: false,
+      autoCancel: true,
+      timeoutAfter: isAlarm ? null : const Duration(minutes: 1).inMilliseconds,
       additionalFlags: isAlarm ? Int32List.fromList(<int>[4]) : null,
+      ticker: isAlarm ? title : null,
       channelShowBadge: true,
       actions: filteredActions,
     );
@@ -712,6 +790,16 @@ class NotificationService with WidgetsBindingObserver {
       snoozeMinutes: config.snoozeMinutes,
     );
 
+    final notifTypeLabel = isAlarm ? 'alarm' : (isPopup ? 'popup' : 'push');
+    final channelId = isAlarm
+        ? 'alarm_channel_v$version'
+        : (isPopup ? 'popup_channel_v$version' : 'reminder_channel_v$version');
+    debugPrint(
+      'NotificationService: scheduling $notifTypeLabel id=$id '
+      'channel=$channelId fireTime=${time.toIso8601String()} '
+      'fullScreenIntent=${isAlarm || isPopup}',
+    );
+
     try {
       await _notifications.zonedSchedule(
         id,
@@ -726,8 +814,9 @@ class NotificationService with WidgetsBindingObserver {
             UILocalNotificationDateInterpretation.absoluteTime,
         payload: enrichedPayload,
       );
+      debugPrint('NotificationService: zonedSchedule OK id=$id');
     } catch (e) {
-      debugPrint('Failed exact zonedSchedule: $e');
+      debugPrint('NotificationService: failed exact zonedSchedule id=$id: $e');
       try {
         await _notifications.zonedSchedule(
           id,
@@ -740,8 +829,9 @@ class NotificationService with WidgetsBindingObserver {
               UILocalNotificationDateInterpretation.absoluteTime,
           payload: enrichedPayload,
         );
+        debugPrint('NotificationService: zonedSchedule inexact OK id=$id');
       } catch (e2) {
-        debugPrint('Failed inexact zonedSchedule: $e2');
+        debugPrint('NotificationService: failed ALL schedules id=$id: $e2');
       }
     }
 
@@ -1168,7 +1258,7 @@ class _ForegroundEntry {
 void notificationTapBackground(NotificationResponse response) async {
   WidgetsFlutterBinding.ensureInitialized();
   tz.initializeTimeZones();
-  final timeZoneName = await FlutterTimezone.getLocalTimezone();
-  tz.setLocalLocation(tz.getLocation(timeZoneName.identifier));
+  final timezoneInfo = await FlutterTimezone.getLocalTimezone();
+  tz.setLocalLocation(tz.getLocation(timezoneInfo.identifier));
   await NotificationService._handleNotificationResponse(response);
 }

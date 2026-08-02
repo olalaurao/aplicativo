@@ -10,6 +10,7 @@ enum KPISourceType {
   timeSpent,
   manualQuantity,
   others,
+  childProjects,
 }
 
 enum KPIDisplayType { number, percentage, progressBar }
@@ -33,6 +34,8 @@ extension KPISourceTypeLabel on KPISourceType {
         return 'Quantidade Manual';
       case KPISourceType.others:
         return 'Outros Indicadores';
+      case KPISourceType.childProjects:
+        return 'Subprojetos';
     }
   }
 }
@@ -200,6 +203,10 @@ KPISourceType _resolveLegacySourceType(String rawSourceType, String? calcMode) {
     case 'reflectionLength':
     case 'organizerAssociationCount':
       return KPISourceType.others;
+    case 'childProjectsProgress':
+    case 'childProjectsAverage':
+    case 'subprojectProgress':
+      return KPISourceType.childProjects;
     default:
       final normalized = rawSourceType.replaceAllMapped(
         RegExp(r'_([a-z])'),
@@ -210,6 +217,9 @@ KPISourceType _resolveLegacySourceType(String rawSourceType, String? calcMode) {
         orElse: () {
           if (calcMode == 'mood_average' || calcMode == 'mood_trend') {
             return KPISourceType.others;
+          }
+          if (rawSourceType.contains('child') || rawSourceType.contains('subproject')) {
+            return KPISourceType.childProjects;
           }
           return KPISourceType.manualQuantity;
         },
@@ -241,6 +251,8 @@ DataSourceType _toDataSourceType(
         return DataSourceType.journalMood;
       }
       return DataSourceType.manualQuantity;
+    case KPISourceType.childProjects:
+      return DataSourceType.childProjects;
   }
 }
 
@@ -267,6 +279,8 @@ KPISourceType _toKPISourceType(
           : KPISourceType.manualQuantity;
     case DataSourceType.journalMood:
       return KPISourceType.others;
+    case DataSourceType.childProjects:
+      return KPISourceType.childProjects;
   }
 }
 
@@ -313,6 +327,8 @@ DataSourceAggregation? _aggregationFromCalculationMode(
     case KPISourceType.manualQuantity:
     case KPISourceType.others:
       return null;
+    case KPISourceType.childProjects:
+      return DataSourceAggregation.average;
   }
 }
 

@@ -806,6 +806,14 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
           _CalculationModeOption(label: 'Contagem de entradas', value: null),
           _CalculationModeOption(label: 'Contagem de palavras', value: 'word_count'),
         ];
+      case KPISourceType.childProjects:
+        return const [
+          _CalculationModeOption(label: 'Média de progresso', value: 'average'),
+          _CalculationModeOption(label: 'Soma de progresso', value: 'sum'),
+          _CalculationModeOption(label: 'Contagem de subprojetos', value: 'count'),
+          _CalculationModeOption(label: 'Maior progresso', value: 'max'),
+          _CalculationModeOption(label: 'Menor progresso', value: 'min'),
+        ];
       default:
         return const [];
     }
@@ -838,6 +846,15 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
     return [
       const _ScopeOption(label: 'Todos', value: null),
       ...organizers.map((o) => _ScopeOption(label: o.displayTitle, value: o.slug)),
+    ];
+  }
+
+  List<_ScopeOption> _getProjectOptions() {
+    final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
+    final projects = allObjects.where((o) => o.type == 'project').toList();
+    
+    return [
+      ...projects.map((p) => _ScopeOption(label: p.displayTitle, value: p.id)),
     ];
   }
 
@@ -1112,6 +1129,25 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
             const SizedBox(height: 12),
           ],
 
+          // Scope picker for childProjects
+          if (_sourceType == KPISourceType.childProjects) ...[
+            DropdownButtonFormField<String>(
+              value: _sourceId,
+              decoration: const InputDecoration(
+                labelText: 'Selecionar Projeto Pai',
+                border: OutlineInputBorder(),
+              ),
+              items: _getProjectOptions().map((option) {
+                return DropdownMenuItem<String>(
+                  value: option.value,
+                  child: Text(option.label),
+                );
+              }).toList(),
+              onChanged: (v) => setState(() => _sourceId = v),
+            ),
+            const SizedBox(height: 12),
+          ],
+
           // Others source type - second dropdown for specific modes
           if (_sourceType == KPISourceType.others) ...[
             DropdownButtonFormField<String>(
@@ -1208,7 +1244,8 @@ class _KpiBuilderSheetState extends ConsumerState<_KpiBuilderSheet> {
           if (_sourceType == KPISourceType.habit ||
               _sourceType == KPISourceType.trackerField ||
               _sourceType == KPISourceType.subtasks ||
-              _sourceType == KPISourceType.entry) ...[
+              _sourceType == KPISourceType.entry ||
+              _sourceType == KPISourceType.childProjects) ...[
             DropdownButtonFormField<String>(
               value: _calculationMode,
               decoration: const InputDecoration(

@@ -3723,10 +3723,10 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       allObjects: allObjects,
     );
 
-    final progress = kpi.targetValue <= 0
+    final progress = kpi.targetValue <= 0 || currentValue == null
         ? 0.0
-        : (currentValue / kpi.targetValue).clamp(0.0, 1.0);
-    final isComplete = kpi.completed || currentValue >= kpi.targetValue;
+        : (currentValue! / kpi.targetValue).clamp(0.0, 1.0);
+    final isComplete = kpi.completed || (currentValue != null && currentValue >= kpi.targetValue);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -3768,7 +3768,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               else if (kpi.displayType == KPIDisplayType.number)
                 Flexible(
                   child: Text(
-                    currentValue.toInt().toString(),
+                    currentValue?.toInt().toString() ?? '0',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
@@ -3796,7 +3796,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
               else
                 Flexible(
                   child: Text(
-                    '${currentValue.toInt()} / ${kpi.targetValue.toInt()}',
+                    '${currentValue?.toInt() ?? 0} / ${kpi.targetValue.toInt()}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
@@ -4227,7 +4227,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           entries: entries,
           moods: moods,
           allObjects: allObjects,
-        );
+        ) ?? 0.0;
       }
     } else if (object is Project) {
       final project = object as Project;
