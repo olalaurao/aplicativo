@@ -588,18 +588,6 @@ class HabitsNotifier extends Notifier<List<Habit>> {
         date,
         habitsMap[habit.slug],
       );
-      state = [
-        for (final h in state)
-          if (h.id == updatedHabit.id) updatedHabit else h,
-      ];
-      ref.read(allObjectsProvider.notifier).replaceObjectInMemory(updatedHabit);
-
-      // Save habit's own .md file with updated completion history
-      updatedHabit.logEvent(
-        'habit_toggled',
-        'Habit toggled on $dateStr (slot $slotIndex)',
-      );
-      await ref.read(vaultProvider.notifier).updateObject(updatedHabit);
 
       // Write habit completions as flat frontmatter keys (Obsidian format)
       // Remove old nested 'habits' key if it exists
@@ -625,17 +613,35 @@ class HabitsNotifier extends Notifier<List<Habit>> {
       );
 
       final newContent = generateMarkdown(frontmatter, newBody);
-      await obsidianService.writeFile(path, newContent);
 
+      // --- OPTIMISTIC MEMORY UPDATES ---
+      state = [
+        for (final h in state)
+          if (h.id == updatedHabit.id) updatedHabit else h,
+      ];
+      
       _updateDailyNoteCache(
         dateStr: dateStr,
         habitsMap: habitsMap,
         frontmatter: frontmatter,
         trackers: trackers,
       );
+      
       ref.read(allObjectsProvider.notifier).replaceObjectInMemory(updatedHabit);
-      // ref.invalidate(objectsByTypeProvider('habit')); // Removed - replaceObjectInMemory handles it
       ref.invalidate(dailyNoteDataProvider(dateStr));
+
+      // Capture notifiers before await
+      final vaultNotifier = ref.read(vaultProvider.notifier);
+
+      // --- ASYNC DISK WRITES ---
+      // Save habit's own .md file with updated completion history
+      updatedHabit.logEvent(
+        'habit_toggled',
+        'Habit toggled on $dateStr (slot $slotIndex)',
+      );
+      
+      await vaultNotifier.updateObject(updatedHabit);
+      await obsidianService.writeFile(path, newContent);
 
       await syncQueue.enqueueAction(
         SyncAction(
