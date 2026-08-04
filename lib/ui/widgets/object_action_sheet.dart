@@ -48,9 +48,10 @@ class ObjectActionSheet extends ConsumerWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             Container(
               margin: const EdgeInsets.symmetric(vertical: 12),
               width: 40,
@@ -89,6 +90,7 @@ class ObjectActionSheet extends ConsumerWidget {
             const SizedBox(height: 8),
           ],
         ),
+      ),
       ),
     );
   }

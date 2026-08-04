@@ -1,7 +1,6 @@
 // lib/features/overdue/replanning/replanning_actions.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/services.dart';
 import '../../../models/content_object.dart';
 import '../../../models/task_model.dart';
 import '../../../models/goal_model.dart';
@@ -139,6 +138,7 @@ class ReplanningActions {
     ContentObject item,
     dynamic vaultNotifier,
   ) {
+    final messenger = ScaffoldMessenger.of(context);
     showDatePicker(
       context: context,
       initialDate: DateTime.now().add(const Duration(days: 1)),
@@ -184,7 +184,14 @@ class ReplanningActions {
           break;
       }
 
-      _showSuccessSnackBar(context, 'Data atualizada');
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Data atualizada'),
+          backgroundColor: AppColors.success,
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     });
   }
 

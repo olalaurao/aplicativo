@@ -1,7 +1,6 @@
 // lib/features/overdue/widgets/overdue_section.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../../../ui/theme.dart';
 import '../../../providers/overdue_provider.dart';
 import 'package:go_router/go_router.dart';
@@ -96,7 +95,6 @@ class _OverdueItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = severityColor(item.severity);
-    final dateFormatter = DateFormat('dd/MM');
 
     return InkWell(
       onTap: onTap,

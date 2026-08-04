@@ -35,6 +35,9 @@ class Organizer extends ContentObject {
   List<String> daysOfWeek; // For dayTheme
   Scheduler? scheduler; // For dayTheme and timeBlock
   @override List<ReminderConfig> reminders; // For dayTheme and timeBlock
+  bool isWildcard;
+  String? energyImpact; // recharge | flow | grind | drain
+  String? reviewStatus; // Needs Review | Doing Well | At Risk
 
   Organizer({
     super.id,
@@ -53,6 +56,9 @@ class Organizer extends ContentObject {
     this.daysOfWeek = const [],
     this.scheduler,
     this.reminders = const [],
+    this.isWildcard = false,
+    this.energyImpact,
+    this.reviewStatus,
     super.organizers,
     super.categories,
     super.createdAt,
@@ -92,6 +98,9 @@ class Organizer extends ContentObject {
     if (reminders.isNotEmpty) {
       frontmatter['reminders'] = reminders.map((r) => r.toMap()).toList();
     }
+    if (isWildcard) frontmatter['is_wildcard'] = isWildcard;
+    if (energyImpact != null) frontmatter['energy_impact'] = energyImpact;
+    if (reviewStatus != null) frontmatter['review_status'] = reviewStatus;
 
     return generateMarkdown(frontmatter, '');
   }
@@ -140,6 +149,9 @@ class Organizer extends ContentObject {
     organizer.daysOfWeek = List<String>.from(
       frontmatter['days_of_week'] as List? ?? [],
     );
+    organizer.isWildcard = frontmatter['is_wildcard'] == true;
+    organizer.energyImpact = frontmatter['energy_impact'] as String?;
+    organizer.reviewStatus = frontmatter['review_status'] as String?;
     if (frontmatter['scheduler'] is Map) {
       organizer.scheduler = Scheduler.fromMap(
         Map<String, dynamic>.from(frontmatter['scheduler'] as Map),
@@ -170,6 +182,9 @@ class Organizer extends ContentObject {
     List<String>? daysOfWeek,
     Scheduler? scheduler,
     List<ReminderConfig>? reminders,
+    bool? isWildcard,
+    String? energyImpact,
+    String? reviewStatus,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     DateTime? createdAt,
@@ -193,6 +208,9 @@ class Organizer extends ContentObject {
       daysOfWeek: daysOfWeek ?? this.daysOfWeek,
       scheduler: scheduler ?? this.scheduler,
       reminders: reminders ?? this.reminders,
+      isWildcard: isWildcard ?? this.isWildcard,
+      energyImpact: energyImpact ?? this.energyImpact,
+      reviewStatus: reviewStatus ?? this.reviewStatus,
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       createdAt: createdAt ?? this.createdAt,

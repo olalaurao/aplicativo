@@ -112,7 +112,9 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
                   backgroundColor: _resolveDialBackground(context, settings),
                   iconColor: Theme.of(context).colorScheme.onSurface,
                   onSegmentTap: (segment) {
-                    if (segment.sourceSlug != null) {
+                    if (segment.kind == DialSegmentKind.timeBlock && segment.sourceSlug != null) {
+                      _showTimeBlockReviewSheet(context, ref, segment);
+                    } else if (segment.sourceSlug != null) {
                       context.push('/detail/${segment.sourceSlug}');
                     }
                     // Scroll legend to this segment
@@ -487,5 +489,88 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
       DialSegmentKind.sleep => Icons.bedtime,
       DialSegmentKind.rotationZone => Icons.rotate_right,
     };
+  }
+
+  void _showTimeBlockReviewSheet(BuildContext context, WidgetRef ref, DialSegment segment) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.backgroundColor(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (BuildContext ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 24),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Text(
+                  'Review: ${segment.title}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'How did this planned block go?',
+                  style: TextStyle(color: AppColors.textMuted),
+                ),
+                const SizedBox(height: 32),
+                ListTile(
+                  leading: const Icon(Icons.check_circle_rounded, color: Colors.green),
+                  title: const Text('As Planned'),
+                  onTap: () {
+                    _updateTimeBlockReview(ref, segment.sourceSlug!, 'as_planned');
+                    Navigator.pop(ctx);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.change_circle_rounded, color: Colors.orange),
+                  title: const Text('Changed'),
+                  onTap: () {
+                    _updateTimeBlockReview(ref, segment.sourceSlug!, 'changed');
+                    Navigator.pop(ctx);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.cancel_rounded, color: Colors.red),
+                  title: const Text('Didn\'t Happen'),
+                  onTap: () {
+                    _updateTimeBlockReview(ref, segment.sourceSlug!, 'didnt_happen');
+                    Navigator.pop(ctx);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.clear_rounded, color: Colors.grey),
+                  title: const Text('Clear Status'),
+                  onTap: () {
+                    _updateTimeBlockReview(ref, segment.sourceSlug!, null);
+                    Navigator.pop(ctx);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _updateTimeBlockReview(WidgetRef ref, String slug, String? status) async {
+    final objects = ref.read(allObjectsProvider).valueOrNull ?? [];
+    final obj = objects.where((o) => o.slug == slug).firstOrNull;
+    final vault = ref.read(vaultProvider.notifier);
+    if (obj != null && obj is Organizer) {
+      final updated = obj.copyWith(reviewStatus: status);
+      await vault.updateObject(updated);
+    }
   }
 }

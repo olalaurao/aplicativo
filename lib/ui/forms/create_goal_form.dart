@@ -69,6 +69,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
   List<OrganizerReference> _organizers = [];
   Scheduler? _scheduler;
   List<ReminderConfig> _reminders = [];
+  List<int> _activeMonths = [];
 
   @override
   void initState() {
@@ -95,6 +96,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
         _scheduler = goal.schedulers.first;
       }
       _reminders = List.from(goal.reminders);
+      _activeMonths = List.from(goal.activeMonths);
     } else {
       if (widget.initialOrganizers != null) {
         _organizers = List.from(widget.initialOrganizers!);
@@ -401,7 +403,82 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
 
                     const SizedBox(height: 12),
 
-                    // âÂ”Â€âÂ”Â€âÂ”Â€ KPIs âÂ”Â€âÂ”Â€âÂ”Â€
+                    // ─── Active Months Card ───
+                    Container(
+                      decoration: AppTheme.cardDecoration(context),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Active months',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 4,
+                              childAspectRatio: 2.0,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
+                            itemCount: 12,
+                            itemBuilder: (context, index) {
+                              final month = index + 1;
+                              final isSelected = _activeMonths.contains(month);
+                              final monthName = DateFormat('MMM').format(DateTime(2024, month));
+                              
+                              return GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    if (isSelected) {
+                                      _activeMonths.remove(month);
+                                    } else {
+                                      _activeMonths.add(month);
+                                      _activeMonths.sort();
+                                    }
+                                  });
+                                },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? AppTheme.accentColor(context).withValues(alpha: 0.15)
+                                        : (Theme.of(context).brightness == Brightness.dark
+                                            ? Colors.white.withValues(alpha: 0.05)
+                                            : Colors.black.withValues(alpha: 0.03)),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: isSelected
+                                        ? Border.all(color: AppTheme.accentColor(context))
+                                        : null,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    monthName,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      color: isSelected
+                                          ? AppTheme.accentColor(context)
+                                          : AppTheme.textPrimaryColor(context),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // ─── KPIs ───
                     Container(
                       decoration: AppTheme.cardDecoration(context),
                       padding: const EdgeInsets.all(16),
@@ -649,6 +726,7 @@ class _CreateGoalFormState extends ConsumerState<CreateGoalForm> {
       color: _selectedColor,
       kpis: _kpis,
       organizers: _organizers,
+      activeMonths: _activeMonths,
       obsidianPath: widget.existingGoal?.obsidianPath ?? '',
     );
 

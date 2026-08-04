@@ -12,6 +12,7 @@ import '../models/habit_model.dart';
 import '../models/organizer_model.dart' as organizer_model;
 import '../models/goal_model.dart';
 import '../models/note_model.dart';
+import '../models/monthly_focus_model.dart';
 import '../models/tracker_model.dart';
 import '../models/mood_model.dart';
 import '../models/analysis_model.dart';
@@ -442,6 +443,9 @@ Future<ParsedVaultResult> parseVaultInIsolate(VaultIsolateParams params) async {
                   ..obsidianPath = relativePath;
               } else if (type == 'action') {
                 obj = ActionMenuItem.fromMarkdown(frontmatter, body)
+                  ..obsidianPath = relativePath;
+              } else if (type == 'monthly_focus') {
+                obj = MonthlyFocus.fromMarkdown(frontmatter, body)
                   ..obsidianPath = relativePath;
               } else if (type == 'template') {
                 obj = TemplateDefinition.fromMap(

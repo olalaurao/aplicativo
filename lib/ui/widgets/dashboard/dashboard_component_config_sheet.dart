@@ -18,15 +18,16 @@ import '../app_dropdown.dart';
 
 class DashboardComponentConfigSheet extends ConsumerStatefulWidget {
   final DashboardBlock block;
+  final String boardId;
 
-  const DashboardComponentConfigSheet({super.key, required this.block});
+  const DashboardComponentConfigSheet({super.key, required this.block, required this.boardId});
 
-  static Future<void> show(BuildContext context, DashboardBlock block) {
+  static Future<void> show(BuildContext context, DashboardBlock block, String boardId) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DashboardComponentConfigSheet(block: block),
+      builder: (_) => DashboardComponentConfigSheet(block: block, boardId: boardId),
     );
   }
 
@@ -50,7 +51,7 @@ class _DashboardComponentConfigSheetState extends ConsumerState<DashboardCompone
   }
 
   void _save() {
-    ref.read(dashboardProvider.notifier).updateBlock(widget.block.copyWith(metadata: _metadata));
+    ref.read(dashboardProvider(widget.boardId).notifier).updateBlock(widget.block.copyWith(metadata: _metadata));
     if (context.canPop()) context.pop();
   }
 
@@ -399,6 +400,153 @@ class _DashboardComponentConfigSheetState extends ConsumerState<DashboardCompone
             ),
           ],
         );
+      case BlockType.timeBalance:
+        return FormSection(
+          title: 'Time Balance',
+          description: 'Customize how your time allocation is displayed.',
+          children: [
+            AppDropdown<String>(
+              value: _metadata['displayMode'] ?? 'percent',
+              items: const [
+                DropdownMenuItem(value: 'percent', child: Text('Percentage (%)')),
+                DropdownMenuItem(value: 'hours', child: Text('Hours (h)')),
+              ],
+              onChanged: (v) => _updateMeta('displayMode', v),
+              label: 'Display Mode',
+            ),
+            const SizedBox(height: 16),
+            AppDropdown<String>(
+              value: _metadata['typeFilter'] ?? 'area',
+              items: const [
+                DropdownMenuItem(value: 'area', child: Text('Areas')),
+                DropdownMenuItem(value: 'project', child: Text('Projects')),
+              ],
+              onChanged: (v) => _updateMeta('typeFilter', v),
+              label: 'Group By',
+            ),
+            const SizedBox(height: 16),
+            AppDropdown<String>(
+              value: _metadata['chartType'] ?? 'pie',
+              items: const [
+                DropdownMenuItem(value: 'pie', child: Text('Pie Chart')),
+                DropdownMenuItem(value: 'stack', child: Text('Stacked Bar')),
+              ],
+              onChanged: (v) => _updateMeta('chartType', v),
+              label: 'Chart Type',
+            ),
+          ],
+        );
+      case BlockType.whereTimeGoes:
+        return FormSection(
+          title: 'Where Your Time Goes',
+          description: 'Settings for top 4 time allocations.',
+          children: [
+            AppSwitchTile(
+              value: _metadata['showOther'] ?? true,
+              onChanged: (v) => _updateMeta('showOther', v),
+              title: 'Show "Other" category',
+              subtitle: 'Group remaining areas into an "Other" slice.',
+            ),
+          ],
+        );
+      case BlockType.rhythmHeatmap:
+        return FormSection(
+          title: 'Rhythm Heatmap',
+          description: 'Customize the heatmap period.',
+          children: [
+            AppDropdown<int>(
+              value: _metadata['daysBack'] ?? 30,
+              items: const [
+                DropdownMenuItem(value: 7, child: Text('Last 7 days')),
+                DropdownMenuItem(value: 30, child: Text('Last 30 days')),
+                DropdownMenuItem(value: 90, child: Text('Last 90 days')),
+              ],
+              onChanged: (v) => _updateMeta('daysBack', v),
+              label: 'Period',
+            ),
+          ],
+        );
+      case BlockType.energyChart:
+        return FormSection(
+          title: 'Energy & Focus',
+          description: 'Customize the energy chart period.',
+          children: [
+            AppDropdown<int>(
+              value: _metadata['weeksBack'] ?? 1,
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('Last week')),
+                DropdownMenuItem(value: 2, child: Text('Last 2 weeks')),
+                DropdownMenuItem(value: 4, child: Text('Last 4 weeks')),
+              ],
+              onChanged: (v) => _updateMeta('weeksBack', v),
+              label: 'Period',
+            ),
+          ],
+        );
+      case BlockType.rechargeVsDrain:
+        return FormSection(
+          title: 'Recharge vs Drain',
+          description: 'No specific settings available yet.',
+          children: const [
+            Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('This block uses the default settings.', style: TextStyle(color: Colors.grey)),
+            ),
+          ],
+        );
+      case BlockType.focusByOrganizer:
+        return FormSection(
+          title: 'Focus by Organizer',
+          description: 'Customize grouping and period.',
+          children: [
+            AppDropdown<String>(
+              value: _metadata['typeFilter'] ?? 'project',
+              items: const [
+                DropdownMenuItem(value: 'area', child: Text('Areas')),
+                DropdownMenuItem(value: 'project', child: Text('Projects')),
+                DropdownMenuItem(value: 'task', child: Text('Tasks')),
+              ],
+              onChanged: (v) => _updateMeta('typeFilter', v),
+              label: 'Group By',
+            ),
+            const SizedBox(height: 16),
+            AppDropdown<int>(
+              value: _metadata['daysBack'] ?? 7,
+              items: const [
+                DropdownMenuItem(value: 7, child: Text('Last 7 days')),
+                DropdownMenuItem(value: 30, child: Text('Last 30 days')),
+              ],
+              onChanged: (v) => _updateMeta('daysBack', v),
+              label: 'Period',
+            ),
+          ],
+        );
+      case BlockType.plannedVsExecuted:
+        return FormSection(
+          title: 'Planned vs Executed',
+          description: 'Customize grouping and period.',
+          children: [
+            AppDropdown<String>(
+              value: _metadata['typeFilter'] ?? 'area',
+              items: const [
+                DropdownMenuItem(value: 'area', child: Text('Areas')),
+                DropdownMenuItem(value: 'project', child: Text('Projects')),
+              ],
+              onChanged: (v) => _updateMeta('typeFilter', v),
+              label: 'Group By',
+            ),
+            const SizedBox(height: 16),
+            AppDropdown<int>(
+              value: _metadata['daysBack'] ?? 7,
+              items: const [
+                DropdownMenuItem(value: 7, child: Text('Last 7 days')),
+                DropdownMenuItem(value: 30, child: Text('Last 30 days')),
+              ],
+              onChanged: (v) => _updateMeta('daysBack', v),
+              label: 'Period',
+            ),
+          ],
+        );
       default:
         return Center(
           child: Padding(
@@ -411,20 +559,21 @@ class _DashboardComponentConfigSheetState extends ConsumerState<DashboardCompone
 }
 
 class AddComponentSheet extends ConsumerWidget {
-  const AddComponentSheet({super.key});
+  final String boardId;
+  const AddComponentSheet({super.key, required this.boardId});
 
-  static Future<void> show(BuildContext context) {
+  static Future<void> show(BuildContext context, String boardId) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const AddComponentSheet(),
+      builder: (_) => AddComponentSheet(boardId: boardId),
     );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dashboardState = ref.watch(dashboardProvider).valueOrNull ?? [];
+    final dashboardState = ref.watch(dashboardProvider(boardId)).valueOrNull ?? [];
     final currentTypes = dashboardState.map((b) => b.type).toSet();
 
     final availableComponents = componentRegistry.where((c) {
@@ -435,47 +584,55 @@ class AddComponentSheet extends ConsumerWidget {
     return StandardSheet(
       radius: SheetRadius.large,
       showHandle: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Text('Add Component', style: Theme.of(context).textTheme.titleMedium!),
-          ),
-          const Divider(height: 1),
-          Flexible(
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: availableComponents.length,
-              itemBuilder: (context, index) {
-                final def = availableComponents[index];
-                return ListTile(
-                  key: ValueKey(def.type.name),
-                  leading: Icon(def.icon, color: AppColors.accent),
-                  title: Text(def.defaultTitle),
-                  subtitle: Text(def.description, style: Theme.of(context).textTheme.bodySmall!),
-                  onTap: () async {
-                    if (context.canPop()) context.pop();
-                    await ref.read(dashboardProvider.notifier).addBlock(
-                      def.type,
-                      def.defaultTitle,
-                      metadata: def.defaultMetadata,
-                    );
-                    // Get the newly added block to configure
-                    final state = ref.read(dashboardProvider).valueOrNull ?? [];
-                    if (state.isNotEmpty) {
-                      final newBlock = state.last;
-                      if (context.mounted) {
-                        DashboardComponentConfigSheet.show(context, newBlock);
-                      }
-                    }
-                  },
-                );
-              },
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75 -
+              MediaQuery.of(context).padding.bottom,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Text('Add Component',
+                  style: Theme.of(context).textTheme.titleMedium!),
             ),
-          ),
-        ],
+            const Divider(height: 1),
+            Expanded(
+              child: ListView.builder(
+                itemCount: availableComponents.length,
+                itemBuilder: (context, index) {
+                  final def = availableComponents[index];
+                  return ListTile(
+                    key: ValueKey(def.type.name),
+                    leading: Icon(def.icon, color: AppColors.accent),
+                    title: Text(def.defaultTitle),
+                    subtitle: Text(def.description,
+                        style: Theme.of(context).textTheme.bodySmall!),
+                    onTap: () async {
+                      if (context.canPop()) context.pop();
+                      await ref.read(dashboardProvider(boardId).notifier).addBlock(
+                            def.type,
+                            def.defaultTitle,
+                            metadata: def.defaultMetadata,
+                          );
+                      // Get the newly added block to configure
+                      final state =
+                          ref.read(dashboardProvider(boardId)).valueOrNull ?? [];
+                      if (state.isNotEmpty) {
+                        final newBlock = state.last;
+                        if (context.mounted) {
+                          DashboardComponentConfigSheet.show(context, newBlock, boardId);
+                        }
+                      }
+                    },
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ],
+        ),
       ),
     );
   }

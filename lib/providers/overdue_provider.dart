@@ -95,8 +95,8 @@ final overdueProvider = Provider<List<OverdueItem>>((ref) {
   }
   
   for (final project in ref.watch(objectsByTypeProvider('project')).cast<Project>()) {
-    if (project.state == ProjectState.completed ||
-        project.state == ProjectState.archived ||
+    if (project.projectState == ProjectState.completed ||
+        project.projectState == ProjectState.archived ||
         project.archived) {
       continue;
     }

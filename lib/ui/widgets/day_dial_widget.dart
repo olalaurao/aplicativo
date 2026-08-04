@@ -441,14 +441,19 @@ class _DayDialPainter extends CustomPainter {
     }
     
     final paint = Paint()
-      ..color = _parseColor(s.colorHex).withValues(alpha: isDragging ? 0.9 : (s.layer == -1 ? 0.3 : 0.8))
+      ..color = _parseColor(s.colorHex).withOpacity(isDragging ? 0.9 : (s.layer == -1 ? 0.3 : 0.8))
       ..style = PaintingStyle.stroke
       ..strokeWidth = ringWidth * 0.5
       ..strokeCap = StrokeCap.butt;
       
     if (isDragging) {
-      paint.color = paint.color.withValues(alpha: 1.0);
+      paint.color = paint.color.withOpacity(1.0);
       paint.strokeWidth = ringWidth * 0.9;
+    }
+
+    if (s.isGhost) {
+      paint.color = _parseColor(s.colorHex).withOpacity(0.15);
+      // Optional: add a thin outline if needed, but stroke width is already there.
     }
 
     if (s.kind == DialSegmentKind.habitSlot || s.kind == DialSegmentKind.reminder) {
@@ -466,6 +471,52 @@ class _DayDialPainter extends CustomPainter {
         false,
         paint,
       );
+
+      // Outline for ghosts
+      if (s.isGhost) {
+        final outlinePaint = Paint()
+          ..color = _parseColor(s.colorHex).withOpacity(0.5)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0;
+        
+        final outerRadius = ringRadius + (ringWidth * 0.25);
+        final innerRadiusGhost = ringRadius - (ringWidth * 0.25);
+
+        // Outer arc
+        canvas.drawArc(Rect.fromCircle(center: center, radius: outerRadius), startAngle, sweep, false, outlinePaint);
+        // Inner arc
+        canvas.drawArc(Rect.fromCircle(center: center, radius: innerRadiusGhost), startAngle, sweep, false, outlinePaint);
+      }
+      
+      // Draw review status marker if ghost
+      if (s.isGhost && s.reviewStatus != null) {
+        final midAngle = startAngle + (sweep / 2);
+        final markerX = center.dx + ringRadius * cos(midAngle);
+        final markerY = center.dy + ringRadius * sin(midAngle);
+        IconData? stIcon;
+        Color stColor = Colors.grey;
+        if (s.reviewStatus == 'as_planned') {
+          stIcon = Icons.check_circle_rounded;
+          stColor = Colors.green;
+        } else if (s.reviewStatus == 'didnt_happen') {
+          stIcon = Icons.cancel_rounded;
+          stColor = Colors.red;
+        } else if (s.reviewStatus == 'changed') {
+          stIcon = Icons.change_circle_rounded;
+          stColor = Colors.orange;
+        }
+        
+        if (stIcon != null) {
+          final tp = TextPainter(
+            text: TextSpan(text: String.fromCharCode(stIcon.codePoint), style: TextStyle(fontSize: 10, fontFamily: 'MaterialIcons', color: stColor)),
+            textDirection: ui.TextDirection.ltr,
+          )..layout();
+          
+          // Draw white circle behind
+          canvas.drawCircle(Offset(markerX, markerY), 6, Paint()..color = Colors.white..style = PaintingStyle.fill);
+          tp.paint(canvas, Offset(markerX - tp.width / 2, markerY - tp.height / 2));
+        }
+      }
     }
   }
 

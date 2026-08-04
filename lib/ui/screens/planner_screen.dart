@@ -11,6 +11,7 @@ import '../../services/daily_schedule_service.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:uuid/uuid.dart';
 import '../../models/organizer_model.dart';
 import '../../models/shared_types.dart';
 import '../widgets/month_calendar_grid.dart';
@@ -271,6 +272,25 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                   icon: const Icon(Icons.access_time_rounded),
                   tooltip: 'Jump to now',
                   onPressed: () => _scrollToNow(animate: true),
+                ),
+              // Log Sleep button
+              if (_viewMode == 0)
+                IconButton(
+                  icon: const Icon(Icons.bedtime_rounded, color: Colors.blue),
+                  tooltip: 'Log Sleep',
+                  onPressed: () => _logSleep(),
+                ),
+              if (_viewMode == 1)
+                IconButton(
+                  icon: const Icon(Icons.auto_awesome_rounded),
+                  tooltip: 'Plan this week',
+                  onPressed: () => context.push('/planning/weekly'),
+                ),
+              if (_viewMode == 2)
+                IconButton(
+                  icon: const Icon(Icons.auto_awesome_rounded),
+                  tooltip: 'Plan this month',
+                  onPressed: () => context.push('/planning/monthly'),
                 ),
             ],
             bottom: PreferredSize(
@@ -1903,6 +1923,29 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
         ],
       ),
     );
+  }
+
+  Future<void> _logSleep() async {
+    final sleepDate = _selectedDate.subtract(const Duration(days: 1));
+    final sleepObj = Task(
+      id: Uuid().v4(),
+      title: 'Sleep',
+      stage: TaskStage.finalized,
+      startDate: sleepDate,
+      scheduledTime: '23:00',
+      duration: 480, // 8 hours
+      allDay: false,
+      timeBlock: 'sys-sleep',
+      energyImpact: 'recharge',
+    );
+    sleepObj.obsidianPath = 'tasks/${sleepObj.id}.md';
+    await ref.read(vaultProvider.notifier).updateObject(sleepObj);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sleep logged successfully!')),
+      );
+    }
   }
 
   void _showDayDetailsSheet(

@@ -662,14 +662,38 @@ class NotificationService with WidgetsBindingObserver {
     }
     var time = triggerTime ?? config.triggerTime;
     if (time == null) return;
-    
-    // If time is in the past, schedule for tomorrow (for recurring reminders like habits)
-    if (time.isBefore(DateTime.now())) {
-      time = time.add(const Duration(days: 1));
-    }
 
     final isAlarm = config.type == NotificationType.alarm;
     final isPopup = config.type == NotificationType.popup;
+    final isPush = !isAlarm && !isPopup;
+
+    // Handle past fire times:
+    //  • Alarms and popups that missed their window → fire immediately (now + 5s),
+    //    so the user still sees the screen instead of silently losing the notification.
+    //  • Push reminders (e.g. habits) that are ≥ 1 h in the past → reschedule to
+    //    the same clock time tomorrow (original recurring-habit behavior).
+    //  • Push reminders that just barely missed (< 1 h ago) → also fire immediately
+    //    to avoid silent loss on fast app restarts.
+    final now = DateTime.now();
+    if (time.isBefore(now)) {
+      final missedBy = now.difference(time);
+      if (isPush && missedBy >= const Duration(hours: 1)) {
+        // Recurring push (e.g. habit) that is genuinely stale → next day
+        time = time.add(const Duration(days: 1));
+        debugPrint(
+          'NotificationService: push id=$id is ${missedBy.inMinutes}m late — '
+          'rescheduling to tomorrow ${time.toIso8601String()}',
+        );
+      } else {
+        // Alarm, popup, or recently-missed push → fire in 5 seconds
+        time = now.add(const Duration(seconds: 5));
+        debugPrint(
+          'NotificationService: id=$id missed by ${missedBy.inSeconds}s — '
+          'firing immediately at ${time.toIso8601String()}',
+        );
+      }
+    }
+
 
     if (Platform.isAndroid && (isAlarm || isPopup)) {
       try {

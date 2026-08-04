@@ -28,6 +28,7 @@ import '../../models/routine_model.dart';
 import '../../models/pillar_model.dart';
 import '../../models/shared_types.dart';
 import '../../models/kpi_model.dart';
+import '../../models/action_menu_item_model.dart';
 import '../../providers/pomodoro_provider.dart';
 import '../widgets/actionable_checklist_tile.dart';
 import '../../services/kpi_engine.dart';
@@ -82,6 +83,7 @@ import 'detail_sections/journal_entry_detail_section.dart';
 import 'detail_sections/idea_detail_section.dart';
 import 'detail_sections/routine_detail_section.dart';
 import 'detail_sections/pillar_detail_section.dart';
+import 'detail_sections/action_menu_item_detail_section.dart';
 import 'detail_views/resource_detail_view.dart';
 import 'detail_views/person_detail_view.dart';
 import 'detail_views/note_detail_view.dart';
@@ -784,7 +786,7 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       onSelected: (val) {
         if (val == 'edit' &&
-            (object is Note || object is Resource || object is JournalEntry)) {
+            (object is Note || object is JournalEntry)) {
           setState(() => _isEditing = !_isEditing);
         } else {
           _handleAction(context, ref, val);
@@ -858,7 +860,12 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
                 children: [
                   Icon(Icons.call_merge_rounded, size: 18),
                   SizedBox(width: 12),
-                  Text('Merge with another note'),
+                  Expanded(
+                    child: Text(
+                      'Merge with another note',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
             );
@@ -1018,6 +1025,22 @@ class _UniversalDetailViewState extends ConsumerState<UniversalDetailView> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
             child: buildPillarTimelineSection(context, ref, object as Pillar),
+          ),
+        ),
+      ];
+    } else if (object is ActionMenuItem) {
+      cards.addAll(buildActionMenuItemPropertyCards(object as ActionMenuItem));
+      return [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+            child: buildActionMenuItemLogButtons(context, ref, object as ActionMenuItem),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: _CollapsiblePropertiesSection(
+            title: 'PROPERTIES',
+            child: PropertyGrid(cards: cards),
           ),
         ),
       ];

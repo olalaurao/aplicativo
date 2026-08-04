@@ -124,6 +124,24 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen>
     HapticFeedback.mediumImpact();
     setState(() => _repeatCount++);
 
+    // Cancel original notification before re-scheduling the snooze
+    if (widget.data.notificationId != null) {
+      NotificationService().cancelNotification(widget.data.notificationId!);
+    }
+
+    // Build a proper payload so the re-snoozed alarm reopens as alarm/popup.
+    // Using objectId as the base URL so _objectIdFromNotificationPayload can
+    // extract it correctly on the other side.
+    final notifType = widget.data.type == AlarmType.alarm ? 'alarm' : 'popup';
+    final objectIdSegment = widget.data.objectId ?? '';
+    final base = objectIdSegment.isNotEmpty
+        ? 'Quartzo://notification?oid=${Uri.encodeComponent(objectIdSegment)}'
+        : '';
+    final sep = base.contains('?') ? '&' : '?';
+    final enrichedPayload = base.isNotEmpty
+        ? '$base${sep}ntype=$notifType'
+        : 'ntype=$notifType';
+
     NotificationService().scheduleReminder(
       id: DateTime.now().millisecondsSinceEpoch % 100000,
       title: widget.data.title,
@@ -136,7 +154,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen>
         notificationBody: widget.data.body,
         snoozeMinutes: minutes,
       ),
-      payload: widget.data.objectId,
+      payload: enrichedPayload,
     );
 
     if (Navigator.canPop(context)) {

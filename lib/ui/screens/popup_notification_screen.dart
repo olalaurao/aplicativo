@@ -53,7 +53,7 @@ class _PopupNotificationScreenState
   late final Animation<double> _fadeAnimation;
   Timer? _autoTimer;
   double _progress = 1.0;
-  late final Timer _progressTimer;
+  Timer? _progressTimer;
 
   int _autoDismissMs = 10000;
 
@@ -109,9 +109,7 @@ class _PopupNotificationScreenState
   void dispose() {
     VibrationService.stop();
     _autoTimer?.cancel();
-    if (this._autoDismissMs > 0) {
-      _progressTimer.cancel();
-    }
+    _progressTimer?.cancel();
     _slideController.dispose();
     super.dispose();
   }
@@ -146,7 +144,7 @@ class _PopupNotificationScreenState
   void _dismiss() {
     VibrationService.stop();
     _autoTimer?.cancel();
-    if (_autoDismissMs > 0) _progressTimer.cancel();
+    _progressTimer?.cancel();
     if (widget.data.notificationId != null) {
       NotificationService().cancelNotification(widget.data.notificationId!);
     }
@@ -157,7 +155,23 @@ class _PopupNotificationScreenState
     VibrationService.stop();
     HapticFeedback.mediumImpact();
     _autoTimer?.cancel();
-    if (_autoDismissMs > 0) _progressTimer.cancel();
+    _progressTimer?.cancel();
+
+    // Cancel original notification before re-scheduling.
+    if (widget.data.notificationId != null) {
+      NotificationService().cancelNotification(widget.data.notificationId!);
+    }
+
+    // Build enriched payload preserving ntype=popup so the re-snoozed
+    // notification reopens as a popup screen instead of a plain push.
+    final objectIdSegment = widget.data.objectId ?? '';
+    final base = objectIdSegment.isNotEmpty
+        ? 'Quartzo://notification?oid=${Uri.encodeComponent(objectIdSegment)}'
+        : '';
+    final sep = base.contains('?') ? '&' : '?';
+    final enrichedPayload = base.isNotEmpty
+        ? '$base${sep}ntype=popup'
+        : 'ntype=popup';
 
     NotificationService().scheduleReminder(
       id: DateTime.now().millisecondsSinceEpoch % 100000,
@@ -169,7 +183,7 @@ class _PopupNotificationScreenState
         notificationBody: widget.data.body,
         snoozeMinutes: minutes,
       ),
-      payload: widget.data.objectId,
+      payload: enrichedPayload,
     );
 
     _pop();
@@ -179,7 +193,7 @@ class _PopupNotificationScreenState
     VibrationService.stop();
     HapticFeedback.mediumImpact();
     _autoTimer?.cancel();
-    if (_autoDismissMs > 0) _progressTimer.cancel();
+    _progressTimer?.cancel();
 
     if (widget.data.objectId != null) {
       try {

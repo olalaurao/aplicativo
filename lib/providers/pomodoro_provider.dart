@@ -22,6 +22,7 @@ import '../services/markdown_parser.dart';
 import '../services/widget_service.dart';
 import 'package:intl/intl.dart';
 import '../ui/theme.dart';
+import '../services/capture_bubble_service.dart';
 
 class PomodoroState {
   final bool isRunning;
@@ -146,7 +147,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
   Future<void> _migrateHistoryFromBlob() async {
     final settings = ref.read(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
-    final migrationApplied = settings.pomodoroHistoryV2Applied ?? false;
+    final migrationApplied = settings.pomodoroHistoryV2Applied;
     if (migrationApplied) return;
 
     final obsidianService = ref.read(obsidianServiceProvider);
@@ -216,6 +217,25 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     await obsidianService.writeFile('sessions/current.md', content);
   }
 
+  void _syncOverlay() {
+    final s = state;
+    if (!s.isRunning) {
+      CaptureOverlayService.stopPomodoro();
+      return;
+    }
+    final int displaySeconds = s.currentType == PomodoroType.stopwatch ? s.elapsedSeconds : s.remainingSeconds;
+    final minutes = displaySeconds ~/ 60;
+    final seconds = displaySeconds % 60;
+    final timeStr = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    final progress = s.totalSeconds <= 0 ? 0.0 : displaySeconds / s.totalSeconds;
+    CaptureOverlayService.updatePomodoro(
+      isRunning: s.isRunning,
+      timeStr: timeStr,
+      type: s.currentType.name,
+      progress: progress,
+    );
+  }
+
   void _initBackgroundListener() {
     FlutterForegroundTask.addTaskDataCallback((data) {
       if (data is int) {
@@ -225,8 +245,10 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
           _notifyPhaseEnd();
         } else if (state.currentType == PomodoroType.stopwatch) {
           state = state.copyWith(elapsedSeconds: data);
+          _syncOverlay();
         } else {
           state = state.copyWith(remainingSeconds: data);
+          _syncOverlay();
         }
       } else if (data is Map<String, dynamic>) {
         final action = data['action'];
@@ -282,15 +304,30 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
   }
 
   void setCurrentItem(String? id, String? title) {
-    if (state.currentItemId != id) {
+    String? resolvedId = id;
+    String? resolvedTitle = title;
+    
+    if (id != null && id.startsWith('pomo_')) {
+      final allObjects = ref.read(allObjectsProvider).valueOrNull ?? [];
+      final obj = allObjects.where((o) => o.id == id || o.slug == id).firstOrNull;
+      if (obj is Task && obj.linkedItemId != null) {
+        resolvedId = obj.linkedItemId;
+        final linkedObj = allObjects.where((o) => o.id == resolvedId || o.slug == resolvedId).firstOrNull;
+        if (linkedObj != null) {
+          resolvedTitle = linkedObj.title;
+        }
+      }
+    }
+
+    if (state.currentItemId != resolvedId) {
       reset();
       state = state.copyWith(
-        currentItemId: id,
-        currentItemTitle: title,
+        currentItemId: resolvedId,
+        currentItemTitle: resolvedTitle,
         completedSessions: 0,
       );
     } else {
-      state = state.copyWith(currentItemTitle: title);
+      state = state.copyWith(currentItemTitle: resolvedTitle);
     }
     _persistState();
   }
@@ -376,6 +413,8 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     } else {
       PomodoroBackgroundService.start(state.remainingSeconds);
     }
+
+    _syncOverlay();
 
     // Local timer only for widget refresh cadence and reminders
     // Actual countdown is handled by background service (single source of truth)
@@ -479,6 +518,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     _timer?.cancel();
     state = state.copyWith(isRunning: false);
     PomodoroBackgroundService.stop();
+    _syncOverlay();
     _persistState();
   }
 
@@ -486,6 +526,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
     _timer?.cancel();
     state = state.copyWith(isRunning: false);
     PomodoroBackgroundService.pause(state.remainingSeconds);
+    _syncOverlay();
     _persistState();
   }
 
@@ -499,6 +540,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       remainingSeconds: state.totalSeconds,
     );
     PomodoroBackgroundService.stop();
+    _syncOverlay();
     _persistState();
   }
 
@@ -516,6 +558,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       );
     }
     PomodoroBackgroundService.stop();
+    _syncOverlay();
     _persistState();
   }
 

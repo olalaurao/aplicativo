@@ -802,13 +802,6 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
         emoji: '📥',
         iconName: 'inbox',
       ),
-      'pillar': TypeSignature(
-        objectType: 'pillar',
-        markerType: MarkerType.property,
-        markerValue: 'type: pillar',
-        emoji: '🏛️',
-        iconName: 'account_balance',
-      ),
       'value': TypeSignature(
         objectType: 'value',
         markerType: MarkerType.folder,

@@ -1,7 +1,6 @@
 import '../../models/saved_filter.dart';
 import '../../models/content_object.dart';
 import '../../models/task_model.dart';
-import '../../models/task_model.dart';
 
 class FilterSortUtils {
   static List<T> applyFilterAndSort<T>(

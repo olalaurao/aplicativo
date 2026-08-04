@@ -463,7 +463,7 @@ class _TripleCheckSheetState extends ConsumerState<TripleCheckSheet>
     await _autoSavePartialState();
     Navigator.of(context).pop();
     Future.delayed(const Duration(milliseconds: 200), () {
-      context.push('/create-task', extra: {'existingTask': widget.task});
+      context.push('/create/task', extra: {'existingTask': widget.task});
     });
   }
 

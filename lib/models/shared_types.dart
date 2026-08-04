@@ -41,6 +41,7 @@ abstract final class ObjectTypes {
   // Content objects (continued)
   static const String pillar = 'pillar';
   static const String action = 'action';
+  static const String monthlyFocus = 'monthly_focus';
 
   /// All canonical types in insertion order.
   static const List<String> all = [
@@ -74,6 +75,7 @@ abstract final class ObjectTypes {
     routine,
     pillar,
     action,
+    monthlyFocus,
   ];
 
   /// Returns true if [type] is a known canonical type string.

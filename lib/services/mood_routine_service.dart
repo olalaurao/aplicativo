@@ -43,7 +43,8 @@ class MoodRoutineService {
 
     return allObjects
         .whereType<MoodDefinition>()
-        .firstWhere((m) => m.id == latestMoodId || m.slug == latestMoodId, orElse: () => null as MoodDefinition);
+        .cast<MoodDefinition?>()
+        .firstWhere((m) => m!.id == latestMoodId || m.slug == latestMoodId, orElse: () => null);
   }
 
   /// Parse mood trigger string to MoodQuadrant

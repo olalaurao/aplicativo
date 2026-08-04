@@ -3,10 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../providers/daily_schedule_provider.dart';
-import '../../models/daily_schedule_snapshot.dart';
+import '../../services/daily_schedule_service.dart';
 import '../theme.dart';
-import '../utils/object_icons.dart';
-import '../../providers/settings_provider.dart';
 
 class PlannerWeekView extends ConsumerWidget {
   final DateTime selectedDate;
@@ -38,26 +36,21 @@ class PlannerWeekView extends ConsumerWidget {
         date.month == DateTime.now().month &&
         date.day == DateTime.now().day;
 
-    final allItems = [
-      ...schedule.allDayItems,
-      ...schedule.timedItems,
-      ...schedule.completableItems
-    ];
-    
-    // De-duplicate items based on object id, prioritizing timed items
+    // De-duplicate items by their id, prioritizing timed items
     final uniqueItems = <String, DailyScheduleItem>{};
-    for (final item in allItems) {
-      if (!uniqueItems.containsKey(item.source.id) || item.startTime != null) {
-        uniqueItems[item.source.id] = item;
+    for (final item in schedule.allItems) {
+      final existing = uniqueItems[item.id];
+      if (existing == null || item.isTimed) {
+        uniqueItems[item.id] = item;
       }
     }
 
     final sortedItems = uniqueItems.values.toList()
       ..sort((a, b) {
-        if (a.startTime == null && b.startTime == null) return 0;
-        if (a.startTime == null) return -1;
-        if (b.startTime == null) return 1;
-        return a.startTime!.compareTo(b.startTime!);
+        if (a.startMinutes == null && b.startMinutes == null) return 0;
+        if (a.startMinutes == null) return -1;
+        if (b.startMinutes == null) return 1;
+        return a.startMinutes!.compareTo(b.startMinutes!);
       });
 
     return Container(
@@ -109,31 +102,26 @@ class PlannerWeekView extends ConsumerWidget {
               ),
             )
           else
-            ...sortedItems.map((item) => _buildItemRow(context, ref, item)),
+            ...sortedItems.map((item) => _buildItemRow(context, item)),
         ],
       ),
     );
   }
 
-  Widget _buildItemRow(BuildContext context, WidgetRef ref, DailyScheduleItem item) {
-    final settings = ref.watch(settingsProvider);
-    final typeSignatures = settings.typeSignatures;
-    
-    final iconData = ObjectIcons.iconDataForTypeWithSignatures(item.source.type, typeSignatures) ??
-        ObjectIcons.defaultIconDataForType(item.source.type);
-    final color = ObjectIcons.colorForTypeWithSignatures(item.source.type, typeSignatures);
-
+  Widget _buildItemRow(BuildContext context, DailyScheduleItem item) {
     return InkWell(
-      onTap: () => context.push('/detail/${item.source.id}', extra: item.source),
+      onTap: item.source != null
+          ? () => context.push('/detail/${item.source!.id}', extra: item.source)
+          : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
           children: [
-            if (item.startTime != null) ...[
+            if (item.isTimed) ...[
               SizedBox(
                 width: 45,
                 child: Text(
-                  DateFormat('HH:mm').format(item.startTime!),
+                  item.time ?? '',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -145,7 +133,7 @@ class PlannerWeekView extends ConsumerWidget {
             ] else ...[
               const SizedBox(width: 53),
             ],
-            Icon(iconData, size: 16, color: color),
+            Icon(item.iconData, size: 16, color: item.color),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -155,7 +143,9 @@ class PlannerWeekView extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 13,
                   decoration: item.isCompleted ? TextDecoration.lineThrough : null,
-                  color: item.isCompleted ? AppTheme.textMutedColor(context) : AppTheme.textPrimaryColor(context),
+                  color: item.isCompleted
+                      ? AppTheme.textMutedColor(context)
+                      : AppTheme.textPrimaryColor(context),
                 ),
               ),
             ),

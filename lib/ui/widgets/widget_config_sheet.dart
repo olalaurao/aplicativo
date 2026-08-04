@@ -36,7 +36,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final organizers = ref.watch(organizerListProvider);
-    final dashboardBlocks = ref.watch(dashboardProvider).valueOrNull ?? [];
+    final dashboardBlocks = ref.watch(dashboardProvider('home')).valueOrNull ?? [];
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Container(
@@ -747,7 +747,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                     );
                 if (block != null) {
                   ref
-                      .read(dashboardProvider.notifier)
+                      .read(dashboardProvider('home').notifier)
                       .updateBlock(block.copyWith(metadata: updatedMetadata));
                 }
               }
@@ -784,7 +784,7 @@ class _WidgetConfigSheetState extends ConsumerState<WidgetConfigSheet> {
                       );
                   if (block != null) {
                     ref
-                        .read(dashboardProvider.notifier)
+                        .read(dashboardProvider('home').notifier)
                         .updateBlock(block.copyWith(metadata: updatedMetadata));
                   }
                 },

@@ -3,6 +3,7 @@
 // Overlay isolate entry point + draggable quick-capture bubble widget.
 
 import 'dart:ui';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -47,6 +48,11 @@ class _CaptureBubbleWidgetState extends State<CaptureBubbleWidget>
   static const double _dismissThreshold = 0.85;
   static const String _bridgePortName = 'quartzo_quick_capture_overlay_bridge';
 
+  bool _pomodoroIsActive = false;
+  String _pomodoroTimeStr = "00:00";
+  String _pomodoroType = "work";
+  double _pomodoroProgress = 1.0;
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +66,21 @@ class _CaptureBubbleWidgetState extends State<CaptureBubbleWidget>
         if (mounted) setState(() => _isVisible = false);
       } else if (event == 'show' && !_isVisible) {
         if (mounted) setState(() => _isVisible = true);
+      } else if (event is String && event.startsWith('pomodoro|')) {
+        final parts = event.split('|');
+        // parts: ["pomodoro", isRunning, timeStr, type, progress]
+        if (parts.length >= 5) {
+          if (mounted) {
+            setState(() {
+              _pomodoroIsActive = parts[1] == 'true';
+              _pomodoroTimeStr = parts[2];
+              _pomodoroType = parts[3];
+              _pomodoroProgress = double.tryParse(parts[4]) ?? 1.0;
+            });
+          }
+        }
+      } else if (event == 'pomodoro_stop') {
+        if (mounted) setState(() => _pomodoroIsActive = false);
       }
     });
   }
@@ -92,6 +113,9 @@ class _CaptureBubbleWidgetState extends State<CaptureBubbleWidget>
     if (!_isVisible) return;
     if (_inDismissZone) {
       HapticFeedback.heavyImpact();
+      if (_pomodoroIsActive) {
+         // Optionally tell the app we hid the bubble, or just close it
+      }
       await _sendToMainApp('dismiss_session');
       await FlutterOverlayWindow.closeOverlay();
       return;
@@ -106,8 +130,11 @@ class _CaptureBubbleWidgetState extends State<CaptureBubbleWidget>
 
   Future<void> _onTap() async {
     HapticFeedback.lightImpact();
-    debugPrint('[CaptureBubble] tap -> open_capture');
-    await _sendToMainApp('open_capture');
+    if (_pomodoroIsActive) {
+      await _sendToMainApp('open_pomodoro');
+    } else {
+      await _sendToMainApp('open_capture');
+    }
   }
 
   Future<void> _sendToMainApp(Object message) async {
@@ -119,12 +146,63 @@ class _CaptureBubbleWidgetState extends State<CaptureBubbleWidget>
     await FlutterOverlayWindow.shareData(message);
   }
 
+  Color _phaseColor(String type) {
+    switch (type) {
+      case 'work':
+        return Colors.red;
+      case 'shortBreak':
+        return Colors.green;
+      case 'longBreak':
+        return Colors.blue;
+      default:
+        return Colors.orange;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_isVisible) return const SizedBox.shrink();
 
     final display = View.of(context).display;
     _screenHeight = display.size.height / display.devicePixelRatio;
+
+    Widget childWidget;
+    Color bgColor;
+    Color shadowColor;
+
+    if (_pomodoroIsActive && !_inDismissZone) {
+      bgColor = Colors.black.withValues(alpha: 0.82);
+      shadowColor = Colors.black.withValues(alpha: 0.35);
+      final activeColor = _phaseColor(_pomodoroType);
+      
+      childWidget = CustomPaint(
+        painter: _CircularTimerPainter(
+          progress: _pomodoroProgress,
+          color: activeColor,
+        ),
+        child: Center(
+          child: Text(
+            _pomodoroTimeStr,
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'Courier', 
+              fontWeight: FontWeight.w900,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      );
+    } else {
+      bgColor = _inDismissZone
+          ? Colors.red.withValues(alpha: 0.9)
+          : const Color(0xFFF97316).withValues(alpha: 0.92);
+      shadowColor = (_inDismissZone ? Colors.red : const Color(0xFFF97316)).withValues(alpha: 0.45);
+      childWidget = Icon(
+        _inDismissZone ? Icons.close_rounded : Icons.add_rounded,
+        color: Colors.white,
+        size: 28,
+      );
+    }
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -139,25 +217,52 @@ class _CaptureBubbleWidgetState extends State<CaptureBubbleWidget>
           height: 56,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: _inDismissZone
-                ? Colors.red.withValues(alpha: 0.9)
-                : const Color(0xFFF97316).withValues(alpha: 0.92),
+            color: bgColor,
             boxShadow: [
               BoxShadow(
-                color: (_inDismissZone ? Colors.red : const Color(0xFFF97316))
-                    .withValues(alpha: 0.45),
+                color: shadowColor,
                 blurRadius: 16,
                 spreadRadius: 2,
               ),
             ],
           ),
-          child: Icon(
-            _inDismissZone ? Icons.close_rounded : Icons.add_rounded,
-            color: Colors.white,
-            size: 28,
-          ),
+          child: childWidget,
         ),
       ),
     );
+  }
+}
+
+class _CircularTimerPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+
+  _CircularTimerPainter({required this.progress, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 3;
+
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.15)
+      ..strokeWidth = 3.5
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawCircle(center, radius, paint);
+
+    final activePaint = Paint()
+      ..color = color
+      ..strokeWidth = 3.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    canvas.drawArc(rect, -pi / 2, 2 * pi * progress, false, activePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CircularTimerPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.color != color;
   }
 }

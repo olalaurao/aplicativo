@@ -25,6 +25,7 @@ import '../../models/pomodoro_session.dart';
 import 'rotation_schedule_dialog.dart';
 import '../forms/scheduler_picker.dart';
 import '../../models/scheduler.dart';
+import '../screens/google_event_detail_screen.dart';
 
 class TimeLineDayView extends ConsumerStatefulWidget {
   final List<Task> tasks;
@@ -453,7 +454,12 @@ class _TimeLineDayViewState extends ConsumerState<TimeLineDayView> {
                           height: height < 20 ? 20 : height, // Minimum height
                           child: GestureDetector(
                             onTap: () {
-                              context.push('/google-event-detail', extra: event);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => GoogleEventDetailScreen(event: event),
+                                ),
+                              );
                             },
                             child: Container(
                               decoration: BoxDecoration(

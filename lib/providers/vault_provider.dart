@@ -32,9 +32,11 @@ import '../services/project_progress_cache.dart';
 import '../models/template_model.dart';
 import '../models/idea_model.dart';
 import '../models/inbox_model.dart';
+import '../models/routine_model.dart';
 import '../models/pomodoro_session.dart';
 import '../models/pillar_model.dart';
 import '../models/action_menu_item_model.dart';
+import '../models/monthly_focus_model.dart';
 
 import '../models/sync_action.dart';
 import '../services/sync_queue_service.dart';
@@ -246,6 +248,17 @@ final moodDefsListProvider = Provider<List<MoodDefinition>>(
   (ref) => ref
       .watch(objectsByTypeProvider('mood_definition'))
       .cast<MoodDefinition>(),
+);
+
+final monthlyFocusListProvider = Provider<List<MonthlyFocus>>(
+  (ref) => ref.watch(objectsByTypeProvider('monthly_focus')).cast<MonthlyFocus>(),
+);
+
+final monthlyFocusForProvider = Provider.family<MonthlyFocus?, ({int year, int month})>(
+  (ref, params) {
+    final list = ref.watch(monthlyFocusListProvider);
+    return list.where((m) => m.year == params.year && m.month == params.month).firstOrNull;
+  },
 );
 
 final conflictingObjectsProvider = Provider<Map<String, List<ContentObject>>>((
@@ -2037,7 +2050,35 @@ class AllObjectsNotifier extends AsyncNotifier<List<ContentObject>> {
     // 5. Auto-advance rotation zones that have timed out (runs after state is set)
     Future.microtask(() => _advanceRotationZones());
 
+    // 6. Seed wildcards
+    Future.microtask(() => _seedWildcards(parsedVault.objects));
+
     return parsedVault.objects;
+  }
+
+  Future<void> _seedWildcards(List<ContentObject> currentObjects) async {
+    final wildcards = [
+      {'id': 'sys-sleep', 'title': 'Sleep', 'type': OrganizerType.activity},
+      {'id': 'sys-deep-work', 'title': 'Deep Work', 'type': OrganizerType.activity},
+      {'id': 'sys-setup', 'title': 'Setup', 'type': OrganizerType.activity},
+      {'id': 'sys-routine', 'title': 'Routine', 'type': OrganizerType.activity},
+    ];
+
+    bool anyAdded = false;
+    for (final wc in wildcards) {
+      if (!currentObjects.any((o) => o.id == wc['id'])) {
+        final newObj = Organizer(
+          id: wc['id'] as String,
+          title: wc['title'] as String,
+          organizerType: wc['type'] as OrganizerType,
+          isWildcard: true,
+        );
+        newObj.obsidianPath = 'app/${newObj.id}.md';
+        
+        await ref.read(vaultProvider.notifier).updateObject(newObj);
+        anyAdded = true;
+      }
+    }
   }
 
   /// Checks every rotation project and advances the zone if the period has
@@ -2751,6 +2792,7 @@ class VaultNotifier extends Notifier<void> {
     if (object is Pillar) return 'pillar';
     // TimeBlock and DayTheme are now Organizer.
     if (object is TemplateDefinition) return 'template';
+    if (object is MonthlyFocus) return 'monthly_focus';
     if (object is Organizer) {
       return object.organizerType.name;
     }
@@ -2775,9 +2817,10 @@ class VaultNotifier extends Notifier<void> {
       'dayTheme' || 'day_theme' => 'organizers/day_themes',
       'timeBlock' || 'time_block' => 'organizers/time_blocks',
       'value' => 'organizers/values',
-      'routine' => 'organizers/routines',
+      'routine' => 'routines',
       'pillar' => 'pillars',
       'pomodoro_session' => 'pomodoros',
+      'monthly_focus' => 'monthly_focus',
       _ => 'app',
     };
   }
@@ -4022,6 +4065,7 @@ class VaultNotifier extends Notifier<void> {
       'pillar' => 'pillars',
       'wellbeing_indicator' => 'app',
       'snapshot' => 'snapshots',
+      'monthly_focus' => 'monthly_focus',
       _ => 'app',
     };
     final originalPath = '$folder/$fileName';

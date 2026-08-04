@@ -19,6 +19,9 @@ class Goal extends ContentObject {
   DateTime? startDate;
   DateTime? deadline;
   List<KPI> kpis;
+  double? targetValue;
+  List<int> activeMonths;
+  List<String> linkedObjectives;
 
   /// V5: links replaces old `subtasks` (WikiLinks) — Goal never embeds Task files.
   /// Use the universal `links` field (ContentObject.links) to reference Tasks/Projects.
@@ -35,6 +38,9 @@ class Goal extends ContentObject {
     this.repeatInterval,
     this.startDate,
     this.deadline,
+    this.targetValue,
+    this.activeMonths = const [],
+    this.linkedObjectives = const [],
     this.kpis = const [],
     this.schedulers = const [],
     this.color,
@@ -61,6 +67,9 @@ class Goal extends ContentObject {
     frontmatter['goal_type'] = goalType.name;
     frontmatter['state'] = state.name;
     if (repeatInterval != null) frontmatter['repeat_interval'] = repeatInterval;
+    if (targetValue != null) frontmatter['target_value'] = targetValue;
+    if (activeMonths.isNotEmpty) frontmatter['active_months'] = activeMonths;
+    if (linkedObjectives.isNotEmpty) frontmatter['linked_objectives'] = linkedObjectives;
     if (startDate != null)
       frontmatter['start_date'] = startDate!.toIso8601String();
     if (deadline != null) frontmatter['deadline'] = deadline!.toIso8601String();
@@ -90,6 +99,18 @@ class Goal extends ContentObject {
       orElse: () => GoalStatus.active,
     );
     goal.repeatInterval = frontmatter['repeat_interval'] as String?;
+    if (frontmatter['target_value'] != null) {
+      goal.targetValue = (frontmatter['target_value'] as num).toDouble();
+    }
+    if (frontmatter['active_months'] != null) {
+      goal.activeMonths = (frontmatter['active_months'] as List)
+          .map((e) => int.tryParse(e.toString()) ?? 0)
+          .where((e) => e > 0 && e <= 12)
+          .toList();
+    }
+    if (frontmatter['linked_objectives'] != null) {
+      goal.linkedObjectives = (frontmatter['linked_objectives'] as List).map((e) => e.toString()).toList();
+    }
     goal.startDate = frontmatter['start_date'] != null
         ? DateTime.tryParse(frontmatter['start_date'].toString())
         : null;
@@ -110,12 +131,6 @@ class Goal extends ContentObject {
     goal.color = frontmatter['color'] as String?;
     goal.icon = frontmatter['icon'] as String?;
 
-    // V5: goal_mode / objective / strategy / phases — parse silently, don't error.
-    // These fields are now on Project. If found on a legacy Goal file, they are
-    // preserved in `links` body note or silently dropped on next save.
-    // V5: social_refs — stripped on next save; any [[links]] already in
-    // ContentObject.links (loaded via loadBaseMap) take precedence.
-
     return goal;
   }
 
@@ -127,6 +142,9 @@ class Goal extends ContentObject {
     String? repeatInterval,
     DateTime? startDate,
     DateTime? deadline,
+    double? targetValue,
+    List<int>? activeMonths,
+    List<String>? linkedObjectives,
     List<KPI>? kpis,
     List<Scheduler>? schedulers,
     String? color,
@@ -148,6 +166,9 @@ class Goal extends ContentObject {
         repeatInterval: repeatInterval ?? this.repeatInterval,
         startDate: startDate ?? this.startDate,
         deadline: deadline ?? this.deadline,
+        targetValue: targetValue ?? this.targetValue,
+        activeMonths: activeMonths ?? this.activeMonths,
+        linkedObjectives: linkedObjectives ?? this.linkedObjectives,
         kpis: kpis ?? this.kpis,
         schedulers: schedulers ?? this.schedulers,
         color: color ?? this.color,

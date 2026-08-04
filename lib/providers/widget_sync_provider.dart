@@ -106,7 +106,7 @@ final widgetSyncProvider = Provider<void>((ref) {
   // Use select to only watch specific data that affects widgets, not entire vault
   final allObjects = ref.watch(allObjectsProvider.select((data) => data.valueOrNull));
   final pomodoro = ref.watch(pomodoroProvider.select((data) => data));
-  final blocks = ref.watch(dashboardProvider.select((data) => data.valueOrNull ?? []));
+  final blocks = ref.watch(dashboardProvider('main').select((data) => data.valueOrNull ?? []));
   final settings = ref.watch(settingsProvider.select((data) => data));
 
   final now = DateTime.now();
@@ -170,7 +170,7 @@ Future<void> forceWidgetSync(ProviderContainer container) async {
     
     final allObjects = await container.read(allObjectsProvider.future);
     final pomodoro = container.read(pomodoroProvider);
-    final blocks = container.read(dashboardProvider).valueOrNull ?? [];
+    final blocks = container.read(dashboardProvider('main')).valueOrNull ?? [];
     final settings = container.read(settingsProvider);
 
     final now = DateTime.now();

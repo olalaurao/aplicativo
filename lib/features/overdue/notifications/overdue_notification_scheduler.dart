@@ -1,6 +1,5 @@
 // lib/features/overdue/notifications/overdue_notification_scheduler.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../providers/overdue_provider.dart';
 import '../../../services/notification_service.dart';
 
 class OverdueNotificationScheduler {

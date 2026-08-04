@@ -16,6 +16,14 @@ enum BlockType {
   goalsProjectsOverview,
   pinnedObject,      // Generic pinned ContentObject (any type)
   trackerAnalysis,   // Chart/stats for a specific tracker or mood
+  weeklyFocus,       // This week's 3 focus tasks
+  timeBalance,       // Block A
+  whereTimeGoes,     // Block A
+  rhythmHeatmap,     // Block B
+  energyChart,       // Block B
+  rechargeVsDrain,   // Block C
+  focusByOrganizer,  // Block D
+  plannedVsExecuted, // Block D
   custom,
   // Legacy types preserved for backward compatibility during migration
   universal,

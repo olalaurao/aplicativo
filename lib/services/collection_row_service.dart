@@ -62,7 +62,7 @@ class CollectionRowService {
       final parts = withoutBlock.split(RegExp(r'\||::'));
       final namePart = parts[0].trim();
       final emojiMatch =
-          RegExp(r'^(\p{Emoji})\s*', unicode: true).firstMatch(namePart);
+          RegExp(r'^([\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FEFF}]+)\s*', unicode: true).firstMatch(namePart);
       final displayTitle = emojiMatch != null
           ? namePart.substring(emojiMatch.end).trim()
           : namePart;

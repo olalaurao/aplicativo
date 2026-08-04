@@ -93,9 +93,15 @@ class TripleCheck {
   );
 }
 
+/// Where this task sits on the despejo triage axis (independent of TaskPriority,
+/// which measures urgency/deadline pressure). Default is `important` because most
+/// captured tasks are — circumstantial is the exception you actively flag.
+enum TaskWeight { important, circumstantial }
+
 class Task extends ContentObject {
   TaskStage stage;
   TaskPriority priority;
+  TaskWeight weight;
   DateTime? startDate;
   DateTime? endDate;
   List<String> notes;
@@ -140,6 +146,9 @@ class Task extends ContentObject {
   List<RelayStep>?
   relaySteps; // null = use flat Pomodoro, non-null = use Relay mode
 
+  String? energyImpact; // recharge | flow | grind | drain
+  String? reviewStatus; // Needs Review | Doing Well | At Risk
+
   bool get isRotationTask =>
       rotationFrequencyType != RotationFrequencyType.none;
   bool get hasDateRange => dateRange != null && dateRange!.trim().isNotEmpty;
@@ -166,6 +175,7 @@ class Task extends ContentObject {
     required super.title,
     this.stage = TaskStage.idea,
     this.priority = TaskPriority.none,
+    this.weight = TaskWeight.important,
     this.startDate,
     this.endDate,
     this.notes = const [],
@@ -211,6 +221,8 @@ class Task extends ContentObject {
     this.flexibilityWindowMinutes,
     this.relaySteps,
     this.completionRef,
+    this.energyImpact,
+    this.reviewStatus,
     DateTime? reminderDate,
   }) : rotationDailyCompletions = rotationDailyCompletions ?? {} {
     if (reminderDate != null) {
@@ -318,6 +330,9 @@ class Task extends ContentObject {
     final frontmatter = toBaseMap();
     frontmatter['stage'] = stage.name;
     frontmatter['priority'] = priority.name;
+    if (weight == TaskWeight.circumstantial) {
+      frontmatter['weight'] = weight.name;
+    }
     if (startDate != null) {
       frontmatter['start_date'] = startDate!.toIso8601String();
     }
@@ -402,6 +417,12 @@ class Task extends ContentObject {
     if (scheduler != null) frontmatter['scheduler'] = scheduler!.toMap();
     if (completionRef != null) {
       frontmatter['completion_ref'] = completionRef!.toMap();
+    }
+    if (energyImpact != null) {
+      frontmatter['energy_impact'] = energyImpact;
+    }
+    if (reviewStatus != null) {
+      frontmatter['review_status'] = reviewStatus;
     }
 
     // Build sessions list dynamically from subtasks to ensure frontmatter is always in sync with body checklist!
@@ -595,6 +616,12 @@ class Task extends ContentObject {
         orElse: () => TaskPriority.none,
       );
     }
+    if (frontmatter['weight'] != null) {
+      task.weight = TaskWeight.values.firstWhere(
+        (e) => e.name == frontmatter['weight'],
+        orElse: () => TaskWeight.important,
+      );
+    }
     final rotGroup = frontmatter['rotation_group'];
     if (rotGroup != null) {
       final raw = rotGroup.toString().replaceAll('[', '').replaceAll(']', '');
@@ -638,6 +665,8 @@ class Task extends ContentObject {
           .map((s) => RelayStep.fromMap(Map<String, dynamic>.from(s)))
           .toList();
     }
+    task.energyImpact = frontmatter['energy_impact']?.toString();
+    task.reviewStatus = frontmatter['review_status']?.toString();
 
     final List<SubtaskSession> fmSessions = [];
     final rawSessions =
@@ -739,6 +768,7 @@ class Task extends ContentObject {
     String? title,
     TaskStage? stage,
     TaskPriority? priority,
+    TaskWeight? weight,
     DateTime? startDate,
     DateTime? endDate,
     List<String>? notes,
@@ -778,6 +808,8 @@ class Task extends ContentObject {
     List<RelayStep>? relaySteps,
     VaultLinkRef? completionRef,
     bool clearCompletionRef = false,
+    String? energyImpact,
+    String? reviewStatus,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     List<String>? tags,
@@ -789,6 +821,7 @@ class Task extends ContentObject {
       title: title ?? this.title,
       stage: stage ?? this.stage,
       priority: priority ?? this.priority,
+      weight: weight ?? this.weight,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
       notes: notes ?? this.notes,
@@ -830,12 +863,11 @@ class Task extends ContentObject {
       rotationDailyCompletions:
           rotationDailyCompletions ??
           Map<String, bool>.from(this.rotationDailyCompletions),
-      flexibilityWindowMinutes:
-          flexibilityWindowMinutes ?? this.flexibilityWindowMinutes,
+      flexibilityWindowMinutes: flexibilityWindowMinutes ?? this.flexibilityWindowMinutes,
       relaySteps: relaySteps ?? this.relaySteps,
-      completionRef: clearCompletionRef
-          ? null
-          : (completionRef ?? this.completionRef),
+      completionRef: clearCompletionRef ? null : (completionRef ?? this.completionRef),
+      energyImpact: energyImpact ?? this.energyImpact,
+      reviewStatus: reviewStatus ?? this.reviewStatus,
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       tags: tags ?? this.tags,

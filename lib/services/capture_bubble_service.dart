@@ -79,12 +79,39 @@ class CaptureOverlayService {
   /// Listens for messages sent from the overlay isolate via
   /// [FlutterOverlayWindow.overlayListener]. Calls [onTap] when the bubble
   /// sends the "open_capture" event.
-  static void listenForTaps(void Function() onTap) {
+  static void listenForTaps(void Function() onTapCapture, {void Function()? onTapPomodoro}) {
     if (!Platform.isAndroid) return;
     FlutterOverlayWindow.overlayListener.listen((data) {
       if (data == 'open_capture') {
-        onTap();
+        onTapCapture();
+      } else if (data == 'open_pomodoro' && onTapPomodoro != null) {
+        onTapPomodoro();
       }
     });
+  }
+
+  /// Sends the current Pomodoro state to the overlay
+  static Future<void> updatePomodoro({
+    required bool isRunning,
+    required String timeStr,
+    required String type,
+    required double progress,
+  }) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await FlutterOverlayWindow.shareData('pomodoro|$isRunning|$timeStr|$type|$progress');
+    } catch (e) {
+      debugPrint('[CaptureOverlayService] updatePomodoro failed: $e');
+    }
+  }
+
+  /// Tells the overlay to hide the Pomodoro UI
+  static Future<void> stopPomodoro() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await FlutterOverlayWindow.shareData('pomodoro_stop');
+    } catch (e) {
+      debugPrint('[CaptureOverlayService] stopPomodoro failed: $e');
+    }
   }
 }

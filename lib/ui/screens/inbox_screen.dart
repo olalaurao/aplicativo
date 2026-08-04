@@ -198,6 +198,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     final queue = ref.watch(unifiedInboxQueueProvider);
     final globalQueue = _applyFilterAndSort(queue, _globalFilter);
     final grouped = _groupQueue(globalQueue);
+    
+    final taskItems = queue.where((i) => i.kind == InboxQueueKind.task && i.source is Task).map((i) => i.source as Task);
+    final urgentCount = taskItems.where((t) => t.priority == TaskPriority.high).length;
+    final importantCount = taskItems.where((t) => t.weight == TaskWeight.important).length;
+    final circumstantialCount = taskItems.where((t) => t.weight == TaskWeight.circumstantial).length;
+
     final hasActiveFilters =
         _globalFilter != null ||
         _groupFilters.values.any((filter) => filter != null);
@@ -270,6 +276,18 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               onClearGroup: (kind) =>
                   setState(() => _groupFilters[kind] = null),
             ),
+            if (taskItems.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 4),
+                child: Text(
+                  'This week: $importantCount important · $urgentCount urgent · $circumstantialCount circumstantial',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textMuted,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
             Expanded(
               child: inboxAsync.isLoading && queue.isEmpty
                   ? const Center(child: CircularProgressIndicator())
@@ -966,7 +984,47 @@ class _InboxCountBadge extends StatelessWidget {
   }
 }
 
-class _InboxQueueCard extends StatelessWidget {
+class _WeightChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _WeightChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppTheme.accentColor(context).withValues(alpha: 0.15) : Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppBorderRadius.sm),
+        side: BorderSide(
+          color: selected ? AppTheme.accentColor(context) : AppTheme.dividerColor(context),
+        ),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppBorderRadius.sm),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: AppTextSize.xs,
+              color: selected ? AppTheme.accentColor(context) : AppColors.textMuted,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InboxQueueCard extends ConsumerWidget {
   final InboxQueueItem item;
   final List<_DisplayProperty> properties;
   final bool isSelected;
@@ -986,7 +1044,7 @@ class _InboxQueueCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final color = _colorForKind(context, item.kind);
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -1046,6 +1104,26 @@ class _InboxQueueCard extends StatelessWidget {
                           color: AppColors.textMuted,
                         ),
                       ),
+                      if (item.kind == InboxQueueKind.task && item.source is Task) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Row(
+                          children: [
+                            _WeightChip(
+                              label: 'Important',
+                              selected: (item.source as Task).weight == TaskWeight.important,
+                              onTap: () => ref.read(vaultProvider.notifier)
+                                  .updateObject((item.source as Task).copyWith(weight: TaskWeight.important)),
+                            ),
+                            const SizedBox(width: 6),
+                            _WeightChip(
+                              label: 'Circumstantial',
+                              selected: (item.source as Task).weight == TaskWeight.circumstantial,
+                              onTap: () => ref.read(vaultProvider.notifier)
+                                  .updateObject((item.source as Task).copyWith(weight: TaskWeight.circumstantial)),
+                            ),
+                          ],
+                        ),
+                      ],
                       if (properties.isNotEmpty) ...[
                         const SizedBox(height: AppSpacing.sm),
                         Wrap(

@@ -30,6 +30,8 @@ class DialSegment {
   final bool isEditable;        // true only for taskPlanned, pomodoroPlanned, reminder, event (if local), habitSlot
   final bool isResizable;       // subset of isEditable
   int layer;                    // 0 = innermost ring, assigned by the layering algorithm
+  final bool isGhost;           // if true, render as ghost layer (reduced opacity, outline only)
+  final String? reviewStatus;   // 'as_planned' | 'didnt_happen' | 'changed'
 
   DialSegment({
     required this.id,
@@ -43,6 +45,8 @@ class DialSegment {
     required this.isEditable,
     required this.isResizable,
     this.layer = 0,
+    this.isGhost = false,
+    this.reviewStatus,
   });
 }
 

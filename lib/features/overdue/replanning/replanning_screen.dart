@@ -1,7 +1,6 @@
 // lib/features/overdue/replanning/replanning_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../../../ui/theme.dart';
 import '../../../providers/overdue_provider.dart';
 import 'replanning_actions.dart';
@@ -210,7 +209,6 @@ class _OverdueItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = severityColor(item.severity);
-    final dateFormatter = DateFormat('dd/MM/yyyy');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

@@ -41,6 +41,7 @@ import 'services/pomodoro_bg_service.dart';
 import 'services/capture_bubble_service.dart';
 import 'overlay/capture_bubble_overlay.dart' as capture_bubble_overlay;
 import 'providers/overlay_bridge_provider.dart';
+import 'providers/pomodoro_provider.dart';
 
 import 'ui/shell/app_shell.dart';
 import 'ui/screens/home_screen.dart';
@@ -58,6 +59,9 @@ import 'ui/screens/shopping_list_screen.dart';
 import 'ui/forms/create_note_form.dart';
 import 'ui/forms/create_resource_form.dart';
 import 'ui/forms/create_template_form.dart';
+import 'ui/screens/monthly_planning_screen.dart';
+import 'ui/screens/year_overview_screen.dart';
+import 'ui/screens/weekly_planning_screen.dart';
 import 'ui/screens/organize_screen.dart';
 import 'ui/screens/more_screen.dart';
 import 'ui/screens/pomodoro_screen.dart';
@@ -476,15 +480,17 @@ class _BootstrapAppState extends State<BootstrapApp> {
     debugPrint('[AppLifecycle] _onAppBackgrounded triggered');
     try {
       final settings = widget.container.read(settingsProvider);
+      final isPomodoroRunning = widget.container.read(pomodoroProvider).isRunning;
       debugPrint(
-        '[AppLifecycle] settings.floatingCaptureBubbleEnabled = ${settings.floatingCaptureBubbleEnabled}',
+        '[AppLifecycle] floatingCaptureBubbleEnabled = ${settings.floatingCaptureBubbleEnabled}, isPomodoroRunning = $isPomodoroRunning',
       );
-      if (!settings.floatingCaptureBubbleEnabled) return;
+      if (!settings.floatingCaptureBubbleEnabled && !isPomodoroRunning) return;
 
       debugPrint(
         '[AppLifecycle] sessionDismissed = ${OverlayBridgeService.sessionDismissed}',
       );
-      if (OverlayBridgeService.sessionDismissed) return;
+      // Only block due to dismiss if pomodoro is NOT running
+      if (OverlayBridgeService.sessionDismissed && !isPomodoroRunning) return;
 
       final granted = await PermissionService.isOverlayPermissionGranted();
       debugPrint('[AppLifecycle] isOverlayPermissionGranted = $granted');
@@ -906,6 +912,9 @@ Future<void> _initApp(ProviderContainer container) async {
           onOpenCapture: () {
             unawaited(_openNativeQuickAddPopup());
           },
+          onOpenPomodoro: () {
+            container.read(routerProvider).push('/pomodoro');
+          },
           onQuickAdd: (data) {
             unawaited(_createOverlayQuickAdd(container, data));
           },
@@ -1148,6 +1157,18 @@ final routerProvider = Provider<GoRouter>((ref) {
             },
           ),
           GoRoute(
+            path: '/planning/weekly',
+            builder: (context, state) => const WeeklyPlanningScreen(),
+          ),
+          GoRoute(
+            path: '/planning/monthly',
+            builder: (context, state) => const MonthlyPlanningScreen(),
+          ),
+          GoRoute(
+            path: '/planning/year',
+            builder: (context, state) => const YearOverviewScreen(),
+          ),
+          GoRoute(
             path: '/week',
             builder: (context, state) => const WeekTimelineScreen(),
           ),
@@ -1163,6 +1184,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 initialTitle: extra?['initialTitle'] as String?,
                 initialDate: extra?['initialDate'] as DateTime?,
                 initialNotes: extra?['initialNotes'] as String?,
+                existingTask: extra?['existingTask'] as Task?,
               );
             },
           ),

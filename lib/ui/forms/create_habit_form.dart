@@ -71,6 +71,8 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
   late final TextEditingController _statementController;
   late final TextEditingController _curiosityController;
   late final TextEditingController _hypothesisController;
+  late final TextEditingController _cueController;
+  late final TextEditingController _rewardController;
   int _pactDurationDays = 30;
   DateTime? _startedAt;
   PactOutcome? _pactOutcome;
@@ -105,6 +107,14 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
     _hypothesisController = WikiLinkTextController(
       context: context,
       text: widget.existingHabit?.hypothesis ?? '',
+    );
+    _cueController = WikiLinkTextController(
+      context: context,
+      text: widget.existingHabit?.cueDescription ?? '',
+    );
+    _rewardController = WikiLinkTextController(
+      context: context,
+      text: widget.existingHabit?.rewardDescription ?? '',
     );
 
     if (widget.existingHabit != null) {
@@ -176,6 +186,8 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
     _statementController.dispose();
     _curiosityController.dispose();
     _hypothesisController.dispose();
+    _cueController.dispose();
+    _rewardController.dispose();
     super.dispose();
   }
 
@@ -404,6 +416,42 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
                     ),
                     const SizedBox(height: 12),
                   ],
+
+                  FormSectionCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'CUE & REWARD',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textMutedColor(context),
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _cueController,
+                          decoration: const InputDecoration(
+                            labelText: 'Deixa (Cue) - O que dispara este hábito?',
+                            border: OutlineInputBorder(),
+                          ),
+                          maxLines: 2,
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _rewardController,
+                          decoration: const InputDecoration(
+                            labelText: 'Recompensa (Reward) - Como você comemora?',
+                            border: OutlineInputBorder(),
+                          ),
+                          maxLines: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
 
                   // ─── Color Swatches ───
                   SizedBox(
@@ -1477,6 +1525,8 @@ class _CreateHabitFormState extends ConsumerState<CreateHabitForm> {
       statement: _habitMode == HabitMode.pact ? _statementController.text.trim() : null,
       curiosityQuestion: _habitMode == HabitMode.pact ? _curiosityController.text.trim() : null,
       hypothesis: _habitMode == HabitMode.pact ? _hypothesisController.text.trim() : null,
+      cueDescription: _cueController.text.trim().isNotEmpty ? _cueController.text.trim() : null,
+      rewardDescription: _rewardController.text.trim().isNotEmpty ? _rewardController.text.trim() : null,
       startedAt: _habitMode == HabitMode.pact
           ? (_startedAt ?? DateTime.now())
           : null,

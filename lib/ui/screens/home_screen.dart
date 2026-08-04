@@ -31,6 +31,14 @@ import '../widgets/dashboard/goals_projects_overview_component.dart';
 import '../widgets/dashboard/dashboard_component_config_sheet.dart';
 import '../widgets/dashboard/pinned_object_component.dart';
 import '../widgets/dashboard/tracker_analysis_component.dart';
+import '../widgets/dashboard/weekly_focus_component.dart';
+import '../widgets/dashboard/time_balance_component.dart';
+import '../widgets/dashboard/where_time_goes_component.dart';
+import '../widgets/dashboard/rhythm_heatmap_component.dart';
+import '../widgets/dashboard/energy_chart_component.dart';
+import '../widgets/dashboard/recharge_vs_drain_component.dart';
+import '../widgets/dashboard/focus_by_organizer_component.dart';
+import '../widgets/dashboard/planned_vs_executed_component.dart';
 import '../../features/overdue/widgets/overdue_section.dart';
 
 final _quickAddSubmittingProvider = StateProvider<bool>((ref) => false);
@@ -243,7 +251,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
-    final blocksState = ref.watch(dashboardProvider);
+    final blocksState = ref.watch(dashboardProvider('home'));
 
     return Scaffold(
       appBar: AppBar(
@@ -269,9 +277,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               if (blocks.isEmpty) {
                 // Seed default
                 WidgetsBinding.instance.addPostFrameCallback((_) async {
-                  await ref.read(dashboardProvider.notifier).addBlock(BlockType.todayTimeline, 'Timeline');
-                  await ref.read(dashboardProvider.notifier).addBlock(BlockType.todayDial, 'Day Dial');
-                  await ref.read(dashboardProvider.notifier).addBlock(BlockType.todayCompletables, 'Today\'s Completables');
+                  await ref.read(dashboardProvider('home').notifier).addBlock(BlockType.todayTimeline, 'Timeline');
+                  await ref.read(dashboardProvider('home').notifier).addBlock(BlockType.todayDial, 'Day Dial');
+                  await ref.read(dashboardProvider('home').notifier).addBlock(BlockType.todayCompletables, 'Today\'s Completables');
                 });
                 return const Center(child: CircularProgressIndicator());
               }
@@ -285,7 +293,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   itemCount: visibleBlocks.length + 1,
                   onReorder: (oldIndex, newIndex) {
                     if (oldIndex < visibleBlocks.length && newIndex <= visibleBlocks.length) {
-                      ref.read(dashboardProvider.notifier).reorderBlocks(oldIndex, newIndex);
+                      ref.read(dashboardProvider('home').notifier).reorderBlocks(oldIndex, newIndex);
                     }
                   },
                   itemBuilder: (context, index) {
@@ -294,7 +302,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         key: const ValueKey('add_component_button'),
                         padding: const EdgeInsets.only(top: 16),
                         child: InkWell(
-                          onTap: () => AddComponentSheet.show(context),
+                          onTap: () => AddComponentSheet.show(context, 'home'),
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
                             padding: const EdgeInsets.all(16),
@@ -335,19 +343,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                 IconButton(
                                   icon: Icon(block.visible ? Icons.visibility_rounded : Icons.visibility_off_rounded, color: AppTheme.textPrimaryColor(context)),
                                   style: IconButton.styleFrom(backgroundColor: AppTheme.surfaceColor(context)),
-                                  onPressed: () => ref.read(dashboardProvider.notifier).toggleVisibility(block.id),
+                                  onPressed: () => ref.read(dashboardProvider('home').notifier).toggleVisibility(block.id),
                                 ),
                                 const SizedBox(width: 4),
                                 IconButton(
                                   icon: Icon(Icons.settings_rounded, color: AppTheme.textPrimaryColor(context)),
                                   style: IconButton.styleFrom(backgroundColor: AppTheme.surfaceColor(context)),
-                                  onPressed: () => DashboardComponentConfigSheet.show(context, block),
+                                  onPressed: () => DashboardComponentConfigSheet.show(context, block, 'home'),
                                 ),
                                 const SizedBox(width: 4),
                                 IconButton(
                                   icon: const Icon(Icons.delete_rounded, color: AppColors.error),
                                   style: IconButton.styleFrom(backgroundColor: AppTheme.surfaceColor(context)),
-                                  onPressed: () => ref.read(dashboardProvider.notifier).removeBlock(block.id),
+                                  onPressed: () => ref.read(dashboardProvider('home').notifier).removeBlock(block.id),
                                 ),
                               ],
                             ),
@@ -469,6 +477,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       case BlockType.todayHabits: return TodayCompletablesComponent(block: block);
       case BlockType.pinnedObject: return PinnedObjectComponent(block: block);
       case BlockType.trackerAnalysis: return TrackerAnalysisComponent(block: block);
+      case BlockType.weeklyFocus: return const WeeklyFocusComponent();
+      case BlockType.timeBalance: return TimeBalanceComponent(block: block);
+      case BlockType.whereTimeGoes: return WhereTimeGoesComponent(block: block);
+      case BlockType.rhythmHeatmap: return RhythmHeatmapComponent(block: block);
+      case BlockType.energyChart: return EnergyChartComponent(block: block);
+      case BlockType.rechargeVsDrain: return RechargeVsDrainComponent(block: block);
+      case BlockType.focusByOrganizer: return FocusByOrganizerComponent(block: block);
+      case BlockType.plannedVsExecuted: return PlannedVsExecutedComponent(block: block);
       default: return Container(
         height: 100,
         decoration: AppTheme.cardDecoration(context),

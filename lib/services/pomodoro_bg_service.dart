@@ -84,15 +84,20 @@ class PomodoroTaskHandler extends TaskHandler {
 
     if (_isRunning) {
       final displaySeconds = _isStopwatchMode ? _elapsedSeconds : _remainingSeconds;
-      final minutes = displaySeconds ~/ 60;
-      final seconds = displaySeconds % 60;
-      final timeStr =
-          '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-      FlutterForegroundTask.updateService(
-        notificationTitle: _isStopwatchMode ? 'Stopwatch running' : 'Pomodoro running',
-        notificationText: _isStopwatchMode ? 'Elapsed time: $timeStr' : 'Time remaining: $timeStr',
-        notificationButtons: PomodoroBackgroundService._notificationButtons,
-      );
+      
+      // Prevent push notification spam: only update notification when minutes change
+      // or at the very end of the timer.
+      if (displaySeconds % 60 == 0 || displaySeconds <= 1 || (_isStopwatchMode && displaySeconds == 1)) {
+        final minutes = displaySeconds ~/ 60;
+        final seconds = displaySeconds % 60;
+        final timeStr =
+            '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+        FlutterForegroundTask.updateService(
+          notificationTitle: _isStopwatchMode ? 'Stopwatch running' : 'Pomodoro running',
+          notificationText: _isStopwatchMode ? 'Elapsed time: $timeStr' : 'Time remaining: $timeStr',
+          notificationButtons: PomodoroBackgroundService._notificationButtons,
+        );
+      }
       return;
     }
 

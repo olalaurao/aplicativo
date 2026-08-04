@@ -248,7 +248,19 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                         );
                       },
                     ),
+                  ] else ...[
+                    const SizedBox(height: 8),
                   ],
+
+                  _buildMenuRow(
+                    context,
+                    'Year Overview',
+                    Icons.calendar_month_rounded,
+                    AppTheme.accentColor(context),
+                    () {
+                      context.push('/planning/year');
+                    },
+                  ),
 
                   const SizedBox(height: 8),
                   _buildMenuRow(

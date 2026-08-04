@@ -581,6 +581,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
         border: Border.all(color: AppTheme.accentColor(context).withValues(alpha: 0.16)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (coverUrl.isNotEmpty)
             ClipRRect(
@@ -611,6 +612,7 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   'Dados importados de ${_sourceName ?? 'uma fonte externa'}',
@@ -629,10 +631,22 @@ class _CreateResourceFormState extends ConsumerState<CreateResourceForm> {
                     color: AppTheme.textMutedColor(context),
                   ),
                 ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {},
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      minimumSize: const Size(0, 0),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Editar manualmente', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
               ],
             ),
           ),
-          TextButton(onPressed: () {}, child: const Text('Editar manualmente')),
         ],
       ),
     );

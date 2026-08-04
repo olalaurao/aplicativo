@@ -33,6 +33,7 @@ class OverlayBridgeService {
   /// showQuickCapture(context) or equivalent.
   static void init({
     required VoidCallback onOpenCapture,
+    VoidCallback? onOpenPomodoro,
     ValueChanged<Map<String, dynamic>>? onQuickAdd,
   }) {
     if (!Platform.isAndroid) return;
@@ -42,22 +43,25 @@ class OverlayBridgeService {
     _receivePort = ReceivePort();
     IsolateNameServer.registerPortWithName(_receivePort!.sendPort, _portName);
     _receivePort!.listen((data) {
-      _handleData(data, onOpenCapture, onQuickAdd);
+      _handleData(data, onOpenCapture, onOpenPomodoro, onQuickAdd);
     });
 
     _sub = FlutterOverlayWindow.overlayListener.listen((data) {
-      _handleData(data, onOpenCapture, onQuickAdd);
+      _handleData(data, onOpenCapture, onOpenPomodoro, onQuickAdd);
     });
   }
 
   static void _handleData(
     dynamic data,
     VoidCallback onOpenCapture,
+    VoidCallback? onOpenPomodoro,
     ValueChanged<Map<String, dynamic>>? onQuickAdd,
   ) {
     debugPrint('[OverlayBridge] received: $data');
     if (data == 'open_capture') {
       onOpenCapture();
+    } else if (data == 'open_pomodoro') {
+      onOpenPomodoro?.call();
     } else if (data == 'dismiss_session') {
       _sessionDismissed = true;
       debugPrint('[OverlayBridge] bubble dismissed for this session');

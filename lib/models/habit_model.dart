@@ -259,6 +259,8 @@ class Habit extends ContentObject {
   String? statement;
   String? curiosityQuestion;
   String? hypothesis;
+  String? cueDescription;
+  String? rewardDescription;
   DateTime? startedAt;
   DateTime? endsAt;
   PactOutcome? pactOutcome;
@@ -313,6 +315,8 @@ class Habit extends ContentObject {
     this.statement,
     this.curiosityQuestion,
     this.hypothesis,
+    this.cueDescription,
+    this.rewardDescription,
     this.startedAt,
     this.endsAt,
     this.pactOutcome,
@@ -418,6 +422,8 @@ class Habit extends ContentObject {
     String? statement,
     String? curiosityQuestion,
     String? hypothesis,
+    String? cueDescription,
+    String? rewardDescription,
     DateTime? startedAt,
     DateTime? endsAt,
     PactOutcome? pactOutcome,
@@ -454,6 +460,8 @@ class Habit extends ContentObject {
       statement: statement ?? this.statement,
       curiosityQuestion: curiosityQuestion ?? this.curiosityQuestion,
       hypothesis: hypothesis ?? this.hypothesis,
+      cueDescription: cueDescription ?? this.cueDescription,
+      rewardDescription: rewardDescription ?? this.rewardDescription,
       startedAt: startedAt ?? this.startedAt,
       endsAt: endsAt ?? this.endsAt,
       pactOutcome: pactOutcome ?? this.pactOutcome,
@@ -599,6 +607,12 @@ class Habit extends ContentObject {
     }
     if (hypothesis != null) {
       frontmatter['hypothesis'] = hypothesis;
+    }
+    if (cueDescription != null && cueDescription!.trim().isNotEmpty) {
+      frontmatter['cue'] = cueDescription;
+    }
+    if (rewardDescription != null && rewardDescription!.trim().isNotEmpty) {
+      frontmatter['reward'] = rewardDescription;
     }
     if (startedAt != null) {
       frontmatter['started_at'] = startedAt!.toIso8601String().split('T').first;
@@ -783,6 +797,8 @@ class Habit extends ContentObject {
     habit.statement = frontmatter['statement'] as String?;
     habit.curiosityQuestion = frontmatter['curiosity_question'] as String?;
     habit.hypothesis = frontmatter['hypothesis'] as String?;
+    habit.cueDescription = frontmatter['cue'] as String?;
+    habit.rewardDescription = frontmatter['reward'] as String?;
     if (frontmatter['started_at'] != null) {
       habit.startedAt = DateTime.tryParse(frontmatter['started_at'].toString());
     }

@@ -6,13 +6,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/dashboard_block.dart';
 import 'package:uuid/uuid.dart';
 
-class DashboardNotifier extends AsyncNotifier<List<DashboardBlock>> {
-  static const _prefKey = 'dashboard_blocks_v3';
+class DashboardNotifier extends FamilyAsyncNotifier<List<DashboardBlock>, String> {
+  String get _prefKey => 'dashboard_blocks_v3_$arg';
 
   @override
-  Future<List<DashboardBlock>> build() async {
+  Future<List<DashboardBlock>> build(String arg) async {
     final prefs = await SharedPreferences.getInstance();
-    final jsonStr = prefs.getString(_prefKey);
+    
+    // Migration: If no new key, try to migrate from old key for 'home' board
+    String? jsonStr = prefs.getString(_prefKey);
+    if (jsonStr == null && arg == 'home') {
+      jsonStr = prefs.getString('dashboard_blocks_v3');
+      if (jsonStr != null) {
+        await prefs.setString(_prefKey, jsonStr);
+      }
+    }
 
     if (jsonStr != null) {
       try {
@@ -52,8 +60,6 @@ class DashboardNotifier extends AsyncNotifier<List<DashboardBlock>> {
       jsonEncode(blocks.map((e) => e.toMap()).toList()),
     );
   }
-
-
 
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
@@ -149,6 +155,6 @@ class DashboardNotifier extends AsyncNotifier<List<DashboardBlock>> {
 }
 
 final dashboardProvider =
-    AsyncNotifierProvider<DashboardNotifier, List<DashboardBlock>>(() {
+    AsyncNotifierProviderFamily<DashboardNotifier, List<DashboardBlock>, String>(() {
       return DashboardNotifier();
     });

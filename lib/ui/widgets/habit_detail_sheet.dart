@@ -623,25 +623,54 @@ class _HabitDetailSheetState extends ConsumerState<HabitDetailSheet> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        subtitle: slotConfig.hasReminders && slotConfig.primaryReminderTime != null
-            ? Row(
+        subtitle: (slotConfig.hasReminders && slotConfig.primaryReminderTime != null) || (currentHabit.cueDescription?.isNotEmpty == true) || (currentHabit.rewardDescription?.isNotEmpty == true)
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    slotConfig.primaryReminderType.name == 'alarm'
-                        ? Icons.alarm_rounded
-                        : Icons.notifications_active_outlined,
-                    size: 12,
-                    color: AppColors.textMuted,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    slotConfig.primaryReminderTime!.format(context),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textMuted,
+                  if (slotConfig.hasReminders && slotConfig.primaryReminderTime != null)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          slotConfig.primaryReminderType.name == 'alarm'
+                              ? Icons.alarm_rounded
+                              : Icons.notifications_active_outlined,
+                          size: 12,
+                          color: AppColors.textMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          slotConfig.primaryReminderTime!.format(context),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                  if (currentHabit.cueDescription?.isNotEmpty == true)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Deixa: ${currentHabit.cueDescription}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                  if (currentHabit.rewardDescription?.isNotEmpty == true)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        'Recompensa: ${currentHabit.rewardDescription}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ),
                 ],
               )
             : null,

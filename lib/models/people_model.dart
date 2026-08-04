@@ -155,6 +155,9 @@ class Person extends Organizer {
     List<String>? daysOfWeek,
     Scheduler? scheduler,
     List<ReminderConfig>? reminders,
+    bool? isWildcard,
+    String? energyImpact,
+    String? reviewStatus,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     DateTime? createdAt,
@@ -190,7 +193,10 @@ class Person extends Organizer {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       obsidianPath: obsidianPath ?? this.obsidianPath,
-    );
+    )
+      ..isWildcard = isWildcard ?? this.isWildcard
+      ..energyImpact = energyImpact ?? this.energyImpact
+      ..reviewStatus = reviewStatus ?? this.reviewStatus;
     return p;
   }
 }
