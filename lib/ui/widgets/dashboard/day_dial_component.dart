@@ -569,7 +569,7 @@ class _DayDialComponentState extends ConsumerState<DayDialComponent> {
     final obj = objects.where((o) => o.slug == slug).firstOrNull;
     final vault = ref.read(vaultProvider.notifier);
     if (obj != null && obj is Organizer) {
-      final updated = obj.copyWith(reviewStatus: status);
+      final updated = obj.copyWith(planReviewStatus: status);
       await vault.updateObject(updated);
     }
   }

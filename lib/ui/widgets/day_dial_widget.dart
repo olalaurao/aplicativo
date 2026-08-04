@@ -489,19 +489,19 @@ class _DayDialPainter extends CustomPainter {
       }
       
       // Draw review status marker if ghost
-      if (s.isGhost && s.reviewStatus != null) {
+      if (s.isGhost && s.planReviewStatus != null) {
         final midAngle = startAngle + (sweep / 2);
         final markerX = center.dx + ringRadius * cos(midAngle);
         final markerY = center.dy + ringRadius * sin(midAngle);
         IconData? stIcon;
         Color stColor = Colors.grey;
-        if (s.reviewStatus == 'as_planned') {
-          stIcon = Icons.check_circle_rounded;
+        if (s.planReviewStatus == 'as_planned') {
           stColor = Colors.green;
-        } else if (s.reviewStatus == 'didnt_happen') {
-          stIcon = Icons.cancel_rounded;
+          stIcon = Icons.check_circle_outline_rounded;
+        } else if (s.planReviewStatus == 'didnt_happen') {
           stColor = Colors.red;
-        } else if (s.reviewStatus == 'changed') {
+          stIcon = Icons.cancel_outlined;
+        } else if (s.planReviewStatus == 'changed') {
           stIcon = Icons.change_circle_rounded;
           stColor = Colors.orange;
         }

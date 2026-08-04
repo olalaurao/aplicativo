@@ -38,6 +38,7 @@ class Organizer extends ContentObject {
   bool isWildcard;
   String? energyImpact; // recharge | flow | grind | drain
   String? reviewStatus; // Needs Review | Doing Well | At Risk
+  String? planReviewStatus; // 'as_planned' | 'didnt_happen' | 'changed'
 
   Organizer({
     super.id,
@@ -59,6 +60,7 @@ class Organizer extends ContentObject {
     this.isWildcard = false,
     this.energyImpact,
     this.reviewStatus,
+    this.planReviewStatus,
     super.organizers,
     super.categories,
     super.createdAt,
@@ -101,6 +103,7 @@ class Organizer extends ContentObject {
     if (isWildcard) frontmatter['is_wildcard'] = isWildcard;
     if (energyImpact != null) frontmatter['energy_impact'] = energyImpact;
     if (reviewStatus != null) frontmatter['review_status'] = reviewStatus;
+    if (planReviewStatus != null) frontmatter['plan_review_status'] = planReviewStatus;
 
     return generateMarkdown(frontmatter, '');
   }
@@ -152,6 +155,7 @@ class Organizer extends ContentObject {
     organizer.isWildcard = frontmatter['is_wildcard'] == true;
     organizer.energyImpact = frontmatter['energy_impact'] as String?;
     organizer.reviewStatus = frontmatter['review_status'] as String?;
+    organizer.planReviewStatus = frontmatter['plan_review_status'] as String?;
     if (frontmatter['scheduler'] is Map) {
       organizer.scheduler = Scheduler.fromMap(
         Map<String, dynamic>.from(frontmatter['scheduler'] as Map),
@@ -185,6 +189,7 @@ class Organizer extends ContentObject {
     bool? isWildcard,
     String? energyImpact,
     String? reviewStatus,
+    String? planReviewStatus,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     DateTime? createdAt,
@@ -211,6 +216,7 @@ class Organizer extends ContentObject {
       isWildcard: isWildcard ?? this.isWildcard,
       energyImpact: energyImpact ?? this.energyImpact,
       reviewStatus: reviewStatus ?? this.reviewStatus,
+      planReviewStatus: planReviewStatus ?? this.planReviewStatus,
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       createdAt: createdAt ?? this.createdAt,

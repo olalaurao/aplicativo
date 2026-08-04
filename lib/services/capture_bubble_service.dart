@@ -6,6 +6,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'permission_service.dart';
 
 class CaptureOverlayService {
   /// Width/height of the overlay window in dp — fixed 72dp square for the bubble.
@@ -15,6 +16,9 @@ class CaptureOverlayService {
   static Future<void> start() async {
     if (!Platform.isAndroid) return;
     try {
+      final granted = await PermissionService.isOverlayPermissionGranted();
+      if (!granted) return;
+
       final active = await FlutterOverlayWindow.isActive();
       if (active) return;
       await FlutterOverlayWindow.showOverlay(

@@ -9,7 +9,8 @@ import '../../providers/pomodoro_provider.dart';
 import '../theme.dart';
 import '../../models/shared_types.dart';
 import '../../providers/vault_provider.dart';
-import 'package:flutter_svg/flutter_svg.dart'; // For icon parsing
+import 'package:flutter_svg/flutter_svg.dart';
+import '../utils/time_format_utils.dart'; // For icon parsing
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'universal_search_picker.dart';
 
@@ -92,7 +93,7 @@ class PomodoroWeekOverview extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${totalHoursThisWeek.toStringAsFixed(0)}h',
+                  formatHoursToDuration(totalHoursThisWeek),
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w900,
                     color: AppTheme.accentColor(context),
@@ -106,7 +107,7 @@ class PomodoroWeekOverview extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '~${avgHoursPerDay.toStringAsFixed(0)}h per day',
+                  '~${formatHoursToDuration(avgHoursPerDay)} per day',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: mutedColor.withValues(alpha: 0.75),
                   ),
@@ -219,7 +220,7 @@ class PomodoroWeekOverview extends ConsumerWidget {
             } else {
               iconWidget = Icon(Icons.folder_open, color: _parseHexColor(organizer.color), size: 20);
             }
-            final hours = (entry.value / 60).toStringAsFixed(0);
+            final formattedTime = formatMinutesToDuration(entry.value.toInt());
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
@@ -252,7 +253,7 @@ class PomodoroWeekOverview extends ConsumerWidget {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    '${hours}h',
+                    formattedTime,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),

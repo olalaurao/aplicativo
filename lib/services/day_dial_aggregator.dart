@@ -227,7 +227,7 @@ class DayDialAggregator {
           layer: -1,
           sourceSlug: block.slug,
           isGhost: true, // Ghost layer for planned shape
-          reviewStatus: block.reviewStatus,
+          planReviewStatus: block.planReviewStatus,
         ));
       }
     }

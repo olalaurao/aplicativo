@@ -15,7 +15,8 @@ class TimeBalanceComponent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final displayMode = block.metadata['displayMode'] as String? ?? 'percent';
-    final typeFilter = block.metadata['typeFilter'] as String? ?? 'area'; // area, project, etc
+    final typeFilters = (block.metadata['typeFilters'] as List?)?.cast<String>() ?? 
+        [(block.metadata['typeFilter'] as String? ?? 'area')]; // fallback to legacy typeFilter
     final chartType = block.metadata['chartType'] as String? ?? 'pie';
 
     final allObjects = ref.watch(allObjectsProvider).valueOrNull ?? [];
@@ -32,7 +33,7 @@ class TimeBalanceComponent extends ConsumerWidget {
       organizers: organizers,
       startDate: startOfPeriod,
       endDate: endOfPeriod,
-      typeFilter: typeFilter,
+      typeFilters: typeFilters,
     );
 
     final totalWildcard = agg.totalWildcard;
@@ -60,9 +61,11 @@ class TimeBalanceComponent extends ConsumerWidget {
           PieChartSectionData(
             color: color,
             value: value,
-            title: displayMode == 'percent' 
-                ? '${((value / totalMinutesInPeriod) * 100).toStringAsFixed(1)}%' 
-                : '${(value / 60).toStringAsFixed(1)}h',
+            title: displayMode == 'both'
+                ? '${((value / totalMinutesInPeriod) * 100).toStringAsFixed(1)}%\n${(value / 60).toStringAsFixed(1)}h'
+                : (displayMode == 'percent' 
+                    ? '${((value / totalMinutesInPeriod) * 100).toStringAsFixed(1)}%' 
+                    : '${(value / 60).toStringAsFixed(1)}h'),
             radius: 50,
             titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
           )

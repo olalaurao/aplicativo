@@ -93,9 +93,12 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     final notifier = ref.read(pomodoroProvider.notifier);
 
     ref.listen(pomodoroProvider, (previous, next) {
-      if (previous?.remainingSeconds != 0 &&
+      if (previous?.showOverrunPrompt == false && next.showOverrunPrompt == true) {
+        _showOverrunPrompt(context, ref);
+      } else if (previous?.remainingSeconds != 0 &&
           next.remainingSeconds == 0 &&
-          next.isRunning == false) {
+          next.isRunning == false &&
+          !next.showOverrunPrompt) {
         _showCompletionSheet(context, next);
       }
     });
@@ -1371,6 +1374,34 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     final notifier = ref.read(pomodoroProvider.notifier);
     notifier.skip();
     HapticFeedback.lightImpact();
+  }
+
+  void _showOverrunPrompt(BuildContext context, WidgetRef ref) {
+    HapticFeedback.mediumImpact();
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Need more time?'),
+        content: const Text('Do you want to add a few more minutes to finish up?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(pomodoroProvider.notifier).resolveOverrun(0);
+            },
+            child: const Text('No, I\'m done'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(pomodoroProvider.notifier).resolveOverrun(5);
+            },
+            child: const Text('+5 min'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showCompletionSheet(BuildContext context, PomodoroState state) {

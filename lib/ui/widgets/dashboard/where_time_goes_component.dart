@@ -30,7 +30,7 @@ class WhereTimeGoesComponent extends ConsumerWidget {
       organizers: organizers,
       startDate: startOfPeriod,
       endDate: endOfPeriod,
-      typeFilter: 'area',
+      typeFilters: ['area'],
     );
 
     // Top 4 + Other

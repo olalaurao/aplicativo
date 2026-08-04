@@ -236,6 +236,7 @@ class Routine extends Organizer {
     bool? isWildcard,
     String? energyImpact,
     String? reviewStatus,
+    String? planReviewStatus,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     DateTime? createdAt,
@@ -270,6 +271,7 @@ class Routine extends Organizer {
     )
       ..isWildcard = isWildcard ?? this.isWildcard
       ..energyImpact = energyImpact ?? this.energyImpact
-      ..reviewStatus = reviewStatus ?? this.reviewStatus;
+      ..reviewStatus = reviewStatus ?? this.reviewStatus
+      ..planReviewStatus = planReviewStatus ?? this.planReviewStatus;
   }
 }

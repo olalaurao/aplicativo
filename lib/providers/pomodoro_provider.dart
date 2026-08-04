@@ -1,7 +1,9 @@
 // lib/providers/pomodoro_provider.dart
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:collection/collection.dart';
 import 'package:flutter/services.dart';
+import '../ui/utils/time_format_utils.dart';
 import '../models/content_object.dart';
 import '../models/pomodoro_session.dart';
 import '../models/sync_action.dart';
@@ -40,6 +42,7 @@ class PomodoroState {
   final List<RelayStep>? relaySteps;
   final int currentRelayIndex;
   final bool isRelayMode;
+  final bool showOverrunPrompt;
 
   PomodoroState({
     this.isRunning = false,
@@ -55,6 +58,7 @@ class PomodoroState {
     this.relaySteps,
     this.currentRelayIndex = 0,
     this.isRelayMode = false,
+    this.showOverrunPrompt = false,
   });
 
   PomodoroState copyWith({
@@ -71,6 +75,7 @@ class PomodoroState {
     List<RelayStep>? relaySteps,
     int? currentRelayIndex,
     bool? isRelayMode,
+    bool? showOverrunPrompt,
   }) {
     return PomodoroState(
       isRunning: isRunning ?? this.isRunning,
@@ -86,6 +91,7 @@ class PomodoroState {
       relaySteps: relaySteps ?? this.relaySteps,
       currentRelayIndex: currentRelayIndex ?? this.currentRelayIndex,
       isRelayMode: isRelayMode ?? this.isRelayMode,
+      showOverrunPrompt: showOverrunPrompt ?? this.showOverrunPrompt,
     );
   }
 }
@@ -136,6 +142,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
           currentItemId: fm['currentItemId'],
           currentItemTitle: fm['currentItemTitle'],
           elapsedSeconds: fm['elapsedSeconds'] ?? 0,
+          showOverrunPrompt: fm['showOverrunPrompt'] ?? false,
         );
       }
     }
@@ -211,6 +218,7 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       'currentItemId': state.currentItemId,
       'currentItemTitle': state.currentItemTitle,
       'elapsedSeconds': state.elapsedSeconds,
+      'showOverrunPrompt': state.showOverrunPrompt,
       'lastUpdate': DateTime.now().toIso8601String(),
     };
     final content = generateMarkdown(fm, '# Pomodoro Current State');
@@ -241,8 +249,14 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       if (data is int) {
         if (data == 0 && state.isRunning && state.currentType != PomodoroType.stopwatch) {
           stop();
-          _completeSession();
           _notifyPhaseEnd();
+          if (state.isRelayMode) {
+            _completeSession();
+            _advanceRelayStep();
+          } else {
+            state = state.copyWith(showOverrunPrompt: true);
+            _persistState();
+          }
         } else if (state.currentType == PomodoroType.stopwatch) {
           state = state.copyWith(elapsedSeconds: data);
           _syncOverlay();
@@ -390,7 +404,43 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
       return;
     }
     
+    // Play sound and show notification for the next phase
+    _vibrateSessionEnd();
+    NotificationService().showImmediateNotification(
+      id: 102,
+      title: 'Relay Step Completed',
+      body: 'Ready for the next phase?',
+    );
+
     _loadRelayStep(nextIndex);
+  }
+
+  void resolveOverrun(int extraMinutes) {
+    if (extraMinutes > 0) {
+      final extraSeconds = extraMinutes * 60;
+      state = state.copyWith(
+        showOverrunPrompt: false,
+        remainingSeconds: extraSeconds,
+        totalSeconds: state.totalSeconds + extraSeconds,
+      );
+      start();
+    } else {
+      state = state.copyWith(showOverrunPrompt: false);
+      _completeSession();
+      if (state.currentType == PomodoroType.work) {
+        final newCompleted = state.completedSessions + 1;
+        if (newCompleted >= state.sessionsToLongBreak) {
+          state = state.copyWith(completedSessions: 0);
+          setDuration(20, PomodoroType.longBreak);
+        } else {
+          state = state.copyWith(completedSessions: newCompleted);
+          setDuration(5, PomodoroType.shortBreak);
+        }
+      } else {
+        setDuration(25, PomodoroType.work);
+      }
+    }
+    _persistState();
   }
 
   void stopRelayMode() {
@@ -406,6 +456,8 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
   void start() {
     if (state.isRunning) return;
     state = state.copyWith(isRunning: true);
+
+    CaptureOverlayService.start();
 
     // Start Background Service
     if (state.currentType == PomodoroType.stopwatch) {
@@ -813,11 +865,11 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
             .take(4)
             .map(
               (entry) =>
-                  '${entry.key} ${(entry.value / 60).toStringAsFixed(0)}h',
+                  '${entry.key} ${formatMinutesToDuration(entry.value)}',
             )
             .join('\n');
     WidgetService.updatePomodoroWeekly(
-      '${totalHours.toStringAsFixed(0)}h this week',
+      '${formatHoursToDuration(totalHours)} this week',
       dayHours,
       details.isEmpty ? 'No sessions logged yet' : details,
       null,

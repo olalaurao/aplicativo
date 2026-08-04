@@ -59,6 +59,11 @@ class NavigationNotifier extends AsyncNotifier<List<NavigationItem>> {
       inBottomBar: false,
     ),
     NavigationItem(
+      section: NavSection.insights,
+      label: 'Insights',
+      route: '/insights',
+    ),
+    NavigationItem(
       section: NavSection.pomodoro,
       label: 'Pomodoro',
       route: '/pomodoro',

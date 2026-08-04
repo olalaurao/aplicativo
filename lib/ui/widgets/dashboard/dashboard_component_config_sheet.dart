@@ -401,6 +401,20 @@ class _DashboardComponentConfigSheetState extends ConsumerState<DashboardCompone
           ],
         );
       case BlockType.timeBalance:
+        final typeFilters = (_metadata['typeFilters'] as List?)?.cast<String>() ?? 
+            [(_metadata['typeFilter'] as String? ?? 'area')];
+
+        void toggleTypeFilter(String filter, bool checked) {
+          final newFilters = List<String>.from(typeFilters);
+          if (checked) {
+            newFilters.add(filter);
+          } else {
+            newFilters.remove(filter);
+          }
+          if (newFilters.isEmpty) newFilters.add('area'); // Ensure at least one
+          _updateMeta('typeFilters', newFilters);
+        }
+
         return FormSection(
           title: 'Time Balance',
           description: 'Customize how your time allocation is displayed.',
@@ -410,19 +424,40 @@ class _DashboardComponentConfigSheetState extends ConsumerState<DashboardCompone
               items: const [
                 DropdownMenuItem(value: 'percent', child: Text('Percentage (%)')),
                 DropdownMenuItem(value: 'hours', child: Text('Hours (h)')),
+                DropdownMenuItem(value: 'both', child: Text('Both (% and h)')),
               ],
               onChanged: (v) => _updateMeta('displayMode', v),
               label: 'Display Mode',
             ),
             const SizedBox(height: 16),
-            AppDropdown<String>(
-              value: _metadata['typeFilter'] ?? 'area',
-              items: const [
-                DropdownMenuItem(value: 'area', child: Text('Areas')),
-                DropdownMenuItem(value: 'project', child: Text('Projects')),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Group By', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
+                const SizedBox(height: 8),
+                StatefulBuilder(builder: (ctx, setSt) {
+                  return Wrap(
+                    spacing: 8,
+                    children: [
+                      FilterChip(
+                        label: const Text('Areas'),
+                        selected: typeFilters.contains('area'),
+                        onSelected: (val) => setSt(() => toggleTypeFilter('area', val)),
+                      ),
+                      FilterChip(
+                        label: const Text('Projects'),
+                        selected: typeFilters.contains('project'),
+                        onSelected: (val) => setSt(() => toggleTypeFilter('project', val)),
+                      ),
+                      FilterChip(
+                        label: const Text('Goals'),
+                        selected: typeFilters.contains('goal'),
+                        onSelected: (val) => setSt(() => toggleTypeFilter('goal', val)),
+                      ),
+                    ],
+                  );
+                }),
               ],
-              onChanged: (v) => _updateMeta('typeFilter', v),
-              label: 'Group By',
             ),
             const SizedBox(height: 16),
             AppDropdown<String>(

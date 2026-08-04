@@ -19,6 +19,7 @@ enum NavSection {
   more,
   shortcut, // Added for custom shortcuts
   statistics,
+  insights, // Added for insights screen
   inbox,
   social,
   dayThemes,
@@ -137,6 +138,8 @@ class NavigationItem {
             : Icons.notifications_none_rounded;
       case NavSection.deletedFiles:
         return active ? Icons.delete_rounded : Icons.delete_outline_rounded;
+      case NavSection.insights:
+        return active ? Icons.insights_rounded : Icons.insights_outlined;
       case NavSection.more:
         return active ? Icons.more_horiz_rounded : Icons.more_horiz_outlined;
       case NavSection.shortcut:

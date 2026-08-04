@@ -148,6 +148,7 @@ class Task extends ContentObject {
 
   String? energyImpact; // recharge | flow | grind | drain
   String? reviewStatus; // Needs Review | Doing Well | At Risk
+  String? planReviewStatus; // 'as_planned' | 'didnt_happen' | 'changed'
 
   bool get isRotationTask =>
       rotationFrequencyType != RotationFrequencyType.none;
@@ -223,6 +224,7 @@ class Task extends ContentObject {
     this.completionRef,
     this.energyImpact,
     this.reviewStatus,
+    this.planReviewStatus,
     DateTime? reminderDate,
   }) : rotationDailyCompletions = rotationDailyCompletions ?? {} {
     if (reminderDate != null) {
@@ -423,6 +425,9 @@ class Task extends ContentObject {
     }
     if (reviewStatus != null) {
       frontmatter['review_status'] = reviewStatus;
+    }
+    if (planReviewStatus != null) {
+      frontmatter['plan_review_status'] = planReviewStatus;
     }
 
     // Build sessions list dynamically from subtasks to ensure frontmatter is always in sync with body checklist!
@@ -667,6 +672,7 @@ class Task extends ContentObject {
     }
     task.energyImpact = frontmatter['energy_impact']?.toString();
     task.reviewStatus = frontmatter['review_status']?.toString();
+    task.planReviewStatus = frontmatter['plan_review_status']?.toString();
 
     final List<SubtaskSession> fmSessions = [];
     final rawSessions =
@@ -810,6 +816,7 @@ class Task extends ContentObject {
     bool clearCompletionRef = false,
     String? energyImpact,
     String? reviewStatus,
+    String? planReviewStatus,
     List<OrganizerReference>? organizers,
     List<String>? categories,
     List<String>? tags,
@@ -868,6 +875,7 @@ class Task extends ContentObject {
       completionRef: clearCompletionRef ? null : (completionRef ?? this.completionRef),
       energyImpact: energyImpact ?? this.energyImpact,
       reviewStatus: reviewStatus ?? this.reviewStatus,
+      planReviewStatus: planReviewStatus ?? this.planReviewStatus,
       organizers: organizers ?? this.organizers,
       categories: categories ?? this.categories,
       tags: tags ?? this.tags,

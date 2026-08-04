@@ -24,7 +24,7 @@ class TimeBalanceAggregator {
     required List<Organizer> organizers,
     required DateTime startDate,
     required DateTime endDate,
-    required String typeFilter,
+    required List<String> typeFilters,
   }) {
     double totalAllocated = 0;
     double totalWildcard = 0;
@@ -50,10 +50,19 @@ class TimeBalanceAggregator {
       if (isWildcard) {
         totalWildcard += task.duration!;
       } else {
-        final linkedGroup = task.organizers.firstWhere(
-          (o) => o.type == typeFilter,
-          orElse: () => OrganizerReference(type: typeFilter, slug: 'unassigned', title: 'Unassigned'),
-        );
+        OrganizerReference? linkedGroup;
+        for (final filter in typeFilters) {
+          linkedGroup = task.organizers.firstWhere(
+            (o) => o.type == filter,
+            orElse: () => OrganizerReference(type: filter, slug: '', title: ''),
+          );
+          if (linkedGroup.slug.isNotEmpty) break; // Found a match
+        }
+
+        // Fallback to unassigned if no match found among filters
+        if (linkedGroup == null || linkedGroup.slug.isEmpty) {
+          linkedGroup = OrganizerReference(type: typeFilters.first, slug: 'unassigned', title: 'Unassigned');
+        }
         
         final groupId = linkedGroup.slug;
         byGroup[groupId] = (byGroup[groupId] ?? 0) + task.duration!;

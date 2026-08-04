@@ -126,8 +126,8 @@ class PomodoroBackgroundService {
         channelId: 'pomodoro_service',
         channelName: 'Pomodoro',
         channelDescription: 'Keeps Pomodoro running in the background',
-        channelImportance: NotificationChannelImportance.HIGH,
-        priority: NotificationPriority.HIGH,
+        channelImportance: NotificationChannelImportance.LOW,
+        priority: NotificationPriority.LOW,
       ),
       iosNotificationOptions: const IOSNotificationOptions(
         showNotification: true,
