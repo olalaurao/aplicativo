@@ -417,11 +417,17 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
 
   void resolveOverrun(int extraMinutes) {
     if (extraMinutes > 0) {
+      // Save the segment that just ended as its own completed session
+      // (remainingSeconds is already 0 at this point, so _completeSession
+      // records exactly the original planned duration — then we open a fresh
+      // independent block for the extra time).
+      _completeSession();
+
       final extraSeconds = extraMinutes * 60;
       state = state.copyWith(
         showOverrunPrompt: false,
         remainingSeconds: extraSeconds,
-        totalSeconds: state.totalSeconds + extraSeconds,
+        totalSeconds: extraSeconds, // fresh segment, do not accumulate
       );
       start();
     } else {
@@ -456,8 +462,6 @@ class PomodoroNotifier extends Notifier<PomodoroState> {
   void start() {
     if (state.isRunning) return;
     state = state.copyWith(isRunning: true);
-
-    CaptureOverlayService.start();
 
     // Start Background Service
     if (state.currentType == PomodoroType.stopwatch) {

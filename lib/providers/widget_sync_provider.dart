@@ -23,6 +23,7 @@ import '../models/pomodoro_session.dart';
 import '../models/reminder_model.dart';
 import '../models/task_model.dart';
 import '../models/shopping_list_model.dart' as shopping_list_model;
+import '../ui/utils/time_format_utils.dart';
 import '../models/journal_entry.dart';
 import '../models/note_model.dart';
 import '../models/resource_model.dart';
@@ -861,10 +862,10 @@ Map<String, dynamic> _buildPomodoroSnapshot(List<PomodoroSession> history) {
   });
   return {
     'title': 'Pomodoro',
-    'total': '${(totalMinutes / 60).toStringAsFixed(0)}h',
-    'details': 'esta semana',
+    'total': '${formatMinutesToDuration(totalMinutes)} this week',
+    'details': 'this week',
     'average':
-        '~${(totalMinutes / 60 / now.weekday).toStringAsFixed(0)}h por dia',
+        '~${formatMinutesToDuration(totalMinutes ~/ (now.weekday == 0 ? 1 : now.weekday))} per day',
     'bars': bars,
   };
 }

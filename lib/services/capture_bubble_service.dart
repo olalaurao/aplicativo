@@ -103,6 +103,8 @@ class CaptureOverlayService {
   }) async {
     if (!Platform.isAndroid) return;
     try {
+      final active = await FlutterOverlayWindow.isActive();
+      if (!active) return;
       await FlutterOverlayWindow.shareData('pomodoro|$isRunning|$timeStr|$type|$progress');
     } catch (e) {
       debugPrint('[CaptureOverlayService] updatePomodoro failed: $e');
@@ -113,6 +115,8 @@ class CaptureOverlayService {
   static Future<void> stopPomodoro() async {
     if (!Platform.isAndroid) return;
     try {
+      final active = await FlutterOverlayWindow.isActive();
+      if (!active) return;
       await FlutterOverlayWindow.shareData('pomodoro_stop');
     } catch (e) {
       debugPrint('[CaptureOverlayService] stopPomodoro failed: $e');

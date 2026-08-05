@@ -401,19 +401,6 @@ class _DashboardComponentConfigSheetState extends ConsumerState<DashboardCompone
           ],
         );
       case BlockType.timeBalance:
-        final typeFilters = (_metadata['typeFilters'] as List?)?.cast<String>() ?? 
-            [(_metadata['typeFilter'] as String? ?? 'area')];
-
-        void toggleTypeFilter(String filter, bool checked) {
-          final newFilters = List<String>.from(typeFilters);
-          if (checked) {
-            newFilters.add(filter);
-          } else {
-            newFilters.remove(filter);
-          }
-          if (newFilters.isEmpty) newFilters.add('area'); // Ensure at least one
-          _updateMeta('typeFilters', newFilters);
-        }
 
         return FormSection(
           title: 'Time Balance',
@@ -436,23 +423,38 @@ class _DashboardComponentConfigSheetState extends ConsumerState<DashboardCompone
                 Text('Group By', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
                 const SizedBox(height: 8),
                 StatefulBuilder(builder: (ctx, setSt) {
+                  // Re-read from _metadata inside the builder so selected state stays fresh
+                  final currentFilters = (_metadata['typeFilters'] as List?)?.cast<String>() ?? 
+                      [(_metadata['typeFilter'] as String? ?? 'area')];
+
+                  void toggleFilter(String filter, bool checked) {
+                    final newFilters = List<String>.from(currentFilters);
+                    if (checked) {
+                      newFilters.add(filter);
+                    } else {
+                      newFilters.remove(filter);
+                    }
+                    if (newFilters.isEmpty) newFilters.add('area');
+                    setSt(() => _updateMeta('typeFilters', newFilters));
+                  }
+
                   return Wrap(
                     spacing: 8,
                     children: [
                       FilterChip(
                         label: const Text('Areas'),
-                        selected: typeFilters.contains('area'),
-                        onSelected: (val) => setSt(() => toggleTypeFilter('area', val)),
+                        selected: currentFilters.contains('area'),
+                        onSelected: (val) => toggleFilter('area', val),
                       ),
                       FilterChip(
                         label: const Text('Projects'),
-                        selected: typeFilters.contains('project'),
-                        onSelected: (val) => setSt(() => toggleTypeFilter('project', val)),
+                        selected: currentFilters.contains('project'),
+                        onSelected: (val) => toggleFilter('project', val),
                       ),
                       FilterChip(
                         label: const Text('Goals'),
-                        selected: typeFilters.contains('goal'),
-                        onSelected: (val) => setSt(() => toggleTypeFilter('goal', val)),
+                        selected: currentFilters.contains('goal'),
+                        onSelected: (val) => toggleFilter('goal', val),
                       ),
                     ],
                   );

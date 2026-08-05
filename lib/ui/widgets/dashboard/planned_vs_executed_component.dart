@@ -9,6 +9,7 @@ import '../../../models/organizer_model.dart';
 import '../../../models/shared_types.dart';
 import '../../../providers/vault_provider.dart';
 import '../../theme.dart';
+import '../../utils/time_format_utils.dart';
 
 class PlannedVsExecutedComponent extends ConsumerWidget {
   final DashboardBlock block;
@@ -173,8 +174,8 @@ class PlannedVsExecutedComponent extends ConsumerWidget {
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 28,
-                      getTitlesWidget: (value, meta) => Text('${value.toStringAsFixed(0)}h', style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                      reservedSize: 36,
+                      getTitlesWidget: (value, meta) => Text(formatHoursToDuration(value), style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
                     ),
                   ),
                   bottomTitles: AxisTitles(

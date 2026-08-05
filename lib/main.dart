@@ -76,6 +76,7 @@ import 'ui/screens/search_screen.dart';
 import 'ui/screens/reminders_screen.dart';
 import 'ui/screens/deleted_files_screen.dart';
 import 'ui/screens/statistics_screen.dart';
+import 'ui/screens/insights_screen.dart';
 import 'ui/screens/inbox_screen.dart';
 import 'ui/screens/social_screen.dart';
 import 'ui/screens/sync_conflicts_screen.dart';
@@ -1308,6 +1309,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/statistics',
             builder: (context, state) => const StatisticsScreen(),
+          ),
+          GoRoute(
+            path: '/insights',
+            builder: (context, state) => const InsightsScreen(),
           ),
           GoRoute(
             path: '/inbox',
